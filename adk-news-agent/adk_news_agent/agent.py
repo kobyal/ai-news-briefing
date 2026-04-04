@@ -1,13 +1,16 @@
-"""AI Latest Briefing — 6-step SequentialAgent pipeline."""
+"""AI Latest Briefing — parallel research pipeline with timing callbacks."""
 import os
+import time
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from google.adk.agents import LlmAgent, SequentialAgent
+from google.adk.agents import LlmAgent, SequentialAgent, ParallelAgent
+from google.adk.agents.callback_context import CallbackContext
 from google.adk.tools import google_search
+from google.genai import types
 from pydantic import BaseModel
 
 from .tools import build_and_save_html, resolve_source_urls
@@ -23,7 +26,7 @@ from .prompts import (
 MODEL = os.environ.get("GOOGLE_GENAI_MODEL", "gemini-2.5-flash")
 
 # ---------------------------------------------------------------------------
-# Pydantic output schema
+# Pydantic output schemas
 # ---------------------------------------------------------------------------
 
 class NewsItem(BaseModel):
@@ -67,15 +70,38 @@ def _fmt(template: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Callbacks — per-agent timing logs
+# ---------------------------------------------------------------------------
+
+def _make_callbacks(name: str):
+    """Return (before, after) callbacks that log timing for a named agent."""
+    def before(ctx: CallbackContext) -> Optional[types.Content]:
+        ctx.state[f"_t_{name}"] = time.time()
+        print(f"  ▶  {name}")
+        return None
+
+    def after(ctx: CallbackContext) -> Optional[types.Content]:
+        t0 = ctx.state.get(f"_t_{name}")
+        elapsed = f"{time.time() - t0:.1f}s" if t0 else "?"
+        print(f"  ✓  {name:<22} {elapsed}")
+        return None
+
+    return before, after
+
+
+# ---------------------------------------------------------------------------
 # Step 1 — VendorResearcher
 # ---------------------------------------------------------------------------
 
+_vr_before, _vr_after = _make_callbacks("VendorResearcher")
 VendorResearcher = LlmAgent(
     name="VendorResearcher",
     model=MODEL,
     tools=[google_search],
     output_key="raw_vendor_news",
     instruction=_fmt(VENDOR_RESEARCHER_PROMPT),
+    before_agent_callback=_vr_before,
+    after_agent_callback=_vr_after,
 )
 
 # ---------------------------------------------------------------------------
@@ -84,63 +110,93 @@ VendorResearcher = LlmAgent(
 # Must use custom tool only — Gemini constraint: no mixing google_search + custom tools.
 # ---------------------------------------------------------------------------
 
+_ur_before, _ur_after = _make_callbacks("URLResolver")
 URLResolver = LlmAgent(
     name="URLResolver",
     model=MODEL,
     tools=[resolve_source_urls],
     output_key="resolved_sources",
     instruction=_fmt(URL_RESOLVER_PROMPT),
+    before_agent_callback=_ur_before,
+    after_agent_callback=_ur_after,
 )
 
 # ---------------------------------------------------------------------------
-# Step 3 — CommunityResearcher
+# Step 3 — CommunityResearcher (runs in parallel with VendorResearcher+URLResolver)
 # ---------------------------------------------------------------------------
 
+_cr_before, _cr_after = _make_callbacks("CommunityResearcher")
 CommunityResearcher = LlmAgent(
     name="CommunityResearcher",
     model=MODEL,
     tools=[google_search],
     output_key="raw_community",
     instruction=_fmt(COMMUNITY_RESEARCHER_PROMPT),
+    before_agent_callback=_cr_before,
+    after_agent_callback=_cr_after,
 )
 
 # ---------------------------------------------------------------------------
 # Step 4 — BriefingWriter
 # ---------------------------------------------------------------------------
 
+_bw_before, _bw_after = _make_callbacks("BriefingWriter")
 BriefingWriter = LlmAgent(
     name="BriefingWriter",
     model=MODEL,
     output_schema=BriefingContent,
     output_key="briefing",
     instruction=_fmt(BRIEFING_WRITER_PROMPT),
+    before_agent_callback=_bw_before,
+    after_agent_callback=_bw_after,
 )
 
 # ---------------------------------------------------------------------------
 # Step 5 — Translator
 # ---------------------------------------------------------------------------
 
+_tr_before, _tr_after = _make_callbacks("Translator")
 Translator = LlmAgent(
     name="Translator",
     model=MODEL,
     output_schema=HebrewBriefing,
     output_key="briefing_he",
     instruction=_fmt(TRANSLATOR_PROMPT),
+    before_agent_callback=_tr_before,
+    after_agent_callback=_tr_after,
 )
 
 # ---------------------------------------------------------------------------
 # Step 6 — Publisher
 # ---------------------------------------------------------------------------
 
+_pb_before, _pb_after = _make_callbacks("Publisher")
 Publisher = LlmAgent(
     name="Publisher",
     model=MODEL,
     tools=[build_and_save_html],
     instruction=_fmt(PUBLISHER_PROMPT),
+    before_agent_callback=_pb_before,
+    after_agent_callback=_pb_after,
 )
 
 # ---------------------------------------------------------------------------
-# Root agent — SequentialAgent
+# Research phase — VendorResearcher→URLResolver in parallel with CommunityResearcher
+# Saves ~33% of total time since both branches are independent.
+# ---------------------------------------------------------------------------
+
+VendorPipeline = SequentialAgent(
+    name="VendorPipeline",
+    sub_agents=[VendorResearcher, URLResolver],
+)
+
+ResearchPhase = ParallelAgent(
+    name="ResearchPhase",
+    sub_agents=[VendorPipeline, CommunityResearcher],
+)
+
+# ---------------------------------------------------------------------------
+# Root agent
 # ---------------------------------------------------------------------------
 
 root_agent = SequentialAgent(
@@ -151,11 +207,9 @@ root_agent = SequentialAgent(
         "HTML latest briefing newsletter."
     ),
     sub_agents=[
-        VendorResearcher,     # Step 1: google_search x5  → raw_vendor_news
-        URLResolver,          # Step 2: resolve_source_urls (immediate) → resolved_sources
-        CommunityResearcher,  # Step 3: google_search x2  → raw_community
-        BriefingWriter,       # Step 4: BriefingContent schema → briefing
-        Translator,           # Step 5: HebrewBriefing schema → briefing_he
-        Publisher,            # Step 6: save HTML
+        ResearchPhase,    # Parallel: VendorResearcher+URLResolver || CommunityResearcher
+        BriefingWriter,   # Step 4: BriefingContent schema → briefing
+        Translator,       # Step 5: HebrewBriefing schema → briefing_he
+        Publisher,        # Step 6: save HTML
     ],
 )

@@ -75,7 +75,7 @@ def _step1_fetch() -> tuple[list, list, list]:
     # Pre-flight: one quick topic search to verify Perplexity web_search is returning data.
     # If it returns nothing, skip the expensive 62-person search to avoid wasting API calls.
     from .searcher import _px_search
-    probe = _px_search("AI news trending X Twitter today site:x.com OR site:twitter.com", label="probe")
+    probe = _px_search("What is the biggest AI news story today?", label="probe")
     if not probe.strip():
         print("  [preflight] Perplexity returned no signal — skipping people search, running topics+Reddit only")
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:

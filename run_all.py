@@ -14,6 +14,7 @@ Usage:
     python run_all.py --merge-only    # only run Merger on latest existing outputs
 """
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -57,15 +58,22 @@ def _run_parallel(agents: list[tuple[Path, str]]) -> dict[str, bool]:
 
     print()
     t0 = time.time()
+    TIMEOUT = int(os.environ.get("AGENT_TIMEOUT", "480"))  # 8 min default
 
     # Wait for each in order, print captured output as they finish
     results = {}
     for label, proc in procs:
-        stdout, _ = proc.communicate()
+        try:
+            stdout, _ = proc.communicate(timeout=TIMEOUT)
+            ok = proc.returncode == 0
+            status = "✓" if ok else "✗ FAILED"
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, _ = proc.communicate()
+            ok = False
+            status = f"✗ TIMEOUT (>{TIMEOUT}s)"
         elapsed = time.time() - t0
-        ok = proc.returncode == 0
         results[label] = ok
-        status = "✓" if ok else "✗ FAILED"
         print(f"\n{'='*60}")
         print(f"  {status}  {label}  (+{elapsed:.0f}s wall clock)")
         print("=" * 60)

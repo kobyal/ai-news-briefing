@@ -69,7 +69,7 @@ def _px_search(query: str, label: str = "") -> str:
 # People tracker — search X for each tracked person's recent posts
 # ---------------------------------------------------------------------------
 
-def fetch_people_signals(max_workers: int = 6) -> list[dict]:
+def fetch_people_signals(max_workers: int = 12) -> list[dict]:
     """Search X for recent posts from each tracked person in parallel."""
     days = LOOKBACK_DAYS()
 
@@ -112,7 +112,7 @@ def fetch_people_signals(max_workers: int = 6) -> list[dict]:
 # Topic tracker — trending AI discussions on X + LinkedIn
 # ---------------------------------------------------------------------------
 
-def fetch_topic_signals(max_workers: int = 4) -> list[dict]:
+def fetch_topic_signals(max_workers: int = 8) -> list[dict]:
     """Search X and LinkedIn for trending AI topics in parallel."""
     days = LOOKBACK_DAYS()
 

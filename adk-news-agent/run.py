@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
 
-from ai_latest_briefing import run_pipeline
+from adk_news_agent import run_pipeline
 
 if __name__ == "__main__":
     run_pipeline()

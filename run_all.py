@@ -44,7 +44,7 @@ def main():
         return
 
     if not args.skip_adk:
-        ok = _run(root / "ai-latest-briefing" / "run.py", "AI Latest Briefing (Google ADK)")
+        ok = _run(root / "adk-news-agent" / "run.py", "AI Latest Briefing (Google ADK)")
         if not ok:
             print("ADK pipeline failed. Continuing with other sources...")
 

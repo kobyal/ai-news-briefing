@@ -72,6 +72,19 @@ def _step1_fetch() -> tuple[list, list, list]:
     print("\n[1/4] Social Fetcher — people + topics + Reddit in parallel threads...")
     import concurrent.futures
 
+    # Pre-flight: one quick topic search to verify Perplexity web_search is returning data.
+    # If it returns nothing, skip the expensive 62-person search to avoid wasting API calls.
+    from .searcher import _px_search
+    probe = _px_search("AI news trending X Twitter today site:x.com OR site:twitter.com", label="probe")
+    if not probe.strip():
+        print("  [preflight] Perplexity returned no signal — skipping people search, running topics+Reddit only")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            f_topics = pool.submit(fetch_topic_signals)
+            f_reddit = pool.submit(fetch_reddit_signals)
+            topics = f_topics.result()
+            reddit = f_reddit.result()
+        return [], topics, reddit
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
         f_people = pool.submit(fetch_people_signals)
         f_topics = pool.submit(fetch_topic_signals)
@@ -136,14 +149,18 @@ Below are raw signals from social media — posts from tracked AI leaders, trend
 ═══ REDDIT HOT POSTS ═══
 {reddit_ctx or '(no Reddit posts)'}
 
-Synthesise these signals into a JSON object. Your goal:
-- Surface what AI practitioners, researchers, and enthusiasts are ACTUALLY saying today
-- Highlight notable posts from specific people (quote them when possible)
-- Identify controversies, excitement, scepticism, hot takes
-- Include concrete signals — model names, benchmark debates, release reactions
-- community_pulse bullets should feel like "what's in the AI Zeitgeist right now"
-- people_highlights: pick the 4-6 most notable people with something interesting to say
-- top_reddit: pick the 8 highest-signal posts from Reddit
+Synthesise ONLY the data above into a JSON object. STRICT RULES:
+
+ANTI-HALLUCINATION (most important):
+- people_highlights: ONLY include a person if their actual post text appears in PEOPLE SIGNALS above. If a person is not in the data, do NOT invent an entry for them. If no real posts were found, return people_highlights as an empty array [].
+- top_reddit: ONLY include posts that appear in REDDIT HOT POSTS above with real titles and scores. Do NOT invent subreddit names or posts. If reddit data is empty, return top_reddit as an empty array [].
+- community_urls: only use URLs that appear verbatim in the data above.
+
+WHAT TO DO WITH REAL DATA:
+- Surface what AI practitioners are ACTUALLY saying — quote them when possible
+- Identify controversies, excitement, hot takes from the topic signals
+- community_pulse bullets: draw from topic signals and any real people signals
+- trending_topics: extract from topic signals — what themes recur across searches?
 
 Return ONLY valid JSON matching this schema:
 {schema}"""

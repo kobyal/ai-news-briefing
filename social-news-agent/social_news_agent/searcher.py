@@ -20,7 +20,9 @@ REDDIT_FEEDS = [
     ("https://www.reddit.com/r/artificial/hot.json",        "r/artificial"),
     ("https://www.reddit.com/r/ChatGPT/hot.json",          "r/ChatGPT"),
     ("https://www.reddit.com/r/singularity/hot.json",       "r/singularity"),
-    ("https://www.reddit.com/r/Rag/hot.json",                    "r/Rag"),
+    ("https://www.reddit.com/r/OpenAI/hot.json",            "r/OpenAI"),
+    ("https://www.reddit.com/r/ClaudeAI/hot.json",          "r/ClaudeAI"),
+    ("https://www.reddit.com/r/Rag/hot.json",               "r/Rag"),
 ]
 
 
@@ -145,7 +147,7 @@ def fetch_topic_signals(max_workers: int = 8) -> list[dict]:
 def fetch_reddit_signals() -> list[dict]:
     """Fetch hot posts from all Reddit AI communities."""
     cutoff  = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS())
-    headers = {"User-Agent": "ai-news-briefing/1.0"}
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; ai-news-briefing/1.0; +https://github.com/kobyal/ai-news-briefing)"}
     posts   = []
 
     def _fetch(url: str, sub: str) -> list[dict]:

@@ -176,7 +176,12 @@ def _build_html(tldr, news_items, community_pulse, topic,
 </div>"""
 
     # ── Social: People Talking Today ────────────────────────────────────────
-    people_highlights = social_data.get("people_highlights", []) or []
+    _bad = {"no posts retrievable", "unavailable", "could not be confirmed",
+            "not available", "no recent posts", "search unavailable", "no posts"}
+    people_highlights = [
+        p for p in (social_data.get("people_highlights", []) or [])
+        if p.get("post") and not any(b in p.get("post", "").lower() for b in _bad)
+    ]
     people_cards_html = ""
     for p in people_highlights[:6]:
         name   = p.get("name", "")
@@ -203,7 +208,11 @@ def _build_html(tldr, news_items, community_pulse, topic,
 {people_cards_html}"""
 
     # ── Social: Hot on Reddit ───────────────────────────────────────────────
-    top_reddit = social_data.get("top_reddit", []) or []
+    top_reddit = [
+        p for p in (social_data.get("top_reddit", []) or [])
+        if p.get("score", 0) > 0 and p.get("title")
+        and "no reddit posts" not in p.get("title", "").lower()
+    ]
     reddit_rows_html = ""
     for p in top_reddit[:8]:
         sub   = p.get("subreddit", "")

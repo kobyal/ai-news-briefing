@@ -378,13 +378,22 @@ function setLang(l,btn){{
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   var en=l==='en';
+  var dir=en?'ltr':'rtl';
+  var align=en?'left':'right';
   document.getElementById('tldr-en').style.display=en?'':'none';
   document.getElementById('tldr-he').style.display=en?'none':'';
   document.getElementById('tldr-label').textContent=en?'TL;DR':'תקציר';
+  document.getElementById('tldr-label').dir=dir;
+  document.getElementById('tldr-label').style.textAlign=align;
   document.getElementById('news-label').textContent=en?'Latest News':'חדשות אחרונות';
+  document.getElementById('news-label').dir=dir;
+  document.getElementById('news-label').style.textAlign=align;
   document.getElementById('community-en').style.display=en?'':'none';
   document.getElementById('community-he').style.display=en?'none':'';
   document.getElementById('community-label').textContent=en?'Community Pulse':'דופק הקהילה';
+  document.getElementById('community-label').dir=dir;
+  document.getElementById('community-label').style.textAlign=align;
+  document.querySelectorAll('.news-card').forEach(function(el){{el.dir=en?'ltr':'rtl';}});
   document.querySelectorAll('.en-content').forEach(function(el){{el.style.display=en?'':'none';}});
   document.querySelectorAll('.he-content').forEach(function(el){{el.style.display=en?'none':'';}});
 }}

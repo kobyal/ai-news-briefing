@@ -10,9 +10,9 @@ Four independent AI agents each gather today's AI industry news and produce a bi
 
 ```
 ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
-│  ai-latest-briefing │  │ perplexity-news-agent│  │   rss-news-agent    │  │  tavily-news-agent  │
+│   adk-news-agent    │  │ perplexity-news-agent│  │   rss-news-agent    │  │  tavily-news-agent  │
 │  Google ADK         │  │  Perplexity Agents   │  │  feedparser/APIs    │  │  Tavily Search      │
-│  Gemini 2.5 Flash   │  │  Claude Haiku 4.5    │  │  Claude Haiku 4.5   │  │  Claude Haiku 4.5   │
+│  Gemini 2.5 Flash   │  │  Claude Haiku 4.5    │  │  Claude Haiku 4.5   │  │  Sonnet 4.6         │
 │  google_search      │  │  Claude Sonnet 4.6   │  │  (Perplexity API)   │  │  (Perplexity API)   │
 │  6-step agent       │  │  5-step pipeline     │  │  4-step pipeline    │  │  4-step pipeline    │
 │  ~$0.00  ~4 min     │  │  ~$0.17  ~2.5 min   │  │  ~$0.03  ~60 sec   │  │  ~$0.04  ~75 sec   │
@@ -51,7 +51,7 @@ Four independent AI agents each gather today's AI industry news and produce a bi
 
 ## Pipelines
 
-### 1. AI Latest Briefing (`ai-latest-briefing/`) — ADK + Gemini
+### 1. ADK News Agent (`adk-news-agent/`) — ADK + Gemini
 
 **Framework:** Google Agent Development Kit (ADK)
 **Model:** Gemini 2.5 Flash (all steps, via `google_search` built-in tool)
@@ -73,7 +73,7 @@ VendorResearcher → URLResolver → CommunityResearcher → BriefingWriter → 
 
 **Run:**
 ```bash
-cd ai-latest-briefing
+cd adk-news-agent
 adk web           # interactive browser UI at localhost:8000
 ```
 

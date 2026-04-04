@@ -2,7 +2,7 @@
 
 Steps
 -----
-1. Find latest JSON from ai-latest-briefing/output/  (source: "adk")
+1. Find latest JSON from adk-news-agent/output/  (source: "adk")
 2. Find latest JSON from perplexity-news-agent/output/ (source: "perplexity")
 3. Call Claude Sonnet via Perplexity Agent API to merge + deduplicate stories
 4. Call Claude Haiku to translate the merged briefing to Hebrew
@@ -117,7 +117,7 @@ def _agent(
 
 def _step1_load_sources() -> tuple[dict, dict, dict, dict]:
     print("\n[1/4] Loading source briefings...")
-    adk_data    = _find_latest_json(_ROOT / "ai-latest-briefing" / "output")
+    adk_data    = _find_latest_json(_ROOT / "adk-news-agent" / "output")
     px_data     = _find_latest_json(_ROOT / "perplexity-news-agent" / "output")
     rss_data    = _find_latest_json(_ROOT / "rss-news-agent" / "output")
     tavily_data = _find_latest_json(_ROOT / "tavily-news-agent" / "output")

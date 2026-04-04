@@ -2,54 +2,114 @@
 
 TRACKED_PEOPLE = [
     # ── Anthropic ──────────────────────────────────────────────────────────
-    {"name": "Boris Cherny",       "handle": "bcherny",        "org": "Anthropic",   "role": "Claude Code creator"},
     {"name": "Dario Amodei",       "handle": "DarioAmodei",    "org": "Anthropic",   "role": "CEO"},
+    {"name": "Boris Cherny",       "handle": "bcherny",        "org": "Anthropic",   "role": "Claude Code creator"},
+    {"name": "Jack Clark",         "handle": "jackclarkSF",    "org": "Anthropic",   "role": "Co-founder / Import AI newsletter"},
+    {"name": "Chris Olah",         "handle": "ch402",          "org": "Anthropic",   "role": "Mechanistic interpretability"},
     {"name": "Amanda Askell",      "handle": "AmandaAskell",   "org": "Anthropic",   "role": "Alignment research"},
+    {"name": "Jared Kaplan",       "handle": "jaredkaplan",    "org": "Anthropic",   "role": "Scaling laws"},
     {"name": "Zack Witten",        "handle": "zackwitten",     "org": "Anthropic",   "role": "Claude prompting"},
 
     # ── OpenAI ─────────────────────────────────────────────────────────────
     {"name": "Sam Altman",         "handle": "sama",           "org": "OpenAI",      "role": "CEO"},
     {"name": "Greg Brockman",      "handle": "gdb",            "org": "OpenAI",      "role": "Co-founder"},
-    {"name": "Andrej Karpathy",    "handle": "karpathy",       "org": "Independent", "role": "AI researcher / ex-OpenAI"},
+    {"name": "Mira Murati",        "handle": "miramurati",     "org": "Independent", "role": "ex-CTO OpenAI"},
+    {"name": "Lilian Weng",        "handle": "lilianweng",     "org": "OpenAI",      "role": "VP Safety / technical blog"},
+    {"name": "Noam Brown",         "handle": "polynoamial",    "org": "OpenAI",      "role": "o-series reasoning research"},
+    {"name": "John Schulman",      "handle": "johnschulman2",  "org": "Anthropic",   "role": "RLHF co-inventor / ex-OpenAI"},
 
     # ── Google DeepMind ────────────────────────────────────────────────────
     {"name": "Demis Hassabis",     "handle": "demishassabis",  "org": "Google DeepMind", "role": "CEO"},
+    {"name": "Sundar Pichai",      "handle": "sundarpichai",   "org": "Google",      "role": "CEO"},
     {"name": "Jeff Dean",          "handle": "JeffDean",       "org": "Google",      "role": "Chief Scientist"},
+    {"name": "Oriol Vinyals",      "handle": "OriolVinyalsML", "org": "Google DeepMind", "role": "VP Research"},
+    {"name": "François Chollet",   "handle": "fchollet",       "org": "Google DeepMind", "role": "Keras / ARC-AGI benchmark"},
+    {"name": "Logan Kilpatrick",   "handle": "OfficialLoganK", "org": "Google DeepMind", "role": "Gemini developer relations"},
+
+    # ── xAI ────────────────────────────────────────────────────────────────
+    {"name": "Elon Musk",          "handle": "elonmusk",       "org": "xAI",         "role": "CEO / Grok"},
+    {"name": "Igor Babuschkin",    "handle": "ibab",           "org": "xAI",         "role": "Co-founder"},
+
+    # ── Microsoft ──────────────────────────────────────────────────────────
+    {"name": "Satya Nadella",      "handle": "satyanadella",   "org": "Microsoft",   "role": "CEO"},
+    {"name": "Mustafa Suleyman",   "handle": "mustafasuleyman","org": "Microsoft",   "role": "CEO Microsoft AI / co-founder DeepMind"},
 
     # ── Meta ───────────────────────────────────────────────────────────────
     {"name": "Yann LeCun",         "handle": "ylecun",         "org": "Meta",        "role": "Chief AI Scientist"},
     {"name": "Mark Zuckerberg",    "handle": "zuck",           "org": "Meta",        "role": "CEO"},
+    {"name": "Joëlle Pineau",      "handle": "joellepineau",   "org": "Meta",        "role": "VP AI Research"},
 
     # ── NVIDIA ─────────────────────────────────────────────────────────────
-    {"name": "Jim Fan",            "handle": "DrJimFan",       "org": "NVIDIA",      "role": "AI research"},
     {"name": "Jensen Huang",       "handle": "jensenhuang",    "org": "NVIDIA",      "role": "CEO"},
+    {"name": "Jim Fan",            "handle": "DrJimFan",       "org": "NVIDIA",      "role": "Senior research scientist"},
 
-    # ── Frontier labs ──────────────────────────────────────────────────────
-    {"name": "Ilya Sutskever",     "handle": "ilyasut",        "org": "SSI",         "role": "Co-founder"},
-    {"name": "Emad Mostaque",      "handle": "EMostaque",      "org": "Independent", "role": "ex-Stability AI CEO"},
+    # ── Mistral ────────────────────────────────────────────────────────────
+    {"name": "Arthur Mensch",      "handle": "arthurmensch",   "org": "Mistral",     "role": "CEO"},
+    {"name": "Guillaume Lample",   "handle": "GuillaumeLample","org": "Mistral",     "role": "Co-founder / CTO"},
+
+    # ── Cohere ─────────────────────────────────────────────────────────────
+    {"name": "Aidan Gomez",        "handle": "aidangomez",     "org": "Cohere",      "role": "CEO / Transformer co-author"},
+
+    # ── Hugging Face ───────────────────────────────────────────────────────
+    {"name": "Clement Delangue",   "handle": "ClementDelangue","org": "Hugging Face","role": "CEO"},
+    {"name": "Thomas Wolf",        "handle": "Thom_Wolf",      "org": "Hugging Face","role": "CSO / co-founder"},
+    {"name": "AK",                 "handle": "_akhaliq",       "org": "Hugging Face","role": "Papers & model releases"},
+
+    # ── Perplexity ─────────────────────────────────────────────────────────
+    {"name": "Aravind Srinivas",   "handle": "AravSrinivas",   "org": "Perplexity",  "role": "CEO"},
+
+    # ── Scale AI ───────────────────────────────────────────────────────────
+    {"name": "Alexandr Wang",      "handle": "alexandr_wang",  "org": "Scale AI",    "role": "CEO"},
+
+    # ── SSI / Frontier labs ────────────────────────────────────────────────
+    {"name": "Ilya Sutskever",     "handle": "ilyasut",        "org": "SSI",         "role": "Co-founder / ex-OpenAI chief scientist"},
+
+    # ── AI Safety ──────────────────────────────────────────────────────────
+    {"name": "Paul Christiano",    "handle": "paulfchristiano","org": "ARC",         "role": "AI safety researcher"},
+    {"name": "Eliezer Yudkowsky",  "handle": "ESYudkowsky",    "org": "MIRI",        "role": "AI alignment / LessWrong"},
+
+    # ── Academic researchers ───────────────────────────────────────────────
+    {"name": "Andrew Ng",          "handle": "AndrewYNg",      "org": "DeepLearning.AI","role": "AI educator / founder"},
+    {"name": "Geoffrey Hinton",    "handle": "geoffreyhinton", "org": "Independent", "role": "Godfather of deep learning / Nobel Prize"},
+    {"name": "Yoshua Bengio",      "handle": "yoshuabengio",   "org": "MILA",        "role": "Turing Award / AI safety advocate"},
+    {"name": "Fei-Fei Li",         "handle": "drfeifei",       "org": "World Labs",  "role": "Spatial intelligence / Stanford AI"},
+    {"name": "Percy Liang",        "handle": "percyliang",     "org": "Stanford",    "role": "HELM benchmarks / CRFM"},
+    {"name": "Pieter Abbeel",      "handle": "pabbeel",        "org": "Covariant",   "role": "Robot learning / CEO"},
 
     # ── Practitioners / builders ───────────────────────────────────────────
-    {"name": "Simon Willison",     "handle": "simonw",         "org": "Independent", "role": "AI tools / LLM practitioner"},
-    {"name": "swyx",               "handle": "swyx",           "org": "Latent Space","role": "AI Engineer community"},
-    {"name": "Ethan Mollick",      "handle": "emollick",       "org": "Wharton",     "role": "AI professor / author"},
+    {"name": "Andrej Karpathy",    "handle": "karpathy",       "org": "Independent", "role": "AI educator / ex-OpenAI / Tesla"},
+    {"name": "Simon Willison",     "handle": "simonw",         "org": "Independent", "role": "LLM tools / Datasette"},
+    {"name": "swyx",               "handle": "swyx",           "org": "Latent Space","role": "AI Engineer community / podcast"},
+    {"name": "Chip Huyen",         "handle": "chipro",         "org": "Independent", "role": "MLOps / AI engineering author"},
+    {"name": "Ethan Mollick",      "handle": "emollick",       "org": "Wharton",     "role": "AI professor / author / One Useful Thing"},
     {"name": "Harrison Chase",     "handle": "hwchase17",      "org": "LangChain",   "role": "CEO / LangChain"},
+    {"name": "Nathan Lambert",     "handle": "natolambert",    "org": "Allen AI",    "role": "RLHF / post-training"},
+    {"name": "Yannic Kilcher",     "handle": "ykilcher",       "org": "Independent", "role": "ML paper explainer"},
     {"name": "Jeremy Howard",      "handle": "jeremyphoward",  "org": "fast.ai",     "role": "Founder / AI educator"},
-    {"name": "Hamel Husain",       "handle": "HamelHusain",    "org": "Independent", "role": "AI engineering"},
-    {"name": "Nathan Lambert",     "handle": "natolambert",    "org": "Allen AI",    "role": "RLHF / alignment"},
-    {"name": "AK",                 "handle": "_akhaliq",       "org": "HuggingFace", "role": "Papers & model releases"},
+    {"name": "Elvis Saravia",      "handle": "omarsar0",       "org": "Independent", "role": "Prompt Engineering Guide"},
+    {"name": "Eugene Yan",         "handle": "eugeneyan",      "org": "Amazon",      "role": "Applied ML / writing"},
+    {"name": "Hamel Husain",       "handle": "HamelHusain",    "org": "Independent", "role": "AI engineering / nbdev"},
 
-    # ── Commentators / critics ─────────────────────────────────────────────
-    {"name": "Gary Marcus",        "handle": "GaryMarcus",     "org": "Independent", "role": "AI critic"},
-    {"name": "Melanie Mitchell",   "handle": "MelMitchell1",   "org": "Santa Fe Inst","role": "AI researcher / critic"},
+    # ── VCs / tech commentators ────────────────────────────────────────────
+    {"name": "Marc Andreessen",    "handle": "pmarca",         "org": "a16z",        "role": "VC / AI optimist"},
+    {"name": "Ben Thompson",       "handle": "benthompson",    "org": "Stratechery", "role": "Tech analyst / AI commentary"},
+
+    # ── Critics / diverse voices ───────────────────────────────────────────
+    {"name": "Gary Marcus",        "handle": "GaryMarcus",     "org": "Independent", "role": "AI critic / professor"},
+    {"name": "Timnit Gebru",       "handle": "timnitGebru",    "org": "DAIR",        "role": "AI ethics / founder DAIR"},
+    {"name": "Melanie Mitchell",   "handle": "MelMitchell1",   "org": "Santa Fe Inst","role": "AI researcher / complexity"},
 ]
 
 # Topic queries for X + LinkedIn search (beyond individual people)
 TOPIC_SEARCHES = [
     "AI model release reaction developers x.com twitter",
     "LLM benchmark debate controversy x.com",
-    "Claude GPT Gemini comparison developer opinion",
-    "AI agent tools vibe coding productivity",
-    "open source AI model huggingface community",
-    "AI safety alignment debate x.com linkedin",
-    "AI startup funding product launch",
+    "Claude GPT Gemini Grok comparison developer opinion",
+    "AI agent coding tools vibe coding cursor windsurf",
+    "open source AI model huggingface llama mistral release",
+    "AI safety alignment existential risk debate x.com",
+    "AI startup funding valuation product launch 2025",
+    "AI regulation policy EU US government",
+    "multimodal AI vision video generation reactions",
+    "AI infrastructure GPU compute cost developers",
 ]

@@ -1,51 +1,86 @@
-# AI News Briefing System — Multi-Pipeline Architecture
+# AI News Briefing — 5-Pipeline Multi-Source Architecture
 
-Four independent AI agents each gather today's AI industry news and produce a bilingual (EN/Hebrew) HTML newsletter. A fifth **merger agent** combines all outputs into one definitive, deduplicated briefing.
+Four independent AI agents gather today's AI industry news in **parallel**, each using a different search mechanism. A fifth **merger agent** deduplicates and combines all outputs into one definitive bilingual (EN/Hebrew) newsletter published to GitHub Pages.
 
-**Final output:** 14 stories, 31 source links, full Hebrew translation, community pulse with real HN/Reddit signals.
+**Live output:** [kobyal.github.io/ai-news-briefing](https://kobyal.github.io/ai-news-briefing)
 
 ---
 
 ## Architecture
 
-```
-┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
-│   adk-news-agent    │  │ perplexity-news-agent│  │   rss-news-agent    │  │  tavily-news-agent  │
-│  Google ADK         │  │  Perplexity Agents   │  │  feedparser/APIs    │  │  Tavily Search      │
-│  Gemini 2.5 Flash   │  │  Claude Haiku 4.5    │  │  Claude Haiku 4.5   │  │  Sonnet 4.6         │
-│  google_search      │  │  Claude Sonnet 4.6   │  │  (Perplexity API)   │  │  (Perplexity API)   │
-│  6-step agent       │  │  5-step pipeline     │  │  4-step pipeline    │  │  4-step pipeline    │
-│  ~$0.00  ~4 min     │  │  ~$0.17  ~2.5 min   │  │  ~$0.03  ~60 sec   │  │  ~$0.04  ~75 sec   │
-│  Theme: purple      │  │  Theme: teal         │  │  Theme: green       │  │  Theme: navy/slate  │
-└──────────┬──────────┘  └──────────┬──────────┘  └──────────┬──────────┘  └──────────┬──────────┘
-           │                        │                         │                         │
-           └────────────────────────┴─────────────┬───────────┘─────────────────────────┘
-                                                  ▼
-                                  ┌───────────────────────────────┐
-                                  │         merger-agent           │
-                                  │  Claude Sonnet 4.6 (dedup)    │
-                                  │  Claude Haiku 4.5 (translate) │
-                                  │  ~$0.18  ~3 min               │
-                                  │  Theme: gold/amber             │
-                                  │  → 14 stories, 31 source links│
-                                  └───────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph parallel["⚡ Source agents run in parallel"]
+        direction LR
+        A["🟣 ADK Agent\nGemini 2.5 Flash\ngoogle_search ×11\n~4 min · free"]
+        B["🟢 Perplexity Agent\nHaiku search · Sonnet write\nPerplexity web_search\n~2.5 min · $0.17"]
+        C["🟡 RSS Agent\nfeedparser + HN/Reddit\nHaiku synthesise\n~60 sec · $0.03"]
+        D["🔵 Tavily Agent\nTavily news API ×11\nSonnet write · Haiku translate\n~75 sec · $0.04"]
+    end
+
+    A -->|briefing.json| M
+    B -->|briefing.json| M
+    C -->|briefing.json| M
+    D -->|briefing.json| M
+
+    M["🟠 Merger Agent\nSonnet 4.6 — dedup + merge\nHaiku 4.5 — translate\n~3 min · $0.18"]
+
+    M -->|index.html| P["📄 GitHub Pages\nEN + Hebrew newsletter\ndaily at 6am Israel time"]
 ```
 
 ---
 
-## LLM Stack — Who Uses What, Where, and Why
+## Data Flow
+
+```mermaid
+flowchart LR
+    subgraph search["Search / Fetch"]
+        S1["Google Search\n(ADK)"]
+        S2["Perplexity web_search\n(agentic)"]
+        S3["RSS + HN + Reddit\n(feedparser)"]
+        S4["Tavily News API\n(advanced depth)"]
+    end
+
+    subgraph llm["LLM Synthesis"]
+        L1["Gemini 2.5 Flash\nwrite + translate"]
+        L2["Sonnet 4.6\nwrite · Haiku translate"]
+        L3["Haiku 4.5\nwrite + translate"]
+        L4["Sonnet 4.6\nwrite · Haiku translate"]
+    end
+
+    subgraph outputs["Per-agent JSON"]
+        J1["adk/output/*.json"]
+        J2["perplexity/output/*.json"]
+        J3["rss/output/*.json"]
+        J4["tavily/output/*.json"]
+    end
+
+    S1 --> L1 --> J1
+    S2 --> L2 --> J2
+    S3 --> L3 --> J3
+    S4 --> L4 --> J4
+
+    J1 & J2 & J3 & J4 --> MRG["Merger\nSonnet 4.6 dedup\nHaiku 4.5 translate"]
+    MRG --> OUT["docs/index.html\nGitHub Pages"]
+```
+
+---
+
+## LLM Stack
 
 | Pipeline | Step | Model | Provider | Why |
 |----------|------|-------|----------|-----|
-| **Perplexity** | Search (steps 1-2) | **Claude Haiku 4.5** | Perplexity Agent API | Cheap + fast for many search iterations; Perplexity wraps `web_search` tool |
-| **Perplexity** | Write + translate (steps 3-4) | **Claude Sonnet 4.6** | Perplexity Agent API | Best quality for final synthesis — most expensive step, one call |
-| **RSS** | Write + translate | **Claude Haiku 4.5** | Perplexity Agent API | RSS data is already structured; Haiku sufficient to synthesise |
-| **Tavily** | Write + translate | **Claude Sonnet 4.6 / Haiku 4.5** | Perplexity Agent API | Same API as RSS/Perplexity pipelines; Sonnet for writing, Haiku for translation |
-| **ADK** | All steps | **Gemini 2.5 Flash** | Google AI (Gemini API) | ADK framework is Google-native; uses built-in `google_search` tool |
-| **Merger** | Dedup + merge | **Claude Sonnet 4.6** | Perplexity Agent API | Merging 4 sources requires the strongest reasoning to deduplicate correctly |
-| **Merger** | Hebrew translation | **Claude Haiku 4.5** | Perplexity Agent API | Translation is mechanical; Haiku handles Hebrew well at lower cost |
+| **Perplexity** | Search ×11 vendors | Claude Haiku 4.5 | Perplexity Agent API | Cheap + fast for many parallel searches |
+| **Perplexity** | Write + translate | Claude Sonnet 4.6 | Perplexity Agent API | Best quality for final synthesis |
+| **RSS** | Write + translate | Claude Haiku 4.5 | Perplexity Agent API | Data already structured; Haiku sufficient |
+| **Tavily** | Write | Claude Sonnet 4.6 | Perplexity Agent API | Sonnet for best synthesis quality |
+| **Tavily** | Translate | Claude Haiku 4.5 | Perplexity Agent API | Translation is mechanical; Haiku handles Hebrew well |
+| **ADK** | All steps | Gemini 2.5 Flash | Google AI | ADK is Google-native; built-in `google_search` |
+| **Merger** | Dedup + merge | Claude Sonnet 4.6 | Perplexity Agent API | Strongest reasoning to merge 4 sources correctly |
+| **Merger** | Hebrew translation | Claude Haiku 4.5 | Perplexity Agent API | Translation is mechanical; lower cost |
 
-**Cost per full run (skip-adk):** ~$0.17 (Perplexity) + ~$0.03 (RSS) + ~$0.04 (Tavily) + ~$0.18 (Merger) ≈ **~$0.42 total**
+**Cost per full run:** ~$0.17 + ~$0.03 + ~$0.04 + ~$0.18 ≈ **~$0.42 total** (ADK is free)
+**Time per full run:** ~4 min wall clock (agents run in parallel, merger ~3 min after)
 
 ---
 
@@ -57,52 +92,44 @@ Four independent AI agents each gather today's AI industry news and produce a bi
 **Model:** Gemini 2.5 Flash (all steps, via `google_search` built-in tool)
 **Cost:** ~$0.00 (Gemini free tier) | **Time:** ~4 min
 
-**Pipeline:**
+```mermaid
+flowchart LR
+    VR["VendorResearcher\ngoogle_search ×11"] -->
+    UR["URLResolver\nresolve URLs"] -->
+    CR["CommunityResearcher\ngoogle_search ×2"] -->
+    BW["BriefingWriter\nJSON output"] -->
+    TR["Translator\nHebrew JSON"] -->
+    PB["Publisher\nHTML + JSON"]
 ```
-VendorResearcher → URLResolver → CommunityResearcher → BriefingWriter → Translator → Publisher
-```
-
-| Step | Tool | Output |
-|------|------|--------|
-| VendorResearcher | `google_search` ×11 | `raw_vendor_news` in session state |
-| URLResolver | `resolve_source_urls` | `resolved_sources` |
-| CommunityResearcher | `google_search` ×2 | `raw_community` |
-| BriefingWriter | JSON schema output | `briefing` JSON |
-| Translator | JSON schema output | `briefing_he` Hebrew JSON |
-| Publisher | `build_and_save_html` | HTML + JSON files |
 
 **Run:**
 ```bash
 cd adk-news-agent
-adk web           # interactive browser UI at localhost:8000
+adk web           # browser UI at localhost:8000
 ```
 
-**Automated:** GitHub Actions at 6am Israel time (3am UTC), publishes to GitHub Pages.
+**Automated:** GitHub Actions at 6am Israel time (3am UTC).
 
-> **Note:** `adk run` headless mode exits before the Publisher step completes. Use `adk web` for reliable full runs.
+> **Note:** `adk run` headless mode exits before Publisher completes. Use `adk web` for reliable full runs.
 
 ---
 
-### 2. Perplexity News Agent (`perplexity-news-agent/`) — Perplexity Agents + Claude
+### 2. Perplexity News Agent (`perplexity-news-agent/`)
 
-**Framework:** None — pure Python, direct HTTP calls to Perplexity Agent API
-**Models:** Claude Haiku 4.5 (search), Claude Sonnet 4.6 (writer + translator)
+**Framework:** None — pure Python, direct HTTP to Perplexity Agent API
+**Models:** Claude Haiku 4.5 (search), Claude Sonnet 4.6 (write + translate)
 **Cost:** ~$0.17/run | **Time:** ~2.5 min
 
-The Perplexity Agent API (`POST /v1/responses`) is a managed agentic runtime. It routes calls to third-party models (Anthropic, OpenAI) and provides a built-in `web_search` tool. Model IDs use the format `anthropic/claude-haiku-4-5` — **not** Sonar/Perplexity's own models.
+The Perplexity Agent API (`POST /v1/responses`) is a managed agentic runtime — send a prompt + model ID, it autonomously calls `web_search` internally. Model IDs are `anthropic/claude-haiku-4-5` (not Perplexity's own Sonar models).
 
-**Pipeline:**
+```mermaid
+flowchart LR
+    VR["VendorResearcher\nHaiku · web_search ×11"] -->
+    CR["CommunityResearcher\nHaiku · web_search ×2"] -->
+    BW["BriefingWriter\nSonnet · json_mode"] -->
+    TR["Translator\nHaiku · Hebrew"] -->
+    PB["Publisher\nHTML + JSON"]
 ```
-VendorResearcher → CommunityResearcher → BriefingWriter → Translator → Publisher
-```
-
-| Step | Model | Tool | Notes |
-|------|-------|------|-------|
-| VendorResearcher | claude-haiku-4-5 | `web_search` | max_steps=3, 11 vendors |
-| CommunityResearcher | claude-haiku-4-5 | `web_search` | max_steps=2, dev reactions |
-| BriefingWriter | claude-sonnet-4-6 | json_mode | Structured JSON briefing |
-| Translator | claude-haiku-4-5 | json_mode | Hebrew |
-| Publisher | Python | — | HTML + JSON |
 
 **Run:**
 ```bash
@@ -120,22 +147,22 @@ LOOKBACK_DAYS=3
 
 ---
 
-### 3. RSS News Agent (`rss-news-agent/`) — Deterministic + Claude
+### 3. RSS News Agent (`rss-news-agent/`)
 
-**Framework:** None — feedparser + direct Perplexity API calls
-**Model:** Claude Haiku 4.5 (writer + translator, via Perplexity API)
+**Framework:** None — feedparser + Perplexity API
+**Model:** Claude Haiku 4.5 (write + translate, via Perplexity API)
 **Cost:** ~$0.03/run | **Time:** ~60 sec
 
-Deterministic feed fetch (no LLM for search) — 13 feeds crawled concurrently, then Claude synthesises. Fastest and cheapest source pipeline.
+No LLM for search — 13 feeds fetched deterministically in parallel, then Claude synthesises. Cheapest pipeline; best at community signals (HN scores, Reddit upvotes).
 
-**Feeds:**
-- Official vendor blogs: OpenAI, Google DeepMind, AWS ML, Microsoft AI, Meta AI
-- Tech media: TechCrunch AI, VentureBeat AI, Planet AI
-- Community: **Hacker News top stories** (JSON API), **HuggingFace Daily Papers**, **Reddit r/ML**, **Reddit r/LocalLLaMA**
+**Feeds:** OpenAI, Google DeepMind, AWS ML, Microsoft AI, Meta AI blogs · TechCrunch AI, VentureBeat · **Hacker News** (JSON API) · **HuggingFace Daily Papers** · **Reddit r/ML**, **r/LocalLLaMA**
 
-**Pipeline:**
-```
-RSS Fetcher (feedparser) → BriefingWriter (LLM) → Translator (LLM) → Publisher
+```mermaid
+flowchart LR
+    F["RSS Fetcher\nfeedparser × 13\n+ HN JSON API"] -->
+    BW["BriefingWriter\nHaiku · json_mode"] -->
+    TR["Translator\nHaiku · Hebrew"] -->
+    PB["Publisher\nHTML + JSON"]
 ```
 
 **Run:**
@@ -145,25 +172,21 @@ cd rss-news-agent && python run.py
 
 ---
 
-### 4. Tavily News Agent (`tavily-news-agent/`) — Tavily Search + Perplexity
+### 4. Tavily News Agent (`tavily-news-agent/`)
 
-**Framework:** None — pure Python, Tavily Python SDK + Perplexity Agent API
-**Models:** Claude Sonnet 4.6 (writer), Claude Haiku 4.5 (translator, via Perplexity API)
+**Framework:** None — pure Python, Tavily SDK + Perplexity API
+**Models:** Claude Sonnet 4.6 (write), Claude Haiku 4.5 (translate)
 **Cost:** ~$0.04/run | **Time:** ~75 sec
 
-Uses Tavily's purpose-built news search API (`search_depth="advanced"`, `topic="news"`) to fetch the freshest articles. LLM synthesis runs via the Perplexity Agent API (same as the other pipelines).
+Tavily's news API (`search_depth="advanced"`, `topic="news"`) fetches the freshest articles — 11 vendors fire concurrently via `ThreadPoolExecutor`.
 
-**Pipeline:**
+```mermaid
+flowchart LR
+    TS["Tavily Searcher\n11 vendors concurrent\nup to 5 results each"] -->
+    BW["BriefingWriter\nSonnet · json_mode"] -->
+    TR["Translator\nHaiku · Hebrew"] -->
+    PB["Publisher\nHTML + JSON"]
 ```
-Tavily Search (11 vendors concurrent) → BriefingWriter (Perplexity) → Translator (Perplexity) → Publisher
-```
-
-| Step | Detail |
-|------|--------|
-| Search | Tavily news API, 11 vendors in parallel via `ThreadPoolExecutor`, up to 5 results each |
-| Write | `anthropic/claude-sonnet-4-6` via Perplexity Agent API |
-| Translate | `anthropic/claude-haiku-4-5`, Hebrew |
-| Fallback | DuckDuckGo if no `TAVILY_API_KEY` |
 
 **Run:**
 ```bash
@@ -181,41 +204,49 @@ LOOKBACK_DAYS=3
 
 ---
 
-### 5. Merger Agent (`merger-agent/`) — Claude Sonnet synthesises all 4
+### 5. Merger Agent (`merger-agent/`)
 
 **Framework:** None — pure Python, Perplexity Agent API
 **Models:** Claude Sonnet 4.6 (merge), Claude Haiku 4.5 (translate)
 **Cost:** ~$0.18/run | **Time:** ~3 min
 
-Reads the latest JSON from all four source pipelines and produces one unified briefing. Missing sources are handled gracefully (runs with whatever is available).
+Reads the latest `briefing.json` from all 4 source pipelines (gracefully skips missing ones) and produces one unified gold/amber-themed HTML newsletter.
+
+```mermaid
+flowchart LR
+    J1["adk/output/*.json"] & J2["perplexity/output/*.json"] & J3["rss/output/*.json"] & J4["tavily/output/*.json"] -->
+    MG["Merger\nSonnet 4.6\ndedup + rank"] -->
+    TR["Translator\nHaiku 4.5\nHebrew"] -->
+    PB["Publisher\ndocs/index.html"]
+```
 
 **Deduplication rules:**
 - Same vendor + same event → merge summaries, combine URLs, keep best date
-- Story in only one source → include as-is, don't drop niche stories
-- Order by importance; aim for vendor breadth (8-14 stories)
-- TL;DR: 5-6 bullets; Community Pulse: 5-7 bullets with `•` prefix
-
-**Output theme:** Gold/amber — visually distinct from all source pipelines.
+- Story in only one source → keep as-is (don't drop niche stories)
+- Order by importance; aim for 8–14 stories across vendors
+- TL;DR: 5–6 bullets · Community Pulse: 5–7 bullets with `•` prefix
 
 **Run:**
 ```bash
-cd merger-agent && python run.py   # auto-finds latest JSON from all 4 pipelines
+cd merger-agent && python run.py
 ```
 
 ---
 
 ## Run Everything
 
-```bash
-# Full run: Perplexity + RSS + Tavily + Merger (~8 min, ~$0.42)
-python run_all.py --skip-adk
+The 4 source agents run **in parallel** — total wall clock is the slowest agent (~4 min), not their sum (~8 min).
 
-# Full run including ADK (requires adk web to be run manually first)
+```bash
+# Full run: all 4 agents in parallel + Merger (~7 min, ~$0.42)
 python run_all.py
 
-# Skip individual pipelines
-python run_all.py --skip-adk --skip-rss   # only Perplexity + Tavily + Merger
-python run_all.py --skip-tavily           # skip Tavily if needed
+# Skip ADK (if you haven't run adk web manually)
+python run_all.py --skip-adk
+
+# Skip individual pipelines as needed
+python run_all.py --skip-adk --skip-rss
+python run_all.py --skip-tavily
 
 # Only merge existing outputs (fastest)
 python run_all.py --merge-only
@@ -223,43 +254,40 @@ python run_all.py --merge-only
 
 ---
 
-## Vendor Coverage
+## Why Four Agents?
 
-All 4 pipelines cover 11 vendors:
+Each pipeline surfaces **different stories** because they use fundamentally different search mechanisms:
 
-| Vendor | Badge color | Focus |
-|--------|-------------|-------|
-| Anthropic | Purple | Claude models, API, safety research |
-| AWS | Orange | Bedrock, Nova, SageMaker |
-| OpenAI | Green | GPT-5, ChatGPT, API |
-| Google | Blue | Gemini, Gemma, DeepMind |
-| Azure | Sky blue | Azure AI Foundry, Copilot, MAI models |
-| Meta | Facebook blue | Llama, Meta AI assistant |
-| xAI | Dark | Grok model releases |
-| NVIDIA | Lime green | NIM microservices, inference hardware |
-| Mistral | Orange | Mistral Small/Large, open-source LLMs |
-| Apple | Gray | Apple Intelligence, on-device AI, Siri |
-| Hugging Face | Amber | Open-source models, datasets, papers |
+| Pipeline | Search method | Unique strength |
+|----------|--------------|-----------------|
+| **ADK/Gemini** | Google Search live index | Breaking announcements, press releases |
+| **Perplexity** | Perplexity agentic web_search | Developer trends, discourse, analysis |
+| **RSS** | Deterministic feed fetch | Official blogs + HN/Reddit community signals |
+| **Tavily** | Purpose-built news API | Freshest articles, multi-source per vendor |
+
+The merger deduplicates overlapping stories while preserving unique finds, producing a briefing that is **broader** (more vendors) and **deeper** (richer summaries from multiple angles) than any single pipeline.
 
 ---
 
 ## Output Format
 
-Each pipeline saves to `<pipeline>/output/YYYY-MM-DD/`:
+Each source pipeline saves to `<pipeline>/output/YYYY-MM-DD/`:
 ```
-briefing_HHMMSS.html   # bilingual newsletter (EN/Hebrew toggle)
-briefing_HHMMSS.json   # structured data consumed by merger
+briefing_HHMMSS.json   # structured data — read by the Merger
+briefing_HHMMSS.html   # standalone bilingual newsletter (for local debugging)
 ```
+
+The Merger saves to `merger-agent/output/YYYY-MM-DD/merged_HHMMSS.{html,json}` and GitHub Actions copies the HTML to `docs/index.html` → GitHub Pages.
 
 **JSON schema (all pipelines):**
 ```json
 {
-  "source": "tavily" | "rss" | "perplexity" | "adk" | "merged",
+  "source": "adk" | "perplexity" | "rss" | "tavily" | "merged",
   "briefing": {
     "tldr": ["5-6 bullet strings"],
     "news_items": [{"vendor", "headline", "published_date", "summary", "urls"}],
-    "community_pulse": "• bullet1\n• bullet2\n...",
-    "community_urls": ["url1", "url2"]
+    "community_pulse": "• bullet1\n• bullet2",
+    "community_urls": ["url1"]
   },
   "briefing_he": {
     "tldr_he": ["..."],
@@ -274,33 +302,36 @@ briefing_HHMMSS.json   # structured data consumed by merger
 ## Setup
 
 ```bash
-# Shared Python venv
 python -m venv .venv && source .venv/bin/activate
 
-# Install deps for the pipelines you want to run
-pip install -r perplexity-news-agent/requirements.txt   # Perplexity + Merger + RSS
-pip install -r tavily-news-agent/requirements.txt        # Tavily + Perplexity
-pip install -r ai-latest-briefing/requirements.txt       # ADK (optional)
+pip install -r perplexity-news-agent/requirements.txt   # Perplexity + RSS + Merger
+pip install -r tavily-news-agent/requirements.txt        # Tavily
+pip install -r adk-news-agent/requirements.txt           # ADK (optional)
 ```
 
 **Required API keys:**
 | Key | Used by | Where to get |
 |-----|---------|-------------|
-| `PERPLEXITY_API_KEY` | Perplexity, RSS, Merger | console.perplexity.ai |
+| `PERPLEXITY_API_KEY` | Perplexity, RSS, Tavily, Merger | console.perplexity.ai |
 | `TAVILY_API_KEY` | Tavily | app.tavily.com |
 | `GOOGLE_API_KEY` | ADK only | Google AI Studio |
 
 ---
 
-## Why Four Agents?
+## Vendor Coverage
 
-Each pipeline surfaces **different stories** because they use fundamentally different search mechanisms:
+All pipelines cover 11 vendors:
 
-| Pipeline | Search method | Best at |
-|----------|--------------|---------|
-| **ADK/Gemini** | Google Search (real-time index) | Breaking announcements, press releases |
-| **Perplexity** | Perplexity web_search with agentic context | Developer trends, controversies, analysis |
-| **RSS** | Official vendor blogs + HN + Reddit | Deep community signals, HN scores, upvote counts |
-| **Tavily** | Purpose-built news API (advanced depth) | Fresh articles, multi-angle coverage per vendor |
-
-The merger deduplicates overlapping stories while preserving unique finds from each source, producing a briefing that is simultaneously **broader** (more vendors, more stories) and **deeper** (richer summaries from multiple perspectives) than any single pipeline.
+| Vendor | Badge color | Focus |
+|--------|-------------|-------|
+| Anthropic | Purple | Claude models, API, safety research |
+| AWS | Orange | Bedrock, Nova, SageMaker |
+| OpenAI | Green | GPT models, ChatGPT, API |
+| Google | Blue | Gemini, Gemma, DeepMind |
+| Azure | Sky blue | Azure AI Foundry, Copilot |
+| Meta | Facebook blue | Llama, Meta AI |
+| xAI | Dark | Grok model releases |
+| NVIDIA | Lime green | NIM microservices, inference hardware |
+| Mistral | Orange | Mistral Small/Large, open-source LLMs |
+| Apple | Gray | Apple Intelligence, on-device AI |
+| Hugging Face | Amber | Open-source models, datasets, papers |

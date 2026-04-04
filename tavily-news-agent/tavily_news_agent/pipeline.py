@@ -1,23 +1,61 @@
-"""Tavily + Bedrock News Agent pipeline.
+"""Tavily News Agent pipeline.
 
 Steps:
-1. Search — Tavily news search for 11 vendors concurrently (deterministic)
-2. Write   — Bedrock Claude Haiku synthesises into structured JSON briefing
-3. Translate — Bedrock Claude Haiku translates to Hebrew
+1. Search  — Tavily news search for 11 vendors concurrently (deterministic)
+2. Write   — Claude Sonnet via Perplexity API synthesises into structured JSON
+3. Translate — Claude Haiku via Perplexity API translates to Hebrew
 4. Publish — save HTML + JSON
 """
 import json
 import os
 import time
 from datetime import datetime
-from pathlib import Path
+
+import requests
 
 from .searcher import fetch_all_vendor_news, Article
-from .bedrock import invoke, _WRITER_MODEL, _TRANSLATOR_MODEL
 from .tools import build_and_save_html, _parse
 
-_LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
-_TODAY         = lambda: datetime.now().strftime("%B %d, %Y")
+_LOOKBACK_DAYS    = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
+_TODAY            = lambda: datetime.now().strftime("%B %d, %Y")
+_API_KEY          = lambda: os.environ.get("PERPLEXITY_API_KEY", "")
+_WRITER_MODEL     = lambda: os.environ.get("TAVILY_WRITER_MODEL",     "anthropic/claude-sonnet-4-6")
+_TRANSLATOR_MODEL = lambda: os.environ.get("TAVILY_TRANSLATOR_MODEL", "anthropic/claude-haiku-4-5")
+_BASE_URL         = "https://api.perplexity.ai"
+
+
+def _llm(prompt: str, *, model: str, json_mode: bool = False, label: str = "") -> str:
+    """Single Perplexity Agent API call, no web_search tool (pure LLM)."""
+    if not _API_KEY():
+        raise RuntimeError("PERPLEXITY_API_KEY not set")
+
+    payload: dict = {"model": model, "input": prompt, "max_steps": 1}
+    if json_mode:
+        payload["text"] = {"format": {"type": "json_object"}}
+
+    t0 = time.time()
+    resp = requests.post(
+        f"{_BASE_URL}/v1/responses",
+        headers={"Authorization": f"Bearer {_API_KEY()}", "Content-Type": "application/json"},
+        json=payload,
+        timeout=120,
+    )
+    if not resp.ok:
+        raise RuntimeError(f"[{label}] Perplexity API {resp.status_code}: {resp.text[:400]}")
+
+    data    = resp.json()
+    elapsed = time.time() - t0
+    text = ""
+    for item in data.get("output", []):
+        if item.get("type") == "message":
+            for part in item.get("content", []):
+                if part.get("type") == "output_text":
+                    text += part.get("text", "")
+
+    cost_info = data.get("usage", {}).get("cost", {})
+    cost_str  = f"  ${cost_info.get('total_cost', 0):.4f}" if cost_info else ""
+    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={data.get('model', model)}{cost_str}")
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -30,9 +68,8 @@ def _step1_search() -> list[Article]:
 
 
 def _step2_write(articles: list[Article]) -> str:
-    print("\n[2/4] BriefingWriter — synthesising via Bedrock Claude Haiku...")
+    print(f"\n[2/4] BriefingWriter — synthesising via {_WRITER_MODEL()}...")
 
-    # Build context text for LLM
     ctx = "\n\n".join(
         f"[{i+1}] VENDOR: {a.vendor}\n"
         f"HEADLINE: {a.headline}\n"
@@ -64,22 +101,20 @@ Write a structured briefing JSON with:
    - headline: specific and descriptive
    - published_date: exact date from the article (e.g. "April 4, 2026"). "Date unknown" if missing.
    - summary: 2-4 sentences with concrete details — model names, numbers, capabilities
-   - urls: 1-3 URLs from the article list above (use the [N] index to pick). Each URL once only.
-3. community_pulse: 4-6 bullet points (each starting with "• ") covering interesting developer angles, controversies, or community reactions implied by the news. Be concrete.
-4. community_urls: empty list [] (no community posts fetched by Tavily).
+   - urls: 1-3 URLs from the article list above. Each URL once only.
+3. community_pulse: 4-6 bullet points (each starting with "• ") covering developer angles, controversies, or community reactions. Be concrete.
+4. community_urls: empty list [].
 
 Return ONLY valid JSON matching the schema. No markdown fences.
 
 JSON SCHEMA:
 {schema}"""
 
-    return invoke(prompt, model=_WRITER_MODEL(),
-                  system="You are a precise JSON-only AI news briefing writer.",
-                  json_mode=True, label="BriefingWriter")
+    return _llm(prompt, model=_WRITER_MODEL(), json_mode=True, label="BriefingWriter")
 
 
 def _step3_translate(briefing_json: str) -> str:
-    print("\n[3/4] Translator — translating to Hebrew via Bedrock...")
+    print(f"\n[3/4] Translator — translating to Hebrew via {_TRANSLATOR_MODEL()}...")
 
     prompt = f"""אתה עורך תוכן טכנולוגי ישראלי. תרגם את עלון ה-AI הבא לעברית.
 
@@ -101,9 +136,7 @@ def _step3_translate(briefing_json: str) -> str:
 - news_items_he: רשימת אובייקטים עם "headline_he" ו-"summary_he" (אותו סדר כמו news_items)
 - community_pulse_he: מחרוזת עברית עם נקודות בולט (• לפני כל נקודה)"""
 
-    return invoke(prompt, model=_TRANSLATOR_MODEL(),
-                  system="You are a precise JSON-only Hebrew translator.",
-                  json_mode=True, label="Translator")
+    return _llm(prompt, model=_TRANSLATOR_MODEL(), json_mode=True, label="Translator")
 
 
 def _step4_publish(briefing_json: str, hebrew_json: str) -> dict:
@@ -125,21 +158,13 @@ def _step4_publish(briefing_json: str, hebrew_json: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def run_pipeline() -> dict:
-    from .bedrock import test_connectivity
     print("=" * 60)
-    print(" Tavily + Bedrock News Agent")
+    print(" Tavily News Agent")
     print(f" {_TODAY()}  |  lookback={_LOOKBACK_DAYS()}d")
     print(f" writer={_WRITER_MODEL()}")
     print("=" * 60)
 
-    print("\n[0/4] Testing Bedrock connectivity...")
-    if not test_connectivity():
-        raise RuntimeError(
-            "Bedrock connectivity failed. Check AWS credentials and region.\n"
-            "Run: aws sso login --profile aws-sandbox-personal-36"
-        )
-
-    t_start = time.time()
+    t_start       = time.time()
     articles      = _step1_search()
     briefing_json = _step2_write(articles)
     hebrew_json   = _step3_translate(briefing_json)

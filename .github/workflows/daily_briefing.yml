@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write       # required for OIDC → AWS Bedrock
 
     steps:
       - name: Checkout repo
@@ -27,21 +26,12 @@ jobs:
           pip install -r perplexity-news-agent/requirements.txt
           pip install -r tavily-news-agent/requirements.txt
 
-      - name: Configure AWS credentials (OIDC — no long-lived keys)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: eu-west-1
-
       - name: Run all pipelines
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GOOGLE_GENAI_MODEL: gemini-2.5-flash
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-          AWS_BEDROCK_REGION: eu-west-1
-          BEDROCK_WRITER_MODEL: eu.anthropic.claude-haiku-4-5-20251001-v1:0
-          BEDROCK_TRANSLATOR_MODEL: eu.anthropic.claude-haiku-4-5-20251001-v1:0
           LOOKBACK_DAYS: 3
         run: python run_all.py
 

@@ -35,7 +35,7 @@ View it here (EN + Hebrew toggle):
 Sources used today:
   • Perplexity Agent API (Claude Haiku 4.5 search, Sonnet 4.6 write)
   • RSS feeds — HN, HuggingFace Papers, Reddit r/ML, vendor blogs (Claude Haiku 4.5)
-  • Tavily News Search + AWS Bedrock Claude Haiku 4.5 (EU)
+  • Tavily News Search + Perplexity API (Sonnet 4.6 write, Haiku 4.5 translate)
   • Merger: Claude Sonnet 4.6 deduplicates all sources
 
 ---
@@ -49,7 +49,7 @@ body_html = f"""\
 <p><a href="{page_url}" style="display:inline-block;background:#1e3a5f;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Read Today's Briefing →</a></p>
 <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0">
 <p style="font-size:13px;color:#64748b">
-Sources: Perplexity Agent API · RSS/HN/Reddit · Tavily + AWS Bedrock · merged by Claude Sonnet 4.6<br>
+Sources: Perplexity Agent API · RSS/HN/Reddit · Tavily + Perplexity · merged by Claude Sonnet 4.6<br>
 <a href="https://github.com/kobyal/ai-news-briefing">github.com/kobyal/ai-news-briefing</a>
 </p>
 </body></html>

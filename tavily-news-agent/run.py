@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the Tavily + AWS Bedrock News Agent."""
+"""Run the Tavily + Perplexity News Agent."""
 import os
 import subprocess
 import sys

@@ -13,7 +13,7 @@ Four independent AI agents each gather today's AI industry news and produce a bi
 │  ai-latest-briefing │  │ perplexity-news-agent│  │   rss-news-agent    │  │  tavily-news-agent  │
 │  Google ADK         │  │  Perplexity Agents   │  │  feedparser/APIs    │  │  Tavily Search      │
 │  Gemini 2.5 Flash   │  │  Claude Haiku 4.5    │  │  Claude Haiku 4.5   │  │  Claude Haiku 4.5   │
-│  google_search      │  │  Claude Sonnet 4.6   │  │  (Perplexity API)   │  │  (AWS Bedrock EU)   │
+│  google_search      │  │  Claude Sonnet 4.6   │  │  (Perplexity API)   │  │  (Perplexity API)   │
 │  6-step agent       │  │  5-step pipeline     │  │  4-step pipeline    │  │  4-step pipeline    │
 │  ~$0.00  ~4 min     │  │  ~$0.17  ~2.5 min   │  │  ~$0.03  ~60 sec   │  │  ~$0.04  ~75 sec   │
 │  Theme: purple      │  │  Theme: teal         │  │  Theme: green       │  │  Theme: navy/slate  │
@@ -40,7 +40,7 @@ Four independent AI agents each gather today's AI industry news and produce a bi
 | **Perplexity** | Search (steps 1-2) | **Claude Haiku 4.5** | Perplexity Agent API | Cheap + fast for many search iterations; Perplexity wraps `web_search` tool |
 | **Perplexity** | Write + translate (steps 3-4) | **Claude Sonnet 4.6** | Perplexity Agent API | Best quality for final synthesis — most expensive step, one call |
 | **RSS** | Write + translate | **Claude Haiku 4.5** | Perplexity Agent API | RSS data is already structured; Haiku sufficient to synthesise |
-| **Tavily** | Write + translate | **Claude Haiku 4.5** | **AWS Bedrock (EU)** | Bedrock is free on sandbox account; Haiku 4.5 is newest/fastest available |
+| **Tavily** | Write + translate | **Claude Sonnet 4.6 / Haiku 4.5** | Perplexity Agent API | Same API as RSS/Perplexity pipelines; Sonnet for writing, Haiku for translation |
 | **ADK** | All steps | **Gemini 2.5 Flash** | Google AI (Gemini API) | ADK framework is Google-native; uses built-in `google_search` tool |
 | **Merger** | Dedup + merge | **Claude Sonnet 4.6** | Perplexity Agent API | Merging 4 sources requires the strongest reasoning to deduplicate correctly |
 | **Merger** | Hebrew translation | **Claude Haiku 4.5** | Perplexity Agent API | Translation is mechanical; Haiku handles Hebrew well at lower cost |
@@ -145,47 +145,37 @@ cd rss-news-agent && python run.py
 
 ---
 
-### 4. Tavily News Agent (`tavily-news-agent/`) — Tavily Search + AWS Bedrock
+### 4. Tavily News Agent (`tavily-news-agent/`) — Tavily Search + Perplexity
 
-**Framework:** None — pure Python, Tavily Python SDK + `anthropic[bedrock]`
-**Model:** Claude Haiku 4.5 (writer + translator, via **AWS Bedrock EU**)
+**Framework:** None — pure Python, Tavily Python SDK + Perplexity Agent API
+**Models:** Claude Sonnet 4.6 (writer), Claude Haiku 4.5 (translator, via Perplexity API)
 **Cost:** ~$0.04/run | **Time:** ~75 sec
 
-Uses Tavily's purpose-built news search API (`search_depth="advanced"`, `topic="news"`) to fetch the freshest articles. LLM synthesis runs on **AWS Bedrock** (account 599843985030, eu-west-1) — a different infrastructure stack from all other pipelines, adding genuine diversity.
+Uses Tavily's purpose-built news search API (`search_depth="advanced"`, `topic="news"`) to fetch the freshest articles. LLM synthesis runs via the Perplexity Agent API (same as the other pipelines).
 
 **Pipeline:**
 ```
-Tavily Search (11 vendors concurrent) → BriefingWriter (Bedrock) → Translator (Bedrock) → Publisher
+Tavily Search (11 vendors concurrent) → BriefingWriter (Perplexity) → Translator (Perplexity) → Publisher
 ```
 
 | Step | Detail |
 |------|--------|
 | Search | Tavily news API, 11 vendors in parallel via `ThreadPoolExecutor`, up to 5 results each |
-| Write | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` EU cross-region inference profile |
-| Translate | Same model, Hebrew |
+| Write | `anthropic/claude-sonnet-4-6` via Perplexity Agent API |
+| Translate | `anthropic/claude-haiku-4-5`, Hebrew |
 | Fallback | DuckDuckGo if no `TAVILY_API_KEY` |
-
-**AWS Bedrock models available (eu-west-1, account 599843985030):**
-- `eu.anthropic.claude-haiku-4-5-20251001-v1:0` — fast/cheap writer ✓
-- `eu.anthropic.claude-sonnet-4-6` — best quality available
-- `eu.anthropic.claude-opus-4-6-v1` — most powerful
-- `google.gemma-3-4b-it`, `google.gemma-3-12b-it`, `google.gemma-3-27b-it` — Google Gemma 3
-- `openai.gpt-oss-120b-1:0`, `nvidia.nemotron-*`, `qwen.qwen3-*`, `mistral.*`
-
-> **Auth:** AWS SCP blocks plain IAM users from Bedrock. Uses SSO profile: `aws sso login --profile aws-sandbox-personal-36`, then `AWS_PROFILE=aws-sandbox-personal-36` in `.env`.
 
 **Run:**
 ```bash
-aws sso login --profile aws-sandbox-personal-36   # once per session
 cd tavily-news-agent && python run.py
 ```
 
 **.env:**
 ```
 TAVILY_API_KEY=tvly-...
-AWS_PROFILE=aws-sandbox-personal-36
-AWS_BEDROCK_REGION=eu-west-1
-BEDROCK_WRITER_MODEL=eu.anthropic.claude-haiku-4-5-20251001-v1:0
+PERPLEXITY_API_KEY=pplx-...
+TAVILY_WRITER_MODEL=anthropic/claude-sonnet-4-6
+TAVILY_TRANSLATOR_MODEL=anthropic/claude-haiku-4-5
 LOOKBACK_DAYS=3
 ```
 
@@ -225,7 +215,7 @@ python run_all.py
 
 # Skip individual pipelines
 python run_all.py --skip-adk --skip-rss   # only Perplexity + Tavily + Merger
-python run_all.py --skip-tavily           # skip if Bedrock SSO expired
+python run_all.py --skip-tavily           # skip Tavily if needed
 
 # Only merge existing outputs (fastest)
 python run_all.py --merge-only
@@ -289,7 +279,7 @@ python -m venv .venv && source .venv/bin/activate
 
 # Install deps for the pipelines you want to run
 pip install -r perplexity-news-agent/requirements.txt   # Perplexity + Merger + RSS
-pip install -r tavily-news-agent/requirements.txt        # Tavily + Bedrock
+pip install -r tavily-news-agent/requirements.txt        # Tavily + Perplexity
 pip install -r ai-latest-briefing/requirements.txt       # ADK (optional)
 ```
 
@@ -298,7 +288,6 @@ pip install -r ai-latest-briefing/requirements.txt       # ADK (optional)
 |-----|---------|-------------|
 | `PERPLEXITY_API_KEY` | Perplexity, RSS, Merger | console.perplexity.ai |
 | `TAVILY_API_KEY` | Tavily | app.tavily.com |
-| `AWS_PROFILE` / SSO | Tavily (Bedrock) | `aws sso login --profile aws-sandbox-personal-36` |
 | `GOOGLE_API_KEY` | ADK only | Google AI Studio |
 
 ---

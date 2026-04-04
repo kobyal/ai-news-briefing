@@ -1,4 +1,4 @@
-"""HTML builder for Tavily News Agent — navy/slate theme (AWS Bedrock powered)."""
+"""HTML builder for Tavily News Agent — navy/slate theme (Perplexity API powered)."""
 import ast
 import json
 import os
@@ -176,7 +176,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
 
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{topic} Briefing · Tavily + Bedrock — {date_display}</title>
+<title>{topic} Briefing · Tavily + Perplexity — {date_display}</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;min-height:100vh;color:#0f172a}}
@@ -216,7 +216,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <div class="header">
 <h1>🎯 {topic} Briefing</h1>
 <div class="date">{date_display}</div>
-<div class="sources-badge">Powered by <b>Tavily Search</b> + <b>AWS Bedrock</b></div>
+<div class="sources-badge">Powered by <b>Tavily Search</b> + <b>Perplexity API</b></div>
 <div class="toggle">
 <button class="tbtn active" onclick="setLang('en',this)">EN</button>
 <button class="tbtn" onclick="setLang('he',this)">עברית</button>
@@ -239,7 +239,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 </div>
 <div class="footer">
   Generated {now.strftime('%B %d, %Y at %H:%M')} ·
-  Tavily News Search + AWS Bedrock Claude
+  Tavily News Search + Perplexity API
 </div>
 <script>
 function setLang(l,btn){{

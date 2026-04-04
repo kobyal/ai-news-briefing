@@ -12,7 +12,7 @@ SOURCE B (Perplexity Agent API):
 SOURCE C (RSS feeds + HN + HuggingFace + Reddit):
 {rss_briefing}
 
-SOURCE D (Tavily News Search + AWS Bedrock):
+SOURCE D (Tavily News Search + Perplexity API):
 {tavily_briefing}
 
 TASK:

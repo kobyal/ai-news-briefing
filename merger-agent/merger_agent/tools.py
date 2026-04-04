@@ -219,11 +219,12 @@ def _build_html(tldr, news_items, community_pulse, topic,
         title = p.get("title", "")
         score = p.get("score", 0)
         url   = p.get("url", "")
+        score_label = "hot" if score == 1 else f"▲ {score:,}"
         reddit_rows_html += (
             f'<div class="reddit-row">'
             f'<span class="reddit-sub">{sub}</span>'
             f'<a href="{url}" class="reddit-title" target="_blank">{title}</a>'
-            f'<span class="reddit-score">▲ {score:,}</span>'
+            f'<span class="reddit-score">{score_label}</span>'
             f'</div>'
         )
 

@@ -141,11 +141,11 @@ def fetch_topic_signals(max_workers: int = 8) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Reddit — direct API, no LLM needed
+# Reddit — direct JSON API with Perplexity fallback (for blocked cloud IPs)
 # ---------------------------------------------------------------------------
 
-def fetch_reddit_signals() -> list[dict]:
-    """Fetch hot posts from all Reddit AI communities."""
+def _fetch_reddit_direct() -> list[dict]:
+    """Direct Reddit JSON API — works locally, often blocked on cloud IPs."""
     cutoff  = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS())
     headers = {"User-Agent": "Mozilla/5.0 (compatible; ai-news-briefing/1.0; +https://github.com/kobyal/ai-news-briefing)"}
     posts   = []
@@ -155,7 +155,7 @@ def fetch_reddit_signals() -> list[dict]:
             resp = requests.get(url, headers=headers, timeout=15,
                                 params={"limit": 30, "raw_json": 1})
             if not resp.ok:
-                print(f"  [Reddit] {sub}: HTTP {resp.status_code}")
+                print(f"  [Reddit direct] {sub}: HTTP {resp.status_code}")
                 return []
             items = resp.json().get("data", {}).get("children", [])
             result = []
@@ -178,15 +178,86 @@ def fetch_reddit_signals() -> list[dict]:
                 })
             return result
         except Exception as e:
-            print(f"  [Reddit] {sub}: {e}")
+            print(f"  [Reddit direct] {sub}: {e}")
             return []
 
-    print(f"  Fetching {len(REDDIT_FEEDS)} Reddit communities...")
     with ThreadPoolExecutor(max_workers=6) as pool:
         futures = [pool.submit(_fetch, url, sub) for url, sub in REDDIT_FEEDS]
         for fut in as_completed(futures):
             posts.extend(fut.result())
 
     posts.sort(key=lambda p: p["score"], reverse=True)
-    print(f"  → {len(posts)} Reddit posts from {len(REDDIT_FEEDS)} communities")
+    return posts
+
+
+def _fetch_reddit_perplexity() -> list[dict]:
+    """Perplexity web_search fallback — used when direct API is blocked."""
+    import re
+    days = LOOKBACK_DAYS()
+    subs = ", ".join(s for _, s in REDDIT_FEEDS)
+    query = (
+        f"Find the most upvoted and discussed posts in the last {days} days on these Reddit communities: "
+        f"{subs}. "
+        f"For each post list: subreddit name, exact post title, upvote score if visible, and the full reddit.com URL. "
+        f"Focus on AI, machine learning, LLM topics. Return at least 10 posts."
+    )
+    raw = _px_search(query, label="Reddit/Perplexity")
+    if not raw.strip():
+        return []
+
+    # Extract reddit.com URLs and build structured entries
+    url_pattern = re.compile(r'https?://(?:www\.)?reddit\.com/r/(\w+)/comments/\S+?(?=\s|$|[)\]>])')
+    sub_pattern  = re.compile(r'r/(\w+)', re.IGNORECASE)
+    results = []
+    seen_urls: set = set()
+
+    for m in url_pattern.finditer(raw):
+        url = m.group(0).rstrip('.,;)')
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        subreddit = f"r/{m.group(1)}"
+
+        # Grab context before the URL to extract title
+        start = max(0, m.start() - 300)
+        ctx   = raw[start:m.start()]
+        lines = [l.strip() for l in ctx.split('\n') if l.strip()]
+        title = lines[-1] if lines else url
+        # Remove leading bullets/numbers/stars
+        title = re.sub(r'^[\d\.\-\*•]+\s*', '', title).strip()
+        if len(title) > 200:
+            title = title[:200]
+
+        # Try to extract score from nearby text
+        score_ctx = raw[max(0, m.start()-100):m.end()+100]
+        score_match = re.search(r'(\d[\d,]+)\s*(?:upvotes?|points?|▲)', score_ctx, re.IGNORECASE)
+        score = int(score_match.group(1).replace(',', '')) if score_match else 1
+
+        results.append({
+            "subreddit": subreddit,
+            "title":     title,
+            "score":     score,
+            "comments":  0,
+            "url":       url,
+            "selftext":  "",
+            "flair":     "",
+        })
+
+    print(f"  [Reddit/Perplexity] extracted {len(results)} posts from web search")
+    return results[:15]
+
+
+def fetch_reddit_signals() -> list[dict]:
+    """Fetch hot posts — direct API first, Perplexity fallback if blocked."""
+    print(f"  Fetching {len(REDDIT_FEEDS)} Reddit communities (direct API)...")
+    posts = _fetch_reddit_direct()
+    print(f"  → {len(posts)} posts from direct API")
+
+    if len(posts) < 3:
+        print("  Direct API returned few results — falling back to Perplexity search...")
+        fallback = _fetch_reddit_perplexity()
+        posts.extend(fallback)
+        posts.sort(key=lambda p: p["score"], reverse=True)
+
+    print(f"  → {len(posts)} Reddit posts total")
     return posts

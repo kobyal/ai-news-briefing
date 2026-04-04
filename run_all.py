@@ -44,20 +44,9 @@ def main():
         return
 
     if not args.skip_adk:
-        # ADK pipeline — run headless via adk run
-        adk_dir = root / "ai-latest-briefing"
-        print(f"\n{'='*60}")
-        print("  Running: AI Latest Briefing (Google ADK)")
-        print(f"  Dir:     {adk_dir}")
-        print("=" * 60)
-        result = subprocess.run(
-            ["adk", "run", "ai_latest_briefing"],
-            cwd=adk_dir,
-            input="Run the full pipeline\n",
-            text=True,
-        )
-        if result.returncode != 0:
-            print("\n[ERROR] ADK pipeline failed. Continuing with Perplexity only...")
+        ok = _run(root / "ai-latest-briefing" / "run.py", "AI Latest Briefing (Google ADK)")
+        if not ok:
+            print("ADK pipeline failed. Continuing with other sources...")
 
     if not args.skip_px:
         ok = _run(root / "perplexity-news-agent" / "run.py", "Perplexity News Agent")

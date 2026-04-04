@@ -85,7 +85,7 @@ def _vendor_style(vendor: str):
 # Public builder
 # ---------------------------------------------------------------------------
 
-def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI") -> dict:
+def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI", social_data: dict = None) -> dict:
     """Build and save the merged briefing as a bilingual HTML newsletter.
 
     Args:
@@ -133,6 +133,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI")
     html = _build_html(
         tldr, news_items, community_pulse, topic,
         tldr_he, news_items_he, community_pulse_he, community_urls,
+        social_data=social_data,
     )
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -153,15 +154,76 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI")
 
 def _build_html(tldr, news_items, community_pulse, topic,
                 tldr_he=None, news_items_he=None, community_pulse_he="",
-                community_urls=None):
+                community_urls=None, social_data=None):
     now          = datetime.now()
     date_display = now.strftime("%B %d, %Y")
     tldr_he        = tldr_he or []
     news_items_he  = news_items_he or []
     community_urls = community_urls or []
+    social_data    = social_data or {}
 
     tldr_en_html = "".join(f"<li>{item}</li>" for item in tldr)
     tldr_he_html = "".join(f"<li>{item}</li>" for item in tldr_he)
+
+    # ── Social: Trending chips ──────────────────────────────────────────────
+    trending_topics = social_data.get("trending_topics", []) or []
+    trending_html = ""
+    if trending_topics:
+        chips = "".join(f'<span class="chip">{t}</span>' for t in trending_topics)
+        trending_html = f"""<div class="trending-row">
+<span class="trending-label">🔥 Trending on X</span>
+<div class="chips">{chips}</div>
+</div>"""
+
+    # ── Social: People Talking Today ────────────────────────────────────────
+    people_highlights = social_data.get("people_highlights", []) or []
+    people_cards_html = ""
+    for p in people_highlights[:6]:
+        name   = p.get("name", "")
+        handle = p.get("handle", "").lstrip("@")
+        org    = p.get("org", "")
+        post   = p.get("post", "")
+        url    = p.get("url", "")
+        why    = p.get("why", "")
+        link   = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
+        initial = name[0].upper() if name else "?"
+        people_cards_html += f"""<div class="person-card">
+<div class="person-header">
+<span class="person-avatar">{initial}</span>
+<div><span class="person-name">{name}</span><span class="person-handle"> · @{handle} · {org}</span></div>
+</div>
+<p class="person-post">"{post}"</p>
+<p class="person-why">{why}</p>
+{link}
+</div>"""
+
+    people_section_html = ""
+    if people_cards_html:
+        people_section_html = f"""<div class="section-label">👤 People Talking Today</div>
+{people_cards_html}"""
+
+    # ── Social: Hot on Reddit ───────────────────────────────────────────────
+    top_reddit = social_data.get("top_reddit", []) or []
+    reddit_rows_html = ""
+    for p in top_reddit[:8]:
+        sub   = p.get("subreddit", "")
+        title = p.get("title", "")
+        score = p.get("score", 0)
+        url   = p.get("url", "")
+        reddit_rows_html += (
+            f'<div class="reddit-row">'
+            f'<span class="reddit-sub">{sub}</span>'
+            f'<a href="{url}" class="reddit-title" target="_blank">{title}</a>'
+            f'<span class="reddit-score">▲ {score:,}</span>'
+            f'</div>'
+        )
+
+    reddit_section_html = ""
+    if reddit_rows_html:
+        reddit_section_html = f"""<div class="reddit-card">
+<div class="section-label" style="margin-top:0">🟠 Hot on Reddit</div>
+{reddit_rows_html}
+</div>"""
 
     cards = ""
     for idx, item in enumerate(news_items):
@@ -246,6 +308,29 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .community-bullets{{padding-left:18px;font-size:14px;line-height:1.8;color:#374151;list-style:disc}}
 .community-bullets[dir=rtl]{{padding-left:0;padding-right:18px;text-align:right}}
 .community-bullets li{{margin-bottom:8px}}
+/* Trending chips */
+.trending-row{{background:#fff;border-radius:12px;padding:14px 20px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}}
+.trending-label{{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#d97706;white-space:nowrap;padding-top:4px}}
+.chips{{display:flex;flex-wrap:wrap;gap:7px}}
+.chip{{background:#fef3c7;border:1px solid #fde68a;border-radius:20px;padding:3px 12px;font-size:12px;color:#92400e;font-weight:500}}
+/* People cards */
+.person-card{{background:#fff;border-radius:12px;padding:16px 20px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
+.person-header{{display:flex;align-items:center;gap:12px;margin-bottom:10px}}
+.person-avatar{{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#d97706,#92400e);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff;flex-shrink:0}}
+.person-name{{font-weight:700;font-size:14px;color:#0f172a}}
+.person-handle{{font-size:12px;color:#94a3b8}}
+.person-post{{font-size:14px;color:#374151;line-height:1.6;font-style:italic;margin-bottom:6px;border-left:3px solid #fde68a;padding-left:10px}}
+.person-why{{font-size:12px;color:#94a3b8;margin-bottom:6px}}
+.x-link{{font-size:12px;color:#d97706;text-decoration:none}}
+.x-link:hover{{text-decoration:underline}}
+/* Reddit */
+.reddit-card{{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
+.reddit-row{{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;flex-wrap:wrap}}
+.reddit-row:last-child{{border-bottom:none}}
+.reddit-sub{{font-size:11px;font-weight:700;color:#ea580c;background:#fff7ed;padding:2px 8px;border-radius:12px;white-space:nowrap;margin-top:2px}}
+.reddit-title{{font-size:13px;color:#2563eb;text-decoration:none;flex:1;line-height:1.4}}
+.reddit-title:hover{{text-decoration:underline}}
+.reddit-score{{font-size:12px;color:#16a34a;font-weight:700;white-space:nowrap;margin-top:2px}}
 .footer{{text-align:center;padding:20px;font-size:12px;color:#94a3b8}}
 </style></head><body>
 <div class="header">
@@ -263,8 +348,11 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <ul id="tldr-en">{tldr_en_html}</ul>
 <ul id="tldr-he" dir="rtl" style="display:none">{tldr_he_html}</ul>
 </div>
+{trending_html}
 <div class="section-label" id="news-label">Latest News</div>
 {cards}
+{people_section_html}
+{reddit_section_html}
 <div class="community-card">
 <h2 id="community-label">Community Pulse</h2>
 <div id="community-en" class="en-content">{community_en_html}</div>

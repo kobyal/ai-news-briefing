@@ -185,9 +185,9 @@ def _step3_translate(merged_json: str) -> str:
     )
 
 
-def _step4_publish(merged_json: str, hebrew_json: str) -> dict:
+def _step4_publish(merged_json: str, hebrew_json: str, social_briefing: dict = None) -> dict:
     print("\n[4/4] Publisher — building combined HTML newsletter...")
-    result = build_and_save_html(merged_json, hebrew_json, topic="AI")
+    result = build_and_save_html(merged_json, hebrew_json, topic="AI", social_data=social_briefing)
 
     # Save raw JSON too
     html_path = result["saved_to"]
@@ -222,7 +222,7 @@ def run_pipeline() -> dict:
     adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing = _step1_load_sources()
     merged_json  = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing)
     hebrew_json  = _step3_translate(merged_json)
-    result       = _step4_publish(merged_json, hebrew_json)
+    result       = _step4_publish(merged_json, hebrew_json, social_briefing=social_briefing)
 
     elapsed = time.time() - t_start
     print(f"\n{'='*60}")

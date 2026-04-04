@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Run all agents: source agents in parallel, then Merger.
 
-The 4 source agents are fully independent and run simultaneously.
-Total wall-clock time ≈ slowest single agent (~4 min) instead of sum (~8 min).
+The 5 source agents are fully independent and run simultaneously.
+Total wall-clock time ≈ slowest single agent (~4 min) instead of sum (~12 min).
 
 Usage:
-    python run_all.py                # all 4 agents in parallel + Merger
-    python run_all.py --skip-adk     # skip ADK
-    python run_all.py --skip-px      # skip Perplexity
-    python run_all.py --skip-rss     # skip RSS
-    python run_all.py --skip-tavily  # skip Tavily
-    python run_all.py --merge-only   # only run Merger on latest existing outputs
+    python run_all.py                 # all 5 agents in parallel + Merger
+    python run_all.py --skip-adk      # skip ADK
+    python run_all.py --skip-px       # skip Perplexity
+    python run_all.py --skip-rss      # skip RSS
+    python run_all.py --skip-tavily   # skip Tavily
+    python run_all.py --skip-social   # skip Social
+    python run_all.py --merge-only    # only run Merger on latest existing outputs
 """
 import argparse
 import subprocess
@@ -79,6 +80,7 @@ def main():
     parser.add_argument("--skip-px",     action="store_true", help="Skip the Perplexity pipeline")
     parser.add_argument("--skip-rss",    action="store_true", help="Skip the RSS pipeline")
     parser.add_argument("--skip-tavily", action="store_true", help="Skip the Tavily pipeline")
+    parser.add_argument("--skip-social", action="store_true", help="Skip the Social pipeline")
     parser.add_argument("--merge-only",  action="store_true", help="Only run the Merger")
     args = parser.parse_args()
 
@@ -98,6 +100,8 @@ def main():
         agents.append((root / "rss-news-agent"          / "run.py", "RSS News Agent"))
     if not args.skip_tavily:
         agents.append((root / "tavily-news-agent"       / "run.py", "Tavily News Agent"))
+    if not args.skip_social:
+        agents.append((root / "social-news-agent"       / "run.py", "Social News Agent"))
 
     results = _run_parallel(agents)
 

@@ -1,7 +1,7 @@
 """Prompt strings for the Merger pipeline."""
 
 MERGER_PROMPT = """\
-You are an AI news editor merging four independent briefings into one definitive daily briefing.
+You are an AI news editor merging five independent briefings into one definitive daily briefing.
 
 SOURCE A (Google ADK + Gemini Search):
 {adk_briefing}
@@ -14,6 +14,9 @@ SOURCE C (RSS feeds + HN + HuggingFace + Reddit):
 
 SOURCE D (Tavily News Search + Perplexity API):
 {tavily_briefing}
+
+SOURCE E (Social signals — X/Twitter, Reddit communities, LinkedIn):
+{social_briefing}
 
 TASK:
 Produce ONE merged briefing as a JSON object. Rules:
@@ -31,9 +34,11 @@ Produce ONE merged briefing as a JSON object. Rules:
 4. tldr — write 5-6 bullets summarising the most important stories from the merged set.
    Each bullet: vendor + what happened + why it matters (15-25 words).
 
-5. community_pulse — synthesise the community reactions from ALL sources into 5-7 bullet points (each starting with "• ").
-   If sources mention the same reaction, merge into one richer bullet. Be concrete — mention specific topics, sentiments, notable HN threads, Reddit discussions.
-   community_urls — up to 4 URLs from the combined community sources.
+5. community_pulse — synthesise community reactions from ALL sources into 5-7 bullet points (each starting with "• ").
+   IMPORTANT: SOURCE E (Social) contains real-time X/Twitter posts, Reddit hot threads, and LinkedIn signals from AI leaders — weight this heavily.
+   Include: specific people's hot takes (quote them if notable), top Reddit threads, trending topics on X, developer sentiment.
+   Merge any overlapping signals from other sources. Be concrete — names, quotes, post content, subreddits, engagement counts.
+   community_urls — up to 6 URLs from the combined community sources (X posts, Reddit threads, LinkedIn posts preferred over news articles).
 
 6. news_items — 8-14 items (be comprehensive). For each:
    - vendor: "Anthropic" | "AWS" | "OpenAI" | "Google" | "Azure" | "Meta" | "xAI" | "NVIDIA" | "Mistral" | "Apple" | "Hugging Face" | "Other"

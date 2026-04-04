@@ -251,7 +251,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <div class="header">
 <h1>⚡ {topic} Combined Briefing</h1>
 <div class="date">{date_display}</div>
-<div class="sources-badge">Merged from <b>ADK</b> · <b>Perplexity</b> · <b>RSS/HN</b> · <b>Tavily</b></div>
+<div class="sources-badge">Merged from <b>ADK</b> · <b>Perplexity</b> · <b>RSS/HN</b> · <b>Tavily</b> · <b>Social</b></div>
 <div class="toggle">
 <button class="tbtn active" onclick="setLang('en',this)">EN</button>
 <button class="tbtn" onclick="setLang('he',this)">עברית</button>

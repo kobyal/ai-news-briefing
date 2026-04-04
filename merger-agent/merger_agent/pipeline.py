@@ -1,12 +1,15 @@
-"""Merger Agent — reads latest JSON outputs from both pipelines and produces a unified briefing.
+"""Merger Agent — reads latest JSON outputs from all pipelines and produces a unified briefing.
 
 Steps
 -----
-1. Find latest JSON from adk-news-agent/output/  (source: "adk")
+1. Find latest JSON from adk-news-agent/output/        (source: "adk")
 2. Find latest JSON from perplexity-news-agent/output/ (source: "perplexity")
-3. Call Claude Sonnet via Perplexity Agent API to merge + deduplicate stories
-4. Call Claude Haiku to translate the merged briefing to Hebrew
-5. Build and save HTML with a distinct gold/combined theme
+3. Find latest JSON from rss-news-agent/output/        (source: "rss")
+4. Find latest JSON from tavily-news-agent/output/     (source: "tavily")
+5. Find latest JSON from social-news-agent/output/     (source: "social")
+6. Call Claude Sonnet via Perplexity Agent API to merge + deduplicate stories
+7. Call Claude Haiku to translate the merged briefing to Hebrew
+8. Build and save HTML with a distinct gold/combined theme
 """
 import json
 import os
@@ -115,12 +118,13 @@ def _agent(
 # Pipeline steps
 # ---------------------------------------------------------------------------
 
-def _step1_load_sources() -> tuple[dict, dict, dict, dict]:
+def _step1_load_sources() -> tuple[dict, dict, dict, dict, dict]:
     print("\n[1/4] Loading source briefings...")
     adk_data    = _find_latest_json(_ROOT / "adk-news-agent" / "output")
     px_data     = _find_latest_json(_ROOT / "perplexity-news-agent" / "output")
     rss_data    = _find_latest_json(_ROOT / "rss-news-agent" / "output")
     tavily_data = _find_latest_json(_ROOT / "tavily-news-agent" / "output")
+    social_data = _find_latest_json(_ROOT / "social-news-agent" / "output")
 
     if not any([adk_data, px_data, rss_data, tavily_data]):
         raise RuntimeError(
@@ -130,16 +134,18 @@ def _step1_load_sources() -> tuple[dict, dict, dict, dict]:
     px_briefing     = (px_data     or {}).get("briefing", px_data     or {})
     rss_briefing    = (rss_data    or {}).get("briefing", rss_data    or {})
     tavily_briefing = (tavily_data or {}).get("briefing", tavily_data or {})
+    social_briefing = (social_data or {}).get("briefing", social_data or {})
 
     n_adk    = len(adk_briefing.get("news_items", []))
     n_px     = len(px_briefing.get("news_items", []))
     n_rss    = len(rss_briefing.get("news_items", []))
     n_tavily = len(tavily_briefing.get("news_items", []))
-    print(f"  ADK: {n_adk}  |  Perplexity: {n_px}  |  RSS: {n_rss}  |  Tavily: {n_tavily}")
-    return adk_briefing, px_briefing, rss_briefing, tavily_briefing
+    n_social = bool(social_briefing.get("community_pulse"))
+    print(f"  ADK: {n_adk}  |  Perplexity: {n_px}  |  RSS: {n_rss}  |  Tavily: {n_tavily}  |  Social: {'✓' if n_social else '–'}")
+    return adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing
 
 
-def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict, tavily_briefing: dict) -> str:
+def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict, tavily_briefing: dict, social_briefing: dict) -> str:
     print("\n[2/4] Merger — deduplicating and merging stories...")
     schema_desc = json.dumps(BriefingContent.model_json_schema(), indent=2)
     prompt = MERGER_PROMPT.format(
@@ -147,6 +153,7 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict, tavi
         perplexity_briefing=json.dumps(px_briefing, ensure_ascii=False, indent=2),
         rss_briefing=json.dumps(rss_briefing, ensure_ascii=False, indent=2),
         tavily_briefing=json.dumps(tavily_briefing, ensure_ascii=False, indent=2),
+        social_briefing=json.dumps(social_briefing, ensure_ascii=False, indent=2),
     )
     return _agent(
         input_text=f"{prompt}\n\nJSON SCHEMA:\n{schema_desc}",
@@ -212,8 +219,8 @@ def run_pipeline() -> dict:
 
     t_start = time.time()
 
-    adk_briefing, px_briefing, rss_briefing, tavily_briefing = _step1_load_sources()
-    merged_json  = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing)
+    adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing = _step1_load_sources()
+    merged_json  = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing)
     hebrew_json  = _step3_translate(merged_json)
     result       = _step4_publish(merged_json, hebrew_json)
 

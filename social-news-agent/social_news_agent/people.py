@@ -102,14 +102,39 @@ TRACKED_PEOPLE = [
 
 # Topic queries for X + LinkedIn search (beyond individual people)
 TOPIC_SEARCHES = [
-    "AI model release reaction developers x.com twitter",
-    "LLM benchmark debate controversy x.com",
-    "Claude GPT Gemini Grok comparison developer opinion",
-    "AI agent coding tools vibe coding cursor windsurf",
-    "open source AI model huggingface llama mistral release",
-    "AI safety alignment existential risk debate x.com",
-    "AI startup funding valuation product launch 2025",
-    "AI regulation policy EU US government",
-    "multimodal AI vision video generation reactions",
-    "AI infrastructure GPU compute cost developers",
+    # Model releases & benchmarks
+    "AI model release announcement reaction developers x.com twitter 2025",
+    "LLM benchmark SWE-bench MMLU GPQA results debate controversy",
+    "o3 o4 reasoning model chain-of-thought debate openai anthropic",
+    "Claude GPT Gemini Grok comparison developer real-world opinion",
+
+    # Coding / agentic tools
+    "Cursor Windsurf Devin AI coding tool viral x.com developer reaction",
+    "AI coding agent SWE-agent vibe coding autonomous developer opinion",
+    "LangGraph CrewAI AutoGen AI agents framework community debate",
+
+    # Open source
+    "open source AI model Llama Mistral Qwen DeepSeek release huggingface",
+    "fine-tuning LoRA PEFT open source community tips x.com",
+
+    # RAG / infra / embeddings
+    "RAG retrieval augmented generation vector database Pinecone Weaviate debate",
+    "AI infrastructure GPU compute cost NVIDIA AMD TPU chips developer",
+
+    # Image / video / voice gen
+    "image generation Midjourney Flux Stable Diffusion viral reaction x.com",
+    "video generation Sora Runway Kling Veo viral demo reaction",
+    "voice AI ElevenLabs real-time speech AI product launch reaction",
+
+    # Safety / policy
+    "AI safety alignment existential risk debate x.com 2025",
+    "AI regulation policy EU AI Act US executive order reaction",
+
+    # Business / startups
+    "AI startup funding valuation product launch announcement 2025",
+    "enterprise AI adoption ROI productivity real-world case study",
+
+    # Viral / community mood
+    "impressive AI demo viral x.com twitter this week",
+    "AI hot take controversial opinion x.com trending this week",
 ]

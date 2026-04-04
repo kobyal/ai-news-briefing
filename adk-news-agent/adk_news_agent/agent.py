@@ -75,13 +75,13 @@ def _fmt(template: str) -> str:
 
 def _make_callbacks(name: str):
     """Return (before, after) callbacks that log timing for a named agent."""
-    def before(ctx: CallbackContext) -> Optional[types.Content]:
-        ctx.state[f"_t_{name}"] = time.time()
+    def before(callback_context: CallbackContext) -> Optional[types.Content]:
+        callback_context.state[f"_t_{name}"] = time.time()
         print(f"  ▶  {name}")
         return None
 
-    def after(ctx: CallbackContext) -> Optional[types.Content]:
-        t0 = ctx.state.get(f"_t_{name}")
+    def after(callback_context: CallbackContext) -> Optional[types.Content]:
+        t0 = callback_context.state.get(f"_t_{name}")
         elapsed = f"{time.time() - t0:.1f}s" if t0 else "?"
         print(f"  ✓  {name:<22} {elapsed}")
         return None

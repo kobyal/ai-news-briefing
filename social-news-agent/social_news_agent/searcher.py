@@ -136,17 +136,75 @@ def fetch_topic_signals(max_workers: int = 8) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Reddit — direct JSON API (best-effort, skipped gracefully if blocked)
+# Reddit — OAuth API (authenticated) with anonymous fallback
 # ---------------------------------------------------------------------------
 
-def fetch_reddit_signals() -> list[dict]:
-    """Fetch hot posts from AI subreddits via direct JSON API."""
-    cutoff  = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS())
-    headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"}
+_REDDIT_UA      = "ai-news-briefing/2.0 (by /u/kobyal)"
+_REDDIT_TOKEN:  dict = {}   # module-level cache: {"token": str, "expires": float}
 
-    def _fetch(url: str, sub: str) -> list[dict]:
+
+def _get_reddit_token() -> str:
+    """Get a Reddit OAuth bearer token using script-app credentials.
+
+    Requires env vars: REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET,
+                       REDDIT_USERNAME, REDDIT_PASSWORD
+    Returns empty string if credentials are missing or auth fails.
+    """
+    client_id     = os.environ.get("REDDIT_CLIENT_ID", "")
+    client_secret = os.environ.get("REDDIT_CLIENT_SECRET", "")
+    username      = os.environ.get("REDDIT_USERNAME", "")
+    password      = os.environ.get("REDDIT_PASSWORD", "")
+
+    if not all([client_id, client_secret, username, password]):
+        return ""
+
+    # Return cached token if still valid (Reddit tokens last 1 hour)
+    now = time.time()
+    if _REDDIT_TOKEN.get("token") and now < _REDDIT_TOKEN.get("expires", 0) - 60:
+        return _REDDIT_TOKEN["token"]
+
+    try:
+        resp = requests.post(
+            "https://www.reddit.com/api/v1/access_token",
+            auth=(client_id, client_secret),
+            data={"grant_type": "password", "username": username, "password": password},
+            headers={"User-Agent": _REDDIT_UA},
+            timeout=15,
+        )
+        if not resp.ok:
+            print(f"  [Reddit OAuth] auth failed: {resp.status_code}")
+            return ""
+        data = resp.json()
+        token = data.get("access_token", "")
+        expires_in = data.get("expires_in", 3600)
+        _REDDIT_TOKEN["token"] = token
+        _REDDIT_TOKEN["expires"] = now + expires_in
+        print(f"  [Reddit OAuth] authenticated ✓")
+        return token
+    except Exception as e:
+        print(f"  [Reddit OAuth] {e}")
+        return ""
+
+
+def fetch_reddit_signals() -> list[dict]:
+    """Fetch hot posts — OAuth if credentials available, anonymous fallback."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS())
+    token  = _get_reddit_token()
+
+    if token:
+        base_url = "https://oauth.reddit.com"
+        headers  = {"User-Agent": _REDDIT_UA, "Authorization": f"Bearer {token}"}
+    else:
+        base_url = "https://www.reddit.com"
+        headers  = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"}
+
+    # Build sub-paths only (strip the full URL from REDDIT_FEEDS)
+    subs = [(url.replace("https://www.reddit.com", "").replace(".json", ""), name)
+            for url, name in REDDIT_FEEDS]
+
+    def _fetch(path: str, sub: str) -> list[dict]:
         try:
-            resp = requests.get(url, headers=headers, timeout=15,
+            resp = requests.get(f"{base_url}{path}.json", headers=headers, timeout=15,
                                 params={"limit": 30, "raw_json": 1})
             if not resp.ok:
                 print(f"  [Reddit] {sub}: HTTP {resp.status_code}")
@@ -175,10 +233,11 @@ def fetch_reddit_signals() -> list[dict]:
             print(f"  [Reddit] {sub}: {e}")
             return []
 
-    print(f"  Fetching {len(REDDIT_FEEDS)} Reddit communities...")
+    mode = "OAuth" if token else "anonymous"
+    print(f"  Fetching {len(subs)} Reddit communities ({mode})...")
     posts: list[dict] = []
     with ThreadPoolExecutor(max_workers=6) as pool:
-        futures = [pool.submit(_fetch, url, sub) for url, sub in REDDIT_FEEDS]
+        futures = [pool.submit(_fetch, path, sub) for path, sub in subs]
         for fut in as_completed(futures):
             posts.extend(fut.result())
 

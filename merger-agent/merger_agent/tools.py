@@ -169,7 +169,18 @@ def _build_html(tldr, news_items, community_pulse, topic,
     trending_topics = social_data.get("trending_topics", []) or []
     trending_html = ""
     if trending_topics:
-        chips = "".join(f'<span class="chip">{t}</span>' for t in trending_topics)
+        chips = ""
+        for t in trending_topics:
+            if isinstance(t, dict):
+                label = t.get("label") or t.get("topic") or str(t)
+                url   = t.get("url", "")
+            else:
+                label = str(t)
+                url   = ""
+            if url:
+                chips += f'<a href="{url}" class="chip chip-link" target="_blank">{label}</a>'
+            else:
+                chips += f'<span class="chip">{label}</span>'
         trending_html = f"""<div class="trending-row">
 <span class="trending-label">🔥 Trending on X</span>
 <div class="chips">{chips}</div>
@@ -187,15 +198,18 @@ def _build_html(tldr, news_items, community_pulse, topic,
         name   = p.get("name", "")
         handle = p.get("handle", "").lstrip("@")
         org    = p.get("org", "")
+        role   = p.get("role", "")
         post   = p.get("post", "")
         url    = p.get("url", "")
         why    = p.get("why", "")
         link   = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
         initial = name[0].upper() if name else "?"
+        org_badge = f'<span class="person-org-badge">{org}</span>' if org else ""
+        subtitle = f"@{handle}" + (f" · {role}" if role else "")
         people_cards_html += f"""<div class="person-card">
 <div class="person-header">
 <span class="person-avatar">{initial}</span>
-<div><span class="person-name">{name}</span><span class="person-handle"> · @{handle} · {org}</span></div>
+<div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">{name}</span>{org_badge}</div><span class="person-handle">{subtitle}</span></div>
 </div>
 <p class="person-post">"{post}"</p>
 <p class="person-why">{why}</p>
@@ -322,13 +336,13 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .trending-row{{background:#fff;border-radius:12px;padding:14px 20px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}}
 .trending-label{{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#d97706;white-space:nowrap;padding-top:4px}}
 .chips{{display:flex;flex-wrap:wrap;gap:7px}}
-.chip{{background:#fef3c7;border:1px solid #fde68a;border-radius:20px;padding:3px 12px;font-size:12px;color:#92400e;font-weight:500}}
+.chip{{background:#fef3c7;border:1px solid #fde68a;border-radius:20px;padding:3px 12px;font-size:12px;color:#92400e;font-weight:500}}.chip-link{{text-decoration:none;cursor:pointer}}.chip-link:hover{{background:#fde68a}}
 /* People cards */
 .person-card{{background:#fff;border-radius:12px;padding:16px 20px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
 .person-header{{display:flex;align-items:center;gap:12px;margin-bottom:10px}}
 .person-avatar{{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#d97706,#92400e);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff;flex-shrink:0}}
 .person-name{{font-weight:700;font-size:14px;color:#0f172a}}
-.person-handle{{font-size:12px;color:#94a3b8}}
+.person-handle{{font-size:12px;color:#94a3b8}}.person-org-badge{{font-size:11px;font-weight:600;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;padding:1px 6px}}
 .person-post{{font-size:14px;color:#374151;line-height:1.6;font-style:italic;margin-bottom:6px;border-left:3px solid #fde68a;padding-left:10px}}
 .person-why{{font-size:12px;color:#94a3b8;margin-bottom:6px}}
 .x-link{{font-size:12px;color:#d97706;text-decoration:none}}

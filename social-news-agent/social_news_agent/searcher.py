@@ -51,8 +51,11 @@ def _px_search(query: str, label: str = "") -> str:
         print(f"  [search] {label}: {resp.status_code} {resp.text[:150]}")
         return ""
 
-    data    = resp.json()
-    text    = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    data      = resp.json()
+    text      = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    citations = data.get("citations", [])
+    if citations:
+        text += "\n\n[SOURCES: " + "  ".join(citations[:8]) + "]"
     elapsed = time.time() - t0
     cost    = data.get("usage", {}).get("cost", {}).get("total_cost", 0)
     print(f"    ✓  {label:<45} {elapsed:4.1f}s  ${cost:.4f}")

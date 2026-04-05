@@ -63,16 +63,19 @@ def build_and_save_html(briefing_json: str, hebrew_json: str) -> dict:
         name   = p.get("name", "")
         handle = p.get("handle", "").lstrip("@")
         org    = p.get("org", "")
+        role   = p.get("role", "")
         post   = p.get("post", "")
         url    = p.get("url", "")
         why    = p.get("why", "")
         link   = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
+        org_badge = f'<span class="person-org-badge">{org}</span>' if org else ""
+        subtitle = f"@{handle}" + (f" · {role}" if role else "")
         people_cards += f"""<div class="person-card">
   <div class="person-header">
     <span class="person-avatar">{name[0].upper()}</span>
     <div>
-      <span class="person-name">{name}</span>
-      <span class="person-handle"> · @{handle} · {org}</span>
+      <div style="display:flex;align-items:center;gap:6px"><span class="person-name">{name}</span>{org_badge}</div>
+      <span class="person-handle">{subtitle}</span>
     </div>
   </div>
   <p class="person-post">"{post}"</p>
@@ -96,7 +99,18 @@ def build_and_save_html(briefing_json: str, hebrew_json: str) -> dict:
         )
 
     # Trending chips
-    trending_en = "".join(f'<span class="chip">{t}</span>' for t in trending_topics)
+    def _chip(t):
+        if isinstance(t, dict):
+            label = t.get("label") or t.get("topic") or str(t)
+            url   = t.get("url", "")
+        else:
+            label = str(t)
+            url   = ""
+        if url:
+            return f'<a href="{url}" class="chip chip-link" target="_blank">{label}</a>'
+        return f'<span class="chip">{label}</span>'
+
+    trending_en = "".join(_chip(t) for t in trending_topics)
     trending_he = "".join(f'<span class="chip">{t}</span>' for t in trending_he)
 
     # Source links
@@ -132,7 +146,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .person-header{{display:flex;align-items:center;gap:12px;margin-bottom:10px}}
 .person-avatar{{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6e40c9,#2ea043);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff;flex-shrink:0}}
 .person-name{{font-weight:700;font-size:14px;color:#e6edf3}}
-.person-handle{{font-size:12px;color:#8b949e}}
+.person-handle{{font-size:12px;color:#8b949e}}.person-org-badge{{font-size:11px;font-weight:600;background:#1f2937;color:#6ee7b7;border:1px solid #374151;border-radius:4px;padding:1px 6px}}
 .person-post{{font-size:14px;color:#c9d1d9;line-height:1.6;font-style:italic;margin-bottom:6px;border-left:3px solid #30363d;padding-left:10px}}
 .person-why{{font-size:12px;color:#8b949e;margin-bottom:6px}}
 .x-link{{font-size:12px;color:#58a6ff;text-decoration:none}}
@@ -146,7 +160,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .reddit-score{{font-size:12px;color:#3fb950;font-weight:700;white-space:nowrap;margin-top:2px}}
 /* Trending chips */
 .chips{{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px}}
-.chip{{background:#21262d;border:1px solid #30363d;border-radius:20px;padding:4px 12px;font-size:12px;color:#c9d1d9}}
+.chip{{background:#21262d;border:1px solid #30363d;border-radius:20px;padding:4px 12px;font-size:12px;color:#c9d1d9}}.chip-link{{text-decoration:none}}.chip-link:hover{{background:#30363d}}
 /* Pulse */
 .pulse-card{{border-left:4px solid #2ea043}}
 .source-link{{display:block;font-size:12px;color:#58a6ff;text-decoration:none;margin-top:4px;word-break:break-all}}

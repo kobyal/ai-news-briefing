@@ -123,7 +123,8 @@ def _step2_write(people: list, topics: list, reddit: list) -> str:
             {
                 "name":   "person name",
                 "handle": "@handle",
-                "org":    "org",
+                "org":    "company or affiliation (e.g. OpenAI, Google DeepMind, Anthropic)",
+                "role":   "their title or role (e.g. CEO, Co-founder, Research Scientist)",
                 "post":   "what they said / key quote",
                 "url":    "link if found",
                 "why":    "why this matters for the AI community"
@@ -132,7 +133,10 @@ def _step2_write(people: list, topics: list, reddit: list) -> str:
         "top_reddit": [
             {"subreddit": "string", "title": "string", "score": 0, "url": "string"}
         ],
-        "trending_topics": ["3-5 strings describing what's trending on social today"],
+        "trending_topics": [
+            {"label": "2-5 word punchy topic name (e.g. 'AGI timeline debate', 'Benchmark crisis')",
+             "url": "best source URL from the data above for this trend, or empty string"}
+        ],
         "tldr": ["3-4 bullet strings — the overall social mood and what AI Twitter/Reddit is buzzing about today"],
     }, indent=2)
 

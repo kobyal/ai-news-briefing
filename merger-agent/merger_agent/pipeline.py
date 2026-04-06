@@ -91,7 +91,7 @@ def _agent(
             "Content-Type":  "application/json",
         },
         json=payload,
-        timeout=120,
+        timeout=200,
     )
 
     if not resp.ok:
@@ -229,7 +229,11 @@ def run_pipeline() -> dict:
 
     adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing = _step1_load_sources()
     merged_json  = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing)
-    hebrew_json  = _step3_translate(merged_json)
+    try:
+        hebrew_json = _step3_translate(merged_json)
+    except Exception as e:
+        print(f"  [Translator] failed ({e}) — publishing without Hebrew")
+        hebrew_json = "{}"
     result       = _step4_publish(merged_json, hebrew_json, social_briefing=social_briefing)
 
     elapsed = time.time() - t_start

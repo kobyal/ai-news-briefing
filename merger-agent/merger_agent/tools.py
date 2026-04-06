@@ -123,8 +123,8 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
     community_pulse = data.get("community_pulse", "")
     community_urls  = data.get("community_urls", []) or []
 
-    tldr_he           = he.get("tldr_he", [])
-    news_items_he     = he.get("news_items_he", [])
+    tldr_he            = he.get("tldr_he", [])
+    headlines_he       = he.get("headlines_he", [])
     community_pulse_he = he.get("community_pulse_he", "")
 
     global_seen: set = set()
@@ -151,7 +151,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
 
     html = _build_html(
         tldr, news_items, community_pulse, topic,
-        tldr_he, news_items_he, community_pulse_he, community_urls,
+        tldr_he, headlines_he, community_pulse_he, community_urls,
         social_data=social_data,
     )
 
@@ -172,12 +172,12 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
 # ---------------------------------------------------------------------------
 
 def _build_html(tldr, news_items, community_pulse, topic,
-                tldr_he=None, news_items_he=None, community_pulse_he="",
+                tldr_he=None, headlines_he=None, community_pulse_he="",
                 community_urls=None, social_data=None):
     now          = datetime.now()
     date_display = now.strftime("%B %d, %Y")
     tldr_he        = tldr_he or []
-    news_items_he  = news_items_he or []
+    headlines_he   = headlines_he or []
     community_urls = community_urls or []
     social_data    = social_data or {}
 
@@ -287,9 +287,8 @@ def _build_html(tldr, news_items, community_pulse, topic,
         )
         sources_block = f'<div class="sources">{sources_html}</div>' if sources_html else ""
 
-        he_item     = news_items_he[idx] if idx < len(news_items_he) else {}
-        headline_he = he_item.get("headline_he", headline)
-        summary_he  = he_item.get("summary_he", summary)  # fall back to English if not translated
+        headline_he = headlines_he[idx] if idx < len(headlines_he) else headline
+        summary_he  = summary  # summaries stay in English
 
         cards += f"""<div class="news-card">
 <div class="card-header">

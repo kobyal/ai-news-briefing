@@ -170,10 +170,11 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict, tavi
 
 def _step3_translate(merged_json: str) -> str:
     print("\n[3/4] Translator — translating to Hebrew...")
-    # Send only the small fields (tldr + community_pulse) to stay well under timeout
+    # Send only small fields — headlines (short), tldr, community_pulse — no summaries
     full = _parse(merged_json)
     slim = json.dumps({
         "tldr":            full.get("tldr", []),
+        "headlines":       [item.get("headline", "") for item in full.get("news_items", [])],
         "community_pulse": full.get("community_pulse", ""),
     }, ensure_ascii=False, indent=2)
     schema_desc = json.dumps(HebrewBriefing.model_json_schema(), indent=2)

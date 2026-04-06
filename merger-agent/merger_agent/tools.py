@@ -308,9 +308,27 @@ def _build_html(tldr, news_items, community_pulse, topic,
     community_en_html = _community_pulse_html(community_pulse)
     community_he_html = _community_pulse_html(community_pulse_he)
 
+    def _url_label(u: str) -> str:
+        import re as _re
+        if "x.com/" in u or "twitter.com/" in u:
+            m = _re.search(r'(?:x|twitter)\.com/([^/]+)/status', u)
+            return f"𝕏 @{m.group(1)}" if m else "𝕏 post"
+        if "reddit.com/" in u:
+            m = _re.search(r'reddit\.com/r/([^/]+)', u)
+            return f"Reddit · r/{m.group(1)}" if m else "Reddit thread"
+        if "news.ycombinator.com" in u:
+            return "Hacker News discussion"
+        if "github.com/" in u:
+            m = _re.search(r'github\.com/([^/]+/[^/]+)', u)
+            return f"GitHub · {m.group(1)}" if m else "GitHub"
+        if "linkedin.com/" in u:
+            return "LinkedIn post"
+        # Generic: show domain
+        m = _re.search(r'https?://(?:www\.)?([^/]+)', u)
+        return m.group(1) if m else u[:50]
+
     community_sources_html = "".join(
-        f'<a href="{u}" target="_blank" class="source-link">'
-        f'{u[:70]}{"..." if len(u) > 70 else ""}</a>'
+        f'<a href="{u}" target="_blank" class="source-link">{_url_label(u)}</a>'
         for u in community_urls if u
     )
     community_sources_block = (

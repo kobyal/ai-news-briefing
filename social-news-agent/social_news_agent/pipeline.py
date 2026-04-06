@@ -165,7 +165,7 @@ WHAT TO DO WITH REAL DATA:
 - Surface what AI practitioners are ACTUALLY saying — quote them when possible
 - Identify controversies, excitement, hot takes from the topic signals
 - community_pulse bullets: draw from topic signals and any real people signals
-- trending_topics: extract from topic signals — what themes recur across searches?
+- trending_topics: extract from topic signals — what themes recur across searches? For each topic's url field, pick a real URL from the [SOURCES: ...] block in the corresponding TOPIC SIGNAL above. NEVER leave url empty if sources are available.
 
 Return ONLY valid JSON matching this schema:
 {schema}"""

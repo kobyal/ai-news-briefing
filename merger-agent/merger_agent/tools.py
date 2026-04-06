@@ -128,24 +128,39 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
     summaries_he       = he.get("summaries_he", [])
     community_pulse_he = he.get("community_pulse_he", "")
 
-    global_seen: set = set()
+    news_seen: set = set()
 
-    def _clean_urls(urls):
+    def _clean_news_urls(urls):
         result = []
         for u in (urls or []):
             if not u:
                 continue
             if re.match(r"https?://[^/]+/?$", u):
                 continue
-            if u in global_seen:
+            if u in news_seen:
                 continue
-            global_seen.add(u)
+            news_seen.add(u)
+            result.append(u)
+        return result
+
+    community_seen: set = set()
+
+    def _clean_community_urls(urls):
+        result = []
+        for u in (urls or []):
+            if not u:
+                continue
+            if re.match(r"https?://[^/]+/?$", u):
+                continue
+            if u in community_seen:
+                continue
+            community_seen.add(u)
             result.append(u)
         return result
 
     for item in news_items:
-        item["urls"] = _clean_urls(item.get("urls") or [])
-    community_urls = _clean_urls(community_urls)
+        item["urls"] = _clean_news_urls(item.get("urls") or [])
+    community_urls = _clean_community_urls(community_urls)
 
     total_links = sum(len(i.get("urls", [])) for i in news_items)
     print(f"  Building HTML — {len(news_items)} stories, {total_links} source links")

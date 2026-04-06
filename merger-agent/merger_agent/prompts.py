@@ -38,7 +38,7 @@ Produce ONE merged briefing as a JSON object. Rules:
    IMPORTANT: SOURCE E (Social) contains real-time X/Twitter posts, Reddit hot threads, and LinkedIn signals from AI leaders — weight this heavily.
    Include: specific people's hot takes (quote them if notable), top Reddit threads, trending topics on X, developer sentiment.
    Merge any overlapping signals from other sources. Be concrete — names, quotes, post content, subreddits, engagement counts.
-   community_urls — up to 6 URLs from the combined community sources (X posts, Reddit threads, LinkedIn posts preferred over news articles).
+   community_urls — 3-6 URLs that directly back the community_pulse bullets above (X posts, Reddit threads, HN discussions preferred; each URL must correspond to something mentioned in the bullets).
 
 6. news_items — 8-14 items (be comprehensive). For each:
    - vendor: "Anthropic" | "AWS" | "OpenAI" | "Google" | "Azure" | "Meta" | "xAI" | "NVIDIA" | "Mistral" | "Apple" | "Hugging Face" | "Other"

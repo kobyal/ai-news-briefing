@@ -18,12 +18,6 @@ class BriefingContent(BaseModel):
     community_urls: List[str] = []
 
 
-class NewsItemHe(BaseModel):
-    headline_he: str
-    summary_he: str
-
-
 class HebrewBriefing(BaseModel):
     tldr_he: List[str]
-    news_items_he: List[NewsItemHe]
     community_pulse_he: str

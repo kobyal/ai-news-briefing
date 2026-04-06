@@ -27,6 +27,11 @@ REDDIT_FEEDS = [
     ("https://www.reddit.com/r/Futurology/hot.json",         "r/Futurology"),
     ("https://www.reddit.com/r/deeplearning/hot.json",       "r/deeplearning"),
     ("https://www.reddit.com/r/ArtificialIntelligence/hot.json", "r/ArtificialIntelligence"),
+    ("https://www.reddit.com/r/NVIDIA/hot.json",             "r/NVIDIA"),
+    ("https://www.reddit.com/r/aws/hot.json",                "r/aws"),
+    ("https://www.reddit.com/r/HuggingFace/hot.json",        "r/HuggingFace"),
+    ("https://www.reddit.com/r/Bard/hot.json",               "r/Bard"),
+    ("https://www.reddit.com/r/LangChain/hot.json",          "r/LangChain"),
 ]
 
 

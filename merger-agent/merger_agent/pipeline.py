@@ -14,6 +14,7 @@ Steps
 import json
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -169,35 +170,79 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict, tavi
 
 
 def _step3_translate(merged_json: str) -> str:
-    print("\n[3/4] Translator — translating to Hebrew...")
-    # Send only small fields — headlines (short), tldr, community_pulse — no summaries
-    full = _parse(merged_json)
-    slim = json.dumps({
-        "tldr":            full.get("tldr", []),
-        "headlines":       [item.get("headline", "") for item in full.get("news_items", [])],
-        "community_pulse": full.get("community_pulse", ""),
-    }, ensure_ascii=False, indent=2)
-    schema_desc = json.dumps(HebrewBriefing.model_json_schema(), indent=2)
-    result = _agent(
-        input_text=TRANSLATOR_PROMPT.format(briefing_json=slim)
-                   + f"\n\nJSON SCHEMA:\n{schema_desc}",
-        model=_TRANSLATOR_MODEL(),
-        instructions=(
-            "Output ONLY a valid JSON object matching the schema. "
-            "No markdown fences, no explanation, no trailing text. "
-            "CRITICAL: all double-quote characters inside string values MUST be escaped as \\\" — "
-            "this is especially important for Hebrew text. Invalid JSON will break the pipeline."
-        ),
-        json_mode=True,
-        max_steps=1,
-        label="Translator",
-    )
-    # Quick validation — log if _parse would fail
-    try:
-        json.loads(result)
-    except Exception as e:
-        print(f"  [Translator] JSON parse warning: {e} — preview: {result[:300]!r}")
-    return result
+    print("\n[3/4] Translator — two parallel calls (headers+pulse / summaries)...")
+    full  = _parse(merged_json)
+    items = full.get("news_items", [])
+
+    # ── Call A: short fields (tldr + headlines + community_pulse) ─────────────
+    def _translate_short():
+        slim = json.dumps({
+            "tldr":            full.get("tldr", []),
+            "headlines":       [it.get("headline", "") for it in items],
+            "community_pulse": full.get("community_pulse", ""),
+        }, ensure_ascii=False, indent=2)
+        schema_desc = json.dumps(HebrewBriefing.model_json_schema(), indent=2)
+        return _agent(
+            input_text=TRANSLATOR_PROMPT.format(briefing_json=slim)
+                       + f"\n\nJSON SCHEMA:\n{schema_desc}",
+            model=_TRANSLATOR_MODEL(),
+            instructions=(
+                "Output ONLY a valid JSON object matching the schema. "
+                "No markdown fences, no explanation, no trailing text. "
+                "CRITICAL: all double-quote characters inside string values MUST be escaped as \\\" — "
+                "this is especially important for Hebrew text."
+            ),
+            json_mode=True,
+            max_steps=1,
+            label="Translator-A (short)",
+        )
+
+    # ── Call B: summaries ─────────────────────────────────────────────────────
+    def _translate_summaries():
+        summaries_input = json.dumps(
+            {"summaries": [it.get("summary", "") for it in items]},
+            ensure_ascii=False, indent=2,
+        )
+        return _agent(
+            input_text=(
+                "תרגם את הסיכומים הבאים לעברית. שמור על שמות חברות ומוצרים באנגלית.\n\n"
+                + summaries_input
+                + '\n\nהחזר JSON בלבד: {"summaries_he": ["תרגום 1", "תרגום 2", ...]}'
+            ),
+            model=_TRANSLATOR_MODEL(),
+            instructions=(
+                "Output ONLY a valid JSON object with key summaries_he (array of strings). "
+                "No markdown fences. CRITICAL: escape all \" inside strings as \\\"."
+            ),
+            json_mode=True,
+            max_steps=1,
+            label="Translator-B (summaries)",
+        )
+
+    result_short = "{}"
+    result_summaries = "{}"
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_short     = pool.submit(_translate_short)
+        f_summaries = pool.submit(_translate_summaries)
+        try:
+            result_short     = f_short.result()
+        except Exception as e:
+            print(f"  [Translator-A] failed: {e}")
+        try:
+            result_summaries = f_summaries.result()
+        except Exception as e:
+            print(f"  [Translator-B] failed: {e}")
+
+    # Merge: inject summaries_he into the short result
+    he = _parse(result_short)
+    summaries_he = _parse(result_summaries).get("summaries_he", [])
+    if summaries_he:
+        he["summaries_he"] = summaries_he
+        try:
+            return json.dumps(he, ensure_ascii=False)
+        except Exception:
+            pass
+    return result_short
 
 
 def _step4_publish(merged_json: str, hebrew_json: str, social_briefing: dict = None) -> dict:

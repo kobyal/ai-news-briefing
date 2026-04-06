@@ -21,4 +21,5 @@ class BriefingContent(BaseModel):
 class HebrewBriefing(BaseModel):
     tldr_he: List[str]
     headlines_he: List[str]
+    summaries_he: List[str] = []
     community_pulse_he: str

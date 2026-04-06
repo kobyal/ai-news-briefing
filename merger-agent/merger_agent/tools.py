@@ -125,6 +125,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
 
     tldr_he            = he.get("tldr_he", [])
     headlines_he       = he.get("headlines_he", [])
+    summaries_he       = he.get("summaries_he", [])
     community_pulse_he = he.get("community_pulse_he", "")
 
     global_seen: set = set()
@@ -151,7 +152,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
 
     html = _build_html(
         tldr, news_items, community_pulse, topic,
-        tldr_he, headlines_he, community_pulse_he, community_urls,
+        tldr_he, headlines_he, summaries_he, community_pulse_he, community_urls,
         social_data=social_data,
     )
 
@@ -172,12 +173,13 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
 # ---------------------------------------------------------------------------
 
 def _build_html(tldr, news_items, community_pulse, topic,
-                tldr_he=None, headlines_he=None, community_pulse_he="",
+                tldr_he=None, headlines_he=None, summaries_he=None, community_pulse_he="",
                 community_urls=None, social_data=None):
     now          = datetime.now()
     date_display = now.strftime("%B %d, %Y")
     tldr_he        = tldr_he or []
     headlines_he   = headlines_he or []
+    summaries_he   = summaries_he or []
     community_urls = community_urls or []
     social_data    = social_data or {}
 
@@ -288,7 +290,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
         sources_block = f'<div class="sources">{sources_html}</div>' if sources_html else ""
 
         headline_he = headlines_he[idx] if idx < len(headlines_he) else headline
-        summary_he  = summary  # summaries stay in English
+        summary_he  = summaries_he[idx] if idx < len(summaries_he) else summary
 
         cards += f"""<div class="news-card">
 <div class="card-header">

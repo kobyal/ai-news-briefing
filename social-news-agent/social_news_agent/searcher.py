@@ -15,14 +15,18 @@ _SEARCH_MODEL = lambda: os.environ.get("SOCIAL_SEARCH_MODEL", "sonar")
 LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 
 REDDIT_FEEDS = [
-    ("https://www.reddit.com/r/MachineLearning/hot.json",  "r/MachineLearning"),
-    ("https://www.reddit.com/r/LocalLLaMA/hot.json",       "r/LocalLLaMA"),
-    ("https://www.reddit.com/r/artificial/hot.json",        "r/artificial"),
-    ("https://www.reddit.com/r/ChatGPT/hot.json",          "r/ChatGPT"),
-    ("https://www.reddit.com/r/singularity/hot.json",       "r/singularity"),
-    ("https://www.reddit.com/r/OpenAI/hot.json",            "r/OpenAI"),
-    ("https://www.reddit.com/r/ClaudeAI/hot.json",          "r/ClaudeAI"),
-    ("https://www.reddit.com/r/Rag/hot.json",               "r/Rag"),
+    ("https://www.reddit.com/r/MachineLearning/hot.json",    "r/MachineLearning"),
+    ("https://www.reddit.com/r/LocalLLaMA/hot.json",         "r/LocalLLaMA"),
+    ("https://www.reddit.com/r/artificial/hot.json",         "r/artificial"),
+    ("https://www.reddit.com/r/ChatGPT/hot.json",            "r/ChatGPT"),
+    ("https://www.reddit.com/r/singularity/hot.json",        "r/singularity"),
+    ("https://www.reddit.com/r/OpenAI/hot.json",             "r/OpenAI"),
+    ("https://www.reddit.com/r/ClaudeAI/hot.json",           "r/ClaudeAI"),
+    ("https://www.reddit.com/r/Rag/hot.json",                "r/Rag"),
+    ("https://www.reddit.com/r/StableDiffusion/hot.json",    "r/StableDiffusion"),
+    ("https://www.reddit.com/r/Futurology/hot.json",         "r/Futurology"),
+    ("https://www.reddit.com/r/deeplearning/hot.json",       "r/deeplearning"),
+    ("https://www.reddit.com/r/ArtificialIntelligence/hot.json", "r/ArtificialIntelligence"),
 ]
 
 

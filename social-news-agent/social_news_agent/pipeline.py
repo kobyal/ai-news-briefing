@@ -107,6 +107,8 @@ def _step2_write(people: list, topics: list, reddit: list) -> str:
     )
 
     topics_ctx = "\n\n---\n".join(
+        f"TOPIC: {t['topic']}  [USE THIS URL: {t['url']}]\n{t['raw'][:500]}"
+        if t.get("url") else
         f"TOPIC: {t['topic']}\n{t['raw'][:500]}"
         for t in topics
     )
@@ -176,13 +178,13 @@ Return ONLY valid JSON matching this schema:
 def _step3_translate(briefing_json: str) -> str:
     print("\n[3/4] Translator — translating to Hebrew...")
 
-    prompt = f"""אתה עורך תוכן טכנולוגי ישראלי. תרגם את דופק הקהילה הבא לעברית.
+    prompt = f"""אתה עורך בכיר בג׳יקטיים (Geektime) — כתב AI ישראלי מנוסה. תרגם את דופק הקהילה הבא לעברית עיתונאית מקצועית.
 
 כללים:
-1. שמור באנגלית: שמות אנשים, שמות חברות, Claude, Gemini, GPT, OpenAI, Anthropic, AWS, Azure, Google, AI, API, LLM, X, Reddit, LinkedIn וכל שם מוצר/פלטפורמה
-2. טון מקצועי אך קליל — כמו פוסט טק ישראלי
-3. שמור על פורמט הנקודות (• בתחילת כל שורה בכל שדה של bullet points)
-4. תרגם community_pulse, tldr, ו-trending_topics
+1. שמות אנשים, חברות ומוצרים — תמיד באנגלית: Claude, Gemini, GPT, OpenAI, Anthropic, AWS, Azure, Google, Meta, NVIDIA, X, Reddit, LinkedIn וכו׳
+2. מונחים טכניים מקובלים — השאר באנגלית: AI, API, LLM, benchmark, agent, prompt, token, open-source
+3. טון: עיתונאי-טכנולוגי ישיר, לא אקדמי ולא שיווקי — כמו ידיעה ב-Geektime
+4. שמור על פורמט הנקודות (• בתחילת כל שורה)
 
 חוק JSON קריטי: אסור להשתמש במרכאות ASCII (") בתוך ערכי מחרוזות עברית. כל " חייב להיות מוסלש כ-\\"
 

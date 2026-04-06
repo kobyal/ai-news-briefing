@@ -131,7 +131,13 @@ def fetch_topic_signals(max_workers: int = 8) -> list[dict]:
             f'Include key quotes and source links.'
         )
         raw = _px_search(query, label=topic[:45])
-        return {"topic": topic, "raw": raw}
+        # Extract first citation URL directly from the [SOURCES: ...] block
+        url = ""
+        import re as _re
+        m = _re.search(r'\[SOURCES:\s*(https?://[^\s]+)', raw)
+        if m:
+            url = m.group(1).strip()
+        return {"topic": topic, "raw": raw, "url": url}
 
     print(f"  Searching {len(TOPIC_SEARCHES)} topic buckets...")
     results = []

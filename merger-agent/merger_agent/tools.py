@@ -289,7 +289,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
 
         he_item     = news_items_he[idx] if idx < len(news_items_he) else {}
         headline_he = he_item.get("headline_he", headline)
-        summary_he  = he_item.get("summary_he", "")
+        summary_he  = he_item.get("summary_he", summary)  # fall back to English if not translated
 
         cards += f"""<div class="news-card">
 <div class="card-header">

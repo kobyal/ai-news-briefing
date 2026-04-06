@@ -60,16 +60,18 @@ def build_and_save_html(briefing_json: str, hebrew_json: str) -> dict:
     # People highlight cards
     people_cards = ""
     for p in people_highlights[:6]:
-        name   = p.get("name", "")
-        handle = p.get("handle", "").lstrip("@")
-        org    = p.get("org", "")
-        role   = p.get("role", "")
-        post   = p.get("post", "")
-        url    = p.get("url", "")
-        why    = p.get("why", "")
-        link   = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
-        org_badge = f'<span class="person-org-badge">{org}</span>' if org else ""
-        subtitle = f"@{handle}" + (f" · {role}" if role else "")
+        name       = p.get("name", "")
+        handle     = p.get("handle", "").lstrip("@")
+        org        = p.get("org", "")
+        role       = p.get("role", "")
+        post       = p.get("post", "")
+        url        = p.get("url", "")
+        why        = p.get("why", "")
+        engagement = p.get("engagement", "")
+        link       = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
+        org_badge  = f'<span class="person-org-badge">{org}</span>' if org else ""
+        eng_badge  = f'<span class="engagement-badge">🔥 {engagement}</span>' if engagement else ""
+        subtitle   = f"@{handle}" + (f" · {role}" if role else "")
         people_cards += f"""<div class="person-card">
   <div class="person-header">
     <span class="person-avatar">{name[0].upper()}</span>
@@ -79,6 +81,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str) -> dict:
     </div>
   </div>
   <p class="person-post">"{post}"</p>
+  {eng_badge}
   <p class="person-why">{why}</p>
   {link}
 </div>"""
@@ -146,7 +149,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .person-header{{display:flex;align-items:center;gap:12px;margin-bottom:10px}}
 .person-avatar{{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6e40c9,#2ea043);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff;flex-shrink:0}}
 .person-name{{font-weight:700;font-size:14px;color:#e6edf3}}
-.person-handle{{font-size:12px;color:#8b949e}}.person-org-badge{{font-size:11px;font-weight:600;background:#1f2937;color:#6ee7b7;border:1px solid #374151;border-radius:4px;padding:1px 6px}}
+.person-handle{{font-size:12px;color:#8b949e}}.person-org-badge{{font-size:11px;font-weight:600;background:#1f2937;color:#6ee7b7;border:1px solid #374151;border-radius:4px;padding:1px 6px}}.engagement-badge{{display:inline-block;font-size:11px;font-weight:600;background:#1c1f26;color:#fb923c;border:1px solid #374151;border-radius:4px;padding:2px 8px;margin-bottom:6px}}
 .person-post{{font-size:14px;color:#c9d1d9;line-height:1.6;font-style:italic;margin-bottom:6px;border-left:3px solid #30363d;padding-left:10px}}
 .person-why{{font-size:12px;color:#8b949e;margin-bottom:6px}}
 .x-link{{font-size:12px;color:#58a6ff;text-decoration:none}}

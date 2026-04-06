@@ -24,20 +24,39 @@ def _parse(value):
             return ast.literal_eval(value)
         except Exception:
             pass
+        # Fix unescaped quotes in Hebrew strings: ארה"ב → ארה\"ב
         try:
-            fixed = re.sub(r'([\u0590-\u05FF])"([\u0590-\u05FF])', r'\1\u05f4\2', value)
+            fixed = re.sub(r'([\u0590-\u05FF])"([\u0590-\u05FF\s])', r'\1\\\"\2', value)
+            fixed = re.sub(r'([\u0590-\u05FF])"([^,}\]])', r'\1\\\"\2', fixed)
             return json.loads(fixed)
         except Exception:
             pass
+        # Aggressive fix: escape all bare quotes inside string values
         try:
             fixed = re.sub(
-                r'(?<=: ")(.+?)(?="(?:\s*[,}]))',
+                r'(?<=: ")(.+?)(?="(?:\s*[,}\]]))',
                 lambda m: m.group(0).replace('"', '\\"'),
                 value,
+                flags=re.DOTALL,
             )
             return json.loads(fixed)
         except Exception:
             pass
+        # Last resort: extract what we can field by field
+        result = {}
+        for key in ("tldr_he", "community_pulse_he"):
+            m = re.search(rf'"{key}"\s*:\s*"(.*?)"(?=\s*[,}}])', value, re.DOTALL)
+            if m:
+                result[key] = m.group(1)
+        arr_m = re.search(r'"tldr_he"\s*:\s*\[([^\]]+)\]', value, re.DOTALL)
+        if arr_m:
+            items = re.findall(r'"([^"]+)"', arr_m.group(1))
+            if items:
+                result["tldr_he"] = items
+        if result:
+            print(f"  [_parse] partial recovery: {list(result.keys())}")
+            return result
+        print(f"  [_parse] FAILED on: {value[:200]!r}")
     return {}
 
 
@@ -195,23 +214,26 @@ def _build_html(tldr, news_items, community_pulse, topic,
     ]
     people_cards_html = ""
     for p in people_highlights[:6]:
-        name   = p.get("name", "")
-        handle = p.get("handle", "").lstrip("@")
-        org    = p.get("org", "")
-        role   = p.get("role", "")
-        post   = p.get("post", "")
-        url    = p.get("url", "")
-        why    = p.get("why", "")
-        link   = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
-        initial = name[0].upper() if name else "?"
-        org_badge = f'<span class="person-org-badge">{org}</span>' if org else ""
-        subtitle = f"@{handle}" + (f" · {role}" if role else "")
+        name       = p.get("name", "")
+        handle     = p.get("handle", "").lstrip("@")
+        org        = p.get("org", "")
+        role       = p.get("role", "")
+        post       = p.get("post", "")
+        url        = p.get("url", "")
+        why        = p.get("why", "")
+        engagement = p.get("engagement", "")
+        link       = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
+        initial    = name[0].upper() if name else "?"
+        org_badge  = f'<span class="person-org-badge">{org}</span>' if org else ""
+        eng_badge  = f'<span class="engagement-badge">🔥 {engagement}</span>' if engagement else ""
+        subtitle   = f"@{handle}" + (f" · {role}" if role else "")
         people_cards_html += f"""<div class="person-card">
 <div class="person-header">
 <span class="person-avatar">{initial}</span>
 <div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">{name}</span>{org_badge}</div><span class="person-handle">{subtitle}</span></div>
 </div>
 <p class="person-post">"{post}"</p>
+{eng_badge}
 <p class="person-why">{why}</p>
 {link}
 </div>"""
@@ -342,7 +364,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .person-header{{display:flex;align-items:center;gap:12px;margin-bottom:10px}}
 .person-avatar{{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#d97706,#92400e);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff;flex-shrink:0}}
 .person-name{{font-weight:700;font-size:14px;color:#0f172a}}
-.person-handle{{font-size:12px;color:#94a3b8}}.person-org-badge{{font-size:11px;font-weight:600;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;padding:1px 6px}}
+.person-handle{{font-size:12px;color:#94a3b8}}.person-org-badge{{font-size:11px;font-weight:600;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;padding:1px 6px}}.engagement-badge{{display:inline-block;font-size:11px;font-weight:600;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;padding:2px 8px;margin-bottom:6px}}
 .person-post{{font-size:14px;color:#374151;line-height:1.6;font-style:italic;margin-bottom:6px;border-left:3px solid #fde68a;padding-left:10px}}
 .person-why{{font-size:12px;color:#94a3b8;margin-bottom:6px}}
 .x-link{{font-size:12px;color:#d97706;text-decoration:none}}

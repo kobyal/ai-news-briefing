@@ -171,18 +171,26 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict, tavi
 def _step3_translate(merged_json: str) -> str:
     print("\n[3/4] Translator — translating to Hebrew...")
     schema_desc = json.dumps(HebrewBriefing.model_json_schema(), indent=2)
-    return _agent(
+    result = _agent(
         input_text=TRANSLATOR_PROMPT.format(briefing_json=merged_json)
                    + f"\n\nJSON SCHEMA:\n{schema_desc}",
         model=_TRANSLATOR_MODEL(),
         instructions=(
             "Output ONLY a valid JSON object matching the schema. "
-            "No markdown fences, no explanation, no trailing text."
+            "No markdown fences, no explanation, no trailing text. "
+            "CRITICAL: all double-quote characters inside string values MUST be escaped as \\\" — "
+            "this is especially important for Hebrew text. Invalid JSON will break the pipeline."
         ),
         json_mode=True,
         max_steps=1,
         label="Translator",
     )
+    # Quick validation — log if _parse would fail
+    try:
+        json.loads(result)
+    except Exception as e:
+        print(f"  [Translator] JSON parse warning: {e} — preview: {result[:300]!r}")
+    return result
 
 
 def _step4_publish(merged_json: str, hebrew_json: str, social_briefing: dict = None) -> dict:

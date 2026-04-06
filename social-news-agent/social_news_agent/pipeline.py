@@ -121,13 +121,14 @@ def _step2_write(people: list, topics: list, reddit: list) -> str:
         "community_urls":  ["4-8 source URLs mixing X posts, Reddit threads, LinkedIn posts"],
         "people_highlights": [
             {
-                "name":   "person name",
-                "handle": "@handle",
-                "org":    "company or affiliation (e.g. OpenAI, Google DeepMind, Anthropic)",
-                "role":   "their title or role (e.g. CEO, Co-founder, Research Scientist)",
-                "post":   "what they said / key quote",
-                "url":    "link if found",
-                "why":    "why this matters for the AI community"
+                "name":       "person name",
+                "handle":     "@handle",
+                "org":        "company or affiliation (e.g. OpenAI, Google DeepMind, Anthropic)",
+                "role":       "their title or role (e.g. CEO, Co-founder, Research Scientist)",
+                "post":       "what they said / key quote",
+                "url":        "link if found",
+                "engagement": "crowd response if known: e.g. '12K likes', 'went viral', '500 replies', or empty string if unknown",
+                "why":        "why this matters for the AI community"
             }
         ],
         "top_reddit": [

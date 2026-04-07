@@ -222,14 +222,14 @@ Unlike the other agents, this one targets **social networks** rather than news s
 **What it tracks:**
 - **62 AI leaders on X/Twitter** — CEOs, researchers, builders, critics across Anthropic, OpenAI, Google DeepMind, xAI, Microsoft, Meta, NVIDIA, Mistral, Cohere, Hugging Face, Perplexity, Scale AI and more
 - **20 trending topic searches** on X + LinkedIn — model releases, benchmark debates, coding tools (Cursor/Windsurf/Devin), open-source reactions, AI safety discourse, viral demos
-- **6 Reddit communities** — r/MachineLearning, r/LocalLLaMA, r/artificial, r/ChatGPT, r/singularity, r/Rag — fetched directly via the Reddit JSON API (no LLM needed)
+- **17 Reddit communities** — r/MachineLearning, r/LocalLLaMA, r/artificial, r/ChatGPT, r/singularity, r/OpenAI, r/ClaudeAI, r/Rag, r/StableDiffusion, r/Futurology, r/deeplearning, r/ArtificialIntelligence, r/NVIDIA, r/aws, r/HuggingFace, r/Bard, r/LangChain — fetched directly via the Reddit JSON API (no LLM needed)
 
 ```mermaid
 flowchart LR
     subgraph fetch["Parallel fetch"]
         P["People searcher\nPerplexity web_search\n× 62 AI leaders on X"]
         T["Topic searcher\nPerplexity web_search\n× 20 trending topics"]
-        R["Reddit fetcher\nDirect JSON API\n× 6 subreddits"]
+        R["Reddit fetcher\nDirect JSON API\n× 17 subreddits"]
     end
     P & T & R -->
     BW["SocialWriter\nSonnet · community pulse\npeople highlights\ntop Reddit"] -->
@@ -264,7 +264,7 @@ LOOKBACK_DAYS=3
     "top_reddit": [
       {"subreddit": "r/...", "title": "...", "score": 0, "url": "..."}
     ],
-    "trending_topics": ["...", "..."],
+    "trending_topics": [{"label": "...", "url": "..."}],
     "tldr": ["..."]
   }
 }
@@ -367,7 +367,8 @@ The Merger saves to `merger-agent/output/YYYY-MM-DD/merged_HHMMSS.{html,json}` a
   },
   "briefing_he": {
     "tldr_he": ["..."],
-    "news_items_he": [{"headline_he", "summary_he"}],
+    "headlines_he": ["..."],
+    "summaries_he": ["..."],
     "community_pulse_he": "• ..."
   }
 }

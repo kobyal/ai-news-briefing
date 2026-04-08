@@ -63,6 +63,36 @@ jobs:
             exit 1
           fi
 
+      - name: Publish combined data JSON to docs/data/ (for Lambda ingestion)
+        run: |
+          python3 - <<'PYEOF'
+import json, glob, os
+from datetime import datetime
+
+date_str = datetime.utcnow().strftime("%Y-%m-%d")
+merger_files = sorted(glob.glob("merger-agent/output/**/*.json", recursive=True), reverse=True)
+social_files = sorted(glob.glob("social-news-agent/output/**/*.json", recursive=True), reverse=True)
+
+merger = json.load(open(merger_files[0])) if merger_files else {}
+social = json.load(open(social_files[0])) if social_files else {}
+
+published = {
+    "date":        date_str,
+    "briefing":    merger.get("briefing", {}),
+    "briefing_he": merger.get("briefing_he", {}),
+    "social":      social.get("briefing", {}),
+    "social_he":   social.get("briefing_he", {}),
+}
+os.makedirs("docs/data", exist_ok=True)
+path = f"docs/data/{date_str}.json"
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(published, f, ensure_ascii=False)
+# also write latest.json as a convenience alias
+with open("docs/data/latest.json", "w", encoding="utf-8") as f:
+    json.dump(published, f, ensure_ascii=False)
+print(f"Published {path} ({len(merger.get('briefing',{}).get('news_items',[]))} stories)")
+PYEOF
+
       - name: Commit and push outputs
         run: |
           git config user.name "github-actions[bot]"

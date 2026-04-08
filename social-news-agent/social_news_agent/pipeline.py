@@ -136,10 +136,6 @@ def _step2_write(people: list, topics: list, reddit: list) -> str:
         "top_reddit": [
             {"subreddit": "string", "title": "string", "score": 0, "url": "string"}
         ],
-        "trending_topics": [
-            {"label": "2-5 word punchy topic name (e.g. 'AGI timeline debate', 'Benchmark crisis')",
-             "url": "best source URL from the data above for this trend, or empty string"}
-        ],
         "tldr": ["3-4 bullet strings — the overall social mood and what AI Twitter/Reddit is buzzing about today"],
     }, indent=2)
 
@@ -167,7 +163,6 @@ WHAT TO DO WITH REAL DATA:
 - Surface what AI practitioners are ACTUALLY saying — quote them when possible
 - Identify controversies, excitement, hot takes from the topic signals
 - community_pulse bullets: draw from topic signals and any real people signals
-- trending_topics: extract from topic signals — what themes recur across searches? For each topic's url field, pick a real URL from the [SOURCES: ...] block in the corresponding TOPIC SIGNAL above. NEVER leave url empty if sources are available.
 
 Return ONLY valid JSON matching this schema:
 {schema}"""
@@ -182,9 +177,16 @@ def _step3_translate(briefing_json: str) -> str:
 
 כללים:
 1. שמות אנשים, חברות ומוצרים — תמיד באנגלית: Claude, Gemini, GPT, OpenAI, Anthropic, AWS, Azure, Google, Meta, NVIDIA, X, Reddit, LinkedIn וכו׳
-2. מונחים טכניים מקובלים — השאר באנגלית: AI, API, LLM, benchmark, agent, prompt, token, open-source
+2. מונחים טכניים מקובלים — השאר באנגלית: AI, API, LLM, benchmark, agent, prompt, token, open-source, cybersecurity
 3. טון: עיתונאי-טכנולוגי ישיר, לא אקדמי ולא שיווקי — כמו ידיעה ב-Geektime
 4. שמור על פורמט הנקודות (• בתחילת כל שורה)
+
+חשוב: תרגם בצורה טבעית ולא מילולית. כתוב כמו שעיתונאי ישראלי היה כותב מאפס.
+דוגמאות לתרגום גרוע ← טוב:
+- ❌ "אבטחה קיברנטית" ← ✅ "אבטחת סייבר"
+- ❌ "הוקפאה מהגישה הציבורית" ← ✅ "לא שוחררה לציבור"
+- ❌ "ארגונים מאומתים" ← ✅ "ארגונים מורשים"
+אם המשפט נשמע כמו Google Translate — תכתוב אותו מחדש.
 
 חוק JSON קריטי: אסור להשתמש במרכאות ASCII (") בתוך ערכי מחרוזות עברית. כל " חייב להיות מוסלש כ-\\"
 
@@ -193,8 +195,7 @@ def _step3_translate(briefing_json: str) -> str:
 
 החזר JSON תקין בלבד עם:
 - community_pulse_he: מחרוזת עברית עם נקודות בולט (• לפני כל נקודה)
-- tldr_he: רשימה של 3-4 משפטי בולט בעברית
-- trending_topics_he: רשימה של 3-5 נושאים בעברית"""
+- tldr_he: רשימה של 3-4 משפטי בולט בעברית"""
 
     return _llm(prompt, model=_TRANSLATOR_MODEL(), json_mode=True, label="Translator")
 

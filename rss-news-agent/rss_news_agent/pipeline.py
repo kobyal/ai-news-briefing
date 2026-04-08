@@ -137,14 +137,17 @@ Return ONLY valid JSON. No markdown fences."""
 
 def _step3_translate(briefing_json: str) -> str:
     print("\n[3/4] Translator — translating to Hebrew...")
-    prompt = f"""אתה עורך תוכן טכנולוגי ישראלי. תרגם את עלון ה-AI הבא לעברית.
+    prompt = f"""אתה עורך בכיר ב-Geektime — כתב AI ישראלי מנוסה. תרגם את עלון ה-AI הבא לעברית עיתונאית מקצועית.
 
 כללים:
-1. שמור באנגלית: Claude, Gemini, GPT, OpenAI, Anthropic, AWS, Bedrock, Azure, Google, AI, API, LLM וכל שם מוצר
+1. שמור באנגלית: Claude, Gemini, GPT, OpenAI, Anthropic, AWS, Bedrock, Azure, Google, AI, API, LLM, benchmark, agent, open-source, cybersecurity וכל שם מוצר
 2. תאריכים נשארים כמו שהם (April 2, וכו׳)
-3. טון מקצועי — כמו עיתון טכנולוגי ישראלי
+3. טון: עיתונאי-טכנולוגי, ישיר, מקצועי — כמו ידיעה ב-Geektime
 4. אל תקצר — אורך דומה למקור
 5. community_pulse_he — שמור על פורמט הנקודות (• בתחילת כל שורה)
+6. תרגם טבעי — לא מילולי. אם נשמע כמו Google Translate, כתוב מחדש.
+   ❌ אבטחה קיברנטית → ✅ אבטחת סייבר | ❌ הוקפאה מהגישה הציבורית → ✅ לא שוחררה לציבור
+   ❌ ארגונים מאומתים → ✅ ארגונים מורשים | ❌ מודל שפה גדול → ✅ LLM
 
 חוק JSON קריטי: אסור להשתמש במרכאות ASCII (") בתוך ערכי מחרוזות עברית.
 כל " בתוך ערך מחרוזת חייב להיות מוסלש כ-\\" — אחרת ה-JSON לא תקין.

@@ -71,13 +71,16 @@ Return ONLY valid JSON. No markdown fences, no explanation — just the JSON obj
 """
 
 TRANSLATOR_PROMPT = """\
-אתה עורך תוכן טכנולוגי ישראלי. תרגם את עלון ה-AI הבא לעברית.
+אתה עורך בכיר ב-Geektime — כתב AI ישראלי מנוסה. תרגם את עלון ה-AI הבא לעברית עיתונאית מקצועית.
 
 כללים:
-1. שמור באנגלית: Claude, Gemini, GPT, OpenAI, Anthropic, AWS, Bedrock, Azure, Google, AI, API, LLM וכל שם מוצר
+1. שמור באנגלית: Claude, Gemini, GPT, OpenAI, Anthropic, AWS, Bedrock, Azure, Google, AI, API, LLM, benchmark, agent, open-source, cybersecurity וכל שם מוצר
 2. תאריכים נשארים כמו שהם (April 2, וכו׳)
-3. טון מקצועי — כמו עיתון טכנולוגי ישראלי
+3. טון: עיתונאי-טכנולוגי, ישיר, מקצועי — כמו ידיעה ב-Geektime
 4. אל תקצר — אורך דומה למקור
+5. תרגם טבעי — לא מילולי. אם נשמע כמו Google Translate, כתוב מחדש.
+   ❌ אבטחה קיברנטית → ✅ אבטחת סייבר | ❌ הוקפאה מהגישה הציבורית → ✅ לא שוחררה לציבור
+   ❌ ארגונים מאומתים → ✅ ארגונים מורשים | ❌ מודל שפה גדול → ✅ LLM
 
 חוק JSON קריטי: אסור להשתמש במרכאות ASCII (") בתוך ערכי מחרוזות עברית.
 במקום ארה"ב כתוב ארה״ב (גרשיים עבריים U+05F4) או ארצות הברית.

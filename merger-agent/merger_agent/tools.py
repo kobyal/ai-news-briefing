@@ -201,27 +201,6 @@ def _build_html(tldr, news_items, community_pulse, topic,
     tldr_en_html = "".join(f"<li>{item}</li>" for item in tldr)
     tldr_he_html = "".join(f"<li>{item}</li>" for item in tldr_he)
 
-    # ── Social: Trending chips ──────────────────────────────────────────────
-    trending_topics = social_data.get("trending_topics", []) or []
-    trending_html = ""
-    if trending_topics:
-        chips = ""
-        for t in trending_topics:
-            if isinstance(t, dict):
-                label = t.get("label") or t.get("topic") or str(t)
-                url   = t.get("url", "")
-            else:
-                label = str(t)
-                url   = ""
-            if url:
-                chips += f'<a href="{url}" class="chip chip-link" target="_blank">{label}</a>'
-            else:
-                chips += f'<span class="chip">{label}</span>'
-        trending_html = f"""<div class="trending-row">
-<span class="trending-label">🔥 Trending on X</span>
-<div class="chips">{chips}</div>
-</div>"""
-
     # ── Social: People Talking Today ────────────────────────────────────────
     _bad = {"no posts retrievable", "unavailable", "could not be confirmed",
             "not available", "no recent posts", "search unavailable", "no posts"}
@@ -428,7 +407,6 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <ul id="tldr-en">{tldr_en_html}</ul>
 <ul id="tldr-he" dir="rtl" style="display:none">{tldr_he_html}</ul>
 </div>
-{trending_html}
 <div class="section-label" id="news-label">Latest News</div>
 {cards}
 {people_section_html}

@@ -44,12 +44,10 @@ def build_and_save_html(briefing_json: str, hebrew_json: str) -> dict:
     community_urls     = data.get("community_urls", []) or []
     people_highlights  = data.get("people_highlights", []) or []
     top_reddit         = data.get("top_reddit", []) or []
-    trending_topics    = data.get("trending_topics", []) or []
     tldr               = data.get("tldr", []) or []
 
     community_pulse_he = he.get("community_pulse_he", "")
     tldr_he            = he.get("tldr_he", []) or []
-    trending_he        = he.get("trending_topics_he", []) or []
 
     now          = datetime.now()
     date_display = now.strftime("%B %d, %Y")
@@ -112,9 +110,6 @@ def build_and_save_html(briefing_json: str, hebrew_json: str) -> dict:
         if url:
             return f'<a href="{url}" class="chip chip-link" target="_blank">{label}</a>'
         return f'<span class="chip">{label}</span>'
-
-    trending_en = "".join(_chip(t) for t in trending_topics)
-    trending_he = "".join(f'<span class="chip">{t}</span>' for t in trending_he)
 
     # Source links
     community_links = "".join(
@@ -187,10 +182,6 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <ul id="tldr-en" class="bullets">{tldr_en_html}</ul>
 <ul id="tldr-he" class="bullets" dir="rtl" style="display:none">{tldr_he_html}</ul>
 </div>
-
-<div class="section-label">🔥 Trending Now</div>
-<div class="chips en-content">{trending_en}</div>
-<div class="chips he-content" dir="rtl" style="display:none">{trending_he}</div>
 
 <div class="section-label">👤 People to Watch</div>
 {people_cards}

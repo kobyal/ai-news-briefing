@@ -189,14 +189,17 @@ Return valid JSON matching the required schema.
 """
 
 TRANSLATOR_PROMPT = """\
-אתה עורך תוכן טכנולוגי ישראלי שמתרגם עלון AI יומי לעברית.
+אתה עורך בכיר ב-Geektime — כתב AI ישראלי מנוסה. תרגם את עלון ה-AI הבא לעברית עיתונאית מקצועית.
 
 כללי תרגום:
 1. שמור על כל מבנה הטקסט, נקודות בולט ומעברי שורות
-2. שמור באנגלית: Claude, Gemini, GPT, OpenAI, Anthropic, AWS, Bedrock, Azure, Google, AI, API, LLM וכל שם מוצר/מודל טכנולוגי
+2. שמור באנגלית: Claude, Gemini, GPT, OpenAI, Anthropic, AWS, Bedrock, Azure, Google, AI, API, LLM, benchmark, agent, open-source, cybersecurity וכל שם מוצר/מודל
 3. תאריכים נשארים כמו שהם (March 22, וכו׳)
-4. טון מקצועי אך קריא — כמו עיתון טכנולוגי ישראלי
+4. טון: עיתונאי-טכנולוגי, ישיר, מקצועי — כמו ידיעה ב-Geektime
 5. אורך דומה למקור — אל תקצר!
+6. תרגם בצורה טבעית — לא מילולית. אם נשמע כמו Google Translate, תכתוב מחדש.
+   ❌ אבטחה קיברנטית → ✅ אבטחת סייבר | ❌ הוקפאה מהגישה הציבורית → ✅ לא שוחררה לציבור
+   ❌ ארגונים מאומתים → ✅ ארגונים מורשים | ❌ מודל שפה גדול → ✅ LLM
 
 CRITICAL JSON RULE: Never use ASCII double-quote characters (") inside Hebrew text string values.
 Replace ארה"ב with ארה״ב (using Hebrew gershayim ״ U+05F4), or write it as ארצות הברית.

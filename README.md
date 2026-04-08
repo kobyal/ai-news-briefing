@@ -221,14 +221,13 @@ Unlike the other agents, this one targets **social networks** rather than news s
 
 **What it tracks:**
 - **62 AI leaders on X/Twitter** — CEOs, researchers, builders, critics across Anthropic, OpenAI, Google DeepMind, xAI, Microsoft, Meta, NVIDIA, Mistral, Cohere, Hugging Face, Perplexity, Scale AI and more
-- **20 trending topic searches** on X + LinkedIn — model releases, benchmark debates, coding tools (Cursor/Windsurf/Devin), open-source reactions, AI safety discourse, viral demos
 - **17 Reddit communities** — r/MachineLearning, r/LocalLLaMA, r/artificial, r/ChatGPT, r/singularity, r/OpenAI, r/ClaudeAI, r/Rag, r/StableDiffusion, r/Futurology, r/deeplearning, r/ArtificialIntelligence, r/NVIDIA, r/aws, r/HuggingFace, r/Bard, r/LangChain — fetched directly via the Reddit JSON API (no LLM needed)
 
 ```mermaid
 flowchart LR
     subgraph fetch["Parallel fetch"]
         P["People searcher\nPerplexity web_search\n× 62 AI leaders on X"]
-        T["Topic searcher\nPerplexity web_search\n× 20 trending topics"]
+        T["Topic searcher\nPerplexity web_search\n× 20 AI topics"]
         R["Reddit fetcher\nDirect JSON API\n× 17 subreddits"]
     end
     P & T & R -->
@@ -264,7 +263,6 @@ LOOKBACK_DAYS=3
     "top_reddit": [
       {"subreddit": "r/...", "title": "...", "score": 0, "url": "..."}
     ],
-    "trending_topics": [{"label": "...", "url": "..."}],
     "tldr": ["..."]
   }
 }
@@ -278,7 +276,7 @@ LOOKBACK_DAYS=3
 **Models:** Claude Sonnet 4.6 (merge), Claude Haiku 4.5 (translate)
 **Cost:** ~$0.18/run | **Time:** ~3 min
 
-Reads the latest JSON from all 5 source pipelines (gracefully skips missing ones). The social agent's output is treated differently — its `people_highlights`, `top_reddit`, and `trending_topics` are passed **directly** to the HTML builder, bypassing LLM compression. Only the `community_pulse` is fed into the merge prompt to enrich the final community section.
+Reads the latest JSON from all 5 source pipelines (gracefully skips missing ones). The social agent's output is treated differently — its `people_highlights` and `top_reddit` are passed **directly** to the HTML builder, bypassing LLM compression. Only the `community_pulse` is fed into the merge prompt to enrich the final community section.
 
 ```mermaid
 flowchart LR
@@ -297,8 +295,7 @@ flowchart LR
 
 **Output HTML sections:**
 1. **TL;DR** — 5-6 bullets from the merged news
-2. **🔥 Trending on X** — chips from social `trending_topics`
-3. **Latest News** — 8-14 story cards with vendor badge, date, summary, source links
+2. **Latest News** — 8-14 story cards with vendor badge, date, summary, source links
 4. **👤 People Talking Today** — person cards from social `people_highlights`: avatar, handle, org, actual post quote, why it matters, link
 5. **🟠 Hot on Reddit** — top Reddit posts with subreddit badge, upvote score, direct link
 6. **Community Pulse** — synthesised from all 5 sources (social heavily weighted)
@@ -341,7 +338,7 @@ Each pipeline surfaces **different signals** because they use fundamentally diff
 | **Tavily** | Purpose-built news API | Freshest articles, multi-source per vendor |
 | **Social** | X/Twitter · Reddit · LinkedIn | What AI practitioners are saying *right now* — people highlights, hot takes, viral posts |
 
-The merger deduplicates overlapping news stories while preserving unique finds. The social agent's structured data (person cards, Reddit rows, trending topics) is rendered directly into the newsletter without compression.
+The merger deduplicates overlapping news stories while preserving unique finds. The social agent's structured data (person cards, Reddit rows) is rendered directly into the newsletter without compression.
 
 ---
 

@@ -138,9 +138,10 @@ def _step2_write(people: list, topics: list, reddit: list) -> str:
                 "org":        "company or affiliation (e.g. OpenAI, Google DeepMind, Anthropic)",
                 "role":       "their title or role (e.g. CEO, Co-founder, Research Scientist)",
                 "post":       "what they said / key quote",
-                "url":        "link if found",
-                "engagement": "crowd response if known: e.g. '12K likes', 'went viral', '500 replies', or empty string if unknown",
-                "why":        "why this matters for the AI community"
+                "date":       "exact date of the post/statement (e.g. 'April 7, 2026'). REQUIRED — extract from the data above.",
+                "url":        "direct URL to the tweet, article, or interview. Check [SOURCES: ...] blocks in PEOPLE SIGNALS for real URLs. NEVER leave empty if sources exist.",
+                "engagement": "crowd response: e.g. '12K likes, 2K retweets', 'went viral on X', '500 replies', or empty string if truly unknown",
+                "why":        "why this matters for the AI community (1-2 sentences)"
             }
         ],
         "top_reddit": [
@@ -168,6 +169,18 @@ ANTI-HALLUCINATION (most important):
 - people_highlights: ONLY include a person if their actual post text appears in PEOPLE SIGNALS above. If a person is not in the data, do NOT invent an entry for them. If no real posts were found, return people_highlights as an empty array [].
 - top_reddit: ONLY include posts that appear in REDDIT HOT POSTS above with real titles and scores. Do NOT invent subreddit names or posts. If reddit data is empty, return top_reddit as an empty array [].
 - community_urls: only use URLs that appear verbatim in the data above.
+
+URL EXTRACTION (critical for people_highlights):
+- Each person's PEOPLE SIGNALS section ends with [SOURCES: url1 url2 ...]. These are REAL URLs from Perplexity's search.
+- For each person in people_highlights, you MUST pick the best URL from their [SOURCES: ...] block.
+- Prefer x.com/twitter.com URLs (direct tweet links) > news article URLs > blog URLs.
+- If no [SOURCES: ...] block exists for that person, check if any URL appears in the raw text itself.
+- NEVER leave the url field as empty string "" if there are sources available in the data.
+
+DATE EXTRACTION:
+- Extract the specific date of each person's post/statement from the raw signal text.
+- Look for patterns like "April 7", "on Monday", "yesterday", "this week" and convert to exact date.
+- If the raw text mentions a date, use it. If not, use "This week" as fallback.
 
 WHAT TO DO WITH REAL DATA:
 - Surface what AI practitioners are ACTUALLY saying — quote them when possible

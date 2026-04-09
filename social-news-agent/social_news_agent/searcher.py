@@ -98,10 +98,13 @@ def fetch_people_signals(max_workers: int = 12) -> list[dict]:
 
         query = (
             f'What has {name} (@{handle}, {role} at {org}) said or done publicly about AI in the past {days} days? '
-            f'Find their tweets, blog posts, conference talks, interviews, or widely-reported statements. '
-            f'Return the actual content or key quotes, include source URLs, '
-            f'and mention engagement if available (e.g. how many likes/retweets/replies the post got, '
-            f'or whether it went viral/was widely shared/discussed). '
+            f'Find their tweets on x.com, blog posts, conference talks, interviews, or widely-reported statements. '
+            f'For EACH item you find, you MUST include: '
+            f'1. The exact date (e.g. "April 7, 2026") '
+            f'2. A direct URL to the source (tweet URL like x.com/{handle}/status/..., article URL, YouTube link, etc.) '
+            f'3. The actual quote or key content '
+            f'4. Engagement metrics if available (likes, retweets, replies, views) '
+            f'If you cannot find a direct URL, provide the URL of the news article that reported it. '
             f'If there is nothing noteworthy from the past {days} days, say so briefly.'
         )
         raw = _px_search(query, label=f"@{handle}")

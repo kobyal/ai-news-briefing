@@ -367,11 +367,6 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .community-bullets{{padding-left:18px;font-size:14px;line-height:1.8;color:#374151;list-style:disc}}
 .community-bullets[dir=rtl]{{padding-left:0;padding-right:18px;text-align:right}}
 .community-bullets li{{margin-bottom:8px}}
-/* Trending chips */
-.trending-row{{background:#fff;border-radius:12px;padding:14px 20px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}}
-.trending-label{{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#d97706;white-space:nowrap;padding-top:4px}}
-.chips{{display:flex;flex-wrap:wrap;gap:7px}}
-.chip{{background:#fef3c7;border:1px solid #fde68a;border-radius:20px;padding:3px 12px;font-size:12px;color:#92400e;font-weight:500}}.chip-link{{text-decoration:none;cursor:pointer}}.chip-link:hover{{background:#fde68a}}
 /* People cards */
 .person-card{{background:#fff;border-radius:12px;padding:16px 20px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
 .person-header{{display:flex;align-items:center;gap:12px;margin-bottom:10px}}

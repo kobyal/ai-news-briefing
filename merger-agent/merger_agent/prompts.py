@@ -36,7 +36,7 @@ Produce ONE merged briefing as a JSON object. Rules:
 
 5. community_pulse — synthesise community reactions from ALL sources into 5-7 bullet points (each starting with "• ").
    IMPORTANT: SOURCE E (Social) contains real-time X/Twitter posts, Reddit hot threads, and LinkedIn signals from AI leaders — weight this heavily.
-   Include: specific people's hot takes (quote them if notable), top Reddit threads, trending topics on X, developer sentiment.
+   Include: specific people's hot takes (quote them if notable), top Reddit threads, developer sentiment.
    Merge any overlapping signals from other sources. Be concrete — names, quotes, post content, subreddits, engagement counts.
    community_urls — 3-6 URLs that directly back the community_pulse bullets above (X posts, Reddit threads, HN discussions preferred; each URL must correspond to something mentioned in the bullets).
 

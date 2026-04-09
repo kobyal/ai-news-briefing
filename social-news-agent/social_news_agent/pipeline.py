@@ -2,7 +2,7 @@
 
 Steps:
 1. People  — Perplexity web_search for each tracked AI leader's recent X posts (parallel)
-2. Topics  — Perplexity web_search for trending AI discussions on X + LinkedIn (parallel)
+2. Topics  — Perplexity web_search for AI discussions on X + LinkedIn (parallel)
 3. Reddit  — direct JSON API from 6 AI subreddits (parallel, no LLM)
 4. Write   — Claude Sonnet synthesises all signals into community-pulse JSON
 5. Translate — Claude Haiku translates to Hebrew
@@ -141,7 +141,7 @@ def _step2_write(people: list, topics: list, reddit: list) -> str:
 
     prompt = f"""Today is {_TODAY()}. You are an AI community analyst with deep knowledge of AI Twitter, Reddit, and LinkedIn.
 
-Below are raw signals from social media — posts from tracked AI leaders, trending topic searches, and Reddit communities.
+Below are raw signals from social media — posts from tracked AI leaders, topic searches, and Reddit communities.
 
 ═══ PEOPLE SIGNALS (X / Twitter) ═══
 {people_ctx or '(no people signals collected)'}

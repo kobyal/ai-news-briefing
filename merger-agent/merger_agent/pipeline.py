@@ -253,11 +253,56 @@ def _step3_translate(merged_json: str) -> str:
     summaries_he = _parse(result_summaries).get("summaries_he", [])
     if summaries_he:
         he["summaries_he"] = summaries_he
-        try:
-            return json.dumps(he, ensure_ascii=False)
-        except Exception:
-            pass
-    return result_short
+
+    # ── Step 3.5: Hebrew Reviewer — fix broken translations ─────────────────
+    print("  [3.5/4] Hebrew Reviewer — fixing broken translations...")
+    try:
+        he_json = json.dumps(he, ensure_ascii=False, indent=2)
+        reviewed = _agent(
+            input_text=(
+                "אתה עורך בכיר ב-Geektime, כתב AI ותיק שכותב עברית מושלמת.\n"
+                "קיבלת תרגום גולמי של עלון AI. התרגום נשמע מתורגם — כמו Google Translate, לא כמו עיתונאי ישראלי.\n\n"
+                "המשימה שלך: כתוב מחדש את כל הטקסט העברי כאילו כתבת את הידיעות מאפס בעברית.\n"
+                "זה לא תיקון שגיאות — זה שכתוב מלא. הקורא צריך להרגיש שזה נכתב במקור בעברית.\n\n"
+                "כללים:\n"
+                "1. כתוב כמו שעיתונאי ב-Geektime או כלכליסט טק היה כותב — ישיר, חד, מקצועי\n"
+                "2. שמות חברות ומוצרים תמיד באנגלית: Claude, OpenAI, AWS, Bedrock, GPT, LLM, benchmark, API, open-source\n"
+                "3. אל תתרגם מונחים שישראלים אומרים באנגלית: startup, scale, deploy, fine-tune, prompt, token, inference\n"
+                "4. תקן מילים שבורות וערבוב שפות (למשל: 'לעברShips' → 'לצ׳יפים של Trainium', 'כhegde' → 'כגיבוי')\n"
+                "5. אם משפט נשמע מעושה או מתורגם — כתוב אותו מחדש בצורה טבעית. מותר לשנות את מבנה המשפט\n"
+                "6. דוגמאות:\n"
+                "   ❌ 'שחרור המודל העיקרי הראשון של Meta בערך בשנה' → ✅ 'המודל הראשון של Meta אחרי שנה של שתיקה'\n"
+                "   ❌ 'מה שהופך אותו למסוכן מדי לשחרור לציבור' → ✅ 'ולכן הוא לא זמין לציבור הרחב'\n"
+                "   ❌ 'הגישה מוגבלת אך ורק לשותפי Project Glasswing' → ✅ 'רק שותפי Project Glasswing מקבלים גישה'\n"
+                "   ❌ 'מואצת דרמטית את לוחות הזמנים של פיתוח' → ✅ 'מקצרת משמעותית את זמני הפיתוח'\n"
+                "7. וודא שכל המרכאות בתוך string values מוסלשות כ-\\\"\n\n"
+                "התרגום הגולמי:\n"
+                + he_json
+                + "\n\nהחזר את אותו JSON עם אותם שדות ומבנה, אבל עם טקסט עברי שנשמע טבעי ומקצועי."
+            ),
+            model=_TRANSLATOR_MODEL(),
+            instructions=(
+                "Output ONLY a valid JSON object with the same keys as the input. "
+                "Fix broken Hebrew text — do NOT change structure, keys, or English content. "
+                "CRITICAL: escape all \" inside strings as \\\"."
+            ),
+            json_mode=True,
+            max_steps=1,
+            label="Hebrew-Reviewer",
+        )
+        reviewed_data = _parse(reviewed)
+        if reviewed_data and len(reviewed_data) >= len(he):
+            he = reviewed_data
+            print("    ✓ Hebrew review complete")
+        else:
+            print("    ⚠ Hebrew reviewer returned incomplete data, using original")
+    except Exception as e:
+        print(f"    ⚠ Hebrew reviewer failed ({e}), using original translation")
+
+    try:
+        return json.dumps(he, ensure_ascii=False)
+    except Exception:
+        return result_short
 
 
 def _step4_publish(merged_json: str, hebrew_json: str, social_briefing: dict = None) -> dict:

@@ -261,34 +261,47 @@ def _step3_translate(merged_json: str) -> str:
         reviewed = _agent(
             input_text=(
                 "אתה עורך בכיר ב-Geektime, כתב AI ותיק שכותב עברית מושלמת.\n"
-                "קיבלת תרגום גולמי של עלון AI. התרגום נשמע מתורגם — כמו Google Translate, לא כמו עיתונאי ישראלי.\n\n"
-                "המשימה שלך: כתוב מחדש את כל הטקסט העברי כאילו כתבת את הידיעות מאפס בעברית.\n"
-                "זה לא תיקון שגיאות — זה שכתוב מלא. הקורא צריך להרגיש שזה נכתב במקור בעברית.\n\n"
+                "קיבלת תרגום גולמי של עלון AI. התרגום מלא בשגיאות קריטיות ונשמע כמו Google Translate.\n\n"
+                "המשימה שלך: כתוב מחדש את כל הטקסט העברי כאילו כתבת את הידיעות מאפס.\n"
+                "זה שכתוב מלא — לא תיקון. הקורא חייב להרגיש שזה נכתב במקור בעברית.\n\n"
+                "שגיאות קריטיות שחייבים לתקן (מופיעות בהרבה תרגומים):\n"
+                "❌ 'הטיסה' (flew) → ✅ 'השיקה' או 'הוציאה' (launched/released) — שגיאה #1 הנפוצה ביותר!\n"
+                "❌ 'ירקה' (spit) → ✅ 'עוררה' (sparked/generated)\n"
+                "❌ 'צתתה' (not a word) → ✅ 'הציתה' (ignited)\n"
+                "❌ 'דלקה' (not a word) → ✅ 'הצית' (ignited)\n"
+                "❌ 'דומינרות' (not a word) → ✅ 'שולטות' או 'דומיננטיות'\n"
+                "❌ 'משחקת קרח' → ✅ 'מתערערת' או 'בקריסה'\n"
+                "❌ 'המרץ locally' → ✅ 'הרץ על ההתקן'\n"
+                "❌ תווים סיניים או שפות אחרות → מחק והחלף בעברית\n"
+                "❌ 'הושקה' (passive) → ✅ 'השיקה' (active)\n\n"
                 "כללים:\n"
-                "1. כתוב כמו שעיתונאי ב-Geektime או כלכליסט טק היה כותב — ישיר, חד, מקצועי\n"
+                "1. כתוב כמו עיתונאי ב-Geektime — ישיר, חד, מקצועי\n"
                 "2. שמות חברות ומוצרים תמיד באנגלית: Claude, OpenAI, AWS, Bedrock, GPT, LLM, benchmark, API, open-source\n"
-                "3. אל תתרגם מונחים שישראלים אומרים באנגלית: startup, scale, deploy, fine-tune, prompt, token, inference\n"
-                "4. תקן מילים שבורות וערבוב שפות (למשל: 'לעברShips' → 'לצ׳יפים של Trainium', 'כhegde' → 'כגיבוי')\n"
-                "5. אם משפט נשמע מעושה או מתורגם — כתוב אותו מחדש בצורה טבעית. מותר לשנות את מבנה המשפט\n"
-                "6. דוגמאות:\n"
-                "   ❌ 'שחרור המודל העיקרי הראשון של Meta בערך בשנה' → ✅ 'המודל הראשון של Meta אחרי שנה של שתיקה'\n"
-                "   ❌ 'מה שהופך אותו למסוכן מדי לשחרור לציבור' → ✅ 'ולכן הוא לא זמין לציבור הרחב'\n"
-                "   ❌ 'הגישה מוגבלת אך ורק לשותפי Project Glasswing' → ✅ 'רק שותפי Project Glasswing מקבלים גישה'\n"
-                "   ❌ 'מואצת דרמטית את לוחות הזמנים של פיתוח' → ✅ 'מקצרת משמעותית את זמני הפיתוח'\n"
-                "7. וודא שכל המרכאות בתוך string values מוסלשות כ-\\\"\n\n"
+                "3. 'launched/released' = 'השיקה' תמיד. לעולם אל תשתמש ב-'הטיסה'\n"
+                "4. אל תתרגם מונחים שישראלים אומרים באנגלית: startup, scale, deploy, fine-tune, prompt, token, inference, open-weight\n"
+                "5. תקן מילים שבורות, ערבוב שפות, ומשפטים שלא מובנים\n"
+                "6. אם משפט נשמע מתורגם — כתוב אותו מחדש. מותר לשנות מבנה\n"
+                "7. דוגמאות נוספות:\n"
+                "   ❌ 'שחרור המודל העיקרי הראשון' → ✅ 'המודל הראשון של Meta אחרי שנה של שתיקה'\n"
+                "   ❌ 'מואצת דרמטית את לוחות הזמנים' → ✅ 'מקצרת משמעותית את זמני הפיתוח'\n"
+                "   ❌ 'שומרי שער ביטחוניים' → ✅ 'מנגנוני בטיחות'\n"
+                "8. וודא שכל המרכאות בתוך strings מוסלשות כ-\\\"\n"
+                "9. מחק כל תו שאינו עברית/אנגלית/ספרות/סימני פיסוק (למשל תווים סיניים)\n\n"
                 "התרגום הגולמי:\n"
                 + he_json
-                + "\n\nהחזר את אותו JSON עם אותם שדות ומבנה, אבל עם טקסט עברי שנשמע טבעי ומקצועי."
+                + "\n\nהחזר את אותו JSON עם אותם שדות ומבנה, עם טקסט עברי טבעי ומקצועי. בדוק כל מילה."
             ),
-            model=_TRANSLATOR_MODEL(),
+            model=_WRITER_MODEL(),  # Use Sonnet (not Haiku) — reviewer is the quality gate
             instructions=(
                 "Output ONLY a valid JSON object with the same keys as the input. "
-                "Fix broken Hebrew text — do NOT change structure, keys, or English content. "
+                "Rewrite ALL Hebrew text to sound native — not translated. "
+                "The word 'הטיסה' must NEVER appear — replace with 'השיקה'. "
+                "Delete any Chinese/CJK characters. "
                 "CRITICAL: escape all \" inside strings as \\\"."
             ),
             json_mode=True,
             max_steps=1,
-            label="Hebrew-Reviewer",
+            label="Hebrew-Reviewer (Sonnet)",
         )
         reviewed_data = _parse(reviewed)
         if reviewed_data and len(reviewed_data) >= len(he):

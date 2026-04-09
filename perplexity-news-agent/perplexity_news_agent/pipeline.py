@@ -89,17 +89,27 @@ def _agent(
         payload["text"] = {"format": {"type": "json_object"}}
 
     t0 = time.time()
-    resp = requests.post(
-        f"{_BASE_URL}/v1/responses",
-        headers={
-            "Authorization": f"Bearer {_API_KEY()}",
-            "Content-Type":  "application/json",
-        },
-        json=payload,
-        timeout=120,
-    )
-
-    if not resp.ok:
+    _RETRYABLE = {429, 500, 502, 503}
+    _RETRY_DELAYS = [5, 15, 30]
+    resp = None
+    for _attempt in range(len(_RETRY_DELAYS) + 1):
+        resp = requests.post(
+            f"{_BASE_URL}/v1/responses",
+            headers={
+                "Authorization": f"Bearer {_API_KEY()}",
+                "Content-Type":  "application/json",
+            },
+            json=payload,
+            timeout=120,
+        )
+        if resp.ok:
+            break
+        if resp.status_code in _RETRYABLE and _attempt < len(_RETRY_DELAYS):
+            delay = _RETRY_DELAYS[_attempt]
+            print(f"    ⟳  [{label}] Perplexity API {resp.status_code} — retrying in {delay}s (attempt {_attempt + 1}/{len(_RETRY_DELAYS)})...")
+            time.sleep(delay)
+            continue
+        # Non-retryable error or exhausted retries
         raise RuntimeError(
             f"[{label}] Perplexity API {resp.status_code}: {resp.text[:400]}"
         )

@@ -50,13 +50,24 @@ def _px_search(query: str, label: str = "") -> str:
     }
 
     t0 = time.time()
-    resp = requests.post(
-        f"{_PX_BASE}/chat/completions",
-        headers={"Authorization": f"Bearer {_PX_KEY()}", "Content-Type": "application/json"},
-        json=payload,
-        timeout=60,
-    )
-    if not resp.ok:
+    _RETRYABLE = {429, 500, 502, 503}
+    _RETRY_DELAYS = [5, 15, 30]
+    resp = None
+    for _attempt in range(len(_RETRY_DELAYS) + 1):
+        resp = requests.post(
+            f"{_PX_BASE}/chat/completions",
+            headers={"Authorization": f"Bearer {_PX_KEY()}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=60,
+        )
+        if resp.ok:
+            break
+        if resp.status_code in _RETRYABLE and _attempt < len(_RETRY_DELAYS):
+            delay = _RETRY_DELAYS[_attempt]
+            print(f"    ⟳  [search] {label}: Perplexity API {resp.status_code} — retrying in {delay}s (attempt {_attempt + 1}/{len(_RETRY_DELAYS)})...")
+            time.sleep(delay)
+            continue
+        # Non-retryable error or exhausted retries
         print(f"  [search] {label}: {resp.status_code} {resp.text[:150]}")
         return ""
 

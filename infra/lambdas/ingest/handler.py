@@ -43,6 +43,7 @@ def lambda_handler(event, context):
         "tldr_he":            briefing_he.get("tldr_he", []),
         "community_pulse":    briefing.get("community_pulse", ""),
         "community_pulse_he": briefing_he.get("community_pulse_he", ""),
+        "community_pulse_items": briefing.get("community_pulse_items", []),
         "community_urls":     briefing.get("community_urls", []),
         "people_highlights":  social.get("people_highlights", []),
         "top_reddit":         social.get("top_reddit", []),

@@ -34,11 +34,23 @@ Produce ONE merged briefing as a JSON object. Rules:
 4. tldr — write 5-6 bullets summarising the most important stories from the merged set.
    Each bullet: vendor + what happened + why it matters (15-25 words).
 
-5. community_pulse — synthesise community reactions from ALL sources into 5-7 bullet points (each starting with "• ").
+5. community_pulse — synthesise community reactions from ALL sources into a STRUCTURED array of 5-7 pulse items.
    IMPORTANT: SOURCE E (Social) contains real-time X/Twitter posts, Reddit hot threads, and LinkedIn signals from AI leaders — weight this heavily.
-   Include: specific people's hot takes (quote them if notable), top Reddit threads, developer sentiment.
-   Merge any overlapping signals from other sources. Be concrete — names, quotes, post content, subreddits, engagement counts.
-   community_urls — 3-6 URLs that directly back the community_pulse bullets above (X posts, Reddit threads, HN discussions preferred; each URL must correspond to something mentioned in the bullets).
+
+   Format as JSON array "community_pulse_items" where each item is:
+   {
+     "headline": "short punchy title (5-10 words, like a sub-headline)",
+     "body": "1-2 sentences explaining the community reaction — be concrete with names, quotes, subreddits, engagement counts",
+     "heat": "hot" | "warm" | "mild" — how much buzz/engagement this topic generated,
+     "source_url": "best URL backing this item (HN thread, Reddit post, X post, article). NEVER empty.",
+     "source_label": "e.g. 'Hacker News (1,506 pts)', 'r/LocalLLaMA', 'Simon Willison's blog', '@karpathy on X'",
+     "related_vendor": "vendor name if this pulse item relates to a specific news_item vendor, or empty string",
+     "related_person": "person name if this references someone from people_highlights, or empty string"
+   }
+
+   ALSO keep the old fields for backward compatibility:
+   community_pulse — same content as a plain string with "• " bullets (one bullet per item)
+   community_urls — flat list of all source_url values from the items above
 
 6. news_items — 8-14 items (be comprehensive). For each:
    - vendor: "Anthropic" | "AWS" | "OpenAI" | "Google" | "Azure" | "Meta" | "xAI" | "NVIDIA" | "Mistral" | "Apple" | "Hugging Face" | "Other"

@@ -18,20 +18,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
-import requests
+import anthropic
 
 from .prompts import MERGER_PROMPT, TRANSLATOR_PROMPT
 from .schemas import BriefingContent, HebrewBriefing
 from .tools import build_and_save_html, _parse
 
 # ---------------------------------------------------------------------------
-# Config
+# Config — Direct Anthropic API (no Perplexity proxy)
 # ---------------------------------------------------------------------------
 
-_API_KEY   = lambda: os.environ.get("PERPLEXITY_API_KEY", "")
-_BASE_URL  = "https://api.perplexity.ai"
-_WRITER_MODEL     = lambda: os.environ.get("MERGER_WRITER_MODEL",     "anthropic/claude-sonnet-4-6")
-_TRANSLATOR_MODEL = lambda: os.environ.get("MERGER_TRANSLATOR_MODEL", "anthropic/claude-haiku-4-5")
+_API_KEY   = lambda: os.environ.get("ANTHROPIC_API_KEY", "")
+_WRITER_MODEL     = lambda: os.environ.get("MERGER_WRITER_MODEL",     "claude-sonnet-4-6-20250514")
+_TRANSLATOR_MODEL = lambda: os.environ.get("MERGER_TRANSLATOR_MODEL", "claude-haiku-4-5-20241022")
 
 _ROOT = Path(__file__).parent.parent.parent  # repo root
 
@@ -72,55 +71,39 @@ def _agent(
     label: str = "",
 ) -> str:
     if not _API_KEY():
-        raise RuntimeError("PERPLEXITY_API_KEY not set — add it to .env")
+        raise RuntimeError("ANTHROPIC_API_KEY not set — add it to .env or GitHub secrets")
 
-    payload: dict = {
-        "model":     model,
-        "input":     input_text,
-        "max_steps": max_steps,
-    }
-    if instructions:
-        payload["instructions"] = instructions
-    if json_mode:
-        payload["text"] = {"format": {"type": "json_object"}}
+    client = anthropic.Anthropic(api_key=_API_KEY())
+    system_prompt = instructions or "You are a helpful assistant. Return only the requested output."
 
     t0 = time.time()
-    _RETRYABLE = {429, 500, 502, 503}
     _RETRY_DELAYS = [5, 15, 30]
+
     resp = None
     for _attempt in range(len(_RETRY_DELAYS) + 1):
-        resp = requests.post(
-            f"{_BASE_URL}/v1/responses",
-            headers={
-                "Authorization": f"Bearer {_API_KEY()}",
-                "Content-Type":  "application/json",
-            },
-            json=payload,
-            timeout=200,
-        )
-        if resp.ok:
+        try:
+            resp = client.messages.create(
+                model=model,
+                max_tokens=16384,
+                system=system_prompt,
+                messages=[{"role": "user", "content": input_text}],
+            )
             break
-        if resp.status_code in _RETRYABLE and _attempt < len(_RETRY_DELAYS):
-            delay = _RETRY_DELAYS[_attempt]
-            print(f"    ⟳  [{label}] Perplexity API {resp.status_code} — retrying in {delay}s (attempt {_attempt + 1}/{len(_RETRY_DELAYS)})...")
-            time.sleep(delay)
-            continue
-        raise RuntimeError(f"[{label}] Perplexity API {resp.status_code}: {resp.text[:400]}")
+        except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+            status = getattr(e, 'status_code', 0)
+            if status in {429, 500, 502, 503, 529} and _attempt < len(_RETRY_DELAYS):
+                delay = _RETRY_DELAYS[_attempt]
+                print(f"    ⟳  [{label}] Anthropic API {status} — retrying in {delay}s (attempt {_attempt + 1}/{len(_RETRY_DELAYS)})...")
+                time.sleep(delay)
+                continue
+            raise RuntimeError(f"[{label}] Anthropic API error: {e}")
 
-    data    = resp.json()
     elapsed = time.time() - t0
+    text = resp.content[0].text if resp and resp.content else ""
 
-    text = ""
-    for item in data.get("output", []):
-        if item.get("type") == "message":
-            for part in item.get("content", []):
-                if part.get("type") == "output_text":
-                    text += part.get("text", "")
-
-    cost_info  = data.get("usage", {}).get("cost", {})
-    cost_str   = f"  ${cost_info.get('total_cost', 0):.4f}" if cost_info else ""
-    model_used = data.get("model", model)
-    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model_used}{cost_str}")
+    usage = resp.usage if resp else None
+    tokens = f"  in={usage.input_tokens} out={usage.output_tokens}" if usage else ""
+    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model}{tokens}")
     return text
 
 

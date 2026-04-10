@@ -153,13 +153,14 @@ def _step1_load_sources() -> tuple[dict, dict, dict, dict, dict]:
 def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict, tavily_briefing: dict, social_briefing: dict) -> str:
     print("\n[2/4] Merger — deduplicating and merging stories...")
     schema_desc = json.dumps(BriefingContent.model_json_schema(), indent=2)
-    prompt = MERGER_PROMPT.format(
-        adk_briefing=json.dumps(adk_briefing, ensure_ascii=False, indent=2),
-        perplexity_briefing=json.dumps(px_briefing, ensure_ascii=False, indent=2),
-        rss_briefing=json.dumps(rss_briefing, ensure_ascii=False, indent=2),
-        tavily_briefing=json.dumps(tavily_briefing, ensure_ascii=False, indent=2),
-        social_briefing=json.dumps(social_briefing, ensure_ascii=False, indent=2),
-    )
+    # Use replace() instead of .format() — the JSON data contains { } that
+    # would be interpreted as format placeholders
+    prompt = MERGER_PROMPT
+    prompt = prompt.replace("{adk_briefing}", json.dumps(adk_briefing, ensure_ascii=False, indent=2))
+    prompt = prompt.replace("{perplexity_briefing}", json.dumps(px_briefing, ensure_ascii=False, indent=2))
+    prompt = prompt.replace("{rss_briefing}", json.dumps(rss_briefing, ensure_ascii=False, indent=2))
+    prompt = prompt.replace("{tavily_briefing}", json.dumps(tavily_briefing, ensure_ascii=False, indent=2))
+    prompt = prompt.replace("{social_briefing}", json.dumps(social_briefing, ensure_ascii=False, indent=2))
     return _agent(
         input_text=f"{prompt}\n\nJSON SCHEMA:\n{schema_desc}",
         model=_WRITER_MODEL(),
@@ -187,7 +188,7 @@ def _step3_translate(merged_json: str) -> str:
         }, ensure_ascii=False, indent=2)
         schema_desc = json.dumps(HebrewBriefing.model_json_schema(), indent=2)
         return _agent(
-            input_text=TRANSLATOR_PROMPT.format(briefing_json=slim)
+            input_text=TRANSLATOR_PROMPT.replace("{briefing_json}", slim)
                        + f"\n\nJSON SCHEMA:\n{schema_desc}",
             model=_TRANSLATOR_MODEL(),
             instructions=(

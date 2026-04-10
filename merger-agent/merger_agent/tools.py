@@ -215,6 +215,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
         org        = p.get("org", "")
         role       = p.get("role", "")
         post       = p.get("post", "")
+        date       = p.get("date", "")
         url        = p.get("url", "")
         why        = p.get("why", "")
         engagement = p.get("engagement", "")
@@ -222,12 +223,14 @@ def _build_html(tldr, news_items, community_pulse, topic,
         initial    = name[0].upper() if name else "?"
         org_badge  = f'<span class="person-org-badge">{org}</span>' if org else ""
         eng_badge  = f'<span class="engagement-badge">🔥 {engagement}</span>' if engagement else ""
+        date_html  = f'<span class="pub-date">📅 {date}</span>' if date else ""
         subtitle   = f"@{handle}" + (f" · {role}" if role else "")
         people_cards_html += f"""<div class="person-card">
 <div class="person-header">
 <span class="person-avatar">{initial}</span>
 <div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">{name}</span>{org_badge}</div><span class="person-handle">{subtitle}</span></div>
 </div>
+{date_html}
 <p class="person-post">"{post}"</p>
 {eng_badge}
 <p class="person-why">{why}</p>

@@ -41,5 +41,7 @@ if __name__ == "__main__":
         if path and sys.platform == "darwin":
             subprocess.run(["open", path], check=False)
     except Exception as e:
-        print(f"\nERROR: {e}", file=sys.stderr)
+        import traceback
+        print(f"\nERROR: {e}")
+        traceback.print_exc()
         sys.exit(1)

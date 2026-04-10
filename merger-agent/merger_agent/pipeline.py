@@ -84,7 +84,7 @@ def _agent(
         try:
             resp = client.messages.create(
                 model=model,
-                max_tokens=16384,
+                max_tokens=32768,
                 system=system_prompt,
                 messages=[{"role": "user", "content": input_text}],
             )
@@ -100,10 +100,21 @@ def _agent(
 
     elapsed = time.time() - t0
     text = resp.content[0].text if resp and resp.content else ""
+    stop = resp.stop_reason if resp else "unknown"
 
     usage = resp.usage if resp else None
     tokens = f"  in={usage.input_tokens} out={usage.output_tokens}" if usage else ""
-    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model}{tokens}")
+    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model}{tokens}  stop={stop}")
+
+    if stop == "max_tokens":
+        print(f"    ⚠  [{label}] Response truncated (max_tokens) — output may be incomplete")
+
+    # Validate JSON output if json_mode was requested
+    if json_mode and text:
+        stripped = text.strip()
+        if not (stripped.startswith("{") or stripped.startswith("[")):
+            print(f"    ⚠  [{label}] Expected JSON but got: {repr(stripped[:80])}")
+
     return text
 
 
@@ -336,7 +347,16 @@ def run_pipeline() -> dict:
     t_start = time.time()
 
     adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing = _step1_load_sources()
-    merged_json  = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing)
+    # Merge with validation — retry once if JSON is invalid
+    merged_json = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing)
+    parsed = _parse(merged_json)
+    if not parsed or not parsed.get("news_items"):
+        print("  ⚠ Merge output invalid — retrying once...")
+        merged_json = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing)
+        parsed = _parse(merged_json)
+        if not parsed or not parsed.get("news_items"):
+            raise RuntimeError(f"Merger returned invalid JSON after retry: {repr(merged_json[:200])}")
+
     try:
         hebrew_json = _step3_translate(merged_json)
     except Exception as e:

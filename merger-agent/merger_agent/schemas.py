@@ -11,11 +11,22 @@ class NewsItem(BaseModel):
     urls: List[str]
 
 
+class CommunityPulseItem(BaseModel):
+    headline: str
+    body: str
+    heat: str  # "hot" | "warm" | "mild"
+    source_url: str
+    source_label: str  # e.g. "r/LocalLLaMA", "@karpathy on X", "Hacker News"
+    related_vendor: str = ""
+    related_person: str = ""
+
+
 class BriefingContent(BaseModel):
     tldr: List[str]
     news_items: List[NewsItem]
-    community_pulse: str
-    community_urls: List[str] = []
+    community_pulse_items: List[CommunityPulseItem] = []
+    community_pulse: str = ""       # backward compat: flat string
+    community_urls: List[str] = []  # backward compat: flat URL list
 
 
 class HebrewBriefing(BaseModel):

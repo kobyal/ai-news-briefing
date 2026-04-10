@@ -34,23 +34,35 @@ Produce ONE merged briefing as a JSON object. Rules:
 4. tldr — write 5-6 bullets summarising the most important stories from the merged set.
    Each bullet: vendor + what happened + why it matters (15-25 words).
 
-5. community_pulse — synthesise community reactions from ALL sources into a STRUCTURED array of 5-7 pulse items.
+5. community_pulse_items — THIS IS NOT A NEWS SUMMARY. The tldr already covers what happened.
+   This section is about REACTIONS, DEBATES, and OPINIONS from the developer community.
+
    IMPORTANT: SOURCE E (Social) contains real-time X/Twitter posts, Reddit hot threads, and LinkedIn signals from AI leaders — weight this heavily.
 
-   Format as JSON array "community_pulse_items" where each item is:
+   Think: "What are developers arguing about? What's controversial? What took off virally? What's the mood?"
+
+   REQUIRED: Return a JSON array "community_pulse_items" with 5-7 items. Each item:
    {
-     "headline": "short punchy title (5-10 words, like a sub-headline)",
-     "body": "1-2 sentences explaining the community reaction — be concrete with names, quotes, subreddits, engagement counts",
-     "heat": "hot" | "warm" | "mild" — how much buzz/engagement this topic generated,
-     "source_url": "best URL backing this item (HN thread, Reddit post, X post, article). NEVER empty.",
-     "source_label": "e.g. 'Hacker News (1,506 pts)', 'r/LocalLLaMA', 'Simon Willison's blog', '@karpathy on X'",
-     "related_vendor": "vendor name if this pulse item relates to a specific news_item vendor, or empty string",
-     "related_person": "person name if this references someone from people_highlights, or empty string"
+     "headline": "punchy reaction title (5-10 words) — frame as debate/opinion, NOT as news",
+     "body": "1-2 sentences. Be SPECIFIC: name the person, subreddit, or thread. Include quotes, engagement numbers, or concrete opinions. NOT a restatement of the news.",
+     "heat": "hot" | "warm" | "mild",
+     "source_url": "direct URL to the discussion/post/thread. MUST NOT be empty.",
+     "source_label": "e.g. 'r/LocalLLaMA (2.3K upvotes)', '@karpathy on X', 'HN (890 pts)', 'Simon Willison's blog'",
+     "related_vendor": "vendor name if related to a news_item, or empty string",
+     "related_person": "person name if referencing someone from people_highlights, or empty string"
    }
 
-   ALSO keep the old fields for backward compatibility:
-   community_pulse — same content as a plain string with "• " bullets (one bullet per item)
-   community_urls — flat list of all source_url values from the items above
+   GOOD examples of community_pulse_items:
+   - headline: "Developers revolt over Meta's open-source U-turn" / body: "r/LocalLLaMA erupted after Muse Spark launch, with top post (2.3K upvotes) calling it 'the biggest betrayal in open-source AI history'. Many vow to switch to Mistral."
+   - headline: "Karpathy's 'second brain' idea goes mega-viral" / body: "@karpathy's GitHub Gist on AI knowledge bases hit 48K likes and 15M views. Lex Fridman co-signed. Developers flooding replies with implementations."
+
+   BAD examples (these just repeat the news — DON'T do this):
+   - "OpenAI announces military deal" — that's a tldr bullet, not a reaction
+   - "AWS revenue exceeds $15B" — that's news, not community pulse
+
+   ALSO keep backward-compat flat fields:
+   community_pulse — plain string with "• " bullets (one per item, reaction-focused)
+   community_urls — flat list of all source_url values from the items
 
 6. news_items — 8-14 items (be comprehensive). For each:
    - vendor: "Anthropic" | "AWS" | "OpenAI" | "Google" | "Azure" | "Meta" | "xAI" | "NVIDIA" | "Mistral" | "Apple" | "Hugging Face" | "Other"

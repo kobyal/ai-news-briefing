@@ -210,15 +210,16 @@ def _step3_translate(merged_json: str, social_data: dict = None) -> str:
         )
         return _agent(
             input_text=(
-                "אתה כתב AI ישראלי ב-Geektime. תרגם את הסיכומים הבאים לעברית עיתונאית טבעית.\n\n"
+                "אתה כתב טכנולוגיה בכיר ב-Geektime. כתוב מחדש את הסיכומים הבאים בעברית — לא תרגום, כתיבה מאפס.\n\n"
+                "הקורא: מפתח/ת ישראלי/ת שעובד/ת עם AI ביומיום.\n\n"
                 "כללים:\n"
-                "- שמות חברות ומוצרים — תמיד באנגלית (Claude, OpenAI, AWS, Bedrock וכו׳)\n"
-                "- מונחים טכניים מקובלים באנגלית: AI, API, LLM, benchmark, agent, open-source, cybersecurity\n"
-                "- תרגם בצורה טבעית ולא מילולית. אם נשמע כמו Google Translate — תכתוב מחדש\n"
-                "- ❌ אבטחה קיברנטית → ✅ אבטחת סייבר | ❌ הוקפאה מהגישה הציבורית → ✅ לא שוחררה לציבור\n"
-                "- ❌ ארגונים מאומתים → ✅ ארגונים מורשים | ❌ השקה ציבורית → ✅ שחרור לציבור\n\n"
+                "- שמות חברות ומוצרים — תמיד באנגלית (Claude, OpenAI, AWS, Bedrock, Gemini וכו׳)\n"
+                "- מונחים טכניים באנגלית: AI, API, LLM, benchmark, agent, open-source, cybersecurity, inference, token, prompt, deploy, fine-tune, alignment, sandbox, zero-day\n"
+                "- launched = 'השיקה' תמיד. לעולם לא 'הטיסה'.\n"
+                "- כתוב בגוף שלישי פעיל: 'השיקה', 'חשפה', 'הכריזה' (לא 'הושקה', 'הוכרזה')\n"
+                "- אם המשפט נשמע מתורגם — כתוב אותו מחדש. אם מפתח ישראלי היה מגלגל עיניים — כתוב מחדש.\n\n"
                 + summaries_input
-                + '\n\nהחזר JSON בלבד: {"summaries_he": ["תרגום 1", "תרגום 2", ...]}'
+                + '\n\nהחזר JSON בלבד: {"summaries_he": ["סיכום 1", "סיכום 2", ...]}'
             ),
             model=_TRANSLATOR_MODEL(),
             instructions=(
@@ -253,12 +254,14 @@ def _step3_translate(merged_json: str, social_data: dict = None) -> str:
 
         return _agent(
             input_text=(
-                "אתה כתב AI ישראלי ב-Geektime. תרגם את התוכן הבא לעברית עיתונאית טבעית.\n\n"
+                "אתה כתב טכנולוגיה בכיר ב-Geektime. כתוב מחדש את התוכן הבא בעברית — לא תרגום, כתיבה מאפס.\n\n"
+                "הקורא: מפתח/ת ישראלי/ת שעובד/ת עם AI ביומיום, קורא/ת TechCrunch, ומדבר/ת על AI עם חברים.\n\n"
                 "כללים:\n"
                 "- שמות אנשים, חברות ומוצרים — תמיד באנגלית\n"
-                "- מונחים טכניים מקובלים באנגלית: AI, API, LLM, benchmark, agent, open-source, cybersecurity\n"
-                "- תרגם בצורה טבעית ולא מילולית. אם נשמע כמו Google Translate — תכתוב מחדש\n"
-                "- הציטוטים הם פוסטים מ-X/Twitter ו-Reddit — כתוב בטון ישיר ותכליתי\n\n"
+                "- מונחים טכניים באנגלית: AI, API, LLM, benchmark, agent, open-source, cybersecurity, token, prompt, inference, alignment, sandbox, chain-of-thought, vibe coding\n"
+                "- launched = 'השיקה'. לעולם לא 'הטיסה'.\n"
+                "- הציטוטים הם פוסטים מ-X/Twitter ו-Reddit — כתוב בטון ישיר ותכליתי, כמו שמפתח ישראלי היה מספר לחבר\n"
+                "- אם המשפט נשמע כמו Google Translate — כתוב אותו מחדש\n\n"
                 + json.dumps(translate_input, ensure_ascii=False, indent=2)
                 + '\n\nהחזר JSON בלבד עם:\n'
                   '- people_he: [{\"post_he\": \"...\", \"why_he\": \"...\"}] (אותו סדר)\n'
@@ -304,64 +307,6 @@ def _step3_translate(merged_json: str, social_data: dict = None) -> str:
         he["people_he"] = people_parsed["people_he"]
     if people_parsed.get("pulse_items_he"):
         he["pulse_items_he"] = people_parsed["pulse_items_he"]
-
-    # ── Step 3.5: Hebrew Reviewer — fix broken translations ─────────────────
-    print("  [3.5/4] Hebrew Reviewer — fixing broken translations...")
-    try:
-        he_json = json.dumps(he, ensure_ascii=False, indent=2)
-        reviewed = _agent(
-            input_text=(
-                "אתה עורך בכיר ב-Geektime, כתב AI ותיק שכותב עברית מושלמת.\n"
-                "קיבלת תרגום גולמי של עלון AI. התרגום מלא בשגיאות קריטיות ונשמע כמו Google Translate.\n\n"
-                "המשימה שלך: כתוב מחדש את כל הטקסט העברי כאילו כתבת את הידיעות מאפס.\n"
-                "זה שכתוב מלא — לא תיקון. הקורא חייב להרגיש שזה נכתב במקור בעברית.\n\n"
-                "שגיאות קריטיות שחייבים לתקן (מופיעות בהרבה תרגומים):\n"
-                "❌ 'הטיסה' (flew) → ✅ 'השיקה' או 'הוציאה' (launched/released) — שגיאה #1 הנפוצה ביותר!\n"
-                "❌ 'ירקה' (spit) → ✅ 'עוררה' (sparked/generated)\n"
-                "❌ 'צתתה' (not a word) → ✅ 'הציתה' (ignited)\n"
-                "❌ 'דלקה' (not a word) → ✅ 'הצית' (ignited)\n"
-                "❌ 'דומינרות' (not a word) → ✅ 'שולטות' או 'דומיננטיות'\n"
-                "❌ 'משחקת קרח' → ✅ 'מתערערת' או 'בקריסה'\n"
-                "❌ 'המרץ locally' → ✅ 'הרץ על ההתקן'\n"
-                "❌ תווים סיניים או שפות אחרות → מחק והחלף בעברית\n"
-                "❌ 'הושקה' (passive) → ✅ 'השיקה' (active)\n\n"
-                "כללים:\n"
-                "1. כתוב כמו עיתונאי ב-Geektime — ישיר, חד, מקצועי\n"
-                "2. שמות חברות ומוצרים תמיד באנגלית: Claude, OpenAI, AWS, Bedrock, GPT, LLM, benchmark, API, open-source\n"
-                "3. 'launched/released' = 'השיקה' תמיד. לעולם אל תשתמש ב-'הטיסה'\n"
-                "4. אל תתרגם מונחים שישראלים אומרים באנגלית: startup, scale, deploy, fine-tune, prompt, token, inference, open-weight\n"
-                "5. תקן מילים שבורות, ערבוב שפות, ומשפטים שלא מובנים\n"
-                "6. אם משפט נשמע מתורגם — כתוב אותו מחדש. מותר לשנות מבנה\n"
-                "7. דוגמאות נוספות:\n"
-                "   ❌ 'שחרור המודל העיקרי הראשון' → ✅ 'המודל הראשון של Meta אחרי שנה של שתיקה'\n"
-                "   ❌ 'מואצת דרמטית את לוחות הזמנים' → ✅ 'מקצרת משמעותית את זמני הפיתוח'\n"
-                "   ❌ 'שומרי שער ביטחוניים' → ✅ 'מנגנוני בטיחות'\n"
-                "8. וודא שכל המרכאות בתוך strings מוסלשות כ-\\\"\n"
-                "9. מחק כל תו שאינו עברית/אנגלית/ספרות/סימני פיסוק (למשל תווים סיניים)\n\n"
-                "התרגום הגולמי:\n"
-                + he_json
-                + "\n\nהחזר את אותו JSON עם אותם שדות ומבנה, עם טקסט עברי טבעי ומקצועי. בדוק כל מילה."
-            ),
-            model=_WRITER_MODEL(),  # Use Sonnet (not Haiku) — reviewer is the quality gate
-            instructions=(
-                "Output ONLY a valid JSON object with the same keys as the input. "
-                "Rewrite ALL Hebrew text to sound native — not translated. "
-                "The word 'הטיסה' must NEVER appear — replace with 'השיקה'. "
-                "Delete any Chinese/CJK characters. "
-                "CRITICAL: escape all \" inside strings as \\\"."
-            ),
-            json_mode=True,
-            max_steps=1,
-            label="Hebrew-Reviewer (Sonnet)",
-        )
-        reviewed_data = _parse(reviewed)
-        if reviewed_data and len(reviewed_data) >= len(he):
-            he = reviewed_data
-            print("    ✓ Hebrew review complete")
-        else:
-            print("    ⚠ Hebrew reviewer returned incomplete data, using original")
-    except Exception as e:
-        print(f"    ⚠ Hebrew reviewer failed ({e}), using original translation")
 
     try:
         return json.dumps(he, ensure_ascii=False)

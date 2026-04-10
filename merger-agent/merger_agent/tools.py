@@ -172,6 +172,8 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
     headlines_he       = he.get("headlines_he", [])
     summaries_he       = he.get("summaries_he", [])
     community_pulse_he = he.get("community_pulse_he", "")
+    people_he          = he.get("people_he", []) or []
+    pulse_items_he     = he.get("pulse_items_he", []) or []
 
     news_seen: set = set()
 
@@ -214,6 +216,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
         tldr, news_items, community_pulse, topic,
         tldr_he, headlines_he, summaries_he, community_pulse_he, community_urls,
         social_data=social_data, community_pulse_items=community_pulse_items,
+        people_he=people_he, pulse_items_he=pulse_items_he,
     )
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -234,7 +237,8 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
 
 def _build_html(tldr, news_items, community_pulse, topic,
                 tldr_he=None, headlines_he=None, summaries_he=None, community_pulse_he="",
-                community_urls=None, social_data=None, community_pulse_items=None):
+                community_urls=None, social_data=None, community_pulse_items=None,
+                people_he=None, pulse_items_he=None):
     now          = datetime.now()
     date_display = now.strftime("%B %d, %Y")
     tldr_he        = tldr_he or []
@@ -242,6 +246,8 @@ def _build_html(tldr, news_items, community_pulse, topic,
     summaries_he   = summaries_he or []
     community_urls = community_urls or []
     social_data    = social_data or {}
+    people_he      = people_he or []
+    pulse_items_he = pulse_items_he or []
 
     tldr_en_html = "".join(f"<li>{item}</li>" for item in tldr)
     tldr_he_html = "".join(f"<li>{item}</li>" for item in tldr_he)
@@ -254,7 +260,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
         if p.get("post") and not any(b in p.get("post", "").lower() for b in _bad)
     ]
     people_cards_html = ""
-    for p in people_highlights[:6]:
+    for idx, p in enumerate(people_highlights[:6]):
         name       = p.get("name", "")
         handle     = p.get("handle", "").lstrip("@")
         org        = p.get("org", "")
@@ -264,27 +270,37 @@ def _build_html(tldr, news_items, community_pulse, topic,
         url        = p.get("url", "")
         why        = p.get("why", "")
         engagement = p.get("engagement", "")
-        link       = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
-        initial    = name[0].upper() if name else "?"
-        org_badge  = f'<span class="person-org-badge">{org}</span>' if org else ""
-        eng_badge  = f'<span class="engagement-badge">🔥 {engagement}</span>' if engagement else ""
-        date_html  = f'<span class="pub-date">📅 {date}</span>' if date else ""
-        subtitle   = f"@{handle}" + (f" · {role}" if role else "")
+
+        # Hebrew translations
+        p_he = people_he[idx] if idx < len(people_he) else {}
+        post_he = p_he.get("post_he", "")
+        why_he  = p_he.get("why_he", "")
+
+        link_en  = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
+        link_he  = f'<a href="{url}" class="x-link" target="_blank">צפה בפוסט →</a>' if url else ""
+        initial  = name[0].upper() if name else "?"
+        org_badge = f'<span class="person-org-badge">{org}</span>' if org else ""
+        eng_badge = f'<span class="engagement-badge">🔥 {engagement}</span>' if engagement else ""
+        date_html = f'<span class="pub-date">📅 {date}</span>' if date else ""
+        subtitle  = f"@{handle}" + (f" · {role}" if role else "")
         people_cards_html += f"""<div class="person-card">
 <div class="person-header">
 <span class="person-avatar">{initial}</span>
 <div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">{name}</span>{org_badge}</div><span class="person-handle">{subtitle}</span></div>
 </div>
 {date_html}
-<p class="person-post">"{post}"</p>
+<p class="person-post en-content">"{post}"</p>
+<p class="person-post he-content" style="display:none;direction:rtl;text-align:right">"{post_he if post_he else post}"</p>
 {eng_badge}
-<p class="person-why">{why}</p>
-{link}
+<p class="person-why en-content">{why}</p>
+<p class="person-why he-content" style="display:none;direction:rtl;text-align:right">{why_he if why_he else why}</p>
+<span class="en-content">{link_en}</span>
+<span class="he-content" style="display:none">{link_he}</span>
 </div>"""
 
     people_section_html = ""
     if people_cards_html:
-        people_section_html = f"""<div class="section-label">👤 People Talking Today</div>
+        people_section_html = f"""<div class="section-label" id="people-label">👤 People Talking Today</div>
 {people_cards_html}"""
 
     # ── Social: Hot on Reddit ───────────────────────────────────────────────
@@ -350,6 +366,23 @@ def _build_html(tldr, news_items, community_pulse, topic,
     # Structured pulse items (preferred) vs flat fallback
     community_pulse_items = community_pulse_items or []
     pulse_structured_html = _pulse_items_html(community_pulse_items)
+
+    # Hebrew structured pulse items
+    pulse_structured_he_html = ""
+    if community_pulse_items and pulse_items_he:
+        he_items = []
+        for idx, item in enumerate(community_pulse_items[:7]):
+            pi_he = pulse_items_he[idx] if idx < len(pulse_items_he) else {}
+            he_items.append({
+                "headline": pi_he.get("headline_he", item.get("headline", "")),
+                "body":     pi_he.get("body_he", item.get("body", "")),
+                "heat":     item.get("heat", "mild"),
+                "source_url":   item.get("source_url", ""),
+                "source_label": item.get("source_label", ""),
+                "related_vendor": item.get("related_vendor", ""),
+                "related_person": item.get("related_person", ""),
+            })
+        pulse_structured_he_html = _pulse_items_html(he_items)
 
     # Flat fallback (backward compat + Hebrew)
     community_en_html = _community_pulse_html(community_pulse)
@@ -477,7 +510,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <div class="community-card">
 <h2 id="community-label">🗣️ Community Pulse</h2>
 <div id="community-en" class="en-content">{pulse_structured_html if pulse_structured_html else community_en_html}</div>
-<div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">{community_he_html}</div>
+<div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">{pulse_structured_he_html if pulse_structured_he_html else community_he_html}</div>
 {community_sources_block if not pulse_structured_html else ''}
 </div>
 </div>
@@ -502,10 +535,12 @@ function setLang(l,btn){{
   document.getElementById('news-label').style.textAlign=align;
   document.getElementById('community-en').style.display=en?'':'none';
   document.getElementById('community-he').style.display=en?'none':'';
-  document.getElementById('community-label').textContent=en?'Community Pulse':'דופק הקהילה';
+  document.getElementById('community-label').textContent=en?'🗣️ Community Pulse':'🗣️ דופק הקהילה';
   document.getElementById('community-label').dir=dir;
   document.getElementById('community-label').style.textAlign=align;
-  document.querySelectorAll('.news-card').forEach(function(el){{el.dir=en?'ltr':'rtl';}});
+  var pl=document.getElementById('people-label');
+  if(pl){{pl.textContent=en?'👤 People Talking Today':'👤 אנשים מדברים היום';pl.dir=dir;pl.style.textAlign=align;}}
+  document.querySelectorAll('.news-card,.person-card').forEach(function(el){{el.dir=en?'ltr':'rtl';}});
   document.querySelectorAll('.en-content').forEach(function(el){{el.style.display=en?'':'none';}});
   document.querySelectorAll('.he-content').forEach(function(el){{el.style.display=en?'none':'';}});
 }}

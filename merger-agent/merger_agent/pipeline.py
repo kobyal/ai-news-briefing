@@ -174,8 +174,8 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict, tavi
     )
 
 
-def _step3_translate(merged_json: str) -> str:
-    print("\n[3/4] Translator — two parallel calls (headers+pulse / summaries)...")
+def _step3_translate(merged_json: str, social_data: dict = None) -> str:
+    print("\n[3/4] Translator — three parallel calls (headers+pulse / summaries / people+pulse-items)...")
     full  = _parse(merged_json)
     items = full.get("news_items", [])
 
@@ -230,11 +230,57 @@ def _step3_translate(merged_json: str) -> str:
             label="Translator-B (summaries)",
         )
 
+    # ── Call C: people highlights + community pulse items ─────────────────────
+    def _translate_people_and_pulse():
+        social = social_data or {}
+        people = social.get("people_highlights", []) or []
+        pulse_items = full.get("community_pulse_items", []) or []
+
+        if not people and not pulse_items:
+            return "{}"
+
+        translate_input = {}
+        if people:
+            translate_input["people"] = [
+                {"post": p.get("post", ""), "why": p.get("why", "")}
+                for p in people[:6]
+            ]
+        if pulse_items:
+            translate_input["pulse_items"] = [
+                {"headline": pi.get("headline", ""), "body": pi.get("body", "")}
+                for pi in pulse_items[:7]
+            ]
+
+        return _agent(
+            input_text=(
+                "אתה כתב AI ישראלי ב-Geektime. תרגם את התוכן הבא לעברית עיתונאית טבעית.\n\n"
+                "כללים:\n"
+                "- שמות אנשים, חברות ומוצרים — תמיד באנגלית\n"
+                "- מונחים טכניים מקובלים באנגלית: AI, API, LLM, benchmark, agent, open-source, cybersecurity\n"
+                "- תרגם בצורה טבעית ולא מילולית. אם נשמע כמו Google Translate — תכתוב מחדש\n"
+                "- הציטוטים הם פוסטים מ-X/Twitter ו-Reddit — כתוב בטון ישיר ותכליתי\n\n"
+                + json.dumps(translate_input, ensure_ascii=False, indent=2)
+                + '\n\nהחזר JSON בלבד עם:\n'
+                  '- people_he: [{\"post_he\": \"...\", \"why_he\": \"...\"}] (אותו סדר)\n'
+                  '- pulse_items_he: [{\"headline_he\": \"...\", \"body_he\": \"...\"}] (אותו סדר)'
+            ),
+            model=_TRANSLATOR_MODEL(),
+            instructions=(
+                "Output ONLY a valid JSON object with keys people_he and pulse_items_he. "
+                "No markdown fences. CRITICAL: escape all \" inside strings as \\\"."
+            ),
+            json_mode=True,
+            max_steps=1,
+            label="Translator-C (people+pulse)",
+        )
+
     result_short = "{}"
     result_summaries = "{}"
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    result_people = "{}"
+    with ThreadPoolExecutor(max_workers=3) as pool:
         f_short     = pool.submit(_translate_short)
         f_summaries = pool.submit(_translate_summaries)
+        f_people    = pool.submit(_translate_people_and_pulse)
         try:
             result_short     = f_short.result()
         except Exception as e:
@@ -243,12 +289,21 @@ def _step3_translate(merged_json: str) -> str:
             result_summaries = f_summaries.result()
         except Exception as e:
             print(f"  [Translator-B] failed: {e}")
+        try:
+            result_people    = f_people.result()
+        except Exception as e:
+            print(f"  [Translator-C] failed: {e}")
 
-    # Merge: inject summaries_he into the short result
+    # Merge all Hebrew results
     he = _parse(result_short)
     summaries_he = _parse(result_summaries).get("summaries_he", [])
     if summaries_he:
         he["summaries_he"] = summaries_he
+    people_parsed = _parse(result_people)
+    if people_parsed.get("people_he"):
+        he["people_he"] = people_parsed["people_he"]
+    if people_parsed.get("pulse_items_he"):
+        he["pulse_items_he"] = people_parsed["pulse_items_he"]
 
     # ── Step 3.5: Hebrew Reviewer — fix broken translations ─────────────────
     print("  [3.5/4] Hebrew Reviewer — fixing broken translations...")
@@ -360,7 +415,7 @@ def run_pipeline() -> dict:
             raise RuntimeError(f"Merger returned invalid JSON after retry: {repr(merged_json[:200])}")
 
     try:
-        hebrew_json = _step3_translate(merged_json)
+        hebrew_json = _step3_translate(merged_json, social_data=social_briefing)
     except Exception as e:
         print(f"  [Translator] failed ({e}) — publishing without Hebrew")
         hebrew_json = "{}"

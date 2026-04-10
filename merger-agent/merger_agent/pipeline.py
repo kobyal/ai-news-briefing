@@ -29,8 +29,8 @@ from .tools import build_and_save_html, _parse
 # ---------------------------------------------------------------------------
 
 _API_KEY   = lambda: os.environ.get("ANTHROPIC_API_KEY", "")
-_WRITER_MODEL     = lambda: os.environ.get("MERGER_WRITER_MODEL",     "claude-sonnet-4-6-20250514")
-_TRANSLATOR_MODEL = lambda: os.environ.get("MERGER_TRANSLATOR_MODEL", "claude-haiku-4-5-20241022")
+_WRITER_MODEL     = lambda: os.environ.get("MERGER_WRITER_MODEL",     "claude-sonnet-4-20250514")
+_TRANSLATOR_MODEL = lambda: os.environ.get("MERGER_TRANSLATOR_MODEL", "claude-sonnet-4-20250514")
 
 _ROOT = Path(__file__).parent.parent.parent  # repo root
 

@@ -92,6 +92,50 @@ def _community_pulse_html(text: str) -> str:
     return f"<p>{text}</p>"
 
 
+def _heat_badge(heat: str) -> str:
+    """Return an HTML badge for the heat level."""
+    h = heat.lower().strip() if heat else "mild"
+    if h == "hot":
+        return '<span class="heat-badge heat-hot">🔥 Hot</span>'
+    elif h == "warm":
+        return '<span class="heat-badge heat-warm">🟡 Warm</span>'
+    return '<span class="heat-badge heat-mild">💬 Mild</span>'
+
+
+def _pulse_items_html(items: list) -> str:
+    """Render structured community_pulse_items as rich cards."""
+    if not items:
+        return ""
+    html = ""
+    for item in items[:7]:
+        headline    = item.get("headline", "")
+        body        = item.get("body", "")
+        heat        = item.get("heat", "mild")
+        source_url  = item.get("source_url", "")
+        source_label = item.get("source_label", "")
+        vendor      = item.get("related_vendor", "")
+        person      = item.get("related_person", "")
+
+        badge = _heat_badge(heat)
+        vendor_tag = f'<span class="pulse-vendor">{vendor}</span>' if vendor else ""
+        person_tag = f'<span class="pulse-person">👤 {person}</span>' if person else ""
+        tags = f'<div class="pulse-tags">{vendor_tag}{person_tag}</div>' if (vendor or person) else ""
+
+        if source_url and source_label:
+            source_html = f'<a href="{source_url}" target="_blank" class="pulse-source">{source_label}</a>'
+        elif source_url:
+            source_html = f'<a href="{source_url}" target="_blank" class="pulse-source">{source_url[:60]}{"..." if len(source_url) > 60 else ""}</a>'
+        else:
+            source_html = ""
+
+        html += f"""<div class="pulse-item">
+<div class="pulse-header">{badge}<span class="pulse-headline">{headline}</span></div>
+<p class="pulse-body">{body}</p>
+<div class="pulse-footer">{source_html}{tags}</div>
+</div>"""
+    return html
+
+
 def _vendor_style(vendor: str):
     key = vendor.lower()
     for k, v in _VENDOR_COLORS.items():
@@ -118,10 +162,11 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
     data = _parse(briefing_json)
     he   = _parse(hebrew_json) if hebrew_json else {}
 
-    tldr            = data.get("tldr", [])
-    news_items      = data.get("news_items", [])
-    community_pulse = data.get("community_pulse", "")
-    community_urls  = data.get("community_urls", []) or []
+    tldr                  = data.get("tldr", [])
+    news_items            = data.get("news_items", [])
+    community_pulse       = data.get("community_pulse", "")
+    community_pulse_items = data.get("community_pulse_items", []) or []
+    community_urls        = data.get("community_urls", []) or []
 
     tldr_he            = he.get("tldr_he", [])
     headlines_he       = he.get("headlines_he", [])
@@ -168,7 +213,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
     html = _build_html(
         tldr, news_items, community_pulse, topic,
         tldr_he, headlines_he, summaries_he, community_pulse_he, community_urls,
-        social_data=social_data,
+        social_data=social_data, community_pulse_items=community_pulse_items,
     )
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -189,7 +234,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
 
 def _build_html(tldr, news_items, community_pulse, topic,
                 tldr_he=None, headlines_he=None, summaries_he=None, community_pulse_he="",
-                community_urls=None, social_data=None):
+                community_urls=None, social_data=None, community_pulse_items=None):
     now          = datetime.now()
     date_display = now.strftime("%B %d, %Y")
     tldr_he        = tldr_he or []
@@ -302,6 +347,11 @@ def _build_html(tldr, news_items, community_pulse, topic,
 </div>
 """
 
+    # Structured pulse items (preferred) vs flat fallback
+    community_pulse_items = community_pulse_items or []
+    pulse_structured_html = _pulse_items_html(community_pulse_items)
+
+    # Flat fallback (backward compat + Hebrew)
     community_en_html = _community_pulse_html(community_pulse)
     community_he_html = _community_pulse_html(community_pulse_he)
 
@@ -320,7 +370,6 @@ def _build_html(tldr, news_items, community_pulse, topic,
             return f"GitHub · {m.group(1)}" if m else "GitHub"
         if "linkedin.com/" in u:
             return "LinkedIn post"
-        # Generic: show domain
         m = _re.search(r'https?://(?:www\.)?([^/]+)', u)
         return m.group(1) if m else u[:50]
 
@@ -388,6 +437,22 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .reddit-title{{font-size:13px;color:#2563eb;text-decoration:none;flex:1;line-height:1.4}}
 .reddit-title:hover{{text-decoration:underline}}
 .reddit-score{{font-size:12px;color:#16a34a;font-weight:700;white-space:nowrap;margin-top:2px}}
+/* Community Pulse items */
+.pulse-item{{padding:14px 0;border-bottom:1px solid #f1f5f9}}
+.pulse-item:last-child{{border-bottom:none}}
+.pulse-header{{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}}
+.pulse-headline{{font-size:14px;font-weight:600;color:#0f172a}}
+.heat-badge{{font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap}}
+.heat-hot{{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}}
+.heat-warm{{background:#fffbeb;color:#d97706;border:1px solid #fde68a}}
+.heat-mild{{background:#f0f4f8;color:#64748b;border:1px solid #e2e8f0}}
+.pulse-body{{font-size:13px;line-height:1.6;color:#4b5563;margin-bottom:6px}}
+.pulse-footer{{display:flex;align-items:center;gap:8px;flex-wrap:wrap}}
+.pulse-source{{font-size:12px;color:#d97706;text-decoration:none}}
+.pulse-source:hover{{text-decoration:underline}}
+.pulse-vendor{{font-size:11px;font-weight:600;background:#f3e8ff;color:#7c3aed;border-radius:4px;padding:1px 6px}}
+.pulse-person{{font-size:11px;color:#64748b}}
+.pulse-tags{{display:flex;gap:6px;align-items:center}}
 .footer{{text-align:center;padding:20px;font-size:12px;color:#94a3b8}}
 </style></head><body>
 <div class="header">
@@ -410,10 +475,10 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 {people_section_html}
 {reddit_section_html}
 <div class="community-card">
-<h2 id="community-label">Community Pulse</h2>
-<div id="community-en" class="en-content">{community_en_html}</div>
+<h2 id="community-label">🗣️ Community Pulse</h2>
+<div id="community-en" class="en-content">{pulse_structured_html if pulse_structured_html else community_en_html}</div>
 <div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">{community_he_html}</div>
-{community_sources_block}
+{community_sources_block if not pulse_structured_html else ''}
 </div>
 </div>
 <div class="footer">

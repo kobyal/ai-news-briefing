@@ -84,9 +84,10 @@ def _agent(
         try:
             resp = client.messages.create(
                 model=model,
-                max_tokens=32768,
+                max_tokens=16384,
                 system=system_prompt,
                 messages=[{"role": "user", "content": input_text}],
+                timeout=600,  # 10 min timeout
             )
             break
         except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:

@@ -151,7 +151,7 @@ def _vendor_style(vendor: str):
 # Public builder
 # ---------------------------------------------------------------------------
 
-def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI", social_data: dict = None) -> dict:
+def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI", social_data: dict = None, youtube_data: list = None) -> dict:
     """Build and save the merged briefing as a bilingual HTML newsletter.
 
     Args:
@@ -220,6 +220,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
         tldr_he, headlines_he, summaries_he, community_pulse_he, community_urls,
         social_data=social_data, community_pulse_items=community_pulse_items,
         people_he=people_he, pulse_items_he=pulse_items_he,
+        youtube_data=youtube_data,
     )
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -241,7 +242,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
 def _build_html(tldr, news_items, community_pulse, topic,
                 tldr_he=None, headlines_he=None, summaries_he=None, community_pulse_he="",
                 community_urls=None, social_data=None, community_pulse_items=None,
-                people_he=None, pulse_items_he=None):
+                people_he=None, pulse_items_he=None, youtube_data=None):
     now          = datetime.now()
     date_display = now.strftime("%B %d, %Y")
     tldr_he        = tldr_he or []
@@ -332,6 +333,43 @@ def _build_html(tldr, news_items, community_pulse, topic,
         reddit_section_html = f"""<div class="reddit-card">
 <div class="section-label" style="margin-top:0">🟠 Hot on Reddit</div>
 {reddit_rows_html}
+</div>"""
+
+    # ── YouTube: AI Videos This Week ──────────────────────────────────────
+    youtube_data = youtube_data or []
+    youtube_rows_html = ""
+    for v in youtube_data[:8]:
+        title   = v.get("headline", "")
+        summary = v.get("summary", "")
+        url     = v.get("urls", [""])[0] if v.get("urls") else ""
+        date    = v.get("published_date", "")
+
+        # Extract channel and views from summary "[Channel · 1.1M views] ..."
+        import re as _re
+        channel_match = _re.match(r'\[([^\]]+)\]\s*(.*)', summary, _re.DOTALL)
+        if channel_match:
+            channel_info = channel_match.group(1)
+            desc = channel_match.group(2)[:120]
+        else:
+            channel_info = ""
+            desc = summary[:120]
+
+        date_html = f'<span class="yt-date">{date}</span>' if date else ""
+        youtube_rows_html += (
+            f'<div class="yt-row">'
+            f'<div class="yt-icon">▶</div>'
+            f'<div class="yt-content">'
+            f'<a href="{url}" class="yt-title" target="_blank">{title}</a>'
+            f'<div class="yt-meta">{channel_info}{" · " + date if date else ""}</div>'
+            f'</div>'
+            f'</div>'
+        )
+
+    youtube_section_html = ""
+    if youtube_rows_html:
+        youtube_section_html = f"""<div class="yt-card">
+<div class="section-label" style="margin-top:0" id="youtube-label">🎬 AI on YouTube</div>
+{youtube_rows_html}
 </div>"""
 
     cards = ""
@@ -465,6 +503,15 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .person-why{{font-size:12px;color:#94a3b8;margin-bottom:6px}}
 .x-link{{font-size:12px;color:#d97706;text-decoration:none}}
 .x-link:hover{{text-decoration:underline}}
+/* YouTube */
+.yt-card{{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
+.yt-row{{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9}}
+.yt-row:last-child{{border-bottom:none}}
+.yt-icon{{width:28px;height:28px;border-radius:6px;background:#ff0000;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}}
+.yt-content{{flex:1;min-width:0}}
+.yt-title{{font-size:13px;color:#0f172a;text-decoration:none;font-weight:600;line-height:1.4;display:block}}
+.yt-title:hover{{color:#d97706}}
+.yt-meta{{font-size:11px;color:#94a3b8;margin-top:2px}}
 /* Reddit */
 .reddit-card{{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
 .reddit-row{{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;flex-wrap:wrap}}
@@ -510,6 +557,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 {cards}
 {people_section_html}
 {reddit_section_html}
+{youtube_section_html}
 <div class="community-card">
 <h2 id="community-label">🗣️ Community Pulse</h2>
 <div id="community-en" class="en-content">{pulse_structured_html if pulse_structured_html else community_en_html}</div>
@@ -545,6 +593,8 @@ function setLang(l,btn){{
   document.getElementById('community-label').style.textAlign=align;
   var pl=document.getElementById('people-label');
   if(pl){{pl.textContent=en?'👤 People Talking Today':'👤 אנשים מדברים היום';pl.dir=dir;pl.style.textAlign=align;}}
+  var yl=document.getElementById('youtube-label');
+  if(yl){{yl.textContent=en?'🎬 AI on YouTube':'🎬 AI ביוטיוב';yl.dir=dir;yl.style.textAlign=align;}}
   document.querySelectorAll('.news-card,.person-card').forEach(function(el){{el.dir=en?'ltr':'rtl';}});
   document.querySelectorAll('.en-content').forEach(function(el){{el.style.display=en?'':'none';}});
   document.querySelectorAll('.he-content').forEach(function(el){{el.style.display=en?'none':'';}});

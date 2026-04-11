@@ -56,7 +56,7 @@ def _ask_grok(client: OpenAI, prompt: str, label: str = "") -> str:
     t0 = time.time()
     try:
         resp = client.chat.completions.create(
-            model="grok-3-mini-fast",
+            model="grok-3-mini",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=2000,
             temperature=0.3,

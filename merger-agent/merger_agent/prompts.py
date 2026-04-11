@@ -18,6 +18,9 @@ SOURCE D (Tavily News Search + Perplexity API):
 SOURCE E (Social signals — X/Twitter, Reddit communities, LinkedIn):
 {social_briefing}
 
+ADDITIONAL SOURCES (Exa semantic search, NewsAPI, YouTube AI channels, GitHub trending repos):
+{extra_sources}
+
 FULL ARTICLE CONTENT (use these to write richer, more detailed summaries with specific facts, numbers, and quotes):
 {enriched_articles}
 

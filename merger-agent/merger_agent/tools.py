@@ -518,8 +518,10 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 </div>
 </div>
 <div class="footer">
-  Generated {now.strftime('%B %d, %Y at %H:%M')} ·
-  Combined intelligence from Google ADK + Perplexity Agent API
+  Generated {now.strftime('%B %d, %Y at %H:%M')} · Merged from 10 AI agents<br>
+  Built by <a href="https://linkedin.com/in/koby-almog-56b50714" target="_blank" style="color:#d97706;text-decoration:none">Koby Almog</a> ·
+  <a href="https://linkedin.com/in/koby-almog-56b50714" target="_blank" style="color:#d97706;text-decoration:none">LinkedIn</a> ·
+  <a href="https://medium.com/@kobyal" target="_blank" style="color:#d97706;text-decoration:none">Medium</a>
 </div>
 <script>
 function setLang(l,btn){{

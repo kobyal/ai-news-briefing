@@ -367,13 +367,14 @@ def _build_html(tldr, news_items, community_pulse, topic,
         desc = desc[:150].rstrip() + ("..." if len(desc) > 150 else "")
 
         vendor_tag = f'<span class="pulse-vendor">{vendor}</span>' if vendor and vendor != "Other" else ""
+        desc_html = f'<div class="yt-desc">{desc}</div>' if desc else ""
         youtube_rows_html += (
             f'<div class="yt-row">'
             f'<div class="yt-icon">▶</div>'
             f'<div class="yt-content">'
             f'<a href="{url}" class="yt-title" target="_blank">{title}</a>'
             f'<div class="yt-meta">{channel_info}{" · " + date if date else ""} {vendor_tag}</div>'
-            f'<div class="yt-desc">{desc}</div>' if desc else ''
+            f'{desc_html}'
             f'</div>'
             f'</div>'
         )

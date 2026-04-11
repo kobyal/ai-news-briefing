@@ -21,6 +21,7 @@ def _load_env():
 
 _load_env()
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))  # repo root for shared module
 
 from rss_news_agent import run_pipeline
 

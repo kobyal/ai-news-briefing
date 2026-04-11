@@ -13,7 +13,7 @@ from google.adk.tools import google_search
 from google.genai import types
 from pydantic import BaseModel
 
-from .tools import build_and_save_html, resolve_source_urls
+from .tools import build_and_save_html, resolve_source_urls, enrich_articles
 from .prompts import (
     VENDOR_RESEARCHER_PROMPT,
     URL_RESOLVER_PROMPT,
@@ -196,6 +196,24 @@ ResearchPhase = ParallelAgent(
 )
 
 # ---------------------------------------------------------------------------
+# Step 3b — ArticleEnricher (reads full article content from resolved URLs)
+# ---------------------------------------------------------------------------
+
+_ae_before, _ae_after = _make_callbacks("ArticleEnricher")
+ArticleEnricher = LlmAgent(
+    name="ArticleEnricher",
+    model=MODEL,
+    tools=[enrich_articles],
+    output_key="enriched_articles",
+    instruction=(
+        "Call the enrich_articles tool now to fetch full article content "
+        "for the resolved URLs. Do not generate any other text — just call the tool."
+    ),
+    before_agent_callback=_ae_before,
+    after_agent_callback=_ae_after,
+)
+
+# ---------------------------------------------------------------------------
 # Root agent
 # ---------------------------------------------------------------------------
 
@@ -208,6 +226,7 @@ root_agent = SequentialAgent(
     ),
     sub_agents=[
         ResearchPhase,    # Parallel: VendorResearcher+URLResolver || CommunityResearcher
+        ArticleEnricher,  # Step 3b: fetch full article text for resolved URLs
         BriefingWriter,   # Step 4: BriefingContent schema → briefing
         Translator,       # Step 5: HebrewBriefing schema → briefing_he
         Publisher,        # Step 6: save HTML

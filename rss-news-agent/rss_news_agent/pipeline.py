@@ -78,15 +78,31 @@ def _step1_fetch(lookback_days: int) -> tuple[list, list]:
     return fetch_all(lookback_days)
 
 
-def _step2_synthesise(vendor_articles: list, community_articles: list) -> str:
+def _step1b_enrich(vendor_articles: list) -> dict[str, str]:
+    """Read full article content via Jina Reader + Firecrawl fallback."""
+    print("\n[1b/4] ArticleReader — fetching full article content...")
+    try:
+        from shared.article_reader import read_articles
+        urls = [a['urls'][0] for a in vendor_articles[:40] if a.get('urls')]
+        return read_articles(urls)
+    except ImportError:
+        print("  [ArticleReader] shared module not available — using summaries only")
+        return {}
+    except Exception as e:
+        print(f"  [ArticleReader] failed ({e}) — using summaries only")
+        return {}
+
+
+def _step2_synthesise(vendor_articles: list, community_articles: list, enriched: dict[str, str] = None) -> str:
     print("\n[2/4] BriefingWriter — synthesising RSS articles into structured JSON...")
+    enriched = enriched or {}
 
     # Build context for LLM — top 40 vendor articles + top 10 community
     vendor_ctx = "\n\n".join(
         f"[{i+1}] VENDOR: {a['vendor']}\n"
         f"HEADLINE: {a['headline']}\n"
         f"DATE: {a['published_date']}\n"
-        f"SUMMARY: {a['summary'][:400]}\n"
+        f"CONTENT: {enriched.get(a['urls'][0] if a.get('urls') else '', a['summary'][:400])}\n"
         f"URL: {a['urls'][0] if a['urls'] else ''}"
         for i, a in enumerate(vendor_articles[:40])
     )
@@ -97,7 +113,7 @@ def _step2_synthesise(vendor_articles: list, community_articles: list) -> str:
 
     prompt = f"""Today is {_TODAY()}. You are an AI news editor.
 
-Below are the latest articles fetched from official vendor blogs, tech news sites, and community platforms.
+Below are the latest articles with their full content (fetched from official vendor blogs, tech news sites, and community platforms).
 
 VENDOR ARTICLES:
 {vendor_ctx}
@@ -197,7 +213,8 @@ def run_pipeline() -> dict:
     t_start = time.time()
 
     vendor_articles, community_articles = _step1_fetch(_LOOKBACK_DAYS())
-    briefing_json = _step2_synthesise(vendor_articles, community_articles)
+    enriched      = _step1b_enrich(vendor_articles)
+    briefing_json = _step2_synthesise(vendor_articles, community_articles, enriched=enriched)
     hebrew_json   = _step3_translate(briefing_json)
     result        = _step4_publish(briefing_json, hebrew_json)
 

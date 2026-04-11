@@ -77,14 +77,30 @@ def _step1_search() -> list[Article]:
     return fetch_all_vendor_news(_LOOKBACK_DAYS())
 
 
-def _step2_write(articles: list[Article]) -> str:
+def _step1b_enrich(articles: list[Article]) -> dict[str, str]:
+    """Read full article content via Jina Reader + Firecrawl fallback."""
+    print("\n[1b/4] ArticleReader — fetching full article content...")
+    try:
+        from shared.article_reader import read_articles
+        urls = [a.url for a in articles[:50] if a.url]
+        return read_articles(urls)
+    except ImportError:
+        print("  [ArticleReader] shared module not available — using snippets only")
+        return {}
+    except Exception as e:
+        print(f"  [ArticleReader] failed ({e}) — using snippets only")
+        return {}
+
+
+def _step2_write(articles: list[Article], enriched: dict[str, str] = None) -> str:
     print(f"\n[2/4] BriefingWriter — synthesising via {_WRITER_MODEL()}...")
+    enriched = enriched or {}
 
     ctx = "\n\n".join(
         f"[{i+1}] VENDOR: {a.vendor}\n"
         f"HEADLINE: {a.headline}\n"
         f"DATE: {a.published_date}\n"
-        f"SUMMARY: {a.snippet[:400]}\n"
+        f"CONTENT: {enriched.get(a.url, a.snippet[:400])}\n"
         f"URL: {a.url}"
         for i, a in enumerate(articles[:50])
     )
@@ -99,7 +115,7 @@ def _step2_write(articles: list[Article]) -> str:
 
     prompt = f"""Today is {_TODAY()}. You are an AI news editor.
 
-Below are the latest articles fetched via Tavily news search.
+Below are the latest articles with their full content (fetched via Tavily news search + article reader).
 
 ARTICLES:
 {ctx}
@@ -179,7 +195,8 @@ def run_pipeline() -> dict:
 
     t_start       = time.time()
     articles      = _step1_search()
-    briefing_json = _step2_write(articles)
+    enriched      = _step1b_enrich(articles)
+    briefing_json = _step2_write(articles, enriched=enriched)
     hebrew_json   = _step3_translate(briefing_json)
     result        = _step4_publish(briefing_json, hebrew_json)
 

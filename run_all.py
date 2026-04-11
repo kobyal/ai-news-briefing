@@ -27,9 +27,14 @@ def _run(script: Path, label: str) -> bool:
     print(f"  Running: {label}")
     print(f"  Script:  {script}")
     print("=" * 60)
-    result = subprocess.run([sys.executable, str(script)], cwd=script.parent)
+    result = subprocess.run(
+        [sys.executable, str(script)], cwd=script.parent,
+        stderr=subprocess.PIPE, text=True,
+    )
     if result.returncode != 0:
         print(f"\n[ERROR] {label} failed (exit {result.returncode})")
+        if result.stderr:
+            print(f"STDERR:\n{result.stderr[-2000:]}")
         return False
     return True
 

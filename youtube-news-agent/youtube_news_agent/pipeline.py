@@ -89,7 +89,12 @@ def _search_youtube() -> list[dict]:
                 timeout=15,
             )
             if not resp.ok:
-                print(f"  YouTube search error {resp.status_code} for '{query[:20]}'")
+                error_msg = resp.text[:200]
+                print(f"  YouTube search error {resp.status_code} for '{query[:20]}': {error_msg}")
+                if resp.status_code == 403 and "YouTube Data API v3" in resp.text:
+                    print("  ⚠ YouTube Data API v3 is NOT enabled in your Google Cloud Console")
+                    print("  → Go to: https://console.cloud.google.com/apis/library/youtube.googleapis.com")
+                    return []  # No point trying more queries
                 continue
 
             for item in resp.json().get("items", []):

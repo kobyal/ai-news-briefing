@@ -37,7 +37,7 @@ Produce ONE merged briefing as a JSON object. Rules:
 
 3. RANKING — order news_items by importance/impact (most significant first). Aim for breadth: include stories from different vendors where possible.
 
-4. tldr — write 5-6 bullets summarising the most important stories from the merged set.
+4. tldr — write 8-10 bullets summarising the most important stories from the merged set.
    Each bullet: vendor + what happened + why it matters (15-25 words).
 
 5. community_pulse_items — THIS IS NOT A NEWS SUMMARY. The tldr already covers what happened.
@@ -116,7 +116,7 @@ TRANSLATOR_PROMPT = """\
 {briefing_json}
 
 החזר JSON תקין בלבד עם ארבעה שדות:
-- tldr_he: רשימה של 5-6 משפטי בולט בעברית (מתורגם מ-tldr)
+- tldr_he: רשימה של 8-10 משפטי בולט בעברית (מתורגם מ-tldr)
 - headlines_he: רשימה של כותרות בעברית באותו סדר כמו headlines (מחרוזת אחת לכל כותרת)
 - summaries_he: רשימה של תקצירים בעברית באותו סדר כמו summaries (פסקה אחת לכל כתבה)
 - community_pulse_he: מחרוזת עברית עם נקודות בולט (• לפני כל נקודה)

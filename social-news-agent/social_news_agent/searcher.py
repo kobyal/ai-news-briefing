@@ -83,6 +83,97 @@ def _px_search(query: str, label: str = "") -> str:
 
 
 # ---------------------------------------------------------------------------
+# Exa fallback for people search
+# ---------------------------------------------------------------------------
+
+def _fetch_people_exa(people: list[dict], days: int) -> list[dict]:
+    """Use Exa semantic search to find recent posts/articles from tracked people."""
+    api_key = os.environ.get("EXA_API_KEY", "")
+    if not api_key:
+        return []
+    try:
+        from exa_py import Exa
+    except ImportError:
+        return []
+
+    from datetime import timedelta
+    start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    exa = Exa(api_key=api_key)
+    results = []
+
+    for person in people:
+        name = person["name"]
+        handle = person["handle"]
+        org = person["org"]
+        role = person["role"]
+        try:
+            resp = exa.search(
+                f"{name} {handle} AI {org} opinion statement",
+                type="auto",
+                num_results=2,
+                start_published_date=start_date,
+            )
+            for r in resp.results:
+                text = getattr(r, "text", "") or ""
+                if len(text) > 100:
+                    url = r.url or ""
+                    results.append({
+                        "person": name,
+                        "handle": handle,
+                        "org": org,
+                        "role": role,
+                        "raw": f"{r.title or ''}\n{text[:600]}\n\n[SOURCES: {url}]",
+                    })
+                    break  # One good result per person is enough
+        except Exception:
+            continue
+
+    print(f"    Exa found {len(results)} people signals")
+    return results
+
+
+def _fetch_topics_exa(topics: list[str], days: int) -> list[dict]:
+    """Use Exa to find trending AI discussions on specific topics."""
+    api_key = os.environ.get("EXA_API_KEY", "")
+    if not api_key:
+        return []
+    try:
+        from exa_py import Exa
+    except ImportError:
+        return []
+
+    from datetime import timedelta
+    start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    exa = Exa(api_key=api_key)
+    results = []
+
+    for topic in topics:
+        try:
+            resp = exa.search(
+                f"{topic} discussion debate developer reaction",
+                type="auto",
+                num_results=2,
+                start_published_date=start_date,
+                category="news",
+            )
+            for r in resp.results:
+                text = getattr(r, "text", "") or ""
+                url = r.url or ""
+                if len(text) > 100:
+                    results.append({
+                        "topic": topic,
+                        "raw": f"{r.title or ''}\n{text[:500]}",
+                        "url": url,
+                    })
+                    break
+        except Exception:
+            continue
+
+    print(f"    Exa found {len(results)} topic signals")
+    return results
+
+
+# ---------------------------------------------------------------------------
 # People tracker — recent public activity from each tracked AI leader
 # ---------------------------------------------------------------------------
 
@@ -126,6 +217,33 @@ def fetch_people_signals(max_workers: int = 12) -> list[dict]:
                 results.append(result)
 
     print(f"  → {len(results)}/{len(TRACKED_PEOPLE)} people had recent activity")
+
+    # Retry with Exa if too few results (< 3 people found)
+    if len(results) < 3:
+        print(f"  ⚠ Only {len(results)} people found — trying Exa fallback for top people...")
+        exa_results = _fetch_people_exa(TRACKED_PEOPLE[:20], days)
+        if exa_results:
+            # Merge: add Exa results for people not already found
+            found_names = {r["person"] for r in results}
+            for er in exa_results:
+                if er["person"] not in found_names:
+                    results.append(er)
+                    found_names.add(er["person"])
+            print(f"  → After Exa fallback: {len(results)} people total")
+
+    # If still < 3, retry Perplexity for the most prominent people
+    if len(results) < 3:
+        print(f"  ⚠ Still only {len(results)} — retrying top 10 people with Perplexity...")
+        found_names = {r["person"] for r in results}
+        retry_people = [p for p in TRACKED_PEOPLE[:10] if p["name"] not in found_names]
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            futures = {pool.submit(_search_person, p): p for p in retry_people}
+            for fut in as_completed(futures):
+                result = fut.result()
+                if result["raw"].strip():
+                    results.append(result)
+        print(f"  → After retry: {len(results)} people total")
+
     return results
 
 
@@ -153,6 +271,7 @@ def fetch_topic_signals(max_workers: int = 8) -> list[dict]:
             url = m.group(1).strip()
         return {"topic": topic, "raw": raw, "url": url}
 
+    days = LOOKBACK_DAYS()
     print(f"  Searching {len(TOPIC_SEARCHES)} topic buckets...")
     results = []
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
@@ -163,6 +282,17 @@ def fetch_topic_signals(max_workers: int = 8) -> list[dict]:
                 results.append(r)
 
     print(f"  → {len(results)} topic searches returned results")
+
+    # Supplement with Exa if < 5 topics came back
+    if len(results) < 5:
+        exa_topics = _fetch_topics_exa(TOPIC_SEARCHES[:8], days)
+        if exa_topics:
+            existing = {r["topic"] for r in results}
+            for et in exa_topics:
+                if et["topic"] not in existing:
+                    results.append(et)
+            print(f"  → After Exa supplement: {len(results)} topics total")
+
     return results
 
 

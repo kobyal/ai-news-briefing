@@ -35,6 +35,8 @@ FEEDS = [
     ("https://deepmind.google/blog/rss.xml",                               "Google",        "rss"),
     ("https://blog.research.google/feeds/posts/default",                   "Google",        "rss"),
     ("https://aws.amazon.com/blogs/machine-learning/feed/",                "AWS",           "rss"),
+    ("https://aws.amazon.com/blogs/aws/feed/",                            "AWS",           "rss"),
+    ("https://www.aboutamazon.com/news/aws/rss",                          "AWS",           "rss"),
     ("https://blogs.microsoft.com/ai/feed/",                               "Azure",         "rss"),
     ("https://ai.meta.com/blog/feed/",                                     "Meta",          "rss"),
     ("https://blogs.nvidia.com/blog/category/deep-learning/feed/",         "NVIDIA",        "rss"),

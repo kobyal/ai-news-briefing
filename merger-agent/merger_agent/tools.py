@@ -341,6 +341,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
     for v in youtube_data[:8]:
         title   = v.get("headline", "")
         summary = v.get("summary", "")
+        vendor  = v.get("vendor", "")
         url     = v.get("urls", [""])[0] if v.get("urls") else ""
         date    = v.get("published_date", "")
 
@@ -349,18 +350,23 @@ def _build_html(tldr, news_items, community_pulse, topic,
         channel_match = _re.match(r'\[([^\]]+)\]\s*(.*)', summary, _re.DOTALL)
         if channel_match:
             channel_info = channel_match.group(1)
-            desc = channel_match.group(2)[:120]
+            desc = channel_match.group(2).strip()
         else:
             channel_info = ""
-            desc = summary[:120]
+            desc = summary.strip()
 
-        date_html = f'<span class="yt-date">{date}</span>' if date else ""
+        # Clean up description — remove tracking URLs and truncate
+        desc = _re.sub(r'https?://\S+', '', desc).strip()
+        desc = desc[:150].rstrip() + ("..." if len(desc) > 150 else "")
+
+        vendor_tag = f'<span class="pulse-vendor">{vendor}</span>' if vendor and vendor != "Other" else ""
         youtube_rows_html += (
             f'<div class="yt-row">'
             f'<div class="yt-icon">▶</div>'
             f'<div class="yt-content">'
             f'<a href="{url}" class="yt-title" target="_blank">{title}</a>'
-            f'<div class="yt-meta">{channel_info}{" · " + date if date else ""}</div>'
+            f'<div class="yt-meta">{channel_info}{" · " + date if date else ""} {vendor_tag}</div>'
+            f'<div class="yt-desc">{desc}</div>' if desc else ''
             f'</div>'
             f'</div>'
         )
@@ -511,7 +517,8 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .yt-content{{flex:1;min-width:0}}
 .yt-title{{font-size:13px;color:#0f172a;text-decoration:none;font-weight:600;line-height:1.4;display:block}}
 .yt-title:hover{{color:#d97706}}
-.yt-meta{{font-size:11px;color:#94a3b8;margin-top:2px}}
+.yt-meta{{font-size:11px;color:#94a3b8;margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}}
+.yt-desc{{font-size:12px;color:#6b7280;margin-top:3px;line-height:1.4}}
 /* Reddit */
 .reddit-card{{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
 .reddit-row{{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;flex-wrap:wrap}}

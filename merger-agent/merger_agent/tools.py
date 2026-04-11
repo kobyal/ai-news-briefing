@@ -151,7 +151,7 @@ def _vendor_style(vendor: str):
 # Public builder
 # ---------------------------------------------------------------------------
 
-def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI", social_data: dict = None, youtube_data: list = None, github_data: list = None) -> dict:
+def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI", social_data: dict = None, youtube_data: list = None, github_data: list = None, xai_data: dict = None) -> dict:
     """Build and save the merged briefing as a bilingual HTML newsletter.
 
     Args:
@@ -177,6 +177,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
     community_pulse_he = he.get("community_pulse_he", "")
     people_he          = he.get("people_he", []) or []
     pulse_items_he     = he.get("pulse_items_he", []) or []
+    youtube_descs_he   = he.get("youtube_descs_he", []) or []
 
     news_seen: set = set()
 
@@ -220,7 +221,8 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
         tldr_he, headlines_he, summaries_he, community_pulse_he, community_urls,
         social_data=social_data, community_pulse_items=community_pulse_items,
         people_he=people_he, pulse_items_he=pulse_items_he,
-        youtube_data=youtube_data, github_data=github_data,
+        youtube_data=youtube_data, github_data=github_data, youtube_descs_he=youtube_descs_he,
+        xai_data=xai_data,
     )
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -242,7 +244,8 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
 def _build_html(tldr, news_items, community_pulse, topic,
                 tldr_he=None, headlines_he=None, summaries_he=None, community_pulse_he="",
                 community_urls=None, social_data=None, community_pulse_items=None,
-                people_he=None, pulse_items_he=None, youtube_data=None, github_data=None):
+                people_he=None, pulse_items_he=None, youtube_data=None, github_data=None, youtube_descs_he=None,
+                xai_data=None):
     now          = datetime.now()
     date_display = now.strftime("%B %d, %Y")
     tldr_he        = tldr_he or []
@@ -256,13 +259,21 @@ def _build_html(tldr, news_items, community_pulse, topic,
     tldr_en_html = "".join(f"<li>{item}</li>" for item in tldr)
     tldr_he_html = "".join(f"<li>{item}</li>" for item in tldr_he)
 
-    # ── Social: People Talking Today ────────────────────────────────────────
+    # ── Social + xAI: People Talking Today ──────────────────────────────────
+    xai_data = xai_data or {}
     _bad = {"no posts retrievable", "unavailable", "could not be confirmed",
             "not available", "no recent posts", "search unavailable", "no posts"}
     people_highlights = [
         p for p in (social_data.get("people_highlights", []) or [])
         if p.get("post") and not any(b in p.get("post", "").lower() for b in _bad)
     ]
+    # Merge xAI Twitter people (prefer xAI data — it has real tweets)
+    xai_people = xai_data.get("people", []) or []
+    existing_names = {p.get("name", "").lower() for p in people_highlights}
+    for xp in xai_people:
+        if xp.get("name", "").lower() not in existing_names and xp.get("post"):
+            people_highlights.append(xp)
+            existing_names.add(xp["name"].lower())
     people_cards_html = ""
     for idx, p in enumerate(people_highlights[:6]):
         name       = p.get("name", "")
@@ -337,8 +348,9 @@ def _build_html(tldr, news_items, community_pulse, topic,
 
     # ── YouTube: AI Videos This Week ──────────────────────────────────────
     youtube_data = youtube_data or []
+    youtube_descs_he = youtube_descs_he or []
     youtube_rows_html = ""
-    for v in youtube_data[:8]:
+    for yt_idx, v in enumerate(youtube_data[:8]):
         title   = v.get("headline", "")
         summary = v.get("summary", "")
         vendor  = v.get("vendor", "")
@@ -355,26 +367,26 @@ def _build_html(tldr, news_items, community_pulse, topic,
             channel_info = ""
             desc = summary.strip()
 
-        # Clean up description — remove tracking URLs, sponsor text, and truncate
+        # Clean up description — remove tracking URLs and sponsor text
         desc = _re.sub(r'https?://\S+', '', desc).strip()
-        # Remove common sponsor/ad patterns
         desc = _re.sub(r'(?i)(try|get|check out|sign up|use code|sponsored by|thank you .{0,30} for sponsoring|use my link|free forever|partner|promo code).*$', '', desc, flags=_re.MULTILINE).strip()
-        desc = _re.sub(r'(?i)^.*?(:\s*https?\S+|referral|discount|coupon).*$', '', desc, flags=_re.MULTILINE).strip()
-        # Remove lines that are just hashtags
+        desc = _re.sub(r'(?i)^.*?(referral|discount|coupon).*$', '', desc, flags=_re.MULTILINE).strip()
         desc = _re.sub(r'^[#\s]+$', '', desc, flags=_re.MULTILINE).strip()
-        # Take first meaningful sentence
-        desc = desc.split('\n')[0].strip() if desc else ""
-        desc = desc[:150].rstrip() + ("..." if len(desc) > 150 else "")
+        # Take first meaningful line, no hard truncation
+        lines = [l.strip() for l in desc.split('\n') if l.strip()]
+        desc = lines[0] if lines else ""
 
         vendor_tag = f'<span class="pulse-vendor">{vendor}</span>' if vendor and vendor != "Other" else ""
-        desc_html = f'<div class="yt-desc">{desc}</div>' if desc else ""
+        desc_he = youtube_descs_he[yt_idx] if yt_idx < len(youtube_descs_he) else ""
+        desc_en_html = f'<div class="yt-desc en-content">{desc}</div>' if desc else ""
+        desc_he_html = f'<div class="yt-desc he-content" style="display:none;direction:rtl;text-align:right">{desc_he}</div>' if desc_he else ""
         youtube_rows_html += (
             f'<div class="yt-row">'
             f'<div class="yt-icon">▶</div>'
             f'<div class="yt-content">'
             f'<a href="{url}" class="yt-title" target="_blank">{title}</a>'
             f'<div class="yt-meta">{channel_info}{" · " + date if date else ""} {vendor_tag}</div>'
-            f'{desc_html}'
+            f'{desc_en_html}{desc_he_html}'
             f'</div>'
             f'</div>'
         )
@@ -386,10 +398,19 @@ def _build_html(tldr, news_items, community_pulse, topic,
 {youtube_rows_html}
 </div>"""
 
-    # ── GitHub: AI Open Source ────────────────────────────────────────────
+    # ── GitHub Trending ─────────────────────────────────────────────────
     github_data = github_data or []
+    # Filter: skip minor patch releases (v1.2.3 patches), keep major/trending
+    import re as _ghre
+    _filtered_gh = []
+    for g in github_data:
+        title = g.get("headline", "")
+        # Skip minor patches like "released v5.5.3" or "langchain-core==1.2.28"
+        if _ghre.search(r'released.*\d+\.\d+\.\d+', title) and not _ghre.search(r'\b[vV]?\d+\.0\.0|[vV]?\d+\.0\b|major|breaking', title):
+            continue
+        _filtered_gh.append(g)
     github_rows_html = ""
-    for g in github_data[:8]:
+    for g in _filtered_gh[:8]:
         title   = g.get("headline", "")
         summary = g.get("summary", "")
         url     = g.get("urls", [""])[0] if g.get("urls") else ""
@@ -423,8 +444,42 @@ def _build_html(tldr, news_items, community_pulse, topic,
     github_section_html = ""
     if github_rows_html:
         github_section_html = f"""<div class="gh-card">
-<div class="section-label" style="margin-top:0" id="github-label">🛠️ AI Open Source</div>
+<div class="section-label" style="margin-top:0" id="github-label">📦 GitHub Trending</div>
 {github_rows_html}
+</div>"""
+
+    # ── xAI: Trending on AI Twitter ─────────────────────────────────────
+    xai_trending = xai_data.get("trending", []) or []
+    xai_trending_html = ""
+    for tp in xai_trending[:8]:
+        author = tp.get("author", "")
+        name = tp.get("name", "")
+        post = tp.get("post", "")
+        date = tp.get("date", "")
+        url = tp.get("url", "")
+        engagement = tp.get("engagement", "")
+        topic = tp.get("topic", "")
+
+        topic_tag = f'<span class="pulse-vendor">{topic}</span>' if topic else ""
+        eng_html = f'<span class="xt-engagement">{engagement}</span>' if engagement else ""
+        link_html = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
+        xai_trending_html += (
+            f'<div class="xt-row">'
+            f'<div class="xt-icon">𝕏</div>'
+            f'<div class="xt-content">'
+            f'<div class="xt-author">{name} <span class="xt-handle">{author}</span></div>'
+            f'<p class="xt-post">"{post}"</p>'
+            f'<div class="xt-meta">{eng_html}{" · " + date if date else ""} {topic_tag}</div>'
+            f'{link_html}'
+            f'</div>'
+            f'</div>'
+        )
+
+    xai_section_html = ""
+    if xai_trending_html:
+        xai_section_html = f"""<div class="xt-card">
+<div class="section-label" style="margin-top:0" id="xai-label">🐦 Trending on AI Twitter</div>
+{xai_trending_html}
 </div>"""
 
     # Today's date string for "NEW" badge comparison
@@ -578,6 +633,17 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .yt-title:hover{{color:#d97706}}
 .yt-meta{{font-size:11px;color:#94a3b8;margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}}
 .yt-desc{{font-size:12px;color:#6b7280;margin-top:3px;line-height:1.4}}
+/* X/Twitter Trending */
+.xt-card{{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
+.xt-row{{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #f1f5f9}}
+.xt-row:last-child{{border-bottom:none}}
+.xt-icon{{width:28px;height:28px;border-radius:6px;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;margin-top:2px}}
+.xt-content{{flex:1;min-width:0}}
+.xt-author{{font-size:13px;font-weight:700;color:#0f172a}}
+.xt-handle{{font-weight:400;color:#94a3b8;font-size:12px}}
+.xt-post{{font-size:13px;color:#374151;line-height:1.5;font-style:italic;margin:4px 0;border-left:3px solid #e2e8f0;padding-left:10px}}
+.xt-meta{{font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px}}
+.xt-engagement{{font-weight:600;color:#d97706}}
 /* GitHub */
 .gh-card{{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
 .gh-row{{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9}}
@@ -617,7 +683,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <div class="header">
 <h1>⚡ {topic} Combined Briefing</h1>
 <div class="date">{date_display}</div>
-<div class="sources-badge">Merged from <b>10 AI agents</b> · ADK · Perplexity · RSS · Tavily · Social · Exa · NewsAPI · YouTube · GitHub · Article Reader</div>
+<div class="sources-badge">Merged from <b>11 AI agents</b> · ADK · Perplexity · RSS · Tavily · Social · Exa · NewsAPI · YouTube · GitHub · Grok/X · Article Reader</div>
 <div class="toggle">
 <button class="tbtn active" onclick="setLang('en',this)">EN</button>
 <button class="tbtn" onclick="setLang('he',this)">עברית</button>
@@ -633,14 +699,15 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 {cards}
 {people_section_html}
 {reddit_section_html}
-{youtube_section_html}
-{github_section_html}
 <div class="community-card">
 <h2 id="community-label">🗣️ Community Pulse</h2>
 <div id="community-en" class="en-content">{pulse_structured_html if pulse_structured_html else community_en_html}</div>
 <div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">{pulse_structured_he_html if pulse_structured_he_html else community_he_html}</div>
 {community_sources_block if not pulse_structured_html else ''}
 </div>
+{youtube_section_html}
+{github_section_html}
+{xai_section_html}
 </div>
 <div class="footer">
   Generated {now.strftime('%B %d, %Y at %H:%M')} · Merged from 10 AI agents<br>
@@ -673,7 +740,9 @@ function setLang(l,btn){{
   var yl=document.getElementById('youtube-label');
   if(yl){{yl.textContent=en?'🎬 AI on YouTube':'🎬 AI ביוטיוב';yl.dir=dir;yl.style.textAlign=align;}}
   var gl=document.getElementById('github-label');
-  if(gl){{gl.textContent=en?'🛠️ AI Open Source':'🛠️ קוד פתוח AI';gl.dir=dir;gl.style.textAlign=align;}}
+  if(gl){{gl.textContent=en?'📦 GitHub Trending':'📦 GitHub Trending';gl.dir=dir;gl.style.textAlign=align;}}
+  var xl=document.getElementById('xai-label');
+  if(xl){{xl.textContent=en?'🐦 Trending on AI Twitter':'🐦 טרנדינג ב-AI Twitter';xl.dir=dir;xl.style.textAlign=align;}}
   document.querySelectorAll('.news-card,.person-card').forEach(function(el){{el.dir=en?'ltr':'rtl';}});
   document.querySelectorAll('.en-content').forEach(function(el){{el.style.display=en?'':'none';}});
   document.querySelectorAll('.he-content').forEach(function(el){{el.style.display=en?'none':'';}});

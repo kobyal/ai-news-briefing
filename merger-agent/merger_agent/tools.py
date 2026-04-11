@@ -706,8 +706,8 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 {community_sources_block if not pulse_structured_html else ''}
 </div>
 {youtube_section_html}
-{github_section_html}
 {xai_section_html}
+{github_section_html}
 </div>
 <div class="footer">
   Generated {now.strftime('%B %d, %Y at %H:%M')} · Merged from 10 AI agents<br>

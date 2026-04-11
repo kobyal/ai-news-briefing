@@ -189,18 +189,7 @@ def run_pipeline() -> dict:
     print("\n[3/3] Formatting output...")
     news_items = []
 
-    # Releases first (most newsworthy)
-    for rel in releases[:10]:
-        summary = f"New release {rel['tag']} of {rel['repo']}. {rel['body'][:400]}"
-        news_items.append({
-            "vendor": "Other",
-            "headline": f"{rel['repo']} released {rel['name']}",
-            "published_date": _format_date(rel["published_at"]),
-            "summary": summary[:600],
-            "urls": [rel["url"]] if rel["url"] else [],
-        })
-
-    # Trending repos
+    # Trending repos first (higher value — hot AI projects)
     for repo in trending[:10]:
         stars = _format_stars(repo["stars"])
         lang = repo.get("language", "")
@@ -215,6 +204,17 @@ def run_pipeline() -> dict:
             "published_date": _format_date(repo.get("updated_at", "")),
             "summary": summary[:600],
             "urls": [repo["url"]] if repo["url"] else [],
+        })
+
+    # Major releases after trending
+    for rel in releases[:10]:
+        summary = f"New release {rel['tag']} of {rel['repo']}. {rel['body'][:400]}"
+        news_items.append({
+            "vendor": "Other",
+            "headline": f"{rel['repo']} released {rel['name']}",
+            "published_date": _format_date(rel["published_at"]),
+            "summary": summary[:600],
+            "urls": [rel["url"]] if rel["url"] else [],
         })
 
     briefing = {

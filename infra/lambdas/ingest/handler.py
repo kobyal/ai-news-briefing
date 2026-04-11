@@ -48,6 +48,9 @@ def lambda_handler(event, context):
         "people_highlights":  social.get("people_highlights", []),
         "top_reddit":         social.get("top_reddit", []),
         "social_tldr":        social.get("tldr", []),
+        "youtube":            data.get("youtube", []),
+        "github":             data.get("github", []),
+        "twitter":            data.get("twitter", []),
     }
 
     ttl = int((datetime.now(timezone.utc) + timedelta(days=90)).timestamp())

@@ -207,6 +207,7 @@ def _step1_load_sources() -> tuple:
             n = len(briefing.get("news_items", []))
             if n > 0:
                 extra_sources.append({"label": label, "briefing": briefing})
+                print(f"  Found: {label} ({n} items)")
 
     # YouTube — load for dedicated HTML section (not merged into news items)
     yt_data = _find_latest_json(_ROOT / "youtube-news-agent" / "output")
@@ -223,7 +224,6 @@ def _step1_load_sources() -> tuple:
         github_data = gh_briefing.get("news_items", [])
         if github_data:
             print(f"  Found: GitHub ({len(github_data)} items)")
-                print(f"  Found: {label} ({n} items)")
 
     # Enriched articles from Article Reader
     enriched_articles = _load_article_reader()

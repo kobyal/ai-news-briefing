@@ -18,6 +18,9 @@ SOURCE D (Tavily News Search + Perplexity API):
 SOURCE E (Social signals — X/Twitter, Reddit communities, LinkedIn):
 {social_briefing}
 
+FULL ARTICLE CONTENT (use these to write richer, more detailed summaries with specific facts, numbers, and quotes):
+{enriched_articles}
+
 TASK:
 Produce ONE merged briefing as a JSON object. Rules:
 

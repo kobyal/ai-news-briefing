@@ -172,7 +172,7 @@ def _build_enriched_context(articles: dict[str, dict], all_urls: list[str]) -> s
     return "\n\n---\n\n".join(parts)
 
 
-def _step1_load_sources() -> tuple[dict, dict, dict, dict, dict, dict, list]:
+def _step1_load_sources() -> tuple:
     print("\n[1/4] Loading source briefings...")
 
     # Core sources (used in merger prompt with dedicated placeholders)

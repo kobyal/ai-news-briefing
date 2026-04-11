@@ -120,6 +120,7 @@ def main():
     agents.append((root / "newsapi-agent"               / "run.py", "NewsAPI Agent"))
     agents.append((root / "youtube-news-agent"          / "run.py", "YouTube News Agent"))
     agents.append((root / "github-trending-agent"       / "run.py", "GitHub Trending Agent"))
+    agents.append((root / "xai-twitter-agent"           / "run.py", "xAI Twitter Agent"))
 
     results = _run_parallel(agents)
 

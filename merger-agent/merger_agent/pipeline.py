@@ -225,6 +225,18 @@ def _step1_load_sources() -> tuple:
         if github_data:
             print(f"  Found: GitHub ({len(github_data)} items)")
 
+    # xAI Twitter — people highlights + trending posts
+    xai_data = {}
+    xai_raw = _find_latest_json(_ROOT / "xai-twitter-agent" / "output")
+    if xai_raw:
+        xai_briefing = xai_raw.get("briefing", xai_raw)
+        xai_people = xai_briefing.get("people_highlights", [])
+        xai_trending = xai_briefing.get("trending_posts", [])
+        xai_community = xai_briefing.get("community_pulse", "")
+        if xai_people or xai_trending:
+            xai_data = {"people": xai_people, "trending": xai_trending, "community": xai_community}
+            print(f"  Found: xAI Twitter ({len(xai_people)} people, {len(xai_trending)} trending)")
+
     # Enriched articles from Article Reader
     enriched_articles = _load_article_reader()
 
@@ -236,7 +248,7 @@ def _step1_load_sources() -> tuple:
     n_articles = len(enriched_articles)
     n_extra = sum(len(s["briefing"].get("news_items", [])) for s in extra_sources)
     print(f"  ADK: {n_adk}  |  Perplexity: {n_px}  |  RSS: {n_rss}  |  Tavily: {n_tavily}  |  Social: {'✓' if n_social else '–'}  |  Articles: {n_articles}  |  Extra: {n_extra}")
-    return adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data, github_data
+    return adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data, github_data, xai_data
 
 
 def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
@@ -285,7 +297,7 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
     )
 
 
-def _step3_translate(merged_json: str, social_data: dict = None) -> str:
+def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: list = None) -> str:
     print("\n[3/4] Translator — three parallel calls (headers+pulse / summaries / people+pulse-items)...")
     full  = _parse(merged_json)
     items = full.get("news_items", [])
@@ -347,8 +359,9 @@ def _step3_translate(merged_json: str, social_data: dict = None) -> str:
         social = social_data or {}
         people = social.get("people_highlights", []) or []
         pulse_items = full.get("community_pulse_items", []) or []
+        yt_items = youtube_data or []
 
-        if not people and not pulse_items:
+        if not people and not pulse_items and not yt_items:
             return "{}"
 
         translate_input = {}
@@ -362,6 +375,23 @@ def _step3_translate(merged_json: str, social_data: dict = None) -> str:
                 {"headline": pi.get("headline", ""), "body": pi.get("body", "")}
                 for pi in pulse_items[:7]
             ]
+        if yt_items:
+            # Extract descriptions (strip [Channel · views] prefix)
+            import re as _re
+            yt_descs = []
+            for v in yt_items[:8]:
+                summary = v.get("summary", "")
+                m = _re.match(r'\[([^\]]+)\]\s*(.*)', summary, _re.DOTALL)
+                desc = m.group(2).strip() if m else summary.strip()
+                # Clean sponsor text
+                desc = _re.sub(r'https?://\S+', '', desc).strip()
+                desc = _re.sub(r'(?i)(try|get|check out|sign up|use code|sponsored by|thank you .{0,30} for sponsoring).*$', '', desc, flags=_re.MULTILINE).strip()
+                lines = [l.strip() for l in desc.split('\n') if l.strip()]
+                desc = lines[0] if lines else ""
+                if desc:
+                    yt_descs.append(desc)
+            if yt_descs:
+                translate_input["youtube_descs"] = yt_descs
 
         return _agent(
             input_text=(
@@ -376,7 +406,8 @@ def _step3_translate(merged_json: str, social_data: dict = None) -> str:
                 + json.dumps(translate_input, ensure_ascii=False, indent=2)
                 + '\n\nהחזר JSON בלבד עם:\n'
                   '- people_he: [{\"post_he\": \"...\", \"why_he\": \"...\"}] (אותו סדר)\n'
-                  '- pulse_items_he: [{\"headline_he\": \"...\", \"body_he\": \"...\"}] (אותו סדר)'
+                  '- pulse_items_he: [{\"headline_he\": \"...\", \"body_he\": \"...\"}] (אותו סדר)\n'
+                  '- youtube_descs_he: [\"תיאור 1\", \"תיאור 2\", ...] (אותו סדר, רק אם youtube_descs קיים)'
             ),
             model=_TRANSLATOR_MODEL(),
             instructions=(
@@ -418,6 +449,8 @@ def _step3_translate(merged_json: str, social_data: dict = None) -> str:
         he["people_he"] = people_parsed["people_he"]
     if people_parsed.get("pulse_items_he"):
         he["pulse_items_he"] = people_parsed["pulse_items_he"]
+    if people_parsed.get("youtube_descs_he"):
+        he["youtube_descs_he"] = people_parsed["youtube_descs_he"]
 
     try:
         return json.dumps(he, ensure_ascii=False)
@@ -425,9 +458,9 @@ def _step3_translate(merged_json: str, social_data: dict = None) -> str:
         return result_short
 
 
-def _step4_publish(merged_json: str, hebrew_json: str, social_briefing: dict = None, youtube_data: list = None, github_data: list = None) -> dict:
+def _step4_publish(merged_json: str, hebrew_json: str, social_briefing: dict = None, youtube_data: list = None, github_data: list = None, xai_data: dict = None) -> dict:
     print("\n[4/4] Publisher — building combined HTML newsletter...")
-    result = build_and_save_html(merged_json, hebrew_json, topic="AI", social_data=social_briefing, youtube_data=youtube_data, github_data=github_data)
+    result = build_and_save_html(merged_json, hebrew_json, topic="AI", social_data=social_briefing, youtube_data=youtube_data, github_data=github_data, xai_data=xai_data)
 
     # Save raw JSON too
     html_path = result["saved_to"]
@@ -459,7 +492,7 @@ def run_pipeline() -> dict:
 
     t_start = time.time()
 
-    adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data, github_data = _step1_load_sources()
+    adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data, github_data, xai_data = _step1_load_sources()
     # Merge with validation — retry once if JSON is invalid
     merged_json = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources)
     parsed = _parse(merged_json)
@@ -471,11 +504,11 @@ def run_pipeline() -> dict:
             raise RuntimeError(f"Merger returned invalid JSON after retry: {repr(merged_json[:200])}")
 
     try:
-        hebrew_json = _step3_translate(merged_json, social_data=social_briefing)
+        hebrew_json = _step3_translate(merged_json, social_data=social_briefing, youtube_data=youtube_data)
     except Exception as e:
         print(f"  [Translator] failed ({e}) — publishing without Hebrew")
         hebrew_json = "{}"
-    result       = _step4_publish(merged_json, hebrew_json, social_briefing=social_briefing, youtube_data=youtube_data, github_data=github_data)
+    result       = _step4_publish(merged_json, hebrew_json, social_briefing=social_briefing, youtube_data=youtube_data, github_data=github_data, xai_data=xai_data)
 
     elapsed = time.time() - t_start
     print(f"\n{'='*60}")

@@ -5,9 +5,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Add repo root to path for shared module
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 # Load .env — check local first, then sibling perplexity-news-agent
 _here = Path(__file__).parent
 for _candidate in [_here / ".env", _here.parent / "perplexity-news-agent" / ".env"]:

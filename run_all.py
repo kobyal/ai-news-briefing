@@ -110,6 +110,7 @@ def main():
         agents.append((root / "tavily-news-agent"       / "run.py", "Tavily News Agent"))
     if not args.skip_social:
         agents.append((root / "social-news-agent"       / "run.py", "Social News Agent"))
+    agents.append((root / "article-reader-agent"        / "run.py", "Article Reader Agent"))
 
     results = _run_parallel(agents)
 

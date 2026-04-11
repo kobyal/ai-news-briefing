@@ -9,61 +9,6 @@ from datetime import datetime
 from typing import List
 
 
-def enrich_articles(topic: str = "AI", tool_context=None) -> dict:
-    """Fetch full article content for resolved source URLs.
-
-    Reads resolved_sources from session state, fetches full article text
-    via Jina Reader + Firecrawl fallback, and stores enriched content
-    back in session state.
-
-    Args:
-        topic: Ignored (required by ADK tool signature).
-
-    Returns:
-        {"enriched_count": N, "success": True}
-    """
-    urls = []
-    if tool_context is not None:
-        raw = tool_context.state.get("resolved_sources", "")
-        # resolved_sources may be a list or a string with URLs
-        if isinstance(raw, list):
-            urls = [u for u in raw if u and u.startswith("http")]
-        elif isinstance(raw, str):
-            urls = re.findall(r"https?://\S+", raw)
-
-    if not urls:
-        print("ArticleEnricher -- no URLs found in resolved_sources")
-        if tool_context is not None:
-            tool_context.state["enriched_articles"] = "{}"
-        return {"enriched_count": 0, "success": True}
-
-    print(f"ArticleEnricher -- reading {len(urls)} articles...")
-    try:
-        from shared.article_reader import read_articles
-        enriched = read_articles(urls[:40])
-
-        # Format as text block for the BriefingWriter
-        parts = []
-        for url, text in enriched.items():
-            parts.append(f"URL: {url}\nFULL_CONTENT:\n{text[:2500]}\n")
-        enriched_text = "\n---\n".join(parts)
-
-        if tool_context is not None:
-            tool_context.state["enriched_articles"] = enriched_text
-        print(f"ArticleEnricher -- enriched {len(enriched)}/{len(urls)} articles")
-        return {"enriched_count": len(enriched), "success": True}
-    except ImportError:
-        print("ArticleEnricher -- shared module not available")
-        if tool_context is not None:
-            tool_context.state["enriched_articles"] = ""
-        return {"enriched_count": 0, "success": True}
-    except Exception as e:
-        print(f"ArticleEnricher -- failed: {e}")
-        if tool_context is not None:
-            tool_context.state["enriched_articles"] = ""
-        return {"enriched_count": 0, "success": True}
-
-
 def resolve_source_urls(urls: List[str]) -> List[str]:
     """Follow redirects on each URL, validate they return 200, deduplicate, and filter junk.
 

@@ -46,6 +46,7 @@ Produce ONE merged briefing as a JSON object. Rules:
      "headline": "punchy reaction title (5-10 words) — frame as debate/opinion, NOT as news",
      "body": "1-2 sentences. Be SPECIFIC: name the person, subreddit, or thread. Include quotes, engagement numbers, or concrete opinions. NOT a restatement of the news.",
      "heat": "hot" | "warm" | "mild",
+     "date": "exact date of the discussion/post (e.g. 'April 10, 2026'). Extract from the source data.",
      "source_url": "direct URL to the discussion/post/thread. MUST NOT be empty.",
      "source_label": "e.g. 'r/LocalLLaMA (2.3K upvotes)', '@karpathy on X', 'HN (890 pts)', 'Simon Willison's blog'",
      "related_vendor": "vendor name if related to a news_item, or empty string",

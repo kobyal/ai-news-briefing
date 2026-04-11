@@ -172,8 +172,10 @@ def _build_enriched_context(articles: dict[str, dict], all_urls: list[str]) -> s
     return "\n\n---\n\n".join(parts)
 
 
-def _step1_load_sources() -> tuple[dict, dict, dict, dict, dict, dict]:
+def _step1_load_sources() -> tuple[dict, dict, dict, dict, dict, dict, list]:
     print("\n[1/4] Loading source briefings...")
+
+    # Core sources (used in merger prompt with dedicated placeholders)
     adk_data    = _find_latest_json(_ROOT / "adk-news-agent" / "output")
     px_data     = _find_latest_json(_ROOT / "perplexity-news-agent" / "output")
     rss_data    = _find_latest_json(_ROOT / "rss-news-agent" / "output")
@@ -190,7 +192,24 @@ def _step1_load_sources() -> tuple[dict, dict, dict, dict, dict, dict]:
     tavily_briefing = (tavily_data or {}).get("briefing", tavily_data or {})
     social_briefing = (social_data or {}).get("briefing", social_data or {})
 
-    # Load enriched articles
+    # Supplementary sources (new agents — loaded dynamically)
+    extra_sources = []
+    extra_agents = [
+        ("exa-news-agent",        "Exa"),
+        ("newsapi-agent",         "NewsAPI"),
+        ("youtube-news-agent",    "YouTube"),
+        ("github-trending-agent", "GitHub"),
+    ]
+    for agent_dir, label in extra_agents:
+        data = _find_latest_json(_ROOT / agent_dir / "output")
+        if data:
+            briefing = data.get("briefing", data)
+            n = len(briefing.get("news_items", []))
+            if n > 0:
+                extra_sources.append({"label": label, "briefing": briefing})
+                print(f"  Found: {label} ({n} items)")
+
+    # Enriched articles from Article Reader
     enriched_articles = _load_article_reader()
 
     n_adk    = len(adk_briefing.get("news_items", []))
@@ -199,23 +218,34 @@ def _step1_load_sources() -> tuple[dict, dict, dict, dict, dict, dict]:
     n_tavily = len(tavily_briefing.get("news_items", []))
     n_social = bool(social_briefing.get("community_pulse"))
     n_articles = len(enriched_articles)
-    print(f"  ADK: {n_adk}  |  Perplexity: {n_px}  |  RSS: {n_rss}  |  Tavily: {n_tavily}  |  Social: {'✓' if n_social else '–'}  |  Articles: {n_articles}")
-    return adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles
+    n_extra = sum(len(s["briefing"].get("news_items", [])) for s in extra_sources)
+    print(f"  ADK: {n_adk}  |  Perplexity: {n_px}  |  RSS: {n_rss}  |  Tavily: {n_tavily}  |  Social: {'✓' if n_social else '–'}  |  Articles: {n_articles}  |  Extra: {n_extra}")
+    return adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources
 
 
 def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
                  tavily_briefing: dict, social_briefing: dict,
-                 enriched_articles: dict = None) -> str:
+                 enriched_articles: dict = None, extra_sources: list = None) -> str:
     print("\n[2/4] Merger — deduplicating and merging stories...")
     enriched_articles = enriched_articles or {}
+    extra_sources = extra_sources or []
 
     # Collect all URLs from all sources for article matching
     all_urls = []
     for briefing in [adk_briefing, px_briefing, rss_briefing, tavily_briefing]:
         for item in briefing.get("news_items", []):
             all_urls.extend(item.get("urls", []))
+    for src in extra_sources:
+        for item in src["briefing"].get("news_items", []):
+            all_urls.extend(item.get("urls", []))
 
     enriched_context = _build_enriched_context(enriched_articles, all_urls)
+
+    # Build extra sources context
+    extra_context = ""
+    for src in extra_sources:
+        extra_context += f"\n\nSOURCE ({src['label']}):\n"
+        extra_context += json.dumps(src["briefing"], ensure_ascii=False, indent=2)
 
     schema_desc = json.dumps(BriefingContent.model_json_schema(), indent=2)
     prompt = MERGER_PROMPT
@@ -225,6 +255,7 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
     prompt = prompt.replace("{tavily_briefing}", json.dumps(tavily_briefing, ensure_ascii=False, indent=2))
     prompt = prompt.replace("{social_briefing}", json.dumps(social_briefing, ensure_ascii=False, indent=2))
     prompt = prompt.replace("{enriched_articles}", enriched_context)
+    prompt = prompt.replace("{extra_sources}", extra_context)
     return _agent(
         input_text=f"{prompt}\n\nJSON SCHEMA:\n{schema_desc}",
         model=_WRITER_MODEL(),
@@ -412,13 +443,13 @@ def run_pipeline() -> dict:
 
     t_start = time.time()
 
-    adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles = _step1_load_sources()
+    adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources = _step1_load_sources()
     # Merge with validation — retry once if JSON is invalid
-    merged_json = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles)
+    merged_json = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources)
     parsed = _parse(merged_json)
     if not parsed or not parsed.get("news_items"):
         print("  ⚠ Merge output invalid — retrying once...")
-        merged_json = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles)
+        merged_json = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources)
         parsed = _parse(merged_json)
         if not parsed or not parsed.get("news_items"):
             raise RuntimeError(f"Merger returned invalid JSON after retry: {repr(merged_json[:200])}")

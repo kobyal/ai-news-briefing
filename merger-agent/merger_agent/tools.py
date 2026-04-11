@@ -355,8 +355,15 @@ def _build_html(tldr, news_items, community_pulse, topic,
             channel_info = ""
             desc = summary.strip()
 
-        # Clean up description — remove tracking URLs and truncate
+        # Clean up description — remove tracking URLs, sponsor text, and truncate
         desc = _re.sub(r'https?://\S+', '', desc).strip()
+        # Remove common sponsor/ad patterns
+        desc = _re.sub(r'(?i)(try|get|check out|sign up|use code|sponsored by|thank you .{0,30} for sponsoring|use my link|free forever|partner|promo code).*$', '', desc, flags=_re.MULTILINE).strip()
+        desc = _re.sub(r'(?i)^.*?(:\s*https?\S+|referral|discount|coupon).*$', '', desc, flags=_re.MULTILINE).strip()
+        # Remove lines that are just hashtags
+        desc = _re.sub(r'^[#\s]+$', '', desc, flags=_re.MULTILINE).strip()
+        # Take first meaningful sentence
+        desc = desc.split('\n')[0].strip() if desc else ""
         desc = desc[:150].rstrip() + ("..." if len(desc) > 150 else "")
 
         vendor_tag = f'<span class="pulse-vendor">{vendor}</span>' if vendor and vendor != "Other" else ""

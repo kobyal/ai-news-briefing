@@ -113,6 +113,33 @@ def _format_views(count) -> str:
         return ""
 
 
+_AI_KEYWORDS = re.compile(
+    r'\bAI\b|artificial intelligence|\bLLM\b|\bGPT\b|Claude|Gemini|Grok|'
+    r'machine learning|deep learning|neural net|transformer model|'
+    r'Anthropic|OpenAI|DeepMind|\bAGI\b|chatbot|\bAI agent|'
+    r'coding.{0,10}\bAI\b|\bAI\b.{0,10}coding|\bprompt engineer|fine.?tun|'
+    r'large language model|diffusion model|open.?source.{0,10}model',
+    re.IGNORECASE,
+)
+
+# Channels that always post AI content (skip relevance check)
+_ALWAYS_AI_CHANNELS = {
+    "AI Explained", "Matthew Berman", "Wes Roth", "David Shapiro",
+    "Prompt Engineering", "WorldofAI", "The AI Advantage", "Matt Wolfe",
+    "Yannic Kilcher", "Machine Learning Street Talk", "All About AI",
+    "Cole Medin", "Sam Witteveen", "Cognitive Revolution Podcast",
+    "OpenAI", "Google DeepMind",
+}
+
+
+def _is_ai_relevant(title: str, description: str = "", channel: str = "") -> bool:
+    """Check if video is actually about AI."""
+    if channel in _ALWAYS_AI_CHANNELS:
+        return True
+    combined = title + " " + description
+    return bool(_AI_KEYWORDS.search(combined))
+
+
 def _is_spam(title: str, description: str = "") -> bool:
     """Filter out non-AI spam that mentions 'AI' tangentially."""
     combined = title + " " + description
@@ -185,10 +212,13 @@ def _fetch_channel_videos(api_key: str) -> list[dict]:
                 except Exception:
                     continue
 
-                # Filter spam and non-English
-                if _is_spam(title, snippet.get("description", "")):
+                # Filter spam, non-English, and non-AI content
+                desc_text = snippet.get("description", "")
+                if _is_spam(title, desc_text):
                     continue
                 if not _is_english(title):
+                    continue
+                if not _is_ai_relevant(title, desc_text, channel_name):
                     continue
 
                 all_videos[vid_id] = {
@@ -247,9 +277,12 @@ def _search_videos(api_key: str) -> dict:
 
                 if not vid_id or vid_id in videos:
                     continue
-                if _is_spam(title, snippet.get("description", "")):
+                desc_text = snippet.get("description", "")
+                if _is_spam(title, desc_text):
                     continue
                 if not _is_english(title):
+                    continue
+                if not _is_ai_relevant(title, desc_text, snippet.get("channelTitle", "")):
                     continue
 
                 videos[vid_id] = {

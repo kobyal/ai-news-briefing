@@ -46,20 +46,19 @@ def _search_exa() -> list[dict]:
     all_results = []
     for query in SEARCH_QUERIES:
         try:
-            result = exa.search_and_contents(
+            result = exa.search(
                 query,
                 type="auto",
-                use_autoprompt=True,
                 num_results=3,
                 start_published_date=start_date,
-                text={"max_characters": 1000},
+                category="news",
             )
             for r in result.results:
                 all_results.append({
                     "title": r.title or "",
                     "url": r.url or "",
-                    "text": (r.text or "")[:800],
-                    "published_date": r.published_date or "",
+                    "text": (getattr(r, "text", "") or "")[:800],
+                    "published_date": getattr(r, "published_date", "") or "",
                     "score": getattr(r, "score", 0.5),
                     "author": getattr(r, "author", ""),
                 })

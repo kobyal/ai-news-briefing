@@ -60,9 +60,9 @@ def _format_views(count: str) -> str:
 
 
 def _search_youtube() -> list[dict]:
-    api_key = os.environ.get("GOOGLE_API_KEY", "")
+    api_key = os.environ.get("YOUTUBE_API_KEY", "") or os.environ.get("GOOGLE_API_KEY", "")
     if not api_key:
-        print("  GOOGLE_API_KEY not set — skipping")
+        print("  YOUTUBE_API_KEY / GOOGLE_API_KEY not set — skipping")
         return []
 
     lookback = _LOOKBACK_DAYS()

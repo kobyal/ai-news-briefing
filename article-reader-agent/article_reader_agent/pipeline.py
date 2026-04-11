@@ -77,7 +77,7 @@ def _collect_existing_urls() -> list[str]:
 
 def _search_urls_tavily() -> list[str]:
     """Search for AI news URLs via Tavily."""
-    api_key = os.environ.get("TAVILY_API_KEY", "")
+    api_key = os.environ.get("TAVILY_API_KEY", "") or os.environ.get("TAVILY_API_KEY2", "")
     if not api_key:
         return []
     try:

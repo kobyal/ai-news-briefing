@@ -41,13 +41,25 @@ LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 class TavilySearcher:
     def __init__(self):
         self.api_key = os.environ.get("TAVILY_API_KEY", "")
+        self._backup_key = os.environ.get("TAVILY_API_KEY2", "")
         self._client = None
+        self._using_backup = False
         if self.api_key:
             try:
                 from tavily import TavilyClient
                 self._client = TavilyClient(api_key=self.api_key)
             except ImportError:
                 print("  [Tavily] tavily-python not installed — falling back to DuckDuckGo")
+
+    def _switch_to_backup(self):
+        """Switch to backup Tavily API key."""
+        if self._backup_key and not self._using_backup:
+            from tavily import TavilyClient
+            self._client = TavilyClient(api_key=self._backup_key)
+            self._using_backup = True
+            print("  [Tavily] Switched to TAVILY_API_KEY2 (backup)")
+            return True
+        return False
 
     def search(self, query: str, days: int = 3, max_results: int = 5) -> List[dict]:
         if self._client:
@@ -68,6 +80,12 @@ class TavilySearcher:
                 )
                 return resp.get("results", [])
             except Exception as e:
+                err_str = str(e).lower()
+                # Quota/rate limit — try backup key before retrying
+                if ("limit" in err_str or "quota" in err_str or "429" in err_str
+                        or "insufficient" in err_str):
+                    if self._switch_to_backup():
+                        continue  # Retry immediately with backup key
                 if attempt < len(_RETRY_DELAYS):
                     delay = _RETRY_DELAYS[attempt]
                     print(f"  [Tavily] Error: {e} — retrying in {delay}s (attempt {attempt + 1})")

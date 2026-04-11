@@ -195,10 +195,10 @@ def _step1_load_sources() -> tuple[dict, dict, dict, dict, dict, dict, list]:
     # Supplementary sources (new agents — loaded dynamically)
     extra_sources = []
     youtube_data = []  # Separate — rendered as its own HTML section
+    github_data = []  # Separate — rendered as its own HTML section
     extra_agents = [
         ("exa-news-agent",        "Exa"),
         ("newsapi-agent",         "NewsAPI"),
-        ("github-trending-agent", "GitHub"),
     ]
     for agent_dir, label in extra_agents:
         data = _find_latest_json(_ROOT / agent_dir / "output")
@@ -215,6 +215,14 @@ def _step1_load_sources() -> tuple[dict, dict, dict, dict, dict, dict, list]:
         youtube_data = yt_briefing.get("news_items", [])
         if youtube_data:
             print(f"  Found: YouTube ({len(youtube_data)} videos)")
+
+    # GitHub — load for dedicated HTML section
+    gh_data = _find_latest_json(_ROOT / "github-trending-agent" / "output")
+    if gh_data:
+        gh_briefing = gh_data.get("briefing", gh_data)
+        github_data = gh_briefing.get("news_items", [])
+        if github_data:
+            print(f"  Found: GitHub ({len(github_data)} items)")
                 print(f"  Found: {label} ({n} items)")
 
     # Enriched articles from Article Reader
@@ -228,7 +236,7 @@ def _step1_load_sources() -> tuple[dict, dict, dict, dict, dict, dict, list]:
     n_articles = len(enriched_articles)
     n_extra = sum(len(s["briefing"].get("news_items", [])) for s in extra_sources)
     print(f"  ADK: {n_adk}  |  Perplexity: {n_px}  |  RSS: {n_rss}  |  Tavily: {n_tavily}  |  Social: {'✓' if n_social else '–'}  |  Articles: {n_articles}  |  Extra: {n_extra}")
-    return adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data
+    return adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data, github_data
 
 
 def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
@@ -417,9 +425,9 @@ def _step3_translate(merged_json: str, social_data: dict = None) -> str:
         return result_short
 
 
-def _step4_publish(merged_json: str, hebrew_json: str, social_briefing: dict = None, youtube_data: list = None) -> dict:
+def _step4_publish(merged_json: str, hebrew_json: str, social_briefing: dict = None, youtube_data: list = None, github_data: list = None) -> dict:
     print("\n[4/4] Publisher — building combined HTML newsletter...")
-    result = build_and_save_html(merged_json, hebrew_json, topic="AI", social_data=social_briefing, youtube_data=youtube_data)
+    result = build_and_save_html(merged_json, hebrew_json, topic="AI", social_data=social_briefing, youtube_data=youtube_data, github_data=github_data)
 
     # Save raw JSON too
     html_path = result["saved_to"]
@@ -451,7 +459,7 @@ def run_pipeline() -> dict:
 
     t_start = time.time()
 
-    adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data = _step1_load_sources()
+    adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data, github_data = _step1_load_sources()
     # Merge with validation — retry once if JSON is invalid
     merged_json = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources)
     parsed = _parse(merged_json)
@@ -467,7 +475,7 @@ def run_pipeline() -> dict:
     except Exception as e:
         print(f"  [Translator] failed ({e}) — publishing without Hebrew")
         hebrew_json = "{}"
-    result       = _step4_publish(merged_json, hebrew_json, social_briefing=social_briefing, youtube_data=youtube_data)
+    result       = _step4_publish(merged_json, hebrew_json, social_briefing=social_briefing, youtube_data=youtube_data, github_data=github_data)
 
     elapsed = time.time() - t_start
     print(f"\n{'='*60}")

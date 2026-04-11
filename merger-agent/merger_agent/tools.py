@@ -151,7 +151,7 @@ def _vendor_style(vendor: str):
 # Public builder
 # ---------------------------------------------------------------------------
 
-def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI", social_data: dict = None, youtube_data: list = None) -> dict:
+def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI", social_data: dict = None, youtube_data: list = None, github_data: list = None) -> dict:
     """Build and save the merged briefing as a bilingual HTML newsletter.
 
     Args:
@@ -220,7 +220,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
         tldr_he, headlines_he, summaries_he, community_pulse_he, community_urls,
         social_data=social_data, community_pulse_items=community_pulse_items,
         people_he=people_he, pulse_items_he=pulse_items_he,
-        youtube_data=youtube_data,
+        youtube_data=youtube_data, github_data=github_data,
     )
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -242,7 +242,7 @@ def build_and_save_html(briefing_json: str, hebrew_json: str, topic: str = "AI",
 def _build_html(tldr, news_items, community_pulse, topic,
                 tldr_he=None, headlines_he=None, summaries_he=None, community_pulse_he="",
                 community_urls=None, social_data=None, community_pulse_items=None,
-                people_he=None, pulse_items_he=None, youtube_data=None):
+                people_he=None, pulse_items_he=None, youtube_data=None, github_data=None):
     now          = datetime.now()
     date_display = now.strftime("%B %d, %Y")
     tldr_he        = tldr_he or []
@@ -378,6 +378,52 @@ def _build_html(tldr, news_items, community_pulse, topic,
 {youtube_rows_html}
 </div>"""
 
+    # ── GitHub: AI Open Source ────────────────────────────────────────────
+    github_data = github_data or []
+    github_rows_html = ""
+    for g in github_data[:8]:
+        title   = g.get("headline", "")
+        summary = g.get("summary", "")
+        url     = g.get("urls", [""])[0] if g.get("urls") else ""
+        date    = g.get("published_date", "")
+
+        # Extract stars/language from summary "[1.2K stars · Python] ..."
+        import re as _re
+        meta_match = _re.match(r'\[([^\]]+)\]\s*(.*)', summary, _re.DOTALL)
+        if meta_match:
+            meta_info = meta_match.group(1)
+            desc = meta_match.group(2).strip()
+        else:
+            meta_info = ""
+            desc = summary.strip()
+
+        desc = desc[:150].rstrip() + ("..." if len(desc) > 150 else "")
+        is_release = "released" in title.lower() or "release" in title.lower()
+        icon = "📦" if is_release else "⭐"
+
+        github_rows_html += (
+            f'<div class="gh-row">'
+            f'<div class="gh-icon">{icon}</div>'
+            f'<div class="gh-content">'
+            f'<a href="{url}" class="gh-title" target="_blank">{title}</a>'
+            f'<div class="gh-meta">{meta_info}{" · " + date if date else ""}</div>'
+            + (f'<div class="gh-desc">{desc}</div>' if desc else '')
+            + f'</div>'
+            f'</div>'
+        )
+
+    github_section_html = ""
+    if github_rows_html:
+        github_section_html = f"""<div class="gh-card">
+<div class="section-label" style="margin-top:0" id="github-label">🛠️ AI Open Source</div>
+{github_rows_html}
+</div>"""
+
+    # Today's date string for "NEW" badge comparison
+    today_str = now.strftime("%B %d, %Y")  # e.g. "April 11, 2026"
+    # Also match without leading zero: "April 1" vs "April 01"
+    today_str_alt = now.strftime("%B ") + str(now.day) + now.strftime(", %Y")
+
     cards = ""
     for idx, item in enumerate(news_items):
         vendor      = item.get("vendor", "Other")
@@ -386,6 +432,8 @@ def _build_html(tldr, news_items, community_pulse, topic,
         summary     = item.get("summary", "")
         urls        = item.get("urls", []) or []
         bg, _       = _vendor_style(vendor)
+        is_today    = pub_date and (today_str in pub_date or today_str_alt in pub_date)
+        new_badge   = '<span class="new-badge">NEW</span>' if is_today else ""
         date_html   = f'<span class="pub-date">📅 {pub_date}</span>' if pub_date else ""
         sources_html = "".join(
             f'<a href="{u}" target="_blank" class="source-link">'
@@ -400,6 +448,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
         cards += f"""<div class="news-card">
 <div class="card-header">
 <span class="badge" style="background:{bg};color:#fff">{vendor}</span>
+{new_badge}
 <h3 class="en-content">{headline}</h3>
 <h3 class="he-content" style="display:none;direction:rtl;text-align:right">{headline_he}</h3>
 </div>
@@ -488,6 +537,8 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .card-header{{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}}
 .badge{{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}}
 .card-header h3{{font-size:15px;font-weight:600;color:#0f172a;flex:1}}
+.new-badge{{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:1px;background:#dc2626;color:#fff;animation:pulse-new 2s ease-in-out infinite}}
+@keyframes pulse-new{{0%,100%{{opacity:1}}50%{{opacity:.7}}}}
 .summary{{font-size:14px;line-height:1.7;color:#4b5563;margin-bottom:8px}}
 .pub-date{{display:block;font-size:12px;color:#94a3b8;margin-bottom:8px}}
 .sources{{display:flex;flex-direction:column;gap:3px;margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9}}
@@ -519,6 +570,16 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .yt-title:hover{{color:#d97706}}
 .yt-meta{{font-size:11px;color:#94a3b8;margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}}
 .yt-desc{{font-size:12px;color:#6b7280;margin-top:3px;line-height:1.4}}
+/* GitHub */
+.gh-card{{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
+.gh-row{{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9}}
+.gh-row:last-child{{border-bottom:none}}
+.gh-icon{{font-size:16px;flex-shrink:0;margin-top:2px}}
+.gh-content{{flex:1;min-width:0}}
+.gh-title{{font-size:13px;color:#0f172a;text-decoration:none;font-weight:600;line-height:1.4;display:block}}
+.gh-title:hover{{color:#7c3aed}}
+.gh-meta{{font-size:11px;color:#94a3b8;margin-top:2px}}
+.gh-desc{{font-size:12px;color:#6b7280;margin-top:3px;line-height:1.4}}
 /* Reddit */
 .reddit-card{{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
 .reddit-row{{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;flex-wrap:wrap}}
@@ -565,6 +626,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 {people_section_html}
 {reddit_section_html}
 {youtube_section_html}
+{github_section_html}
 <div class="community-card">
 <h2 id="community-label">🗣️ Community Pulse</h2>
 <div id="community-en" class="en-content">{pulse_structured_html if pulse_structured_html else community_en_html}</div>
@@ -602,6 +664,8 @@ function setLang(l,btn){{
   if(pl){{pl.textContent=en?'👤 People Talking Today':'👤 אנשים מדברים היום';pl.dir=dir;pl.style.textAlign=align;}}
   var yl=document.getElementById('youtube-label');
   if(yl){{yl.textContent=en?'🎬 AI on YouTube':'🎬 AI ביוטיוב';yl.dir=dir;yl.style.textAlign=align;}}
+  var gl=document.getElementById('github-label');
+  if(gl){{gl.textContent=en?'🛠️ AI Open Source':'🛠️ קוד פתוח AI';gl.dir=dir;gl.style.textAlign=align;}}
   document.querySelectorAll('.news-card,.person-card').forEach(function(el){{el.dir=en?'ltr':'rtl';}});
   document.querySelectorAll('.en-content').forEach(function(el){{el.style.display=en?'':'none';}});
   document.querySelectorAll('.he-content').forEach(function(el){{el.style.display=en?'none':'';}});

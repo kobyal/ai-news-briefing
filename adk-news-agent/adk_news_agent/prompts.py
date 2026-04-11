@@ -165,6 +165,9 @@ Today is {today}. You are writing an AI briefing for developers covering the lat
 VENDOR NEWS:
 {{state.raw_vendor_news}}
 
+FULL ARTICLE CONTENT (use this for richer, more detailed summaries):
+{{state.enriched_articles}}
+
 COMMUNITY REACTIONS:
 {{state.raw_community}}
 

@@ -55,19 +55,27 @@ class TavilySearcher:
         return self._ddg_search(query, max_results)
 
     def _tavily_search(self, query: str, days: int, max_results: int) -> List[dict]:
-        try:
-            resp = self._client.search(
-                query=query,
-                search_depth="advanced",
-                topic="news",
-                days=days,
-                max_results=max_results,
-                include_answer=False,
-            )
-            return resp.get("results", [])
-        except Exception as e:
-            print(f"  [Tavily] Error: {e} — falling back to DuckDuckGo")
-            return self._ddg_search(query, max_results)
+        _RETRY_DELAYS = [3, 8]
+        for attempt in range(len(_RETRY_DELAYS) + 1):
+            try:
+                resp = self._client.search(
+                    query=query,
+                    search_depth="advanced",
+                    topic="news",
+                    days=days,
+                    max_results=max_results,
+                    include_answer=False,
+                )
+                return resp.get("results", [])
+            except Exception as e:
+                if attempt < len(_RETRY_DELAYS):
+                    delay = _RETRY_DELAYS[attempt]
+                    print(f"  [Tavily] Error: {e} — retrying in {delay}s (attempt {attempt + 1})")
+                    import time
+                    time.sleep(delay)
+                    continue
+                print(f"  [Tavily] Error after retries: {e} — falling back to DuckDuckGo")
+                return self._ddg_search(query, max_results)
 
     def _ddg_search(self, query: str, max_results: int) -> List[dict]:
         try:

@@ -111,12 +111,14 @@ def _pulse_items_html(items: list) -> str:
         headline    = item.get("headline", "")
         body        = item.get("body", "")
         heat        = item.get("heat", "mild")
+        date        = item.get("date", "")
         source_url  = item.get("source_url", "")
         source_label = item.get("source_label", "")
         vendor      = item.get("related_vendor", "")
         person      = item.get("related_person", "")
 
         badge = _heat_badge(heat)
+        date_html = f'<span class="pub-date">📅 {date}</span>' if date else ""
         vendor_tag = f'<span class="pulse-vendor">{vendor}</span>' if vendor else ""
         person_tag = f'<span class="pulse-person">👤 {person}</span>' if person else ""
         tags = f'<div class="pulse-tags">{vendor_tag}{person_tag}</div>' if (vendor or person) else ""
@@ -130,6 +132,7 @@ def _pulse_items_html(items: list) -> str:
 
         html += f"""<div class="pulse-item">
 <div class="pulse-header">{badge}<span class="pulse-headline">{headline}</span></div>
+{date_html}
 <p class="pulse-body">{body}</p>
 <div class="pulse-footer">{source_html}{tags}</div>
 </div>"""

@@ -15,6 +15,7 @@ class CommunityPulseItem(BaseModel):
     headline: str
     body: str
     heat: str  # "hot" | "warm" | "mild"
+    date: str = ""  # e.g. "April 10, 2026"
     source_url: str
     source_label: str  # e.g. "r/LocalLLaMA", "@karpathy on X", "Hacker News"
     related_vendor: str = ""

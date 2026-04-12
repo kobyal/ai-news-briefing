@@ -1,67 +1,89 @@
-"""xAI Twitter Agent — uses Grok to find real X/Twitter posts from AI leaders.
+"""xAI Twitter Agent — uses Grok with live X search to find real tweets.
 
-Grok has native access to X/Twitter data, making it far more reliable
-than web search for finding actual tweets, engagement numbers, and quotes.
+Grok has native access to X/Twitter data via its search tools.
+We MUST enable search in the API call — without it, Grok hallucinates.
 
 Outputs:
 - people_highlights: actual tweets from tracked AI leaders
 - trending_posts: hottest AI posts on X this week
 - community_signals: what AI Twitter is debating
-
-All three feed into the merger's People Talking Today, Community Pulse,
-and a new Trending on AI Twitter section.
 """
 import json
 import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
-from openai import OpenAI
+import requests
 
 _TODAY = lambda: datetime.now().strftime("%B %d, %Y")
+_TODAY_ISO = lambda: datetime.now().strftime("%Y-%m-%d")
 _LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 
-# Top AI leaders to track on X (subset — most active on Twitter)
+# Top AI leaders to track on X
 TRACKED_HANDLES = [
     {"name": "Sam Altman", "handle": "sama", "org": "OpenAI", "role": "CEO"},
     {"name": "Dario Amodei", "handle": "DarioAmodei", "org": "Anthropic", "role": "CEO"},
     {"name": "Elon Musk", "handle": "elonmusk", "org": "xAI", "role": "CEO"},
     {"name": "Andrej Karpathy", "handle": "karpathy", "org": "Independent", "role": "AI educator"},
     {"name": "Yann LeCun", "handle": "ylecun", "org": "Meta", "role": "Chief AI Scientist"},
-    {"name": "Demis Hassabis", "handle": "demaboringhat", "org": "Google DeepMind", "role": "CEO"},
+    {"name": "Demis Hassabis", "handle": "demishassabis", "org": "Google DeepMind", "role": "CEO"},
     {"name": "Jim Fan", "handle": "DrJimFan", "org": "NVIDIA", "role": "Senior Research Manager"},
     {"name": "Simon Willison", "handle": "simonw", "org": "Independent", "role": "LLM tools developer"},
-    {"name": "Emad Mostaque", "handle": "EMostaque", "org": "Independent", "role": "AI entrepreneur"},
     {"name": "Gary Marcus", "handle": "GaryMarcus", "org": "Independent", "role": "AI critic"},
     {"name": "Ethan Mollick", "handle": "emollick", "org": "Wharton", "role": "AI researcher"},
     {"name": "Swyx", "handle": "swyx", "org": "Independent", "role": "AI builder / writer"},
     {"name": "Harrison Chase", "handle": "hwchase17", "org": "LangChain", "role": "CEO"},
     {"name": "Logan Kilpatrick", "handle": "OfficialLoganK", "org": "Google", "role": "Product Lead"},
     {"name": "Greg Brockman", "handle": "gdb", "org": "OpenAI", "role": "President"},
+    {"name": "Jack Clark", "handle": "jackclarkSF", "org": "Anthropic", "role": "Co-founder"},
 ]
 
 
-def _get_client() -> OpenAI | None:
-    api_key = os.environ.get("XAI_API_KEY", "")
+def _get_api_key() -> str:
+    return os.environ.get("XAI_API_KEY", "")
+
+
+def _grok_search(prompt: str, label: str = "") -> str:
+    """Call Grok API with live search enabled.
+
+    Uses the /v1/chat/completions endpoint with search tool to get
+    real-time X/Twitter data instead of hallucinated training data.
+    """
+    api_key = _get_api_key()
     if not api_key:
-        print("  XAI_API_KEY not set — skipping")
-        return None
-    return OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
+        return ""
 
-
-def _ask_grok(client: OpenAI, prompt: str, label: str = "") -> str:
-    """Single Grok API call."""
     t0 = time.time()
     try:
-        resp = client.chat.completions.create(
-            model="grok-3-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=2000,
-            temperature=0.3,
+        resp = requests.post(
+            "https://api.x.ai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "grok-3-mini",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 2000,
+                "temperature": 0.2,
+                "search": {
+                    "mode": "auto",
+                    "sources": [{"type": "x"}],
+                },
+            },
+            timeout=60,
         )
-        text = resp.choices[0].message.content or ""
+        if not resp.ok:
+            error = resp.text[:150]
+            elapsed = time.time() - t0
+            print(f"    ✗  {label:<35} {elapsed:4.1f}s  HTTP {resp.status_code}: {error}")
+            return ""
+
+        data = resp.json()
+        text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         elapsed = time.time() - t0
         print(f"    ✓  {label:<35} {elapsed:4.1f}s")
         return text
@@ -71,38 +93,87 @@ def _ask_grok(client: OpenAI, prompt: str, label: str = "") -> str:
         return ""
 
 
-def _fetch_people(client: OpenAI) -> list[dict]:
-    """Find recent tweets from tracked AI leaders via Grok."""
+def _validate_date(date_str: str) -> bool:
+    """Reject dates outside the lookback window."""
+    if not date_str:
+        return False
+    # Must contain 2026 (current year)
+    if "2026" not in date_str and "2025" not in date_str:
+        return False
+    # Try to parse and check within lookback
+    try:
+        for fmt in ["%B %d, %Y", "%Y-%m-%d", "%B %d %Y"]:
+            try:
+                dt = datetime.strptime(date_str.strip(), fmt)
+                cutoff = datetime.now() - timedelta(days=_LOOKBACK_DAYS() + 1)
+                return dt >= cutoff
+            except ValueError:
+                continue
+    except Exception:
+        pass
+    # If contains April 2026 or similar, accept
+    return "April" in date_str and "2026" in date_str
+
+
+def _validate_engagement(engagement: str) -> bool:
+    """Reject suspiciously fake engagement numbers."""
+    if not engagement:
+        return True
+    # Reject if ALL numbers are exact multiples of 10K+ (too perfect)
+    nums = re.findall(r'(\d+)[KMB]', engagement)
+    if len(nums) >= 3:
+        int_nums = [int(n) for n in nums]
+        if all(n % 10 == 0 for n in int_nums) and all(n >= 10 for n in int_nums):
+            return False
+    return True
+
+
+def _fetch_people(api_key: str) -> list[dict]:
+    """Find recent tweets from tracked AI leaders."""
     days = _LOOKBACK_DAYS()
+    today = _TODAY()
     results = []
 
     def _search_person(person: dict) -> dict | None:
         name = person["name"]
         handle = person["handle"]
         prompt = (
-            f"What has @{handle} ({name}) posted on X/Twitter in the past {days} days about AI? "
-            f"Find their most notable tweet or post. Return ONLY a JSON object with these fields:\n"
-            f'{{"post": "exact quote or close paraphrase of their post", '
-            f'"date": "exact date like April 10, 2026", '
-            f'"url": "direct tweet URL like https://x.com/{handle}/status/...", '
-            f'"engagement": "likes, retweets, views if known", '
-            f'"why": "1 sentence on why this matters for the AI community"}}\n'
-            f"If they haven't posted anything notable about AI, return {{}}"
+            f"Search X/Twitter for the most recent post by @{handle} ({name}) about AI "
+            f"from the past {days} days (today is {today}). "
+            f"I need the ACTUAL tweet — not a made-up one. "
+            f"Return ONLY a JSON object:\n"
+            f'{{"post": "exact quote from their actual tweet", '
+            f'"date": "exact date like April 12, 2026", '
+            f'"url": "https://x.com/{handle}/status/ACTUAL_ID", '
+            f'"engagement": "actual likes/retweets/views if shown", '
+            f'"why": "1 sentence on why this matters"}}\n'
+            f"If you cannot find a real recent tweet, return {{}}. "
+            f"Do NOT make up tweets. Do NOT use dates from 2023 or 2024."
         )
-        raw = _ask_grok(client, prompt, label=f"@{handle}")
-        if not raw or raw.strip() == "{}":
+        raw = _grok_search(prompt, label=f"@{handle}")
+        if not raw or raw.strip() in ("{}", "null", ""):
             return None
         try:
-            data = json.loads(raw.strip().removeprefix("```json").removesuffix("```").strip())
-            if data.get("post") and len(data["post"]) > 20:
-                data["name"] = name
-                data["handle"] = handle
-                data["org"] = person["org"]
-                data["role"] = person["role"]
-                return data
+            # Clean markdown fences
+            clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            data = json.loads(clean)
+            if not data or not data.get("post") or len(data.get("post", "")) < 20:
+                return None
+            # Validate date
+            if not _validate_date(data.get("date", "")):
+                print(f"      ⚠ @{handle}: rejected — date '{data.get('date')}' outside window")
+                return None
+            # Validate engagement
+            if not _validate_engagement(data.get("engagement", "")):
+                print(f"      ⚠ @{handle}: rejected — suspicious engagement numbers")
+                return None
+            data["name"] = name
+            data["handle"] = handle
+            data["org"] = person["org"]
+            data["role"] = person["role"]
+            return data
         except json.JSONDecodeError:
-            pass
-        return None
+            return None
 
     print(f"  Searching {len(TRACKED_HANDLES)} people on X via Grok...")
     with ThreadPoolExecutor(max_workers=5) as pool:
@@ -112,70 +183,84 @@ def _fetch_people(client: OpenAI) -> list[dict]:
             if result:
                 results.append(result)
 
-    print(f"  → {len(results)} people with recent X activity")
+    print(f"  → {len(results)} people with verified recent X activity")
     return results
 
 
-def _fetch_trending(client: OpenAI) -> list[dict]:
-    """Find trending AI posts on X via Grok."""
+def _fetch_trending(api_key: str) -> list[dict]:
+    """Find trending AI posts on X."""
     days = _LOOKBACK_DAYS()
+    today = _TODAY()
     prompt = (
-        f"What are the top 8 most viral or discussed AI-related posts on X/Twitter "
-        f"from the past {days} days? Focus on posts with high engagement (likes, "
-        f"retweets, views) about AI models, releases, debates, or AI industry news.\n\n"
-        f"Return a JSON array where each item has:\n"
-        f'{{"author": "@handle", "name": "Full Name", '
-        f'"post": "quote or summary of the post", '
-        f'"date": "exact date", '
-        f'"url": "direct tweet URL", '
-        f'"engagement": "e.g. 45K likes, 12K retweets, 8M views", '
-        f'"topic": "brief topic label like AI safety, model release, etc."}}\n'
-        f"Return ONLY the JSON array, no markdown."
+        f"Search X/Twitter for the top 8 most viral AI-related posts from the past {days} days "
+        f"(today is {today}). I need REAL posts that actually exist — not fabricated ones.\n\n"
+        f"For each post, include:\n"
+        f'- "author": "@handle"\n'
+        f'- "name": "Full Name"\n'
+        f'- "post": "actual quote from the tweet"\n'
+        f'- "date": "exact date like April 12, 2026" (must be from {today[:4]})\n'
+        f'- "url": "https://x.com/handle/status/REAL_ID"\n'
+        f'- "engagement": "actual engagement numbers"\n'
+        f'- "topic": "brief topic label"\n\n'
+        f"Return ONLY a JSON array. Do NOT fabricate posts or use dates before 2026."
     )
-    raw = _ask_grok(client, prompt, label="trending_ai_posts")
+    raw = _grok_search(prompt, label="trending_ai_posts")
     if not raw:
         return []
     try:
-        data = json.loads(raw.strip().removeprefix("```json").removesuffix("```").strip())
-        if isinstance(data, list):
-            return [d for d in data if d.get("post")]
-        return []
+        clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        data = json.loads(clean)
+        if not isinstance(data, list):
+            return []
+        # Validate each item
+        valid = []
+        for d in data:
+            if not d.get("post"):
+                continue
+            if not _validate_date(d.get("date", "")):
+                continue
+            if not _validate_engagement(d.get("engagement", "")):
+                continue
+            valid.append(d)
+        print(f"  → {len(valid)}/{len(data)} trending posts passed validation")
+        return valid
     except json.JSONDecodeError:
         return []
 
 
-def _fetch_community_signals(client: OpenAI) -> str:
-    """Find what AI Twitter is debating via Grok."""
+def _fetch_community_signals(api_key: str) -> str:
+    """Find what AI Twitter is debating."""
     days = _LOOKBACK_DAYS()
+    today = _TODAY()
     prompt = (
-        f"What are the top 5 debates, controversies, or hot topics in the AI community "
-        f"on X/Twitter in the past {days} days? Focus on real discussions with specific "
-        f"people, quotes, and engagement numbers. Be concrete — name names, cite posts.\n\n"
-        f"Format as bullet points starting with •"
+        f"Search X/Twitter for the top 5 AI debates and controversies from the past {days} days "
+        f"(today is {today}). Focus on REAL discussions with specific people and actual posts.\n"
+        f"Format as bullet points starting with •. Include @handles and real quotes."
     )
-    return _ask_grok(client, prompt, label="community_signals")
+    return _grok_search(prompt, label="community_signals")
 
 
 def run_pipeline() -> dict:
     print("=" * 60)
-    print(" xAI Twitter Agent (Grok)")
+    print(" xAI Twitter Agent (Grok + Live Search)")
     print(f" {_TODAY()}  |  lookback={_LOOKBACK_DAYS()}d")
     print("=" * 60)
 
-    client = _get_client()
-    if not client:
+    api_key = _get_api_key()
+    if not api_key:
+        print("  XAI_API_KEY not set — skipping")
         return {"saved_to": "", "success": True}
 
     t_start = time.time()
 
     print("\n[1/3] Finding AI leaders on X...")
-    people = _fetch_people(client)
+    people = _fetch_people(api_key)
 
     print("\n[2/3] Finding trending AI posts...")
-    trending = _fetch_trending(client)
+    trending = _fetch_trending(api_key)
 
     print("\n[3/3] Finding community signals...")
-    community = _fetch_community_signals(client)
+    community = _fetch_community_signals(api_key)
 
     output = {
         "source": "xai_twitter",
@@ -184,7 +269,7 @@ def run_pipeline() -> dict:
             "trending_posts": trending,
             "community_pulse": community,
             "community_urls": [],
-            "news_items": [],  # This agent doesn't produce news items
+            "news_items": [],
             "tldr": [],
         },
     }

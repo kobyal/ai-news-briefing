@@ -35,7 +35,10 @@ Produce ONE merged briefing as a JSON object. Rules:
 
 2. UNIQUE STORIES — if a story appears in only one source, include it as-is. Do not discard niche or technical stories.
 
-3. RANKING — order news_items by importance/impact (most significant first). Aim for breadth: include stories from different vendors where possible.
+3. RANKING — PRIORITIZE FRESHNESS. Stories from today or yesterday should rank ABOVE older stories
+   even if the older story is "bigger" news. A 2-day old story should only appear if nothing newer
+   covers that vendor. Within the same day, order by importance/impact.
+   Aim for breadth: include stories from different vendors where possible.
 
 4. tldr — write 8-10 bullets summarising the most important stories from the merged set.
    Each bullet: vendor + what happened + why it matters (15-25 words).

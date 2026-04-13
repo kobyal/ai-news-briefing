@@ -179,7 +179,7 @@ flowchart LR
 | NewsAPI | no LLM | NewsAPI |
 | YouTube | no LLM | YouTube Data API v3 |
 | GitHub Trending | no LLM | GitHub REST APIs |
-| xAI Twitter | `grok-3-mini` via Responses API with `x_search` tool | xAI API |
+| xAI Twitter | `grok-4` via Responses API with `x_search` tool | xAI API |
 | Merger | `MERGER_WRITER_MODEL` default `claude-sonnet-4-20250514`, `MERGER_TRANSLATOR_MODEL` default `claude-sonnet-4-20250514` | Anthropic API |
 
 The CI workflow currently sets both merger steps to `claude-sonnet-4-20250514`.

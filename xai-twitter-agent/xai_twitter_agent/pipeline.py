@@ -64,7 +64,7 @@ def _grok_search(prompt: str, label: str = "", handles: list[str] | None = None)
         x_search_config["allowed_x_handles"] = handles
 
     payload = {
-        "model": "grok-3-mini",
+        "model": "grok-4",
         "input": prompt,
         "tools": [{"type": "x_search", "x_search": x_search_config}],
         "temperature": 0.2,

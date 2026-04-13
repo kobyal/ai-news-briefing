@@ -36,12 +36,14 @@ def _format_date(raw: str) -> str:
 
 def _search_newsapi() -> list[dict]:
     api_key = os.environ.get("NEWSAPI_KEY", "")
+    backup_key = os.environ.get("NEWSAPI_KEY2", "")
     if not api_key:
         print("  NEWSAPI_KEY not set — skipping")
         return []
 
     lookback = _LOOKBACK_DAYS()
     from_date = (datetime.now() - timedelta(days=lookback)).strftime("%Y-%m-%d")
+    current_key = api_key
 
     all_articles = []
     for query in SEARCH_QUERIES:
@@ -54,7 +56,7 @@ def _search_newsapi() -> list[dict]:
                     "sortBy": "relevancy",
                     "pageSize": 5,
                     "language": "en",
-                    "apiKey": api_key,
+                    "apiKey": current_key,
                 },
                 timeout=15,
             )
@@ -69,6 +71,28 @@ def _search_newsapi() -> list[dict]:
                         "published_at": article.get("publishedAt", ""),
                         "source_name": article.get("source", {}).get("name", ""),
                     })
+            elif resp.status_code in (401, 426, 429) and backup_key and current_key != backup_key:
+                print(f"  Primary key failed ({resp.status_code}) — switching to NEWSAPI_KEY2")
+                current_key = backup_key
+                # Retry this query with backup key
+                resp2 = requests.get(
+                    "https://newsapi.org/v2/everything",
+                    params={"q": query, "from": from_date, "sortBy": "relevancy",
+                            "pageSize": 5, "language": "en", "apiKey": current_key},
+                    timeout=15,
+                )
+                if resp2.ok:
+                    for article in resp2.json().get("articles", []):
+                        all_articles.append({
+                            "title": article.get("title", ""),
+                            "url": article.get("url", ""),
+                            "description": (article.get("description") or "")[:500],
+                            "content": (article.get("content") or "")[:800],
+                            "published_at": article.get("publishedAt", ""),
+                            "source_name": article.get("source", {}).get("name", ""),
+                        })
+                else:
+                    print(f"  Backup key also failed ({resp2.status_code})")
             else:
                 print(f"  NewsAPI error {resp.status_code} for '{query[:20]}'")
         except Exception as e:

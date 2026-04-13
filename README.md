@@ -59,24 +59,33 @@ Export only the keys you need for the pipelines you run:
 
 ```mermaid
 flowchart TD
-    subgraph parallel["⚡ All source agents run in parallel"]
+    subgraph core["⚡ Core source agents (run in parallel)"]
         direction LR
-        A["🟣 ADK Agent\nGemini 2.5 Flash\ngoogle_search ×11\n~4 min · free"]
-        B["🟢 Perplexity Agent\nHaiku search · Sonnet write\nweb_search ×11\n~2.5 min · $0.17"]
-        C["🟡 RSS Agent\nfeedparser + HN/Reddit\nHaiku synthesise\n~60 sec · $0.03"]
-        D["🔵 Tavily Agent\nTavily news API ×11\nSonnet write · Haiku translate\n~75 sec · $0.04"]
-        E["🟤 Social Agent\nX · Reddit · LinkedIn\n62 people + 20 topics\n~4 min · $0.25"]
+        A["🟣 ADK\nGemini 2.5 Flash\ngoogle_search ×11"]
+        B["🟢 Perplexity\nHaiku search · Sonnet write\nweb_search ×11"]
+        C["🟡 RSS\nfeedparser + HN/Reddit\nHaiku synthesise"]
+        D["🔵 Tavily\nnews API ×11\nSonnet write · Haiku translate"]
+        E["🟤 Social\nX · Reddit · LinkedIn\n62 people · 20 topics"]
     end
 
-    A -->|briefing.json| M
-    B -->|briefing.json| M
-    C -->|briefing.json| M
-    D -->|briefing.json| M
-    E -->|social.json| M
+    subgraph extras["➕ Optional feeders"]
+        X["Exa Agent\nExa search → Sonnet"]
+        N["NewsAPI Agent\nNewsAPI fetch → Haiku"]
+        Y["YouTube Agent\nYouTube Data API → Haiku"]
+        G["GitHub Trending\nscrape → Haiku"]
+        T["xAI Twitter\nX API → Sonnet"]
+        R["Article Reader\nFirecrawl/Jina enrich\nfull-text cache"]
+    end
 
-    M["🟠 Merger Agent\nSonnet 4.6 — dedup + merge\nHaiku 4.5 — translate\n~3 min · $0.18"]
+    A & B & C & D & E --> M
+    X & N --> M
+    R --> M
+    Y -. videos .-> P
+    G -. repos .-> P
+    T -. people/trending .-> P
 
-    M -->|index.html| P["📄 GitHub Pages\nEN + Hebrew newsletter\ndaily at 6am Israel time"]
+    M["🟠 Merger\nSonnet 4.6 merge\nHaiku 4.5 translate"]
+    M -->|docs/index.html| P["📄 GitHub Pages\nEN + Hebrew newsletter"]
 ```
 
 ---
@@ -85,28 +94,46 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    subgraph search["Search / Fetch"]
-        S1["Google Search\n(ADK)"]
-        S2["Perplexity web_search\n(agentic)"]
-        S3["RSS + HN + Reddit\n(feedparser)"]
-        S4["Tavily News API\n(advanced depth)"]
-        S5["Perplexity web_search\n× 62 people + 20 topics\n+ Reddit JSON API\n(social)"]
+    subgraph fetch["Fetch / search"]
+        S1["Google Search\nADK"]
+        S2["Perplexity web_search\n11 vendors"]
+        S3["RSS + HN + Reddit"]
+        S4["Tavily News API\n11 vendors"]
+        S5["Perplexity web_search\n62 people · 20 topics\n+ Reddit JSON API"]
+        S6["Exa API"]
+        S7["NewsAPI"]
+        S8["YouTube Data API"]
+        S9["GitHub Trending scrape"]
+        S10["xAI Twitter API"]
+        S11["Firecrawl/Jina\n(full article text)"]
     end
 
-    subgraph llm["LLM Synthesis"]
-        L1["Gemini 2.5 Flash\nwrite + translate"]
-        L2["Sonnet 4.6\nwrite · Haiku translate"]
-        L3["Haiku 4.5\nwrite + translate"]
-        L4["Sonnet 4.6\nwrite · Haiku translate"]
-        L5["Sonnet 4.6 write\nHaiku translate"]
+    subgraph llm["LLM synthesis"]
+        L1["Gemini 2.5 Flash"]
+        L2["Haiku 4.5 → Sonnet 4.6"]
+        L3["Haiku 4.5"]
+        L4["Sonnet 4.6 → Haiku 4.5"]
+        L5["Haiku 4.5 → Sonnet 4.6"]
+        L6["Sonnet 4.6"]
+        L7["Haiku 4.5"]
+        L8["Haiku 4.5 summaries"]
+        L9["Haiku 4.5 summaries"]
+        L10["Sonnet 4.6 pulse"]
+        L11["Context enricher"]
     end
 
-    subgraph outputs["Per-agent JSON"]
-        J1["adk/output/*.json"]
-        J2["perplexity/output/*.json"]
-        J3["rss/output/*.json"]
-        J4["tavily/output/*.json"]
-        J5["social/output/*.json"]
+    subgraph outputs["Saved JSON"]
+        J1["adk/output"]
+        J2["perplexity/output"]
+        J3["rss/output"]
+        J4["tavily/output"]
+        J5["social/output"]
+        J6["exa-news-agent/output"]
+        J7["newsapi-agent/output"]
+        J8["youtube-news-agent/output"]
+        J9["github-trending-agent/output"]
+        J10["xai-twitter-agent/output"]
+        J11["article-reader-agent/output"]
     end
 
     S1 --> L1 --> J1
@@ -114,9 +141,18 @@ flowchart LR
     S3 --> L3 --> J3
     S4 --> L4 --> J4
     S5 --> L5 --> J5
+    S6 --> L6 --> J6
+    S7 --> L7 --> J7
+    S8 --> L8 --> J8
+    S9 --> L9 --> J9
+    S10 --> L10 --> J10
+    S11 --> L11 --> J11
 
-    J1 & J2 & J3 & J4 & J5 --> MRG["Merger\nSonnet 4.6 dedup\nHaiku 4.5 translate"]
-    MRG --> OUT["docs/index.html\nGitHub Pages"]
+    J1 & J2 & J3 & J4 & J5 & J6 & J7 & J11 --> MRG["Merger\nSonnet 4.6 dedup\nHaiku 4.5 translate"]
+    J8 -. videos .-> OUT["docs/index.html"]
+    J9 -. repos .-> OUT
+    J10 -. people/trending .-> OUT
+    MRG --> OUT
 ```
 
 ---

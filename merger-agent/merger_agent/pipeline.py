@@ -15,7 +15,7 @@ import json
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import anthropic
@@ -502,6 +502,26 @@ def run_pipeline() -> dict:
         parsed = _parse(merged_json)
         if not parsed or not parsed.get("news_items"):
             raise RuntimeError(f"Merger returned invalid JSON after retry: {repr(merged_json[:200])}")
+
+    # Filter out stale stories (older than 3 days)
+    parsed = _parse(merged_json)
+    cutoff = datetime.now() - timedelta(days=3)
+    original_count = len(parsed.get("news_items", []))
+    fresh_items = []
+    for item in parsed.get("news_items", []):
+        pub = item.get("published_date", "")
+        try:
+            pub_dt = datetime.strptime(pub, "%B %d, %Y")
+            if pub_dt >= cutoff:
+                fresh_items.append(item)
+            else:
+                print(f"  ✂ Dropped stale story: {item.get('headline', '?')} ({pub})")
+        except ValueError:
+            fresh_items.append(item)  # keep if date can't be parsed
+    if len(fresh_items) < original_count:
+        parsed["news_items"] = fresh_items
+        merged_json = json.dumps(parsed, ensure_ascii=False)
+        print(f"  Kept {len(fresh_items)}/{original_count} stories after freshness filter")
 
     try:
         hebrew_json = _step3_translate(merged_json, social_data=social_briefing, youtube_data=youtube_data)

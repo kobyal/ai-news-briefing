@@ -29,6 +29,7 @@ SEARCH_QUERIES = [
 def _search_exa() -> list[dict]:
     """Search Exa.ai for AI news articles."""
     api_key = os.environ.get("EXA_API_KEY", "")
+    backup_key = os.environ.get("EXA_API_KEY2", "")
     if not api_key:
         print("  EXA_API_KEY not set — skipping")
         return []
@@ -40,6 +41,7 @@ def _search_exa() -> list[dict]:
         return []
 
     exa = Exa(api_key=api_key)
+    _backup_key = backup_key  # for fallback
     lookback = _LOOKBACK_DAYS()
     start_date = (datetime.now() - timedelta(days=lookback)).strftime("%Y-%m-%d")
 
@@ -63,7 +65,27 @@ def _search_exa() -> list[dict]:
                     "author": getattr(r, "author", ""),
                 })
         except Exception as e:
-            print(f"  Search error for '{query[:30]}': {e}")
+            # Try backup key on failure
+            if _backup_key and not getattr(exa, '_using_backup', False):
+                print(f"  Primary key failed ({e}) — switching to EXA_API_KEY2")
+                exa = Exa(api_key=_backup_key)
+                exa._using_backup = True
+                try:
+                    result = exa.search(query, type="auto", num_results=3,
+                                        start_published_date=start_date, category="news")
+                    for r in result.results:
+                        all_results.append({
+                            "title": r.title or "", "url": r.url or "",
+                            "text": (getattr(r, "text", "") or "")[:800],
+                            "published_date": getattr(r, "published_date", "") or "",
+                            "score": getattr(r, "score", 0.5),
+                            "author": getattr(r, "author", ""),
+                        })
+                    continue
+                except Exception as e2:
+                    print(f"  Backup key also failed: {e2}")
+            else:
+                print(f"  Search error for '{query[:30]}': {e}")
             continue
 
     return all_results

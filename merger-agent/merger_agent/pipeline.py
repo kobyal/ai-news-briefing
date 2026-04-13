@@ -6,7 +6,7 @@ Steps
 2. Find latest JSON from perplexity-news-agent/output/ (source: "perplexity")
 3. Find latest JSON from rss-news-agent/output/        (source: "rss")
 4. Find latest JSON from tavily-news-agent/output/     (source: "tavily")
-5. Find latest JSON from social-news-agent/output/     (source: "social")
+5. Load social data from xai-twitter-agent/output/     (people + trending)
 6. Call Claude Sonnet via Perplexity Agent API to merge + deduplicate stories
 7. Call Claude Haiku to translate the merged briefing to Hebrew
 8. Build and save HTML with a distinct gold/combined theme
@@ -180,8 +180,6 @@ def _step1_load_sources() -> tuple:
     px_data     = _find_latest_json(_ROOT / "perplexity-news-agent" / "output")
     rss_data    = _find_latest_json(_ROOT / "rss-news-agent" / "output")
     tavily_data = _find_latest_json(_ROOT / "tavily-news-agent" / "output")
-    social_data = _find_latest_json(_ROOT / "social-news-agent" / "output")
-
     if not any([adk_data, px_data, rss_data, tavily_data]):
         raise RuntimeError(
             "No source briefings found. Run at least one source pipeline first."
@@ -190,7 +188,6 @@ def _step1_load_sources() -> tuple:
     px_briefing     = (px_data     or {}).get("briefing", px_data     or {})
     rss_briefing    = (rss_data    or {}).get("briefing", rss_data    or {})
     tavily_briefing = (tavily_data or {}).get("briefing", tavily_data or {})
-    social_briefing = (social_data or {}).get("briefing", social_data or {})
 
     # Supplementary sources (new agents — loaded dynamically)
     extra_sources = []
@@ -225,8 +222,9 @@ def _step1_load_sources() -> tuple:
         if github_data:
             print(f"  Found: GitHub ({len(github_data)} items)")
 
-    # xAI Twitter — people highlights + trending posts
+    # xAI Twitter — serves as social source (people + trending + community)
     xai_data = {}
+    social_briefing = {}
     xai_raw = _find_latest_json(_ROOT / "xai-twitter-agent" / "output")
     if xai_raw:
         xai_briefing = xai_raw.get("briefing", xai_raw)
@@ -235,7 +233,14 @@ def _step1_load_sources() -> tuple:
         xai_community = xai_briefing.get("community_pulse", "")
         if xai_people or xai_trending:
             xai_data = {"people": xai_people, "trending": xai_trending, "community": xai_community}
-            print(f"  Found: xAI Twitter ({len(xai_people)} people, {len(xai_trending)} trending)")
+            # Also use as social_briefing for the merger prompt and translation
+            social_briefing = {
+                "people_highlights": xai_people,
+                "community_pulse": xai_community,
+                "community_urls": [],
+                "top_reddit": [],
+            }
+            print(f"  Found: Social/xAI ({len(xai_people)} people, {len(xai_trending)} trending)")
 
     # Enriched articles from Article Reader
     enriched_articles = _load_article_reader()
@@ -244,10 +249,10 @@ def _step1_load_sources() -> tuple:
     n_px     = len(px_briefing.get("news_items", []))
     n_rss    = len(rss_briefing.get("news_items", []))
     n_tavily = len(tavily_briefing.get("news_items", []))
-    n_social = bool(social_briefing.get("community_pulse"))
+    n_social = len(social_briefing.get("people_highlights", []))
     n_articles = len(enriched_articles)
     n_extra = sum(len(s["briefing"].get("news_items", [])) for s in extra_sources)
-    print(f"  ADK: {n_adk}  |  Perplexity: {n_px}  |  RSS: {n_rss}  |  Tavily: {n_tavily}  |  Social: {'✓' if n_social else '–'}  |  Articles: {n_articles}  |  Extra: {n_extra}")
+    print(f"  ADK: {n_adk}  |  Perplexity: {n_px}  |  RSS: {n_rss}  |  Tavily: {n_tavily}  |  Social/xAI: {n_social} people  |  Articles: {n_articles}  |  Extra: {n_extra}")
     return adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data, github_data, xai_data
 
 

@@ -32,7 +32,7 @@ if isinstance(twitter_raw, dict):
     xb = twitter_raw.get("briefing", {})
     twitter_data = {
         "people": xb.get("people_highlights", xb.get("news_items", [])),
-        "trending": xb.get("trending_topics", []),
+        "trending": xb.get("trending_posts", xb.get("trending_topics", [])),
         "community": xb.get("community_pulse", ""),
     }
 

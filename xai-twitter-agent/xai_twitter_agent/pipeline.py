@@ -39,6 +39,11 @@ TRACKED_HANDLES = [
     {"name": "Logan Kilpatrick", "handle": "OfficialLoganK", "org": "Google", "role": "Product Lead"},
     {"name": "Greg Brockman", "handle": "gdb", "org": "OpenAI", "role": "President"},
     {"name": "Jack Clark", "handle": "jackclarkSF", "org": "Anthropic", "role": "Co-founder"},
+    {"name": "Boris Cherny", "handle": "bcherny", "org": "Anthropic", "role": "Claude Code lead"},
+    {"name": "Alex Albert", "handle": "alexalbert__", "org": "Anthropic", "role": "Prompt engineering"},
+    {"name": "Guillermo Rauch", "handle": "raaborning", "org": "Vercel", "role": "CEO"},
+    {"name": "Aravind Srinivas", "handle": "AravSrinivas", "org": "Perplexity", "role": "CEO"},
+    {"name": "Arthur Mensch", "handle": "arthurmensch", "org": "Mistral", "role": "CEO"},
 ]
 
 
@@ -205,17 +210,23 @@ def _fetch_trending(api_key: str) -> list[dict]:
     days = _LOOKBACK_DAYS()
     today = _TODAY()
     prompt = (
-        f"Search X/Twitter for the top 8 most viral AI-related posts from the past {days} days "
-        f"(today is {today}). I need REAL posts that actually exist — not fabricated ones.\n\n"
-        f"For each post, include:\n"
-        f'- "author": "@handle"\n'
-        f'- "name": "Full Name"\n'
-        f'- "post": "actual quote from the tweet"\n'
-        f'- "date": "exact date like April 12, 2026" (must be from {today[:4]})\n'
-        f'- "url": "https://x.com/handle/status/REAL_ID"\n'
-        f'- "engagement": "actual engagement numbers"\n'
-        f'- "topic": "brief topic label"\n\n'
-        f"Return ONLY a JSON array. Do NOT fabricate posts or use dates before 2026."
+        f"Search X/Twitter for the top 8 most viral and discussed AI posts from the past {days} days "
+        f"(today is {today}).\n\n"
+        f"Focus on MAINSTREAM AI topics only:\n"
+        f"- LLM releases, benchmarks, and model comparisons\n"
+        f"- AI coding tools (Claude Code, Cursor, Copilot, Windsurf)\n"
+        f"- AI agents, agentic workflows, and developer tools\n"
+        f"- Major company announcements (OpenAI, Anthropic, Google, Meta, xAI, Mistral)\n"
+        f"- AI policy, safety, and industry debates\n\n"
+        f"EXCLUDE niche/spam: medical AI, crypto/prediction markets, non-English posts, "
+        f"promotional threads, newsletters, podcast ads.\n\n"
+        f"Prefer posts with HIGH engagement (1000+ likes or 100K+ views).\n"
+        f"Keep post text concise — max 280 characters, truncate if longer.\n\n"
+        f"For each post return:\n"
+        f'{{"author": "@handle", "name": "Full Name", "post": "tweet text (max 280 chars)", '
+        f'"date": "April 12, 2026", "url": "https://x.com/handle/status/ID", '
+        f'"engagement": "likes/retweets/views", "topic": "brief label"}}\n\n'
+        f"Return ONLY a JSON array."
     )
     raw = _grok_search(prompt, label="trending_ai_posts")
     if not raw:

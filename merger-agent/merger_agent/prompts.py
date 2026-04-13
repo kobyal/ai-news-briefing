@@ -1,6 +1,8 @@
 """Prompt strings for the Merger pipeline."""
+import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+from shared.vendors import VENDOR_ENUM
 
-MERGER_PROMPT = """\
+MERGER_PROMPT = f"""\
 You are an AI news editor merging five independent briefings into one definitive daily briefing.
 
 SOURCE A (Google ADK + Gemini Search):
@@ -79,7 +81,7 @@ Produce ONE merged briefing as a JSON object. Rules:
 6. news_items — MUST contain 15-25 items. You are receiving 50+ source stories — do NOT compress them into 12.
    Include every distinct announcement. A vendor WILL have 2-4 stories if they made multiple announcements.
    For each:
-   - vendor: "Anthropic" | "AWS" | "OpenAI" | "Google" | "Azure" | "Meta" | "xAI" | "NVIDIA" | "Mistral" | "Apple" | "Hugging Face" | "Alibaba" | "DeepSeek" | "Samsung" | "Other"
+   - vendor: {VENDOR_ENUM}
    - headline: specific and descriptive
    - published_date: exact date (e.g. "April 4, 2026"). "Date unknown" if not available.
    - summary: 2-4 sentences, concrete details from all sources combined

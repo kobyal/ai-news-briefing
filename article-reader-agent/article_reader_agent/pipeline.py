@@ -26,21 +26,10 @@ from shared.article_reader import read_article, ArticleContent, _should_skip_url
 _ROOT = Path(__file__).parent.parent.parent
 _TODAY = lambda: datetime.now().strftime("%B %d, %Y")
 
-# Search queries to find today's top AI news URLs
-_SEARCH_QUERIES = [
-    "Anthropic Claude AI news today",
-    "OpenAI GPT news today",
-    "Google Gemini DeepMind AI news today",
-    "Meta Llama AI news today",
-    "AWS Bedrock AI news today",
-    "Microsoft Azure AI Copilot news today",
-    "NVIDIA AI news today",
-    "xAI Grok news today",
-    "Mistral AI news today",
-    "Apple Intelligence AI news today",
-    "Hugging Face AI news today",
-    "AI startup funding news today",
-]
+import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+from shared.vendors import VENDOR_QUERIES
+
+_SEARCH_QUERIES = [f"{name} AI news today" for name, _ in VENDOR_QUERIES] + ["AI startup funding news today"]
 
 
 def _collect_existing_urls() -> list[str]:

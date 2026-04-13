@@ -364,25 +364,12 @@ def _enrich_and_filter(api_key: str, videos: dict) -> list[dict]:
 # Vendor classification
 # ---------------------------------------------------------------------------
 
+import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+from shared.vendors import classify_vendor as _classify_vendor_shared
+
+
 def _classify_vendor(title: str, desc: str) -> str:
-    combined = (title + " " + desc).lower()
-    vendors = {
-        "Anthropic": ["anthropic", "claude"],
-        "OpenAI": ["openai", "chatgpt", "gpt-4", "gpt-5", "codex", "sora"],
-        "Google": ["google", "gemini", "deepmind"],
-        "AWS": ["aws", "bedrock", "amazon"],
-        "Azure": ["microsoft", "azure", "copilot"],
-        "Meta": ["meta", "llama"],
-        "xAI": ["xai", "grok"],
-        "NVIDIA": ["nvidia"],
-        "Mistral": ["mistral"],
-        "Apple": ["apple intelligence"],
-        "Hugging Face": ["hugging face"],
-    }
-    for vendor, keywords in vendors.items():
-        if any(k in combined for k in keywords):
-            return vendor
-    return "Other"
+    return _classify_vendor_shared(title + " " + desc)
 
 
 # ---------------------------------------------------------------------------

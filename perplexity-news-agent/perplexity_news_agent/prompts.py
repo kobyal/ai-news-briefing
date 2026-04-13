@@ -2,25 +2,22 @@
 
 Placeholders replaced at pipeline load: {today}, {month_year}, {lookback_days}
 """
+import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+from shared.vendors import VENDOR_QUERIES, VENDOR_ENUM
 
-VENDOR_RESEARCHER_PROMPT = """\
-Today is {today}. You are a senior AI industry analyst.
+_vendor_lines = "\n".join(
+    f"{i+1}. {name} — latest news, releases, updates"
+    for i, (name, _) in enumerate(VENDOR_QUERIES)
+)
+
+VENDOR_RESEARCHER_PROMPT = f"""\
+Today is {{today}}. You are a senior AI industry analyst.
 
 Search the web for the most recent news from EACH of these vendors. \
-Cover the last {lookback_days} day(s). Use the web_search tool.
+Cover the last {{lookback_days}} day(s). Use the web_search tool.
 
 Vendors to research:
-1. Anthropic / Claude — latest model releases, product updates, research
-2. AWS / Amazon Bedrock — new AI services, Bedrock updates, model additions
-3. OpenAI / ChatGPT — new models, product launches, API changes
-4. Google / Gemini / DeepMind — Gemini updates, AI product launches, research
-5. Microsoft / Azure OpenAI — Azure AI Foundry, Copilot, model availability
-6. Meta / Llama — Llama model releases, Meta AI updates
-7. xAI / Grok — Grok model releases, xAI product updates
-8. NVIDIA — AI model releases, NIM, inference infrastructure, CUDA AI updates
-9. Mistral AI — new model releases, API updates, open-source releases
-10. Apple — Apple Intelligence updates, Core ML, on-device AI, Siri AI features
-11. Hugging Face — new models, datasets, platform updates, open-source releases
+{_vendor_lines}
 
 For each vendor output:
 
@@ -59,7 +56,7 @@ Today is {today}. Write a structured AI briefing for developers.
 Rules:
 1. tldr: 5-6 bullets covering the most important stories. Each: vendor name + what happened + why it matters (15-25 words).
 2. news_items: 8-11 items, one per vendor story (cover as many vendors as possible). Each:
-   - vendor: "Anthropic" | "AWS" | "OpenAI" | "Google" | "Azure" | "Meta" | "xAI" | "NVIDIA" | "Mistral" | "Apple" | "Hugging Face" | "Other"
+   - vendor: {VENDOR_ENUM}
    - headline: specific and descriptive
    - published_date: exact date from source, e.g. "April 2, 2026"
    - summary: 2-3 sentences, concrete details — model names, numbers, capabilities

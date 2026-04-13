@@ -68,20 +68,8 @@ FEEDS = [
     ("https://www.reddit.com/r/LocalLLaMA/hot.json",                       "Other",         "reddit"),
 ]
 
-# Keywords that map article content → vendor (overrides feed-level tag for aggregators)
-VENDOR_KEYWORDS = {
-    "Anthropic": ["anthropic", "claude", "claude-3", "claude-4", "opus", "sonnet", "haiku"],
-    "OpenAI":    ["openai", "chatgpt", "gpt-4", "gpt-5", "o1", "o3", "sora", "dall-e"],
-    "Google":    ["google", "gemini", "deepmind", "bard", "gemma", "vertex", "veo", "lyria"],
-    "AWS":       ["aws", "amazon bedrock", "bedrock", "nova", "sagemaker", "titan"],
-    "Azure":     ["azure", "microsoft", "copilot", "phi-4", "phi-3", "bing ai", "foundry"],
-    "Meta":      ["meta ai", "llama", "meta llama", "meta ", " meta's", "fair"],
-    "xAI":       ["xai", "grok", "x.ai", "elon musk ai"],
-    "NVIDIA":    ["nvidia", "cuda", "nim microservice", "h100", "blackwell", "rtx ai"],
-    "Mistral":   ["mistral", "mixtral", "pixtral", "codestral"],
-    "Apple":     ["apple intelligence", "apple ai", "siri ai", "core ml", "on-device ai"],
-    "Hugging Face": ["hugging face", "huggingface", "hf", "transformers library"],
-}
+import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+from shared.vendors import VENDOR_KEYWORDS
 
 
 def _infer_vendor(title: str, summary: str, feed_vendor: str) -> str:

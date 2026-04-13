@@ -69,26 +69,12 @@ def _search_exa() -> list[dict]:
     return all_results
 
 
+import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+from shared.vendors import classify_vendor as _classify_vendor_shared
+
+
 def _classify_vendor(title: str, text: str) -> str:
-    """Simple keyword-based vendor classification."""
-    combined = (title + " " + text).lower()
-    vendors = {
-        "Anthropic": ["anthropic", "claude"],
-        "OpenAI": ["openai", "chatgpt", "gpt-4", "gpt-5", "dall-e"],
-        "Google": ["google", "gemini", "deepmind"],
-        "AWS": ["aws", "bedrock", "amazon"],
-        "Azure": ["microsoft", "azure", "copilot"],
-        "Meta": ["meta", "llama", "muse spark"],
-        "xAI": ["xai", "grok", "elon musk"],
-        "NVIDIA": ["nvidia", "cuda", "tensorrt"],
-        "Mistral": ["mistral"],
-        "Apple": ["apple intelligence", "core ml", "siri"],
-        "Hugging Face": ["hugging face", "huggingface"],
-    }
-    for vendor, keywords in vendors.items():
-        if any(k in combined for k in keywords):
-            return vendor
-    return "Other"
+    return _classify_vendor_shared(title + " " + text)
 
 
 def _format_date(raw: str) -> str:

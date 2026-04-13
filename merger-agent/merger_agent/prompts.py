@@ -77,7 +77,7 @@ Produce ONE merged briefing as a JSON object. Rules:
    community_urls — flat list of all source_url values from the items
 
 6. news_items — 8-14 items (be comprehensive). For each:
-   - vendor: "Anthropic" | "AWS" | "OpenAI" | "Google" | "Azure" | "Meta" | "xAI" | "NVIDIA" | "Mistral" | "Apple" | "Hugging Face" | "Other"
+   - vendor: "Anthropic" | "AWS" | "OpenAI" | "Google" | "Azure" | "Meta" | "xAI" | "NVIDIA" | "Mistral" | "Apple" | "Hugging Face" | "Alibaba" | "DeepSeek" | "Samsung" | "Other"
    - headline: specific and descriptive
    - published_date: exact date (e.g. "April 4, 2026"). "Date unknown" if not available.
    - summary: 2-4 sentences, concrete details from all sources combined

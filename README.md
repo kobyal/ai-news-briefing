@@ -7,7 +7,7 @@ The current architecture is:
 - **6 supplemental agents**: Article Reader, Exa, NewsAPI, YouTube, GitHub Trending, xAI Twitter
 - **1 final merger**: loads the latest outputs, deduplicates stories, translates to Hebrew, and publishes the combined HTML
 
-**Live output:** [kobyal.github.io/ai-news-briefing](https://kobyal.github.io/ai-news-briefing)
+**Live site:** [duus0s1bicxag.cloudfront.net](https://duus0s1bicxag.cloudfront.net/) (CloudFront) | [kobyal.github.io/ai-news-briefing](https://kobyal.github.io/ai-news-briefing) (GitHub Pages — raw HTML)
 
 **Suggested GitHub About text:** `11-agent AI news collection + merger pipeline: ADK, Perplexity, RSS, Tavily, Social, Article Reader, Exa, NewsAPI, YouTube, GitHub Trending, xAI Twitter -> bilingual EN/Hebrew briefing + docs/data JSON.`
 
@@ -640,7 +640,7 @@ The GitHub Actions workflow (`daily_briefing.yml`) only responds to `workflow_di
 
 ## Vendor Coverage
 
-The vendor-oriented pipelines still center on these 11 buckets:
+The merger classifies stories into these vendor buckets:
 
 | Vendor | Focus |
 |--------|-------|
@@ -655,5 +655,70 @@ The vendor-oriented pipelines still center on these 11 buckets:
 | Mistral | Open and commercial models |
 | Apple | Apple Intelligence, on-device AI |
 | Hugging Face | Models, datasets, open-source ecosystem |
+| Alibaba | Qwen, Tongyi, cloud AI |
+| DeepSeek | DeepSeek models, open-source LLMs |
+| Samsung | On-device AI, Gauss, hardware AI |
 
-Supplemental agents can also emit stories outside these buckets and mark them as `Other`.
+Stories not matching a specific vendor are classified as `Other`.
+
+---
+
+## Web App
+
+The frontend is a **Next.js** static-export app in `web/`. It fetches data from the API at runtime and renders:
+
+| Route | Description |
+|-------|-------------|
+| `/` | Homepage — TL;DR, stories grid, vendor filter, community/social sections |
+| `/stories` | Full story archive with hero + grid layout |
+| `/community` | People highlights, Reddit, community pulse |
+| `/media` | YouTube, GitHub trending, X/Twitter |
+| `/archive` | Calendar view of past briefings |
+| `/[date]` | Individual day briefing |
+
+### Local development
+
+```bash
+cd web
+npm install
+npm run dev   # → http://localhost:3000
+```
+
+### Build & deploy
+
+```bash
+cd web
+npm run build                    # generates out/ (static export)
+aws s3 sync out s3://ai-news-briefing-web --delete
+aws cloudfront create-invalidation --distribution-id E2XOWDA6B84582 --paths "/*"
+```
+
+---
+
+## Infrastructure (AWS CDK)
+
+All infrastructure is defined in `infra/` using AWS CDK (Python).
+
+| Stack | Resources |
+|-------|-----------|
+| `DatabaseStack` | DynamoDB table `ai-news-stories` (PK/SK, GSI on date+vendor) |
+| `TriggerStack` | Lambda `ai-news-trigger` — dispatches GitHub Actions workflow via EventBridge cron |
+| `IngestStack` | Lambda `ai-news-ingest` — reads from GitHub Pages, writes to DynamoDB. Runs delete-then-write per date |
+| `ApiStack` | Lambda `ai-news-api` behind API Gateway — serves `/api/stories`, `/api/archive`, `/api/story/:id` |
+| `FrontendStack` | S3 bucket + CloudFront distribution with OAC, API proxy on `/api/*` |
+
+### Deploy CDK
+
+```bash
+cd infra
+pip install -r requirements.txt
+cdk deploy --all
+```
+
+### EventBridge schedule (Israel time)
+
+| Time | Lambda | Purpose |
+|------|--------|---------|
+| 03:00 (00:00 UTC) | `ai-news-trigger` | Kick off GitHub Actions pipeline |
+| 07:00 (04:00 UTC) | `ai-news-ingest` | Ingest morning run to DynamoDB |
+| 16:00 (13:00 UTC) | `ai-news-ingest` | Ingest afternoon run to DynamoDB |

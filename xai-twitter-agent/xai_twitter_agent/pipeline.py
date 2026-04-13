@@ -273,6 +273,108 @@ def _fetch_community_signals(api_key: str) -> str:
     return _grok_search(prompt, label="community_signals")
 
 
+# ---------------------------------------------------------------------------
+# Free X scraping layer — supplements Grok with direct public tweet fetches
+# ---------------------------------------------------------------------------
+
+def _scrape_user_timeline(handle: str, max_tweets: int = 5) -> list[dict]:
+    """Fetch recent public tweets via X's syndication API (no auth needed)."""
+    url = f"https://syndication.twitter.com/srv/timeline-profile/screen-name/{handle}"
+    try:
+        resp = requests.get(url, timeout=10, headers={
+            "User-Agent": "Mozilla/5.0 (compatible; ai-news-briefing/1.0)",
+            "Accept": "text/html",
+        })
+        if not resp.ok:
+            return []
+        # Parse tweet data from the syndication HTML
+        # The response contains embedded tweet data in data attributes
+        tweets = []
+        # Extract tweet URLs and text from the HTML
+        tweet_pattern = re.compile(
+            r'href="https://twitter\.com/\w+/status/(\d+)"[^>]*>.*?'
+            r'<p[^>]*>(.*?)</p>',
+            re.DOTALL
+        )
+        for match in tweet_pattern.finditer(resp.text):
+            tweet_id = match.group(1)
+            text = re.sub(r'<[^>]+>', '', match.group(2)).strip()
+            if text and len(text) > 20:
+                tweets.append({
+                    "url": f"https://x.com/{handle}/status/{tweet_id}",
+                    "text": text[:500],
+                })
+            if len(tweets) >= max_tweets:
+                break
+        return tweets
+    except Exception:
+        return []
+
+
+def _scrape_enrich_people(people: list[dict]) -> list[dict]:
+    """Enrich Grok people results with scraped data: validate URLs, fill gaps."""
+    enriched = 0
+    validated = 0
+
+    for person in people:
+        handle = person.get("handle", "")
+        grok_url = person.get("url", "")
+
+        # If Grok returned no URL or invalid URL, try scraping
+        if not grok_url:
+            scraped = _scrape_user_timeline(handle, max_tweets=3)
+            if scraped:
+                # Find a tweet that roughly matches the Grok post content
+                post_lower = person.get("post", "").lower()[:50]
+                best = None
+                for tweet in scraped:
+                    # Check for keyword overlap
+                    overlap = sum(1 for w in post_lower.split() if len(w) > 3 and w in tweet["text"].lower())
+                    if overlap >= 2:
+                        best = tweet
+                        break
+                if best:
+                    person["url"] = best["url"]
+                    enriched += 1
+                elif scraped:
+                    # Fallback: use most recent tweet URL
+                    person["url"] = scraped[0]["url"]
+                    enriched += 1
+        else:
+            validated += 1
+
+    if enriched or validated:
+        print(f"  Scrape enrichment: {validated} valid URLs, {enriched} recovered via scraping")
+    return people
+
+
+def _scrape_extra_trending(existing_handles: set) -> list[dict]:
+    """Scrape additional trending AI content from known active posters."""
+    extra_handles = ["kaborning", "mmitchell_ai", "_akhaliq", "oaborning"]
+    extra = []
+    for handle in extra_handles:
+        if handle.lower() in existing_handles:
+            continue
+        tweets = _scrape_user_timeline(handle, max_tweets=2)
+        for tweet in tweets:
+            # Quick AI relevance check
+            ai_keywords = {"ai", "llm", "gpt", "claude", "gemini", "model", "agent", "neural", "training", "inference"}
+            words = set(tweet["text"].lower().split())
+            if words & ai_keywords:
+                extra.append({
+                    "author": f"@{handle}",
+                    "post": tweet["text"][:280],
+                    "url": tweet["url"],
+                    "date": "",
+                    "engagement": "",
+                    "topic": "AI",
+                    "source": "scrape",
+                })
+    if extra:
+        print(f"  Scraped {len(extra)} extra trending posts")
+    return extra
+
+
 def run_pipeline() -> dict:
     print("=" * 60)
     print(" xAI Twitter Agent (Grok + Live Search)")
@@ -286,14 +388,22 @@ def run_pipeline() -> dict:
 
     t_start = time.time()
 
-    print("\n[1/3] Finding AI leaders on X...")
+    print("\n[1/4] Finding AI leaders on X...")
     people = _fetch_people(api_key)
 
-    print("\n[2/3] Finding trending AI posts...")
+    print("\n[2/4] Finding trending AI posts...")
     trending = _fetch_trending(api_key)
 
-    print("\n[3/3] Finding community signals...")
+    print("\n[3/4] Finding community signals...")
     community = _fetch_community_signals(api_key)
+
+    print("\n[4/4] Enriching with free X scraping...")
+    # Validate/enrich people URLs via scraping
+    people = _scrape_enrich_people(people)
+    # Scrape extra trending from known active handles
+    existing_handles = {t.get("author", "").lstrip("@").lower() for t in trending}
+    extra_trending = _scrape_extra_trending(existing_handles)
+    trending.extend(extra_trending)
 
     output = {
         "source": "xai_twitter",

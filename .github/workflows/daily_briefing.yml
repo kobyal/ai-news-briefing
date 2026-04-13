@@ -3,14 +3,19 @@ name: Daily AI Briefing
 on:
   workflow_dispatch:
     inputs:
-      merge_only:
-        description: 'Only run merger (skip source agents)'
+      mode:
+        description: 'Run mode'
         required: false
-        default: 'false'
+        default: 'all'
         type: choice
         options:
-          - 'false'
-          - 'true'
+          - 'all'
+          - 'merge-only'
+          - 'budget'
+      skip_agents:
+        description: 'Agents to skip (comma-separated: xai,social,exa)'
+        required: false
+        default: ''
 
 jobs:
   briefing:
@@ -68,11 +73,19 @@ jobs:
           MERGER_TRANSLATOR_MODEL: claude-sonnet-4-20250514
           LOOKBACK_DAYS: 3
         run: |
-          if [ "${{ inputs.merge_only }}" = "true" ]; then
-            python run_all.py --merge-only
-          else
-            python run_all.py
+          MODE="${{ inputs.mode || 'all' }}"
+          SKIP="${{ inputs.skip_agents }}"
+          CMD="python run_all.py"
+          if [ "$MODE" = "merge-only" ]; then
+            CMD="$CMD --merge-only"
+          elif [ "$MODE" = "budget" ]; then
+            CMD="$CMD --skip xai"
           fi
+          if [ -n "$SKIP" ]; then
+            CMD="$CMD --skip $(echo $SKIP | tr ',' ' ')"
+          fi
+          echo "Running: $CMD"
+          $CMD
 
       - name: Copy latest merged output to docs/index.html (GitHub Pages)
         run: |

@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """Run all agents: source agents in parallel, then Merger.
 
-The 5 source agents are fully independent and run simultaneously.
-Total wall-clock time ≈ slowest single agent (~4 min) instead of sum (~12 min).
-
 Usage:
-    python run_all.py                 # all 5 agents in parallel + Merger
-    python run_all.py --skip-adk      # skip ADK
-    python run_all.py --skip-px       # skip Perplexity
-    python run_all.py --skip-rss      # skip RSS
-    python run_all.py --skip-tavily   # skip Tavily
-    python run_all.py --skip-social   # skip Social
-    python run_all.py --merge-only    # only run Merger on latest existing outputs
+    python run_all.py                 # all agents + Merger
+    python run_all.py --merge-only    # only Merger (reuses latest outputs)
+    python run_all.py --skip xai rss  # skip specific agents
+    python run_all.py --only adk tavily merger  # run ONLY these agents
 """
 import argparse
 import os
@@ -20,9 +14,36 @@ import sys
 import time
 from pathlib import Path
 
+# ── Agent registry: name → (script path relative to root, cost tier) ──────
+AGENTS = {
+    # Core source agents
+    "adk":        ("adk-news-agent/run.py",          "paid",  "Google Gemini API"),
+    "perplexity": ("perplexity-news-agent/run.py",   "paid",  "Perplexity API"),
+    "rss":        ("rss-news-agent/run.py",           "paid",  "Perplexity API (writer)"),
+    "tavily":     ("tavily-news-agent/run.py",        "paid",  "Tavily API"),
+    "social":     ("social-news-agent/run.py",        "paid",  "Perplexity API"),
+    # Supplemental agents
+    "article":    ("article-reader-agent/run.py",     "cheap", "Firecrawl (free tier)"),
+    "exa":        ("exa-news-agent/run.py",           "cheap", "Exa (free tier)"),
+    "newsapi":    ("newsapi-agent/run.py",            "free",  "NewsAPI (free tier)"),
+    "youtube":    ("youtube-news-agent/run.py",       "free",  "YouTube Data API (free quota)"),
+    "github":     ("github-trending-agent/run.py",    "free",  "GitHub API (free)"),
+    "xai":        ("xai-twitter-agent/run.py",        "paid",  "xAI Grok-4 (~$1/run)"),
+    # Merger (always runs last)
+    "merger":     ("merger-agent/run.py",             "paid",  "Anthropic Claude"),
+}
+
+AGENT_DISPLAY = {
+    "adk": "ADK News Agent", "perplexity": "Perplexity News Agent",
+    "rss": "RSS News Agent", "tavily": "Tavily News Agent",
+    "social": "Social News Agent", "article": "Article Reader Agent",
+    "exa": "Exa News Agent", "newsapi": "NewsAPI Agent",
+    "youtube": "YouTube News Agent", "github": "GitHub Trending Agent",
+    "xai": "xAI Twitter Agent", "merger": "Merger Agent",
+}
+
 
 def _run(script: Path, label: str) -> bool:
-    """Run a single script, streaming output live (used for the Merger)."""
     print(f"\n{'='*60}")
     print(f"  Running: {label}")
     print(f"  Script:  {script}")
@@ -40,32 +61,27 @@ def _run(script: Path, label: str) -> bool:
 
 
 def _run_parallel(agents: list[tuple[Path, str]]) -> dict[str, bool]:
-    """Launch agents simultaneously, capture each output, print when done."""
     if not agents:
         return {}
 
     print(f"\n{'='*60}")
-    print(f"  Launching {len(agents)} source agents in parallel...")
+    print(f"  Launching {len(agents)} agents in parallel...")
     print("=" * 60)
 
-    # Start all agents at once
     procs = []
     for script, label in agents:
         proc = subprocess.Popen(
             [sys.executable, str(script)],
             cwd=script.parent,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
         procs.append((label, proc))
         print(f"  ▶  {label}  (pid {proc.pid})")
 
     print()
     t0 = time.time()
-    TIMEOUT = int(os.environ.get("AGENT_TIMEOUT", "480"))  # 8 min default
+    TIMEOUT = int(os.environ.get("AGENT_TIMEOUT", "480"))
 
-    # Wait for each in order, print captured output as they finish
     results = {}
     for label, proc in procs:
         try:
@@ -89,46 +105,79 @@ def _run_parallel(agents: list[tuple[Path, str]]) -> dict[str, bool]:
 
 def main():
     parser = argparse.ArgumentParser(description="Run AI news agent pipelines")
-    parser.add_argument("--skip-adk",    action="store_true", help="Skip the ADK pipeline")
-    parser.add_argument("--skip-px",     action="store_true", help="Skip the Perplexity pipeline")
-    parser.add_argument("--skip-rss",    action="store_true", help="Skip the RSS pipeline")
-    parser.add_argument("--skip-tavily", action="store_true", help="Skip the Tavily pipeline")
-    parser.add_argument("--skip-social", action="store_true", help="Skip the Social pipeline")
-    parser.add_argument("--merge-only",  action="store_true", help="Only run the Merger")
+    parser.add_argument("--merge-only", action="store_true", help="Only run the Merger")
+    parser.add_argument("--skip", nargs="*", default=[], metavar="AGENT",
+                        help=f"Skip these agents. Choices: {', '.join(AGENTS.keys())}")
+    parser.add_argument("--only", nargs="*", default=[], metavar="AGENT",
+                        help="Run ONLY these agents (+ merger). Choices: same as --skip")
+    parser.add_argument("--free-only", action="store_true",
+                        help="Run only free/cheap agents (skip all paid APIs)")
+    parser.add_argument("--list", action="store_true", help="List all agents and their cost tiers")
+    # Legacy flags
+    parser.add_argument("--skip-adk", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--skip-px", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--skip-rss", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--skip-tavily", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--skip-social", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     root = Path(__file__).parent
+
+    if args.list:
+        print(f"\n{'Agent':<14} {'Tier':<6} {'API Cost'}")
+        print("-" * 50)
+        for name, (_, tier, api) in AGENTS.items():
+            icon = {"free": "🟢", "cheap": "🟡", "paid": "🔴"}[tier]
+            print(f"  {icon} {name:<12} {tier:<6} {api}")
+        return
 
     if args.merge_only:
         _run(root / "merger-agent" / "run.py", "Merger Agent")
         return
 
-    # Build list of independent agents to run in parallel
+    # Build skip set from all flag sources
+    skip = set(args.skip)
+    if args.skip_adk: skip.add("adk")
+    if args.skip_px: skip.add("perplexity")
+    if args.skip_rss: skip.add("rss")
+    if args.skip_tavily: skip.add("tavily")
+    if args.skip_social: skip.add("social")
+
+    # Determine which agents to run
+    if args.only:
+        enabled = set(args.only)
+        enabled.discard("merger")  # merger runs separately
+    elif args.free_only:
+        enabled = {name for name, (_, tier, _) in AGENTS.items() if tier in ("free", "cheap")}
+        enabled.add("merger")  # merger always runs
+    else:
+        enabled = set(AGENTS.keys())
+
+    enabled -= skip
+    enabled.discard("merger")  # merger runs after all others
+
+    # Build parallel list (everything except merger)
     agents = []
-    if not args.skip_adk:
-        agents.append((root / "adk-news-agent"          / "run.py", "ADK News Agent"))
-    if not args.skip_px:
-        agents.append((root / "perplexity-news-agent"   / "run.py", "Perplexity News Agent"))
-    if not args.skip_rss:
-        agents.append((root / "rss-news-agent"          / "run.py", "RSS News Agent"))
-    if not args.skip_tavily:
-        agents.append((root / "tavily-news-agent"       / "run.py", "Tavily News Agent"))
-    if not args.skip_social:
-        agents.append((root / "social-news-agent"       / "run.py", "Social News Agent"))
-    agents.append((root / "article-reader-agent"        / "run.py", "Article Reader Agent"))
-    agents.append((root / "exa-news-agent"              / "run.py", "Exa News Agent"))
-    agents.append((root / "newsapi-agent"               / "run.py", "NewsAPI Agent"))
-    agents.append((root / "youtube-news-agent"          / "run.py", "YouTube News Agent"))
-    agents.append((root / "github-trending-agent"       / "run.py", "GitHub Trending Agent"))
-    agents.append((root / "xai-twitter-agent"           / "run.py", "xAI Twitter Agent"))
+    for name in AGENTS:
+        if name == "merger":
+            continue
+        if name in enabled:
+            script = root / AGENTS[name][0]
+            agents.append((script, AGENT_DISPLAY[name]))
 
-    results = _run_parallel(agents)
+    if agents:
+        skipped = set(AGENTS.keys()) - enabled - {"merger"}
+        if skipped:
+            print(f"\n  Skipping: {', '.join(sorted(skipped))}")
 
-    failed = [label for label, ok in results.items() if not ok]
-    if failed:
-        print(f"\n[WARNING] Failed: {', '.join(failed)} — continuing with available outputs")
+        results = _run_parallel(agents)
+        failed = [label for label, ok in results.items() if not ok]
+        if failed:
+            print(f"\n[WARNING] Failed: {', '.join(failed)} — continuing with available outputs")
 
-    _run(root / "merger-agent" / "run.py", "Merger Agent")
+    # Merger always runs (unless explicitly skipped)
+    if "merger" not in skip:
+        _run(root / "merger-agent" / "run.py", "Merger Agent")
 
 
 if __name__ == "__main__":

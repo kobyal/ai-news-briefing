@@ -27,7 +27,7 @@ PUBLISHED: [exact date, e.g. April 4, 2026]
 SUMMARY: [2-3 sentences with concrete details — model names, numbers, capabilities]
 SOURCES: [list the citation URLs, one per line]
 
-If nothing was published in the last {lookback_days} day(s), report the most recent story \
+If nothing was published in the last {{lookback_days}} day(s), report the most recent story \
 and note its actual date. If a vendor had no significant news, write "No major news found."
 """
 

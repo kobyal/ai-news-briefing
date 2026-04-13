@@ -17,7 +17,7 @@ Run exactly {len(VENDOR_QUERIES)} searches — one per vendor. Use broad queries
 {_search_lines}
 
 For each vendor, pick the MOST RECENT story you find. Prefer stories from the last \
-{lookback_days} day(s), but if nothing was published that recently, include the latest \
+{{lookback_days}} day(s), but if nothing was published that recently, include the latest \
 story available and note its actual publication date. \
 Each story MUST include its exact publication date from the source.
 

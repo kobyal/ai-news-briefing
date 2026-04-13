@@ -6,12 +6,11 @@ on:
       mode:
         description: 'Run mode'
         required: false
-        default: 'budget'
+        default: 'all'
         type: choice
         options:
           - 'all'
           - 'merge-only'
-          - 'budget'
 
 jobs:
   briefing:
@@ -57,9 +56,6 @@ jobs:
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
           REDDIT_USERNAME: ${{ secrets.REDDIT_USERNAME }}
           REDDIT_PASSWORD: ${{ secrets.REDDIT_PASSWORD }}
-          SOCIAL_SEARCH_MODEL: sonar
-          SOCIAL_WRITER_MODEL: anthropic/claude-sonnet-4-6
-          SOCIAL_TRANSLATOR_MODEL: anthropic/claude-haiku-4-5
           RSS_WRITER_MODEL: claude-haiku-4-5-20251001
           RSS_TRANSLATOR_MODEL: claude-haiku-4-5-20251001
           TAVILY_WRITER_MODEL: claude-haiku-4-5-20251001
@@ -79,8 +75,6 @@ jobs:
           MODE="${{ inputs.mode || 'all' }}"
           if [ "$MODE" = "merge-only" ]; then
             python run_all.py --merge-only
-          elif [ "$MODE" = "budget" ]; then
-            python run_all.py --skip social
           else
             python run_all.py
           fi

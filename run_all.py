@@ -19,16 +19,15 @@ AGENTS = {
     # Core source agents
     "adk":        ("adk-news-agent/run.py",          "paid",  "Google Gemini API"),
     "perplexity": ("perplexity-news-agent/run.py",   "paid",  "Perplexity API"),
-    "rss":        ("rss-news-agent/run.py",           "paid",  "Perplexity API (writer)"),
-    "tavily":     ("tavily-news-agent/run.py",        "paid",  "Tavily API"),
-    "social":     ("social-news-agent/run.py",        "paid",  "Perplexity API"),
+    "rss":        ("rss-news-agent/run.py",           "paid",  "Anthropic (haiku)"),
+    "tavily":     ("tavily-news-agent/run.py",        "paid",  "Tavily + Anthropic (haiku)"),
     # Supplemental agents
-    "article":    ("article-reader-agent/run.py",     "cheap", "Firecrawl (free tier)"),
+    "article":    ("article-reader-agent/run.py",     "cheap", "Jina (free tier)"),
     "exa":        ("exa-news-agent/run.py",           "cheap", "Exa (free tier)"),
     "newsapi":    ("newsapi-agent/run.py",            "free",  "NewsAPI (free tier)"),
     "youtube":    ("youtube-news-agent/run.py",       "free",  "YouTube Data API (free quota)"),
     "github":     ("github-trending-agent/run.py",    "free",  "GitHub API (free)"),
-    "xai":        ("xai-twitter-agent/run.py",        "paid",  "xAI Grok-4 (~$1/run)"),
+    "xai":        ("xai-twitter-agent/run.py",        "paid",  "xAI Grok-4 (~$0.35/run)"),
     # Merger (always runs last)
     "merger":     ("merger-agent/run.py",             "paid",  "Anthropic Claude"),
 }
@@ -36,7 +35,7 @@ AGENTS = {
 AGENT_DISPLAY = {
     "adk": "ADK News Agent", "perplexity": "Perplexity News Agent",
     "rss": "RSS News Agent", "tavily": "Tavily News Agent",
-    "social": "Social News Agent", "article": "Article Reader Agent",
+    "article": "Article Reader Agent",
     "exa": "Exa News Agent", "newsapi": "NewsAPI Agent",
     "youtube": "YouTube News Agent", "github": "GitHub Trending Agent",
     "xai": "xAI Twitter Agent", "merger": "Merger Agent",
@@ -118,7 +117,6 @@ def main():
     parser.add_argument("--skip-px", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--skip-rss", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--skip-tavily", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--skip-social", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     root = Path(__file__).parent
@@ -141,7 +139,6 @@ def main():
     if args.skip_px: skip.add("perplexity")
     if args.skip_rss: skip.add("rss")
     if args.skip_tavily: skip.add("tavily")
-    if args.skip_social: skip.add("social")
 
     # Determine which agents to run
     if args.only:

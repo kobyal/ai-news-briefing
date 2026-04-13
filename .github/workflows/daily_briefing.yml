@@ -1,7 +1,16 @@
 name: Daily AI Briefing
 
 on:
-  workflow_dispatch:        # triggered by EventBridge → ai-news-trigger Lambda
+  workflow_dispatch:
+    inputs:
+      merge_only:
+        description: 'Only run merger (skip source agents)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
   briefing:
@@ -58,7 +67,12 @@ jobs:
           MERGER_WRITER_MODEL: claude-sonnet-4-20250514
           MERGER_TRANSLATOR_MODEL: claude-sonnet-4-20250514
           LOOKBACK_DAYS: 3
-        run: python run_all.py
+        run: |
+          if [ "${{ inputs.merge_only }}" = "true" ]; then
+            python run_all.py --merge-only
+          else
+            python run_all.py
+          fi
 
       - name: Copy latest merged output to docs/index.html (GitHub Pages)
         run: |

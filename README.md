@@ -1,6 +1,6 @@
-# AI News Briefing — 6-Pipeline Multi-Source Architecture
+# AI News Briefing — 11-Agent Multi-Source Architecture
 
-Five independent AI agents gather today's AI industry news **in parallel** — four scanning news sources, one monitoring social networks (X/Twitter, Reddit, LinkedIn). A sixth **merger agent** deduplicates, combines, and enriches all outputs into one definitive bilingual (EN/Hebrew) newsletter published to GitHub Pages.
+Eleven AI agents run in parallel: **5 core news pipelines** + **6 feeders/enrichers** (Article Reader, Exa, NewsAPI, YouTube, GitHub Trending, xAI Twitter). A merger agent deduplicates, combines, and enriches everything into one bilingual (EN/Hebrew) newsletter published to GitHub Pages.
 
 **Live output:** [kobyal.github.io/ai-news-briefing](https://kobyal.github.io/ai-news-briefing)
 
@@ -20,6 +20,10 @@ python run_all.py
 
 # fastest path if JSON already exists
 python run_all.py --merge-only
+
+# skip core agents selectively (optional):
+# python run_all.py --skip-adk --skip-social
+# note: feeders (Exa/NewsAPI/YouTube/GitHub/xAI/ArticleReader) auto-run; they no-op if their API key is missing
 ```
 
 ### Required environment
@@ -35,6 +39,7 @@ Export only the keys you need for the pipelines you run:
 | `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` / `REDDIT_USERNAME` / `REDDIT_PASSWORD` | Social | Reddit JSON API |
 | `YOUTUBE_API_KEY` | youtube-news-agent | optional |
 | `FIRECRAWL_API_KEY`, `EXA_API_KEY`, `NEWSAPI_KEY`, `XAI_API_KEY` | optional agents | see workflow |
+| `GITHUB_TOKEN` | github-trending-agent | optional (lifts rate limits) |
 
 `LOOKBACK_DAYS` (default 3) controls how far back each agent searches.
 
@@ -173,10 +178,16 @@ flowchart LR
 | **Merger** | Dedup + merge | Claude Sonnet 4.6 | Perplexity Agent API | Strongest reasoning to merge 5 sources correctly |
 | **Merger** | Hebrew translation | Claude Haiku 4.5 | Perplexity Agent API | Translation is mechanical; lower cost |
 
-**Cost per full run:** ~$0.17 + ~$0.03 + ~$0.04 + ~$0.25 + ~$0.18 ≈ **~$0.67 total** (ADK is free)
-**Time per full run:** ~4 min wall clock (all 5 agents run in parallel, merger ~3 min after)
+**Core run cost:** ~$0.17 + ~$0.03 + ~$0.04 + ~$0.25 + ~$0.18 ≈ **~$0.67** (ADK is free)
+**Core run time:** ~4 min wall clock (5 core agents in parallel; merger ~3 min after)
+**Optional feeders:** mostly free (YouTube, GitHub Trending, NewsAPI), Exa billed per search, xAI Twitter billed via Grok API. Article Reader fetches full text only (no LLM cost).
 
 ---
+
+## Agents
+
+- **Core (5):** ADK, Perplexity, RSS, Tavily, Social.
+- **Feeders/enrichers (6):** Article Reader (full-text cache), Exa (semantic search), NewsAPI (structured wires), YouTube (high-signal videos), GitHub Trending (repos + releases), xAI Twitter (Grok live X search).
 
 ## Pipelines
 
@@ -388,6 +399,70 @@ flowchart LR
 **Run:**
 ```bash
 cd merger-agent && python run.py
+```
+
+### 7. Article Reader Agent (`article-reader-agent/`)
+
+Fetches full article text for URLs surfaced by other agents + fresh Tavily/DuckDuckGo search. Saves enriched text for the merger to produce denser summaries.
+
+**Inputs:** URLs from latest ADK/Perplexity/RSS/Tavily runs + Tavily search (requires `TAVILY_API_KEY` or `TAVILY_API_KEY2`).
+
+**Run:**
+```bash
+cd article-reader-agent && python run.py
+```
+
+### 8. Exa News Agent (`exa-news-agent/`)
+
+Semantic search via Exa.ai to surface niche/technical AI stories that keyword search misses.
+
+**Key:** `EXA_API_KEY`
+
+**Run:**
+```bash
+cd exa-news-agent && python run.py
+```
+
+### 9. NewsAPI Agent (`newsapi-agent/`)
+
+Structured news from 150k+ sources; reliable dates and metadata.
+
+**Key:** `NEWSAPI_KEY`
+
+**Run:**
+```bash
+cd newsapi-agent && python run.py
+```
+
+### 10. YouTube News Agent (`youtube-news-agent/`)
+
+Pulls high-engagement AI videos from curated channels + keyword search. No LLM cost; filters by views.
+
+**Key:** `YOUTUBE_API_KEY` (or `GOOGLE_API_KEY`)
+
+**Run:**
+```bash
+cd youtube-news-agent && python run.py
+```
+
+### 11. GitHub Trending Agent (`github-trending-agent/`)
+
+Tracks trending AI repos and fresh releases from major projects (LangChain, vLLM, Ollama, etc.). Optional `GITHUB_TOKEN` lifts rate limits.
+
+**Run:**
+```bash
+cd github-trending-agent && python run.py
+```
+
+### 12. xAI Twitter Agent (`xai-twitter-agent/`)
+
+Uses Grok (with live X search) to pull real tweets from 15 tracked AI leaders + viral posts + community debates.
+
+**Key:** `XAI_API_KEY` (skips silently if missing)
+
+**Run:**
+```bash
+cd xai-twitter-agent && python run.py
 ```
 
 ---

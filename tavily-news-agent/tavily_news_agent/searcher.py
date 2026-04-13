@@ -21,19 +21,8 @@ class Article:
     source: str = ""   # "tavily" | "ddg"
 
 
-VENDOR_QUERIES = [
-    ("Anthropic",    ["Anthropic Claude AI news latest release",        "Claude API update announcement"]),
-    ("OpenAI",       ["OpenAI ChatGPT GPT news latest",                 "OpenAI model release announcement"]),
-    ("Google",       ["Google Gemini DeepMind AI news latest",          "Google AI model release announcement"]),
-    ("AWS",          ["Amazon Bedrock AWS AI news latest",              "Amazon Nova AI announcement"]),
-    ("Azure",        ["Microsoft Azure OpenAI Copilot news latest",     "Microsoft AI Foundry announcement"]),
-    ("Meta",         ["Meta Llama AI news latest release",              "Meta AI announcement"]),
-    ("xAI",          ["xAI Grok model news latest",                     "Elon Musk Grok AI release"]),
-    ("NVIDIA",       ["NVIDIA AI model NIM inference news latest",      "NVIDIA GPU AI announcement"]),
-    ("Mistral",      ["Mistral AI model release news latest",           "Mistral open source LLM"]),
-    ("Apple",        ["Apple Intelligence Siri AI news latest",         "Apple on-device AI announcement"]),
-    ("Hugging Face", ["Hugging Face model release news latest",         "HuggingFace open source AI"]),
-]
+import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+from shared.vendors import VENDOR_QUERIES
 
 LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 

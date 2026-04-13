@@ -14,38 +14,14 @@ import requests
 _TODAY = lambda: datetime.now().strftime("%B %d, %Y")
 _LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 
-SEARCH_QUERIES = [
-    "artificial intelligence",
-    "OpenAI ChatGPT GPT",
-    "Anthropic Claude AI",
-    "Google Gemini DeepMind",
-    "Meta Llama AI",
-    "Microsoft Copilot Azure AI",
-    "NVIDIA AI GPU",
-    "AI startup funding",
-]
+import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+from shared.vendors import VENDOR_QUERIES, classify_vendor as _classify_vendor_single
 
-_VENDOR_MAP = {
-    "anthropic": "Anthropic", "claude": "Anthropic",
-    "openai": "OpenAI", "chatgpt": "OpenAI", "gpt-4": "OpenAI", "gpt-5": "OpenAI",
-    "google": "Google", "gemini": "Google", "deepmind": "Google",
-    "aws": "AWS", "bedrock": "AWS", "amazon": "AWS",
-    "microsoft": "Azure", "azure": "Azure", "copilot": "Azure",
-    "meta": "Meta", "llama": "Meta",
-    "xai": "xAI", "grok": "xAI",
-    "nvidia": "NVIDIA",
-    "mistral": "Mistral",
-    "apple intelligence": "Apple", "siri": "Apple",
-    "hugging face": "Hugging Face", "huggingface": "Hugging Face",
-}
+SEARCH_QUERIES = [q for _, qs in VENDOR_QUERIES for q in qs[:1]] + ["AI startup funding"]
 
 
 def _classify_vendor(title: str, desc: str) -> str:
-    combined = (title + " " + desc).lower()
-    for keyword, vendor in _VENDOR_MAP.items():
-        if keyword in combined:
-            return vendor
-    return "Other"
+    return _classify_vendor_single(title + " " + desc)
 
 
 def _format_date(raw: str) -> str:

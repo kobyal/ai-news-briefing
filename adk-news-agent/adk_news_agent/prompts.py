@@ -2,22 +2,19 @@
 
 Placeholders replaced at module load: {today}, {month_year}, {lookback_days}
 """
+import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+from shared.vendors import VENDOR_QUERIES, VENDOR_ENUM
 
-VENDOR_RESEARCHER_PROMPT = """\
-Today is {today}. You are a senior AI industry analyst covering the last {lookback_days} day(s).
+_search_lines = "\n".join(
+    f"{i+1}. {queries[0]} {{month_year}}"
+    for i, (_, queries) in enumerate(VENDOR_QUERIES)
+)
 
-Run exactly 11 searches — one per vendor. Use broad queries WITHOUT a specific date:
-1. Anthropic Claude latest news {month_year}
-2. AWS Bedrock latest announcement {month_year}
-3. OpenAI latest release {month_year}
-4. Google Gemini AI latest update {month_year}
-5. Microsoft Azure OpenAI latest announcement {month_year}
-6. Meta Llama AI latest news {month_year}
-7. xAI Grok latest release {month_year}
-8. NVIDIA AI models latest announcement {month_year}
-9. Mistral AI latest model release {month_year}
-10. Apple Intelligence Siri AI latest update {month_year}
-11. Hugging Face new models open source {month_year}
+VENDOR_RESEARCHER_PROMPT = f"""\
+Today is {{today}}. You are a senior AI industry analyst covering the last {{lookback_days}} day(s).
+
+Run exactly {len(VENDOR_QUERIES)} searches — one per vendor. Use broad queries WITHOUT a specific date:
+{_search_lines}
 
 For each vendor, pick the MOST RECENT story you find. Prefer stories from the last \
 {lookback_days} day(s), but if nothing was published that recently, include the latest \
@@ -173,7 +170,7 @@ Write a structured briefing. Follow the JSON schema exactly. Guidelines:
 1. tldr: 5-6 bullets covering the most important stories. Each names the vendor + what happened + why it matters (15-25 words each).
 
 2. news_items: 8-11 items. Include ALL vendors that had news (do not skip any). For each:
-   - vendor: one of "Anthropic", "AWS", "OpenAI", "Google", "Azure", "Meta", "xAI", "NVIDIA", "Mistral", "Apple", "Hugging Face", or "Other"
+   - vendor: one of {VENDOR_ENUM}
    - headline: specific and descriptive (not generic like "New update released")
    - published_date: exact date from the source, e.g. "March 22, 2026". If unknown write "Date unknown".
    - summary: 2-3 sentences with concrete details — model names, capabilities, dates, numbers

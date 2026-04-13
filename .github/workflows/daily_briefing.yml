@@ -87,6 +87,23 @@ jobs:
           git pull --rebase -X ours
           git push
 
+      - name: Trigger Lambda ingest to DynamoDB
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          pip install -q boto3
+          python3 -c "
+          import boto3, json
+          from datetime import datetime
+          date = datetime.utcnow().strftime('%Y-%m-%d')
+          client = boto3.client('lambda', region_name='us-east-1')
+          resp = client.invoke(FunctionName='ai-news-ingest', Payload=json.dumps({'date': date}))
+          result = json.loads(resp['Payload'].read())
+          print(f'Ingest result: {result}')
+          "
+
       - name: Send email
         env:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}

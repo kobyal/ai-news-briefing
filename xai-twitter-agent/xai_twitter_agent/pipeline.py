@@ -49,57 +49,66 @@ def _get_api_key() -> str:
 def _grok_search(prompt: str, label: str = "") -> str:
     """Call Grok API with live search enabled.
 
-    Uses the /v1/chat/completions endpoint with search tool to get
-    real-time X/Twitter data instead of hallucinated training data.
+    Tries search parameter first, falls back to plain chat if not supported.
     """
     api_key = _get_api_key()
     if not api_key:
         return ""
 
     t0 = time.time()
-    try:
-        resp = requests.post(
-            "https://api.x.ai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
+    # Try with search enabled first
+    for attempt, use_search in enumerate([True, False]):
+        try:
+            payload = {
                 "model": "grok-3-mini",
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 2000,
+                "max_tokens": 3000,
                 "temperature": 0.2,
-                "search": {
-                    "mode": "auto",
-                    "sources": [{"type": "x"}],
-                },
-            },
-            timeout=60,
-        )
-        if not resp.ok:
-            error = resp.text[:150]
-            elapsed = time.time() - t0
-            print(f"    ✗  {label:<35} {elapsed:4.1f}s  HTTP {resp.status_code}: {error}")
-            return ""
+            }
+            if use_search:
+                payload["search"] = {"mode": "on", "sources": [{"type": "x"}]}
 
-        data = resp.json()
-        text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-        elapsed = time.time() - t0
-        print(f"    ✓  {label:<35} {elapsed:4.1f}s")
-        return text
-    except Exception as e:
-        elapsed = time.time() - t0
-        print(f"    ✗  {label:<35} {elapsed:4.1f}s  error: {str(e)[:80]}")
-        return ""
+            resp = requests.post(
+                "https://api.x.ai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=60,
+            )
+            if not resp.ok:
+                if attempt == 0 and resp.status_code in (400, 422):
+                    # Search parameter not supported, try without
+                    print(f"    ⟳  {label}: search param not supported, retrying without...")
+                    continue
+                error = resp.text[:150]
+                elapsed = time.time() - t0
+                print(f"    ✗  {label:<35} {elapsed:4.1f}s  HTTP {resp.status_code}: {error}")
+                return ""
+
+            data = resp.json()
+            text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            elapsed = time.time() - t0
+            search_tag = " [search]" if use_search else " [no-search]"
+            print(f"    ✓  {label:<35} {elapsed:4.1f}s{search_tag}")
+            return text
+        except Exception as e:
+            if attempt == 0:
+                continue
+            elapsed = time.time() - t0
+            print(f"    ✗  {label:<35} {elapsed:4.1f}s  error: {str(e)[:80]}")
+            return ""
+    return ""
 
 
 def _validate_date(date_str: str) -> bool:
-    """Reject dates outside the lookback window."""
-    if not date_str:
-        return False
-    # Must contain 2026 (current year)
-    if "2026" not in date_str and "2025" not in date_str:
-        return False
+    """Reject dates clearly outside the lookback window. Accept missing/vague dates."""
+    if not date_str or date_str.lower() in ("unknown", "n/a", "recent"):
+        return True  # Missing date is OK — don't filter aggressively
+    # Reject if clearly from wrong year
+    if re.search(r'20[0-2][0-4]', date_str):
+        return False  # 2020-2024 dates = hallucinated
     # Try to parse and check within lookback
     try:
         for fmt in ["%B %d, %Y", "%Y-%m-%d", "%B %d %Y"]:

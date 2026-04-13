@@ -2,8 +2,8 @@
 
 Steps:
 1. Search  — Tavily news search for 11 vendors concurrently (deterministic)
-2. Write   — Claude Sonnet via Perplexity API synthesises into structured JSON
-3. Translate — Claude Haiku via Perplexity API translates to Hebrew
+2. Write   — Claude Sonnet via Anthropic API synthesises into structured JSON
+3. Translate — Claude Haiku via Anthropic API translates to Hebrew
 4. Publish — save HTML + JSON
 """
 import json
@@ -11,60 +11,65 @@ import os
 import time
 from datetime import datetime
 
-import requests
+import anthropic
 
 from .searcher import fetch_all_vendor_news, Article
 from .tools import build_and_save_html, _parse
 
 _LOOKBACK_DAYS    = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 _TODAY            = lambda: datetime.now().strftime("%B %d, %Y")
-_API_KEY          = lambda: os.environ.get("PERPLEXITY_API_KEY", "")
-_WRITER_MODEL     = lambda: os.environ.get("TAVILY_WRITER_MODEL",     "anthropic/claude-sonnet-4-6")
-_TRANSLATOR_MODEL = lambda: os.environ.get("TAVILY_TRANSLATOR_MODEL", "anthropic/claude-haiku-4-5")
-_BASE_URL         = "https://api.perplexity.ai"
+_API_KEY          = lambda: os.environ.get("ANTHROPIC_API_KEY", "")
+_WRITER_MODEL     = lambda: os.environ.get("TAVILY_WRITER_MODEL",     "claude-sonnet-4-20250514")
+_TRANSLATOR_MODEL = lambda: os.environ.get("TAVILY_TRANSLATOR_MODEL", "claude-haiku-4-5-20251001")
 
 
 def _llm(prompt: str, *, model: str, json_mode: bool = False, label: str = "") -> str:
-    """Single Perplexity Agent API call, no web_search tool (pure LLM)."""
+    """Single Anthropic messages.create() call."""
     if not _API_KEY():
-        raise RuntimeError("PERPLEXITY_API_KEY not set")
+        raise RuntimeError("ANTHROPIC_API_KEY not set — add it to .env or GitHub secrets")
 
-    payload: dict = {"model": model, "input": prompt, "max_steps": 1}
-    if json_mode:
-        payload["text"] = {"format": {"type": "json_object"}}
+    client = anthropic.Anthropic(api_key=_API_KEY())
 
     t0 = time.time()
-    _RETRYABLE = {429, 500, 502, 503}
     _RETRY_DELAYS = [5, 15, 30]
+
     resp = None
     for _attempt in range(len(_RETRY_DELAYS) + 1):
-        resp = requests.post(
-            f"{_BASE_URL}/v1/responses",
-            headers={"Authorization": f"Bearer {_API_KEY()}", "Content-Type": "application/json"},
-            json=payload,
-            timeout=120,
-        )
-        if resp.ok:
+        try:
+            resp = client.messages.create(
+                model=model,
+                max_tokens=16384,
+                system="You are a helpful assistant. Return only the requested output.",
+                messages=[{"role": "user", "content": prompt}],
+                timeout=180,
+            )
             break
-        if resp.status_code in _RETRYABLE and _attempt < len(_RETRY_DELAYS):
-            delay = _RETRY_DELAYS[_attempt]
-            print(f"    ⟳  [{label}] Perplexity API {resp.status_code} — retrying in {delay}s (attempt {_attempt + 1}/{len(_RETRY_DELAYS)})...")
-            time.sleep(delay)
-            continue
-        raise RuntimeError(f"[{label}] Perplexity API {resp.status_code}: {resp.text[:400]}")
+        except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+            status = getattr(e, 'status_code', 0)
+            if status in {429, 500, 502, 503, 529} and _attempt < len(_RETRY_DELAYS):
+                delay = _RETRY_DELAYS[_attempt]
+                print(f"    ⟳  [{label}] Anthropic API {status} — retrying in {delay}s (attempt {_attempt + 1}/{len(_RETRY_DELAYS)})...")
+                time.sleep(delay)
+                continue
+            raise RuntimeError(f"[{label}] Anthropic API error: {e}")
 
-    data    = resp.json()
     elapsed = time.time() - t0
-    text = ""
-    for item in data.get("output", []):
-        if item.get("type") == "message":
-            for part in item.get("content", []):
-                if part.get("type") == "output_text":
-                    text += part.get("text", "")
+    text = resp.content[0].text if resp and resp.content else ""
+    stop = resp.stop_reason if resp else "unknown"
 
-    cost_info = data.get("usage", {}).get("cost", {})
-    cost_str  = f"  ${cost_info.get('total_cost', 0):.4f}" if cost_info else ""
-    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={data.get('model', model)}{cost_str}")
+    usage = resp.usage if resp else None
+    tokens = f"  in={usage.input_tokens} out={usage.output_tokens}" if usage else ""
+    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model}{tokens}  stop={stop}")
+
+    if stop == "max_tokens":
+        print(f"    ⚠  [{label}] Response truncated (max_tokens) — output may be incomplete")
+
+    # Validate JSON output if json_mode was requested
+    if json_mode and text:
+        stripped = text.strip()
+        if not (stripped.startswith("{") or stripped.startswith("[")):
+            print(f"    ⚠  [{label}] Expected JSON but got: {repr(stripped[:80])}")
+
     return text
 
 

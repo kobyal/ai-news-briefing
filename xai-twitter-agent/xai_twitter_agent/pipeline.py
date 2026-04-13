@@ -26,24 +26,14 @@ _LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 TRACKED_HANDLES = [
     {"name": "Sam Altman", "handle": "sama", "org": "OpenAI", "role": "CEO"},
     {"name": "Dario Amodei", "handle": "DarioAmodei", "org": "Anthropic", "role": "CEO"},
-    {"name": "Elon Musk", "handle": "elonmusk", "org": "xAI", "role": "CEO"},
     {"name": "Andrej Karpathy", "handle": "karpathy", "org": "Independent", "role": "AI educator"},
     {"name": "Yann LeCun", "handle": "ylecun", "org": "Meta", "role": "Chief AI Scientist"},
-    {"name": "Demis Hassabis", "handle": "demishassabis", "org": "Google DeepMind", "role": "CEO"},
-    {"name": "Jim Fan", "handle": "DrJimFan", "org": "NVIDIA", "role": "Senior Research Manager"},
-    {"name": "Simon Willison", "handle": "simonw", "org": "Independent", "role": "LLM tools developer"},
-    {"name": "Gary Marcus", "handle": "GaryMarcus", "org": "Independent", "role": "AI critic"},
-    {"name": "Ethan Mollick", "handle": "emollick", "org": "Wharton", "role": "AI researcher"},
-    {"name": "Swyx", "handle": "swyx", "org": "Independent", "role": "AI builder / writer"},
-    {"name": "Harrison Chase", "handle": "hwchase17", "org": "LangChain", "role": "CEO"},
-    {"name": "Logan Kilpatrick", "handle": "OfficialLoganK", "org": "Google", "role": "Product Lead"},
-    {"name": "Greg Brockman", "handle": "gdb", "org": "OpenAI", "role": "President"},
-    {"name": "Jack Clark", "handle": "jackclarkSF", "org": "Anthropic", "role": "Co-founder"},
     {"name": "Boris Cherny", "handle": "bcherny", "org": "Anthropic", "role": "Claude Code lead"},
-    {"name": "Alex Albert", "handle": "alexalbert__", "org": "Anthropic", "role": "Prompt engineering"},
-    {"name": "Guillermo Rauch", "handle": "raaborning", "org": "Vercel", "role": "CEO"},
-    {"name": "Aravind Srinivas", "handle": "AravSrinivas", "org": "Perplexity", "role": "CEO"},
-    {"name": "Arthur Mensch", "handle": "arthurmensch", "org": "Mistral", "role": "CEO"},
+    {"name": "Simon Willison", "handle": "simonw", "org": "Independent", "role": "LLM tools developer"},
+    {"name": "Jim Fan", "handle": "DrJimFan", "org": "NVIDIA", "role": "Senior Research Manager"},
+    {"name": "Demis Hassabis", "handle": "demishassabis", "org": "Google DeepMind", "role": "CEO"},
+    {"name": "Ethan Mollick", "handle": "emollick", "org": "Wharton", "role": "AI researcher"},
+    {"name": "Jack Clark", "handle": "jackclarkSF", "org": "Anthropic", "role": "Co-founder"},
 ]
 
 
@@ -146,6 +136,22 @@ def _validate_engagement(engagement: str) -> bool:
     return True
 
 
+def _validate_url(url: str) -> str:
+    """Validate a tweet URL via HEAD request. Return the URL if valid, empty string otherwise."""
+    if not url:
+        return ""
+    # Must be from x.com or twitter.com
+    if not re.match(r"https?://(www\.)?(x\.com|twitter\.com)/", url):
+        return ""
+    try:
+        resp = requests.head(url, timeout=5, allow_redirects=True)
+        if resp.status_code in (403, 404):
+            return ""
+        return url
+    except Exception:
+        return ""
+
+
 def _fetch_people(api_key: str) -> list[dict]:
     """Find recent tweets from tracked AI leaders."""
     days = _LOOKBACK_DAYS()
@@ -185,6 +191,8 @@ def _fetch_people(api_key: str) -> list[dict]:
             if not _validate_engagement(data.get("engagement", "")):
                 print(f"      ⚠ @{handle}: rejected — suspicious engagement numbers")
                 return None
+            # Validate URL
+            data["url"] = _validate_url(data.get("url", ""))
             data["name"] = name
             data["handle"] = handle
             data["org"] = person["org"]
@@ -245,6 +253,7 @@ def _fetch_trending(api_key: str) -> list[dict]:
                 continue
             if not _validate_engagement(d.get("engagement", "")):
                 continue
+            d["url"] = _validate_url(d.get("url", ""))
             valid.append(d)
         print(f"  → {len(valid)}/{len(data)} trending posts passed validation")
         return valid

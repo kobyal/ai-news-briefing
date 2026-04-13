@@ -13,15 +13,14 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-import requests
+import anthropic
 
 from .feeds import fetch_all, VENDOR_KEYWORDS
 from .tools import build_and_save_html, _parse
 
-_API_KEY   = lambda: os.environ.get("PERPLEXITY_API_KEY", "")
-_BASE_URL  = "https://api.perplexity.ai"
-_WRITER_MODEL     = lambda: os.environ.get("RSS_WRITER_MODEL",     "anthropic/claude-haiku-4-5")
-_TRANSLATOR_MODEL = lambda: os.environ.get("RSS_TRANSLATOR_MODEL", "anthropic/claude-haiku-4-5")
+_API_KEY   = lambda: os.environ.get("ANTHROPIC_API_KEY", "")
+_WRITER_MODEL     = lambda: os.environ.get("RSS_WRITER_MODEL",     "claude-haiku-4-5-20251001")
+_TRANSLATOR_MODEL = lambda: os.environ.get("RSS_TRANSLATOR_MODEL", "claude-haiku-4-5-20251001")
 _LOOKBACK_DAYS    = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 _TODAY            = lambda: datetime.now().strftime("%B %d, %Y")
 
@@ -29,43 +28,57 @@ _ROOT = Path(__file__).parent.parent.parent
 
 
 # ---------------------------------------------------------------------------
-# LLM call (same pattern as other pipelines)
+# LLM call — direct Anthropic API (same pattern as merger agent)
 # ---------------------------------------------------------------------------
 
 def _agent(input_text: str, *, model: str, instructions: str = None,
            json_mode: bool = False, label: str = "") -> str:
     if not _API_KEY():
-        raise RuntimeError("PERPLEXITY_API_KEY not set")
+        raise RuntimeError("ANTHROPIC_API_KEY not set — add it to .env or GitHub secrets")
 
-    payload = {"model": model, "input": input_text, "max_steps": 1}
-    if instructions:
-        payload["instructions"] = instructions
-    if json_mode:
-        payload["text"] = {"format": {"type": "json_object"}}
+    client = anthropic.Anthropic(api_key=_API_KEY())
+    system_prompt = instructions or "You are a helpful assistant. Return only the requested output."
 
     t0 = time.time()
-    resp = requests.post(
-        f"{_BASE_URL}/v1/responses",
-        headers={"Authorization": f"Bearer {_API_KEY()}", "Content-Type": "application/json"},
-        json=payload,
-        timeout=120,
-    )
-    if not resp.ok:
-        raise RuntimeError(f"[{label}] API {resp.status_code}: {resp.text[:300]}")
+    _RETRY_DELAYS = [5, 15, 30]
 
-    data = resp.json()
+    resp = None
+    for _attempt in range(len(_RETRY_DELAYS) + 1):
+        try:
+            resp = client.messages.create(
+                model=model,
+                max_tokens=16384,
+                system=system_prompt,
+                messages=[{"role": "user", "content": input_text}],
+                timeout=120,
+            )
+            break
+        except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+            status = getattr(e, 'status_code', 0)
+            if status in {429, 500, 502, 503, 529} and _attempt < len(_RETRY_DELAYS):
+                delay = _RETRY_DELAYS[_attempt]
+                print(f"    ⟳  [{label}] Anthropic API {status} — retrying in {delay}s (attempt {_attempt + 1}/{len(_RETRY_DELAYS)})...")
+                time.sleep(delay)
+                continue
+            raise RuntimeError(f"[{label}] Anthropic API error: {e}")
+
     elapsed = time.time() - t0
+    text = resp.content[0].text if resp and resp.content else ""
+    stop = resp.stop_reason if resp else "unknown"
 
-    text = ""
-    for item in data.get("output", []):
-        if item.get("type") == "message":
-            for part in item.get("content", []):
-                if part.get("type") == "output_text":
-                    text += part.get("text", "")
+    usage = resp.usage if resp else None
+    tokens = f"  in={usage.input_tokens} out={usage.output_tokens}" if usage else ""
+    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model}{tokens}  stop={stop}")
 
-    cost_info = data.get("usage", {}).get("cost", {})
-    cost_str  = f"  ${cost_info.get('total_cost', 0):.4f}" if cost_info else ""
-    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={data.get('model', model)}{cost_str}")
+    if stop == "max_tokens":
+        print(f"    ⚠  [{label}] Response truncated (max_tokens) — output may be incomplete")
+
+    # Validate JSON output if json_mode was requested
+    if json_mode and text:
+        stripped = text.strip()
+        if not (stripped.startswith("{") or stripped.startswith("[")):
+            print(f"    ⚠  [{label}] Expected JSON but got: {repr(stripped[:80])}")
+
     return text
 
 

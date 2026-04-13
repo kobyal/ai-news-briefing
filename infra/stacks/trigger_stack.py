@@ -24,7 +24,7 @@ class TriggerStack(Stack):
             timeout=Duration.seconds(30),
             memory_size=128,
             environment={
-                "GITHUB_PAT": "REPLACE_ME",  # set manually or via SSM
+                "GITHUB_PAT": "REPLACE_AFTER_DEPLOY",  # set via CLI post-deploy
             },
         )
 

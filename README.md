@@ -715,10 +715,17 @@ pip install -r requirements.txt
 cdk deploy --all
 ```
 
-### EventBridge schedule (Israel time)
+### EventBridge schedule (single daily run)
 
-| Time | Lambda | Purpose |
-|------|--------|---------|
-| 03:00 (00:00 UTC) | `ai-news-trigger` | Kick off GitHub Actions pipeline |
-| 07:00 (04:00 UTC) | `ai-news-ingest` | Ingest morning run to DynamoDB |
-| 16:00 (13:00 UTC) | `ai-news-ingest` | Ingest afternoon run to DynamoDB |
+| Israel Time | UTC | Lambda | Purpose |
+|-------------|-----|--------|---------|
+| 06:00 | 03:00 | `ai-news-trigger` | Kick off GitHub Actions pipeline (budget mode by default) |
+| 06:20 | 03:20 | `ai-news-ingest` | Ingest to DynamoDB after pipeline completes |
+
+### GitHub Actions workflow modes
+
+| Mode | What runs | Cost per run |
+|------|-----------|-------------|
+| `budget` (default) | All agents except xAI | ~$1.44 |
+| `all` | Everything including xAI | ~$2.39 |
+| `merge-only` | Just the merger | ~$0.10 |

@@ -31,7 +31,8 @@ Produce ONE merged briefing as a JSON object. Rules:
    - Keep ONE story, not duplicates
    - Merge the summaries into a richer, more complete paragraph (best details from all sources)
    - Combine ALL source URLs from all versions (deduplicated)
-   - Use the most specific/accurate published_date
+   - published_date: use the LATEST date among the merged sources (not the earliest)
+   - Be aggressive: two stories about the same vendor and same product/feature MUST be merged even if headlines differ slightly
 
 2. UNIQUE STORIES — if a story appears in only one source, include it as-is. Do not discard niche or technical stories.
 

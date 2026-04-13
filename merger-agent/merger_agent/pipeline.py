@@ -20,7 +20,7 @@ from pathlib import Path
 
 import anthropic
 
-from .prompts import MERGER_PROMPT, TRANSLATOR_PROMPT
+from .prompts import MERGER_PROMPT, TRANSLATOR_PROMPT, VENDOR_ENUM
 from .schemas import BriefingContent, HebrewBriefing
 from .tools import build_and_save_html, _parse
 
@@ -284,6 +284,7 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
     prompt = prompt.replace("{social_briefing}", json.dumps(social_briefing, ensure_ascii=False, indent=2))
     prompt = prompt.replace("{enriched_articles}", enriched_context)
     prompt = prompt.replace("{extra_sources}", extra_context)
+    prompt = prompt.replace("{vendor_enum}", VENDOR_ENUM)
     return _agent(
         input_text=f"{prompt}\n\nJSON SCHEMA:\n{schema_desc}",
         model=_WRITER_MODEL(),

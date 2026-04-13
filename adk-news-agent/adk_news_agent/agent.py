@@ -63,10 +63,12 @@ _lookback_days = int(os.environ.get("LOOKBACK_DAYS", "3"))
 
 
 def _fmt(template: str) -> str:
+    from shared.vendors import VENDOR_ENUM
     return (template
             .replace("{today}", _today)
             .replace("{month_year}", _month_year)
-            .replace("{lookback_days}", str(_lookback_days)))
+            .replace("{lookback_days}", str(_lookback_days))
+            .replace("{VENDOR_ENUM}", VENDOR_ENUM))
 
 
 # ---------------------------------------------------------------------------

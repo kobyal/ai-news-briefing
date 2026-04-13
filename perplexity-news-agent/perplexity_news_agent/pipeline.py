@@ -48,10 +48,12 @@ _MONTH_YEAR    = lambda: datetime.now().strftime("%B %Y")
 
 
 def _fmt(template: str) -> str:
+    from shared.vendors import VENDOR_ENUM
     return (template
             .replace("{today}", _TODAY())
             .replace("{month_year}", _MONTH_YEAR())
-            .replace("{lookback_days}", str(_LOOKBACK_DAYS())))
+            .replace("{lookback_days}", str(_LOOKBACK_DAYS()))
+            .replace("{VENDOR_ENUM}", VENDOR_ENUM))
 
 
 # ---------------------------------------------------------------------------

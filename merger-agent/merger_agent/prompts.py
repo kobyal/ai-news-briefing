@@ -32,13 +32,14 @@ Produce ONE merged briefing as a JSON object. Rules:
    - Merge the summaries into a richer, more complete paragraph (best details from all sources)
    - Combine ALL source URLs from all versions (deduplicated)
    - published_date: use the LATEST date among the merged sources (not the earliest)
-   - Be aggressive: two stories about the same vendor and same product/feature MUST be merged even if headlines differ slightly
+   - ONLY merge when stories describe the SAME specific announcement (e.g. two articles about "Bedrock Agent Registry launch").
+     Do NOT merge different announcements from the same vendor (e.g. "Agent Registry" and "Project Houdini" are separate stories even though both are AWS).
 
 2. UNIQUE STORIES — if a story appears in only one source, include it as-is. Do not discard niche or technical stories.
+   A vendor CAN and SHOULD have multiple stories if they made multiple distinct announcements.
 
 3. RANKING — PRIORITIZE FRESHNESS. Stories from today or yesterday should rank ABOVE older stories
-   even if the older story is "bigger" news. A 2-day old story should only appear if nothing newer
-   covers that vendor. Within the same day, order by importance/impact.
+   even if the older story is "bigger" news. Within the same day, order by importance/impact.
    Aim for breadth: include stories from different vendors where possible.
 
 4. tldr — write 8-10 bullets summarising the most important stories from the merged set.

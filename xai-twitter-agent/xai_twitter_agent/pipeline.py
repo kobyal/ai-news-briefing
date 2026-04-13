@@ -102,54 +102,24 @@ def _grok_search(prompt: str, label: str = "", handles: list[str] | None = None)
 
 
 def _validate_date(date_str: str) -> bool:
-    """Reject dates clearly outside the lookback window. Accept missing/vague dates."""
+    """Only reject dates clearly hallucinated (pre-2025). Accept everything else."""
     if not date_str or date_str.lower() in ("unknown", "n/a", "recent"):
-        return True  # Missing date is OK — don't filter aggressively
-    # Reject if clearly from wrong year
-    if re.search(r'20[0-2][0-4]', date_str):
-        return False  # 2020-2024 dates = hallucinated
-    # Try to parse and check within lookback
-    try:
-        for fmt in ["%B %d, %Y", "%Y-%m-%d", "%B %d %Y"]:
-            try:
-                dt = datetime.strptime(date_str.strip(), fmt)
-                cutoff = datetime.now() - timedelta(days=_LOOKBACK_DAYS() + 1)
-                return dt >= cutoff
-            except ValueError:
-                continue
-    except Exception:
-        pass
-    # If contains April 2026 or similar, accept
-    return "April" in date_str and "2026" in date_str
-
-
-def _validate_engagement(engagement: str) -> bool:
-    """Reject suspiciously fake engagement numbers."""
-    if not engagement:
         return True
-    # Reject if ALL numbers are exact multiples of 10K+ (too perfect)
-    nums = re.findall(r'(\d+)[KMB]', engagement)
-    if len(nums) >= 3:
-        int_nums = [int(n) for n in nums]
-        if all(n % 10 == 0 for n in int_nums) and all(n >= 10 for n in int_nums):
-            return False
+    # Only reject obviously old dates (2024 and earlier)
+    if re.search(r'20[0-1]\d|202[0-4]', date_str) and "2025" not in date_str and "2026" not in date_str:
+        return False
     return True
 
 
-def _validate_url(url: str) -> str:
-    """Validate a tweet URL via HEAD request. Return the URL if valid, empty string otherwise."""
-    if not url:
-        return ""
-    # Must be from x.com or twitter.com
-    if not re.match(r"https?://(www\.)?(x\.com|twitter\.com)/", url):
-        return ""
-    try:
-        resp = requests.head(url, timeout=5, allow_redirects=True)
-        if resp.status_code in (403, 404):
-            return ""
-        return url
-    except Exception:
-        return ""
+def _ensure_url(url: str, handle: str) -> str:
+    """Ensure we have a usable URL. Keep Grok's URL if it looks like a tweet,
+    otherwise fall back to the user's profile."""
+    if url and re.match(r"https?://(www\.)?(x\.com|twitter\.com)/\w+/status/\d+", url):
+        return url  # Looks like a real tweet URL — keep it
+    if url and re.match(r"https?://(www\.)?(x\.com|twitter\.com)/", url):
+        return url  # Some other x.com URL — keep it
+    # Fallback to profile
+    return f"https://x.com/{handle}" if handle else ""
 
 
 def _fetch_people(api_key: str) -> list[dict]:
@@ -183,16 +153,12 @@ def _fetch_people(api_key: str) -> list[dict]:
             data = json.loads(clean)
             if not data or not data.get("post") or len(data.get("post", "")) < 20:
                 return None
-            # Validate date
+            # Only reject clearly hallucinated dates
             if not _validate_date(data.get("date", "")):
-                print(f"      ⚠ @{handle}: rejected — date '{data.get('date')}' outside window")
+                print(f"      ⚠ @{handle}: rejected — date '{data.get('date')}' is pre-2025")
                 return None
-            # Validate engagement
-            if not _validate_engagement(data.get("engagement", "")):
-                print(f"      ⚠ @{handle}: rejected — suspicious engagement numbers")
-                return None
-            # Validate URL
-            data["url"] = _validate_url(data.get("url", ""))
+            # Ensure URL (keep Grok's if valid, fallback to profile)
+            data["url"] = _ensure_url(data.get("url", ""), handle)
             data["name"] = name
             data["handle"] = handle
             data["org"] = person["org"]
@@ -244,16 +210,15 @@ def _fetch_trending(api_key: str) -> list[dict]:
         data = json.loads(clean)
         if not isinstance(data, list):
             return []
-        # Validate each item
+        # Light validation — only reject empty posts and pre-2025 dates
         valid = []
         for d in data:
             if not d.get("post"):
                 continue
             if not _validate_date(d.get("date", "")):
                 continue
-            if not _validate_engagement(d.get("engagement", "")):
-                continue
-            d["url"] = _validate_url(d.get("url", ""))
+            author = d.get("author", "").lstrip("@")
+            d["url"] = _ensure_url(d.get("url", ""), author)
             valid.append(d)
         print(f"  → {len(valid)}/{len(data)} trending posts passed validation")
         return valid
@@ -300,35 +265,30 @@ def _oembed_validate(url: str) -> dict | None:
 
 
 def _validate_and_enrich(people: list[dict], trending: list[dict]) -> tuple[list[dict], list[dict]]:
-    """Validate all URLs from Grok via oembed. Strip invalid ones."""
-    valid_count = 0
-    stripped_count = 0
+    """Validate URLs via oembed. Keep all URLs but log which are verified."""
+    verified = 0
+    unverified = 0
 
-    # Validate people URLs
-    for person in people:
-        url = person.get("url", "")
-        if url:
+    all_items = [(p, p.get("handle", "")) for p in people] + [(t, t.get("author", "").lstrip("@")) for t in trending]
+
+    for item, handle in all_items:
+        url = item.get("url", "")
+        if not url:
+            # No URL at all — set profile fallback
+            if handle:
+                item["url"] = f"https://x.com/{handle}"
+            continue
+        if "/status/" in url:
             result = _oembed_validate(url)
             if result:
-                valid_count += 1
+                verified += 1
             else:
-                person["url"] = ""
-                stripped_count += 1
+                unverified += 1
+                # Keep the URL — it might still work in browser even if oembed rejects it
 
-    # Validate trending URLs
-    for post in trending:
-        url = post.get("url", "")
-        if url:
-            result = _oembed_validate(url)
-            if result:
-                valid_count += 1
-            else:
-                post["url"] = ""
-                stripped_count += 1
-
-    total = valid_count + stripped_count
+    total = verified + unverified
     if total:
-        print(f"  URL validation: {valid_count}/{total} valid, {stripped_count} stripped")
+        print(f"  URL validation: {verified}/{total} verified via oembed, {unverified} kept unverified")
     return people, trending
 
 

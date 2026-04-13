@@ -55,7 +55,24 @@ def lambda_handler(event, context):
 
     ttl = int((datetime.now(timezone.utc) + timedelta(days=90)).timestamp())
     ingested_at = datetime.now(timezone.utc).isoformat()
-    written = skipped = 0
+    written = deleted = 0
+
+    # Delete existing entries for this date before writing (clean re-run)
+    scan_kwargs = {
+        "FilterExpression": "SK = :sk",
+        "ExpressionAttributeValues": {":sk": f"date#{date_str}"},
+        "ProjectionExpression": "PK, SK",
+    }
+    while True:
+        scan_resp = table.scan(**scan_kwargs)
+        for old in scan_resp.get("Items", []):
+            table.delete_item(Key={"PK": old["PK"], "SK": old["SK"]})
+            deleted += 1
+        if "LastEvaluatedKey" not in scan_resp:
+            break
+        scan_kwargs["ExclusiveStartKey"] = scan_resp["LastEvaluatedKey"]
+    if deleted:
+        print(f"Cleared {deleted} existing entries for {date_str}")
 
     for idx, item in enumerate(news_items):
         urls = item.get("urls", [])
@@ -63,11 +80,6 @@ def lambda_handler(event, context):
         story_id = hashlib.sha256(primary.encode()).hexdigest()[:12]
         pk = f"story#{story_id}"
         sk = f"date#{date_str}"
-
-        existing = table.get_item(Key={"PK": pk, "SK": sk}).get("Item")
-        if existing:
-            skipped += 1
-            continue
 
         row = {
             "PK": pk, "SK": sk,
@@ -99,5 +111,5 @@ def lambda_handler(event, context):
     except Exception as e:
         print(f"Archive update failed: {e}")
 
-    print(f"Done: written={written} skipped={skipped}")
-    return {"date": date_str, "written": written, "skipped": skipped}
+    print(f"Done: deleted={deleted} written={written}")
+    return {"date": date_str, "deleted": deleted, "written": written}

@@ -12,10 +12,6 @@ on:
           - 'all'
           - 'merge-only'
           - 'budget'
-      skip_agents:
-        description: 'Agents to skip (comma-separated: xai,social,exa)'
-        required: false
-        default: ''
 
 jobs:
   briefing:
@@ -74,18 +70,13 @@ jobs:
           LOOKBACK_DAYS: 3
         run: |
           MODE="${{ inputs.mode || 'all' }}"
-          SKIP="${{ inputs.skip_agents }}"
-          CMD="python run_all.py"
           if [ "$MODE" = "merge-only" ]; then
-            CMD="$CMD --merge-only"
+            python run_all.py --merge-only
           elif [ "$MODE" = "budget" ]; then
-            CMD="$CMD --skip xai"
+            python run_all.py --skip xai
+          else
+            python run_all.py
           fi
-          if [ -n "$SKIP" ]; then
-            CMD="$CMD --skip $(echo $SKIP | tr ',' ' ')"
-          fi
-          echo "Running: $CMD"
-          $CMD
 
       - name: Copy latest merged output to docs/index.html (GitHub Pages)
         run: |

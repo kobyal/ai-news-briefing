@@ -267,9 +267,13 @@ def _build_html(tldr, news_items, community_pulse, topic,
         p for p in (social_data.get("people_highlights", []) or [])
         if p.get("post") and not any(b in p.get("post", "").lower() for b in _bad)
     ]
-    # DISABLED: xAI people data is hallucinated (no real X search via API)
-    # xai_people = xai_data.get("people", []) or []
-    # for xp in xai_people: ...
+    # Merge xAI Twitter people (now using real x_search data)
+    xai_people = xai_data.get("people", []) or []
+    existing_names = {p.get("name", "").lower() for p in people_highlights}
+    for xp in xai_people:
+        if xp.get("name", "").lower() not in existing_names and xp.get("post"):
+            people_highlights.append(xp)
+            existing_names.add(xp["name"].lower())
     people_cards_html = ""
     for idx, p in enumerate(people_highlights[:6]):
         name       = p.get("name", "")
@@ -447,15 +451,39 @@ def _build_html(tldr, news_items, community_pulse, topic,
     # ── xAI: Trending on AI Twitter ─────────────────────────────────────
     # DISABLED: Grok API hallucinates tweets — no real-time X search via API.
     # The search parameter is not supported. All trending data is fabricated.
-    # Re-enable when xAI adds proper search to their API.
+    # Re-enabled: now using correct Responses API with x_search tool
+    xai_trending = xai_data.get("trending", []) or []
     xai_trending_html = ""
-    xai_section_html = ""
+    for tp in xai_trending[:8]:
+        author = tp.get("author", "")
+        name = tp.get("name", "")
+        post = tp.get("post", "") or tp.get("tweet", "")
+        date = tp.get("date", "")
+        url = tp.get("url", "") or tp.get("tweet_url", "")
+        engagement = tp.get("engagement", "")
+        topic = tp.get("topic", "")
 
-    # Original code kept for reference:
-    # xai_trending = xai_data.get("trending", []) or []
-    # for tp in xai_trending[:8]:
-    #     ... (render trending posts)
-    # xai_section_html = f"""<div class="xt-card">..."""
+        topic_tag = f'<span class="pulse-vendor">{topic}</span>' if topic else ""
+        eng_html = f'<span class="xt-engagement">{engagement}</span>' if engagement else ""
+        link_html = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
+        xai_trending_html += (
+            f'<div class="xt-row">'
+            f'<div class="xt-icon">𝕏</div>'
+            f'<div class="xt-content">'
+            f'<div class="xt-author">{name} <span class="xt-handle">{author}</span></div>'
+            f'<p class="xt-post">"{post}"</p>'
+            f'<div class="xt-meta">{eng_html}{" · " + date if date else ""} {topic_tag}</div>'
+            f'{link_html}'
+            f'</div>'
+            f'</div>'
+        )
+
+    xai_section_html = ""
+    if xai_trending_html:
+        xai_section_html = f"""<div class="xt-card">
+<div class="section-label" style="margin-top:0" id="xai-label">🐦 Trending on AI Twitter</div>
+{xai_trending_html}
+</div>"""
 
     # Today's date string for "NEW" badge comparison
     today_str = now.strftime("%B %d, %Y")  # e.g. "April 11, 2026"
@@ -658,7 +686,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <div class="header">
 <h1>⚡ {topic} Combined Briefing</h1>
 <div class="date">{date_display}</div>
-<div class="sources-badge">Merged from <b>10 AI agents</b> · ADK · Perplexity · RSS · Tavily · Social · Exa · NewsAPI · YouTube · GitHub · Article Reader</div>
+<div class="sources-badge">Merged from <b>11 AI agents</b> · ADK · Perplexity · RSS · Tavily · Social · Exa · NewsAPI · YouTube · GitHub · Grok/X · Article Reader</div>
 <div class="toggle">
 <button class="tbtn active" onclick="setLang('en',this)">EN</button>
 <button class="tbtn" onclick="setLang('he',this)">עברית</button>

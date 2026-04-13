@@ -1,10 +1,7 @@
 name: Daily AI Briefing
 
 on:
-  schedule:
-    - cron: '12 3 * * *'   # ~6:12am Israel time (UTC+3 summer)
-    - cron: '12 15 * * *'  # ~6:12pm Israel time (UTC+3 summer)
-  workflow_dispatch:        # manual trigger from GitHub UI
+  workflow_dispatch:        # triggered by EventBridge → ai-news-trigger Lambda
 
 jobs:
   briefing:
@@ -86,23 +83,6 @@ jobs:
           git diff --staged --quiet || git commit -m "briefing: $(date +'%Y-%m-%d %H:%M UTC')"
           git pull --rebase -X ours
           git push
-
-      - name: Trigger Lambda ingest to DynamoDB
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          pip install -q boto3
-          python3 -c "
-          import boto3, json
-          from datetime import datetime
-          date = datetime.utcnow().strftime('%Y-%m-%d')
-          client = boto3.client('lambda', region_name='us-east-1')
-          resp = client.invoke(FunctionName='ai-news-ingest', Payload=json.dumps({'date': date}))
-          result = json.loads(resp['Payload'].read())
-          print(f'Ingest result: {result}')
-          "
 
       - name: Send email
         env:

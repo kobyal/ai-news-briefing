@@ -75,13 +75,14 @@ flowchart TD
     E --> P
     I --> P
     J --> P
-    K --> D2["docs/data/*.json"]
+    K --> P
 
     M["Final Merger Agent"] --> P["docs/index.html"]
     M --> D2
     E --> D2
     I --> D2
     J --> D2
+    K --> D2["docs/data/*.json"]
 ```
 
 ### What feeds the merger vs. what renders separately
@@ -98,9 +99,7 @@ flowchart TD
 | NewsAPI | Yes | No | Through merged briefing |
 | YouTube | No | Yes | Yes |
 | GitHub Trending | No | Yes | Yes |
-| xAI Twitter | Loaded but not currently rendered in merged HTML | No | Yes |
-
-The current merger renderer intentionally leaves the xAI Twitter HTML section disabled because the project treats Grok/X results as not reliable enough for direct rendering yet.
+| xAI Twitter | No | Yes (`trending_posts`, `people_highlights` merged) | Yes |
 
 ---
 
@@ -180,7 +179,7 @@ flowchart LR
 | NewsAPI | no LLM | NewsAPI |
 | YouTube | no LLM | YouTube Data API v3 |
 | GitHub Trending | no LLM | GitHub REST APIs |
-| xAI Twitter | `grok-3-mini` with X search enabled when supported | xAI API |
+| xAI Twitter | `grok-3-mini` via Responses API with `x_search` tool | xAI API |
 | Merger | `MERGER_WRITER_MODEL` default `claude-sonnet-4-20250514`, `MERGER_TRANSLATOR_MODEL` default `claude-sonnet-4-20250514` | Anthropic API |
 
 The CI workflow currently sets both merger steps to `claude-sonnet-4-20250514`.
@@ -442,7 +441,7 @@ Uses Grok to look for:
 - viral AI posts on X
 - AI Twitter community signals
 
-The agent saves JSON output, and `publish_data.py` includes it in `docs/data`. The merger currently does **not** render it into the public newsletter HTML.
+The agent saves JSON output. `publish_data.py` includes it in `docs/data`, the merger renders trending posts as a dedicated section, and xAI people are merged into the "People Talking Today" cards.
 
 ```mermaid
 flowchart LR
@@ -466,8 +465,9 @@ python3 run.py
 Runs **after** the other agents. It loads the latest saved outputs, merges core news, uses Article Reader full-text context, includes Exa and NewsAPI as extra sources, translates to Hebrew with three parallel calls, and renders the final HTML.
 
 Directly rendered sections in the merged page come from:
-- Social `people_highlights`
+- Social `people_highlights` (merged with xAI `people_highlights`)
 - Social `top_reddit`
+- xAI Twitter `trending_posts`
 - YouTube `news_items`
 - GitHub Trending `news_items`
 
@@ -532,7 +532,7 @@ The repo is no longer "five pipelines plus merger". It is a layered collection s
 | Enrichment | Article Reader | Full article text for better merged summaries |
 | Supplemental discovery | Exa, NewsAPI | Niche semantic search plus structured mainstream news coverage |
 | Direct-render side channels | YouTube, GitHub Trending | Video and open-source sections that should not be collapsed into headline cards |
-| Experimental / data-only channel | xAI Twitter | X/Twitter collection saved to JSON, currently not rendered in HTML |
+| Social side channel | xAI Twitter | X/Twitter trending posts + people highlights, rendered in merged HTML |
 | Final synthesis | Merger | Deduplication, ranking, Hebrew translation, HTML publishing |
 
 That split matters because different agents solve different problems:
@@ -590,18 +590,22 @@ That split matters because different agents solve different problems:
 
 ## Automation and Publishing
 
-GitHub Actions in [daily_briefing.yml](/Users/kobyalmog/vscode/projects/ai-news-briefing/.github/workflows/daily_briefing.yml) runs:
-- on schedule at `03:12 UTC` and `15:12 UTC`
-- on manual `workflow_dispatch`
+The daily schedule is driven entirely by EventBridge (no GitHub Actions cron):
 
-The workflow does:
+| Israel time | UTC | Lambda | Action |
+|---|---|---|---|
+| 06:00 | 03:00 | `ai-news-trigger` | Dispatches GitHub Actions workflow |
+| 07:00 | 04:00 | `ai-news-ingest` | Ingests published data into DynamoDB |
+| 15:00 | 12:00 | `ai-news-trigger` | Dispatches GitHub Actions workflow |
+| 16:00 | 13:00 | `ai-news-ingest` | Ingests published data into DynamoDB |
+
+The GitHub Actions workflow (`daily_briefing.yml`) only responds to `workflow_dispatch` — no cron. Steps:
 1. install dependencies
 2. run `python3 run_all.py`
 3. copy the latest merged HTML to `docs/index.html`
 4. run `python3 publish_data.py`
 5. commit and push outputs
-6. trigger Lambda ingest
-7. send email
+6. send email
 
 ---
 

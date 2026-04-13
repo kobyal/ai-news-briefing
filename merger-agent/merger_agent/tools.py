@@ -267,13 +267,15 @@ def _build_html(tldr, news_items, community_pulse, topic,
         p for p in (social_data.get("people_highlights", []) or [])
         if p.get("post") and not any(b in p.get("post", "").lower() for b in _bad)
     ]
-    # Merge xAI Twitter people (now using real x_search data)
+    # Merge xAI people into the people list (deduplicate by handle)
     xai_people = xai_data.get("people", []) or []
-    existing_names = {p.get("name", "").lower() for p in people_highlights}
+    seen_handles = {p.get("handle", "").lstrip("@").lower() for p in people_highlights}
     for xp in xai_people:
-        if xp.get("name", "").lower() not in existing_names and xp.get("post"):
-            people_highlights.append(xp)
-            existing_names.add(xp["name"].lower())
+        h = xp.get("handle", "").lstrip("@").lower()
+        if h and h not in seen_handles and xp.get("post"):
+            if not any(b in xp.get("post", "").lower() for b in _bad):
+                people_highlights.append(xp)
+                seen_handles.add(h)
     people_cards_html = ""
     for idx, p in enumerate(people_highlights[:6]):
         name       = p.get("name", "")
@@ -449,9 +451,6 @@ def _build_html(tldr, news_items, community_pulse, topic,
 </div>"""
 
     # ── xAI: Trending on AI Twitter ─────────────────────────────────────
-    # DISABLED: Grok API hallucinates tweets — no real-time X search via API.
-    # The search parameter is not supported. All trending data is fabricated.
-    # Re-enabled: now using correct Responses API with x_search tool
     xai_trending = xai_data.get("trending", []) or []
     xai_trending_html = ""
     for tp in xai_trending[:8]:
@@ -462,6 +461,8 @@ def _build_html(tldr, news_items, community_pulse, topic,
         url = tp.get("url", "") or tp.get("tweet_url", "")
         engagement = tp.get("engagement", "")
         topic = tp.get("topic", "")
+        if not post:
+            continue
 
         topic_tag = f'<span class="pulse-vendor">{topic}</span>' if topic else ""
         eng_html = f'<span class="xt-engagement">{engagement}</span>' if engagement else ""

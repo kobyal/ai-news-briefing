@@ -83,7 +83,7 @@ def _grok_search(prompt: str, label: str = "", handles: list[str] | None = None)
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=90,
+            timeout=180,
         )
         if not resp.ok:
             elapsed = time.time() - t0

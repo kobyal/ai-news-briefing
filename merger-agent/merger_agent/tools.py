@@ -283,6 +283,8 @@ def _build_html(tldr, news_items, community_pulse, topic,
         org        = p.get("org", "")
         role       = p.get("role", "")
         post       = p.get("post", "")
+        if len(post) > 300:
+            post = post[:297] + "..."
         date       = p.get("date", "")
         url        = p.get("url", "")
         why        = p.get("why", "")
@@ -463,6 +465,9 @@ def _build_html(tldr, news_items, community_pulse, topic,
         topic = tp.get("topic", "")
         if not post:
             continue
+        # Truncate long posts
+        if len(post) > 300:
+            post = post[:297] + "..."
 
         topic_tag = f'<span class="pulse-vendor">{topic}</span>' if topic else ""
         eng_html = f'<span class="xt-engagement">{engagement}</span>' if engagement else ""

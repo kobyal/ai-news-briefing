@@ -4,6 +4,55 @@ Five independent AI agents gather today's AI industry news **in parallel** — f
 
 **Live output:** [kobyal.github.io/ai-news-briefing](https://kobyal.github.io/ai-news-briefing)
 
+## Quick Start (local)
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r perplexity-news-agent/requirements.txt \
+            -r tavily-news-agent/requirements.txt \
+            -r social-news-agent/requirements.txt \
+            -r merger-agent/requirements.txt \
+            -r rss-news-agent/requirements.txt \
+            -r adk-news-agent/requirements.txt
+
+# run everything in parallel then merge (~7 min, ~$0.67)
+python run_all.py
+
+# fastest path if JSON already exists
+python run_all.py --merge-only
+```
+
+### Required environment
+
+Export only the keys you need for the pipelines you run:
+
+| Key | Used by | Note |
+|-----|---------|------|
+| `PERPLEXITY_API_KEY` | Perplexity, RSS, Tavily, Social, Merger | console.perplexity.ai |
+| `TAVILY_API_KEY` | Tavily | app.tavily.com |
+| `GOOGLE_API_KEY` | ADK | Google AI Studio |
+| `ANTHROPIC_API_KEY` | Merger (Claude Sonnet) | matches workflow default |
+| `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` / `REDDIT_USERNAME` / `REDDIT_PASSWORD` | Social | Reddit JSON API |
+| `YOUTUBE_API_KEY` | youtube-news-agent | optional |
+| `FIRECRAWL_API_KEY`, `EXA_API_KEY`, `NEWSAPI_KEY`, `XAI_API_KEY` | optional agents | see workflow |
+
+`LOOKBACK_DAYS` (default 3) controls how far back each agent searches.
+
+### Repo layout
+
+- `adk-news-agent/`, `perplexity-news-agent/`, `rss-news-agent/`, `tavily-news-agent/`, `social-news-agent/` — core pipelines
+- `merger-agent/` — dedup + bilingual merge, writes `docs/index.html`
+- `article-reader-agent/`, `exa-news-agent/`, `newsapi-agent/`, `github-trending-agent/`, `xai-twitter-agent/`, `youtube-news-agent/` — optional feeders
+- `run_all.py` — orchestrates all pipelines, then merger
+- `publish_data.py` — publishes combined JSON to `docs/data/`
+- `.github/workflows/daily_briefing.yml` — scheduled runs + publishing
+
+### CI/CD & publishing
+
+- GitHub Actions runs at **03:12 UTC** and **15:12 UTC** (≈06:12 and 18:12 Israel time) plus manual dispatch.
+- Steps: install deps → `python run_all.py` → copy latest merged HTML to `docs/index.html` → publish combined JSON via `publish_data.py` → commit outputs → trigger Lambda ingest → send email.
+- Pages: the action writes the latest newsletter to `docs/index.html` served at [kobyal.github.io/ai-news-briefing](https://kobyal.github.io/ai-news-briefing).
+
 ---
 
 ## Architecture

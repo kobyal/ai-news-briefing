@@ -34,6 +34,7 @@ TRACKED_HANDLES = [
     {"name": "Demis Hassabis", "handle": "demishassabis", "org": "Google DeepMind", "role": "CEO"},
     {"name": "Ethan Mollick", "handle": "emollick", "org": "Wharton", "role": "AI researcher"},
     {"name": "Jack Clark", "handle": "jackclarkSF", "org": "Anthropic", "role": "Co-founder"},
+    {"name": "Claude", "handle": "claudeai", "org": "Anthropic", "role": "Official account"},
 ]
 
 
@@ -109,6 +110,27 @@ def _validate_date(date_str: str) -> bool:
     if re.search(r'20[0-1]\d|202[0-4]', date_str) and "2025" not in date_str and "2026" not in date_str:
         return False
     return True
+
+
+def _parse_engagement(engagement: str) -> int:
+    """Extract total engagement number from a string like '1234/56/789000' or '1.2K likes'."""
+    if not engagement:
+        return 0
+    # Try to find all numbers (handles formats like "1234/56/789000" or "Likes=1234, Views=500000")
+    nums = re.findall(r'(\d+(?:\.\d+)?)\s*[KkMm]?', engagement)
+    total = 0
+    for n in nums:
+        val = float(n)
+        # Check if followed by K/M suffix in original string
+        idx = engagement.find(n)
+        if idx >= 0:
+            after = engagement[idx + len(n):idx + len(n) + 1].upper()
+            if after == 'K':
+                val *= 1000
+            elif after == 'M':
+                val *= 1_000_000
+        total += int(val)
+    return total
 
 
 def _ensure_url(url: str, handle: str) -> str:
@@ -210,7 +232,8 @@ def _fetch_trending(api_key: str) -> list[dict]:
         data = json.loads(clean)
         if not isinstance(data, list):
             return []
-        # Light validation — only reject empty posts and pre-2025 dates
+        # Validate and filter by engagement quality
+        MIN_ENGAGEMENT = 500  # minimum total engagement (likes+retweets+views)
         valid = []
         for d in data:
             if not d.get("post"):
@@ -219,9 +242,17 @@ def _fetch_trending(api_key: str) -> list[dict]:
                 continue
             author = d.get("author", "").lstrip("@")
             d["url"] = _ensure_url(d.get("url", ""), author)
+            d["_engagement_score"] = _parse_engagement(d.get("engagement", ""))
             valid.append(d)
-        print(f"  → {len(valid)}/{len(data)} trending posts passed validation")
-        return valid
+        # Sort by engagement (highest first) and filter low-quality
+        valid.sort(key=lambda x: x.get("_engagement_score", 0), reverse=True)
+        high_quality = [d for d in valid if d.get("_engagement_score", 0) >= MIN_ENGAGEMENT]
+        if len(high_quality) < 3:
+            high_quality = valid[:8]  # fallback: keep top 8 if not enough pass threshold
+        for d in high_quality:
+            d.pop("_engagement_score", None)  # clean up internal field
+        print(f"  → {len(high_quality)}/{len(data)} trending posts passed quality filter (min engagement: {MIN_ENGAGEMENT})")
+        return high_quality
     except json.JSONDecodeError:
         return []
 

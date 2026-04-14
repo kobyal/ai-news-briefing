@@ -30,9 +30,13 @@ LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 class TavilySearcher:
     def __init__(self):
         self.api_key = os.environ.get("TAVILY_API_KEY", "")
-        self._backup_key = os.environ.get("TAVILY_API_KEY2", "")
+        self._backup_keys = [
+            os.environ.get("TAVILY_API_KEY2", ""),
+            os.environ.get("TAVILY_API_KEY3", ""),
+        ]
+        self._backup_keys = [k for k in self._backup_keys if k]  # filter empty
         self._client = None
-        self._using_backup = False
+        self._key_index = 0  # 0 = primary, 1+ = backups
         if self.api_key:
             try:
                 from tavily import TavilyClient
@@ -41,12 +45,13 @@ class TavilySearcher:
                 print("  [Tavily] tavily-python not installed — falling back to DuckDuckGo")
 
     def _switch_to_backup(self):
-        """Switch to backup Tavily API key."""
-        if self._backup_key and not self._using_backup:
+        """Switch to next backup Tavily API key."""
+        if self._key_index < len(self._backup_keys):
             from tavily import TavilyClient
-            self._client = TavilyClient(api_key=self._backup_key)
-            self._using_backup = True
-            print("  [Tavily] Switched to TAVILY_API_KEY2 (backup)")
+            next_key = self._backup_keys[self._key_index]
+            self._client = TavilyClient(api_key=next_key)
+            self._key_index += 1
+            print(f"  [Tavily] Switched to TAVILY_API_KEY{self._key_index + 1} (backup {self._key_index})")
             return True
         return False
 

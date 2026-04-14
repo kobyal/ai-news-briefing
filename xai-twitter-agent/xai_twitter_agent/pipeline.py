@@ -35,6 +35,8 @@ TRACKED_HANDLES = [
     {"name": "Ethan Mollick", "handle": "emollick", "org": "Wharton", "role": "AI researcher"},
     {"name": "Jack Clark", "handle": "jackclarkSF", "org": "Anthropic", "role": "Co-founder"},
     {"name": "Claude", "handle": "claudeai", "org": "Anthropic", "role": "Official account"},
+    {"name": "Uri Eliabayev", "handle": "urieli17", "org": "Anthropic", "role": "Claude engineer"},
+    {"name": "Anthropic", "handle": "AnthropicAI", "org": "Anthropic", "role": "Official account"},
 ]
 
 

@@ -529,6 +529,31 @@ def run_pipeline() -> dict:
         merged_json = json.dumps(parsed, ensure_ascii=False)
         print(f"  Kept {len(fresh_items)}/{original_count} stories after freshness filter")
 
+    # Validate URLs — strip broken ones (404, timeouts)
+    parsed = _parse(merged_json)
+    total_urls = 0
+    stripped_urls = 0
+    for item in parsed.get("news_items", []):
+        valid_urls = []
+        for url in item.get("urls", []):
+            total_urls += 1
+            try:
+                resp = __import__("requests").head(url, timeout=8, allow_redirects=True,
+                    headers={"User-Agent": "Mozilla/5.0 (compatible; ai-news-briefing/1.0)"})
+                if resp.status_code < 400:
+                    valid_urls.append(url)
+                else:
+                    stripped_urls += 1
+                    print(f"  ✂ URL {resp.status_code}: {url[:60]}")
+            except Exception:
+                stripped_urls += 1
+                print(f"  ✂ URL timeout: {url[:60]}")
+        item["urls"] = valid_urls
+        item["source_count"] = len(valid_urls)
+    if stripped_urls:
+        merged_json = json.dumps(parsed, ensure_ascii=False)
+        print(f"  URL validation: {total_urls - stripped_urls}/{total_urls} passed, {stripped_urls} stripped")
+
     try:
         hebrew_json = _step3_translate(merged_json, social_data=social_briefing, youtube_data=youtube_data)
     except Exception as e:

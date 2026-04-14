@@ -17,31 +17,33 @@ def _latest(pattern):
 
 print("Finding latest outputs:")
 merger = _latest("merger-agent/output/**/*.json")
-social = _latest("social-news-agent/output/**/*.json")
 youtube_raw = _latest("youtube-news-agent/output/**/*.json")
 github_raw = _latest("github-trending-agent/output/**/*.json")
-twitter_raw = _latest("xai-twitter-agent/output/**/*.json")
+xai_raw = _latest("xai-twitter-agent/output/**/*.json")
 
 # Extract news_items from standard agent format
 youtube_items = (youtube_raw.get("briefing", {}) if isinstance(youtube_raw, dict) else {}).get("news_items", [])
 github_items = (github_raw.get("briefing", {}) if isinstance(github_raw, dict) else {}).get("news_items", [])
 
-# Twitter/xAI has people + trending structure
-twitter_data = {}
-if isinstance(twitter_raw, dict):
-    xb = twitter_raw.get("briefing", {})
-    twitter_data = {
-        "people": xb.get("people_highlights", xb.get("news_items", [])),
-        "trending": xb.get("trending_posts", xb.get("trending_topics", [])),
-        "community": xb.get("community_pulse", ""),
-    }
+# xAI serves as the social source (people + trending + community)
+xai_briefing = (xai_raw.get("briefing", {}) if isinstance(xai_raw, dict) else {})
+social_data = {
+    "people_highlights": xai_briefing.get("people_highlights", []),
+    "community_pulse": xai_briefing.get("community_pulse", ""),
+    "top_reddit": [],
+}
+twitter_data = {
+    "people": xai_briefing.get("people_highlights", []),
+    "trending": xai_briefing.get("trending_posts", xai_briefing.get("trending_topics", [])),
+    "community": xai_briefing.get("community_pulse", ""),
+}
 
 published = {
     "date":        date_str,
     "briefing":    merger.get("briefing", {}),
     "briefing_he": merger.get("briefing_he", {}),
-    "social":      social.get("briefing", {}),
-    "social_he":   social.get("briefing_he", {}),
+    "social":      social_data,
+    "social_he":   {},
     "youtube":     youtube_items,
     "github":      github_items,
     "twitter":     twitter_data,

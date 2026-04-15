@@ -1,15 +1,17 @@
-# AI News Briefing - 11 Collection Agents + Final Merger
+# AI News Briefing - 10 Collection Agents + Final Merger
 
-This repo runs **11 collection/enrichment agents in parallel**, then a final **Merger Agent** turns the latest outputs into one bilingual AI briefing in English and Hebrew.
+This repo runs **10 collection/enrichment agents in parallel**, then a final **Merger Agent** turns the latest outputs into one bilingual AI briefing in English and Hebrew.
 
 The current architecture is:
-- **5 core source pipelines**: ADK, Perplexity, RSS, Tavily, Social
+- **4 core source pipelines**: ADK, Perplexity, RSS, Tavily
 - **6 supplemental agents**: Article Reader, Exa, NewsAPI, YouTube, GitHub Trending, xAI Twitter
 - **1 final merger**: loads the latest outputs, deduplicates stories, translates to Hebrew, and publishes the combined HTML
 
+The xAI Twitter agent also serves as the social data source (people highlights, trending posts, community pulse).
+
 **Live site:** [duus0s1bicxag.cloudfront.net](https://duus0s1bicxag.cloudfront.net/) (CloudFront) | [kobyal.github.io/ai-news-briefing](https://kobyal.github.io/ai-news-briefing) (GitHub Pages — raw HTML)
 
-**Suggested GitHub About text:** `11-agent AI news collection + merger pipeline: ADK, Perplexity, RSS, Tavily, Social, Article Reader, Exa, NewsAPI, YouTube, GitHub Trending, xAI Twitter -> bilingual EN/Hebrew briefing + docs/data JSON.`
+**Suggested GitHub About text:** `10-agent AI news collection + merger pipeline: ADK, Perplexity, RSS, Tavily, Article Reader, Exa, NewsAPI, YouTube, GitHub Trending, xAI Twitter -> bilingual EN/Hebrew briefing + docs/data JSON.`
 
 ---
 
@@ -23,22 +25,21 @@ pip install \
   -r adk-news-agent/requirements.txt \
   -r perplexity-news-agent/requirements.txt \
   -r tavily-news-agent/requirements.txt \
-  -r social-news-agent/requirements.txt \
   -r merger-agent/requirements.txt \
   -r rss-news-agent/requirements.txt \
   firecrawl-py exa-py newsapi-python
 
-# Run all 11 collection/enrichment agents, then the merger.
+# Run all 10 collection/enrichment agents, then the merger.
 python3 run_all.py
 
 # Run only the merger against the latest saved outputs.
 python3 run_all.py --merge-only
 
 # Skip selected core pipelines.
-python3 run_all.py --skip-adk --skip-social
+python3 run_all.py --skip adk rss
 ```
 
-`run_all.py` always launches the supplemental agents. If an API key is missing, those agents usually no-op and continue cleanly.
+`run_all.py` launches all agents in parallel (except the merger which runs last). If an API key is missing, agents usually no-op and continue cleanly.
 
 ---
 
@@ -46,12 +47,11 @@ python3 run_all.py --skip-adk --skip-social
 
 ```mermaid
 flowchart TD
-    subgraph core["5 core source pipelines"]
+    subgraph core["4 core source pipelines"]
         A["ADK"]
         B["Perplexity"]
         C["RSS"]
         D["Tavily"]
-        E["Social"]
     end
 
     subgraph extra["6 supplemental agents"]
@@ -60,29 +60,26 @@ flowchart TD
         H["NewsAPI"]
         I["YouTube"]
         J["GitHub Trending"]
-        K["xAI Twitter"]
+        K["xAI Twitter (also social source)"]
     end
 
     A --> M
     B --> M
     C --> M
     D --> M
-    E --> M
     G --> M
     H --> M
     F --> M
 
-    E --> P
+    K --> P
     I --> P
     J --> P
-    K --> P
 
     M["Final Merger Agent"] --> P["docs/index.html"]
     M --> D2
-    E --> D2
+    K --> D2
     I --> D2
-    J --> D2
-    K --> D2["docs/data/*.json"]
+    J --> D2["docs/data/*.json"]
 ```
 
 ### What feeds the merger vs. what renders separately
@@ -93,13 +90,12 @@ flowchart TD
 | Perplexity | Yes | No | Through merged briefing |
 | RSS | Yes | No | Through merged briefing |
 | Tavily | Yes | No | Through merged briefing |
-| Social | Partly | Yes (`people_highlights`, `top_reddit`) | Yes |
 | Article Reader | Yes (full-text context) | No | No |
 | Exa | Yes | No | Through merged briefing |
 | NewsAPI | Yes | No | Through merged briefing |
 | YouTube | No | Yes | Yes |
 | GitHub Trending | No | Yes | Yes |
-| xAI Twitter | No | Yes (`trending_posts`, `people_highlights` merged) | Yes |
+| xAI Twitter | Social data for merger | Yes (`trending_posts`, `people_highlights`) | Yes (social + twitter) |
 
 ---
 
@@ -112,12 +108,11 @@ flowchart LR
         A2["Perplexity web_search"]
         A3["RSS + HN + Reddit"]
         A4["Tavily news search"]
-        A5["Social: people + topics + Reddit"]
         A6["Exa semantic search"]
         A7["NewsAPI"]
         A8["YouTube Data API"]
         A9["GitHub Search + Releases API"]
-        A10["Grok + X search"]
+        A10["Grok + X search (social source)"]
         A11["Article Reader: Jina + Firecrawl"]
     end
 
@@ -139,7 +134,6 @@ flowchart LR
     A2 --> J1
     A3 --> J1
     A4 --> J1
-    A5 --> J1
     A6 --> J2
     A7 --> J2
     A8 --> J3
@@ -152,14 +146,11 @@ flowchart LR
     J4 --> M1
     M1 --> M2
     M2 --> M3
-    J1 --> M3
     J3 --> M3
     M3 --> O1["docs/index.html"]
 
     M3 --> M4
-    J1 --> M4
     J3 --> M4
-    O2["social JSON"] --> M4
     M4 --> O3["docs/data/latest.json"]
 ```
 
@@ -173,7 +164,6 @@ flowchart LR
 | Perplexity | `PERPLEXITY_SEARCH_MODEL` default `anthropic/claude-haiku-4-5`, writer `anthropic/claude-sonnet-4-6`, translator `anthropic/claude-haiku-4-5` | Perplexity Responses API |
 | RSS | writer `anthropic/claude-haiku-4-5`, translator `anthropic/claude-haiku-4-5` | Perplexity Responses API |
 | Tavily | writer `anthropic/claude-sonnet-4-6`, translator `anthropic/claude-haiku-4-5` | Tavily + Perplexity Responses API |
-| Social | search `sonar`, writer `anthropic/claude-sonnet-4-6`, translator `anthropic/claude-haiku-4-5` | Perplexity Chat/Responses API |
 | Article Reader | no LLM | Jina Reader + Firecrawl |
 | Exa | no LLM | Exa API |
 | NewsAPI | no LLM | NewsAPI |
@@ -285,40 +275,7 @@ python3 run.py
 - `TAVILY_TRANSLATOR_MODEL`
 - `LOOKBACK_DAYS`
 
-### 5. Social News Agent (`social-news-agent/`)
-
-Tracks the AI conversation layer instead of article publishing:
-- `62` tracked people
-- `20` topic buckets
-- `17` Reddit communities
-
-It uses Perplexity search for people/topics, authenticated Reddit if credentials exist, anonymous Reddit fallback otherwise, and Exa fallback when people/topic coverage is too thin.
-
-```mermaid
-flowchart LR
-    A["People search: 62 tracked people"] --> D["SocialWriter"]
-    B["Topic search: 20 topic buckets"] --> D
-    C["Reddit fetch: 17 communities"] --> D
-    D --> E["Translator"]
-    E --> F["Publisher"]
-```
-
-**Run**
-```bash
-cd social-news-agent
-python3 run.py
-```
-
-**Key env**
-- `PERPLEXITY_API_KEY`
-- `SOCIAL_SEARCH_MODEL` (default `sonar`)
-- `SOCIAL_WRITER_MODEL`
-- `SOCIAL_TRANSLATOR_MODEL`
-- `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USERNAME`, `REDDIT_PASSWORD` for OAuth mode
-- `EXA_API_KEY` for fallback search
-- `LOOKBACK_DAYS`
-
-### 6. Article Reader Agent (`article-reader-agent/`)
+### 5. Article Reader Agent (`article-reader-agent/`)
 
 Collects article URLs from recent core outputs, supplements them with Tavily or DuckDuckGo search, reads full text with Jina Reader, and falls back to Firecrawl when needed.
 
@@ -344,7 +301,7 @@ python3 run.py
 - `SKIP_ARTICLE_READING=true` to disable
 - `ARTICLE_READ_TIMEOUT`
 
-### 7. Exa News Agent (`exa-news-agent/`)
+### 6. Exa News Agent (`exa-news-agent/`)
 
 Semantic search layer for niche or technical AI stories that broader web/news search can miss.
 
@@ -366,7 +323,7 @@ python3 run.py
 - `EXA_API_KEY`
 - `LOOKBACK_DAYS`
 
-### 8. NewsAPI Agent (`newsapi-agent/`)
+### 7. NewsAPI Agent (`newsapi-agent/`)
 
 Structured news wire layer that prioritizes normalized dates, source metadata, and broad mainstream coverage.
 
@@ -388,7 +345,7 @@ python3 run.py
 - `NEWSAPI_KEY`
 - `LOOKBACK_DAYS`
 
-### 9. YouTube News Agent (`youtube-news-agent/`)
+### 8. YouTube News Agent (`youtube-news-agent/`)
 
 Video discovery layer that pulls from `26` curated channels, adds `4` targeted searches, fetches stats, filters aggressively, and emits a JSON section for direct rendering in the merged HTML.
 
@@ -411,7 +368,7 @@ python3 run.py
 - `YOUTUBE_API_KEY` or `GOOGLE_API_KEY`
 - `LOOKBACK_DAYS`
 
-### 10. GitHub Trending Agent (`github-trending-agent/`)
+### 9. GitHub Trending Agent (`github-trending-agent/`)
 
 Tracks open-source AI momentum through repository search and release polling:
 - `6` trending search queries
@@ -434,7 +391,7 @@ python3 run.py
 - `GITHUB_TOKEN` optional for higher rate limits
 - `LOOKBACK_DAYS`
 
-### 11. xAI Twitter Agent (`xai-twitter-agent/`)
+### 10. xAI Twitter Agent (`xai-twitter-agent/`)
 
 Uses Grok to look for:
 - recent posts from `15` tracked AI leaders
@@ -460,14 +417,12 @@ python3 run.py
 - `XAI_API_KEY`
 - `LOOKBACK_DAYS`
 
-### 12. Merger Agent (`merger-agent/`)
+### 11. Merger Agent (`merger-agent/`)
 
 Runs **after** the other agents. It loads the latest saved outputs, merges core news, uses Article Reader full-text context, includes Exa and NewsAPI as extra sources, translates to Hebrew with three parallel calls, and renders the final HTML.
 
 Directly rendered sections in the merged page come from:
-- Social `people_highlights` (merged with xAI `people_highlights`)
-- Social `top_reddit`
-- xAI Twitter `trending_posts`
+- xAI Twitter `people_highlights` and `trending_posts`
 - YouTube `news_items`
 - GitHub Trending `news_items`
 
@@ -477,7 +432,7 @@ flowchart LR
     B["Load Exa + NewsAPI"] --> F
     C["Load Article Reader full text"] --> F
     F --> G["Parallel Hebrew translation"]
-    D["Load Social structured blocks"] --> H["HTML builder"]
+    D["Load xAI social data"] --> H["HTML builder"]
     E["Load YouTube + GitHub JSON"] --> H
     G --> H
     H --> I["Save merged_*.html and merged_*.json"]
@@ -502,7 +457,7 @@ python3 run.py
 
 ```mermaid
 flowchart LR
-    A["Launch 11 collection/enrichment agents"] --> B["Wait for completion / timeouts"]
+    A["Launch 10 collection/enrichment agents"] --> B["Wait for completion / timeouts"]
     B --> C["Warn on failures but continue"]
     C --> D["Run merger once"]
 ```
@@ -510,8 +465,8 @@ flowchart LR
 **Commands**
 ```bash
 python3 run_all.py
-python3 run_all.py --skip-adk
-python3 run_all.py --skip-px --skip-social
+python3 run_all.py --skip adk
+python3 run_all.py --skip perplexity xai
 python3 run_all.py --merge-only
 ```
 
@@ -523,23 +478,22 @@ python3 run_all.py --merge-only
 
 ## Why This Architecture
 
-The repo is no longer "five pipelines plus merger". It is a layered collection system:
+The system is a layered collection pipeline:
 
 | Layer | Agents | Purpose |
 |------|--------|---------|
 | Core news collection | ADK, Perplexity, RSS, Tavily | High-signal vendor and industry news from different retrieval styles |
-| Social/community collection | Social | What people are discussing, not just what was published |
 | Enrichment | Article Reader | Full article text for better merged summaries |
 | Supplemental discovery | Exa, NewsAPI | Niche semantic search plus structured mainstream news coverage |
 | Direct-render side channels | YouTube, GitHub Trending | Video and open-source sections that should not be collapsed into headline cards |
-| Social side channel | xAI Twitter | X/Twitter trending posts + people highlights, rendered in merged HTML |
+| Social + X/Twitter | xAI Twitter | People highlights, trending posts, community pulse — serves as the social data source |
 | Final synthesis | Merger | Deduplication, ranking, Hebrew translation, HTML publishing |
 
 That split matters because different agents solve different problems:
 - ADK and Perplexity are best at live search.
 - RSS is deterministic and cheap.
 - Tavily is strong for fresh vendor-by-vendor article retrieval.
-- Social catches practitioner sentiment and community reaction.
+- xAI Twitter catches practitioner sentiment and community reaction via X/Twitter.
 - Article Reader improves summary density by adding full article text.
 - Exa and NewsAPI widen recall without changing the core story format.
 - YouTube and GitHub are more useful as dedicated sections than as generic news cards.
@@ -560,8 +514,6 @@ That split matters because different agents solve different problems:
 | `rss-news-agent/output/YYYY-MM-DD/briefing_*.json` | RSS structured briefing |
 | `tavily-news-agent/output/YYYY-MM-DD/briefing_*.html` | Tavily standalone newsletter |
 | `tavily-news-agent/output/YYYY-MM-DD/briefing_*.json` | Tavily structured briefing |
-| `social-news-agent/output/YYYY-MM-DD/briefing_*.html` | Social standalone newsletter |
-| `social-news-agent/output/YYYY-MM-DD/briefing_*.json` | Social structured briefing |
 | `article-reader-agent/output/YYYY-MM-DD/articles_*.json` | Full article text cache for merger context |
 | `exa-news-agent/output/YYYY-MM-DD/exa_*.json` | Supplemental news source |
 | `newsapi-agent/output/YYYY-MM-DD/newsapi_*.json` | Supplemental news source |
@@ -579,12 +531,11 @@ That split matters because different agents solve different problems:
 | `docs/data/YYYY-MM-DD.json` | `publish_data.py` | Combined machine-readable daily snapshot |
 | `docs/data/latest.json` | `publish_data.py` | Latest combined snapshot |
 
-`publish_data.py` currently bundles:
-- merged briefing
-- social briefing
+`publish_data.py` bundles:
+- merged briefing (EN + Hebrew)
+- xAI social data (people, trending, community)
 - YouTube items
 - GitHub items
-- twitter/xAI payload
 
 ---
 
@@ -595,9 +546,7 @@ The daily schedule is driven entirely by EventBridge (no GitHub Actions cron):
 | Israel time | UTC | Lambda | Action |
 |---|---|---|---|
 | 06:00 | 03:00 | `ai-news-trigger` | Dispatches GitHub Actions workflow |
-| 07:00 | 04:00 | `ai-news-ingest` | Ingests published data into DynamoDB |
-| 15:00 | 12:00 | `ai-news-trigger` | Dispatches GitHub Actions workflow |
-| 16:00 | 13:00 | `ai-news-ingest` | Ingests published data into DynamoDB |
+| 06:20 | 03:20 | `ai-news-ingest` | Ingests published data into DynamoDB |
 
 The GitHub Actions workflow (`daily_briefing.yml`) only responds to `workflow_dispatch` — no cron. Steps:
 1. install dependencies
@@ -615,16 +564,14 @@ The GitHub Actions workflow (`daily_briefing.yml`) only responds to `workflow_di
 |--------|---------|
 | `GOOGLE_API_KEY` | ADK, optionally YouTube |
 | `GOOGLE_GENAI_MODEL` | ADK |
-| `PERPLEXITY_API_KEY` | Perplexity, RSS, Tavily, Social |
+| `PERPLEXITY_API_KEY` | Perplexity, RSS, Tavily |
 | `PERPLEXITY_SEARCH_MODEL` | Perplexity |
 | `PERPLEXITY_WRITER_MODEL` | Perplexity |
 | `PERPLEXITY_TRANSLATOR_MODEL` | Perplexity |
 | `RSS_WRITER_MODEL` / `RSS_TRANSLATOR_MODEL` | RSS |
 | `TAVILY_API_KEY` / `TAVILY_API_KEY2` | Tavily, Article Reader |
 | `TAVILY_WRITER_MODEL` / `TAVILY_TRANSLATOR_MODEL` | Tavily |
-| `SOCIAL_SEARCH_MODEL` / `SOCIAL_WRITER_MODEL` / `SOCIAL_TRANSLATOR_MODEL` | Social |
-| `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USERNAME`, `REDDIT_PASSWORD` | Social Reddit OAuth |
-| `EXA_API_KEY` | Exa, Social fallback |
+| `EXA_API_KEY` | Exa |
 | `NEWSAPI_KEY` | NewsAPI |
 | `YOUTUBE_API_KEY` | YouTube |
 | `GITHUB_TOKEN` | GitHub Trending optional auth |

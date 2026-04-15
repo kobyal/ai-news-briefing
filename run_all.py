@@ -112,11 +112,6 @@ def main():
     parser.add_argument("--free-only", action="store_true",
                         help="Run only free/cheap agents (skip all paid APIs)")
     parser.add_argument("--list", action="store_true", help="List all agents and their cost tiers")
-    # Legacy flags
-    parser.add_argument("--skip-adk", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--skip-px", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--skip-rss", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--skip-tavily", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     root = Path(__file__).parent
@@ -133,12 +128,7 @@ def main():
         _run(root / "merger-agent" / "run.py", "Merger Agent")
         return
 
-    # Build skip set from all flag sources
     skip = set(args.skip)
-    if args.skip_adk: skip.add("adk")
-    if args.skip_px: skip.add("perplexity")
-    if args.skip_rss: skip.add("rss")
-    if args.skip_tavily: skip.add("tavily")
 
     # Determine which agents to run
     if args.only:

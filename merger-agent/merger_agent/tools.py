@@ -1,9 +1,15 @@
 """HTML builder for the Merger Agent — gold/amber "combined" theme."""
 import ast
+import html as _html
 import json
 import os
 import re
 from datetime import datetime
+
+
+def _esc(text: str) -> str:
+    """Escape text for safe HTML rendering."""
+    return _html.escape(str(text)) if text else ""
 
 
 # ---------------------------------------------------------------------------
@@ -118,22 +124,22 @@ def _pulse_items_html(items: list) -> str:
         person      = item.get("related_person", "")
 
         badge = _heat_badge(heat)
-        date_html = f'<span class="pub-date">📅 {date}</span>' if date else ""
-        vendor_tag = f'<span class="pulse-vendor">{vendor}</span>' if vendor else ""
-        person_tag = f'<span class="pulse-person">👤 {person}</span>' if person else ""
+        date_html = f'<span class="pub-date">📅 {_esc(date)}</span>' if date else ""
+        vendor_tag = f'<span class="pulse-vendor">{_esc(vendor)}</span>' if vendor else ""
+        person_tag = f'<span class="pulse-person">👤 {_esc(person)}</span>' if person else ""
         tags = f'<div class="pulse-tags">{vendor_tag}{person_tag}</div>' if (vendor or person) else ""
 
         if source_url and source_label:
-            source_html = f'<a href="{source_url}" target="_blank" class="pulse-source">{source_label}</a>'
+            source_html = f'<a href="{_esc(source_url)}" target="_blank" class="pulse-source">{_esc(source_label)}</a>'
         elif source_url:
-            source_html = f'<a href="{source_url}" target="_blank" class="pulse-source">{source_url[:60]}{"..." if len(source_url) > 60 else ""}</a>'
+            source_html = f'<a href="{_esc(source_url)}" target="_blank" class="pulse-source">{_esc(source_url[:60])}{"..." if len(source_url) > 60 else ""}</a>'
         else:
             source_html = ""
 
         html += f"""<div class="pulse-item">
-<div class="pulse-header">{badge}<span class="pulse-headline">{headline}</span></div>
+<div class="pulse-header">{badge}<span class="pulse-headline">{_esc(headline)}</span></div>
 {date_html}
-<p class="pulse-body">{body}</p>
+<p class="pulse-body">{_esc(body)}</p>
 <div class="pulse-footer">{source_html}{tags}</div>
 </div>"""
     return html
@@ -256,8 +262,8 @@ def _build_html(tldr, news_items, community_pulse, topic,
     people_he      = people_he or []
     pulse_items_he = pulse_items_he or []
 
-    tldr_en_html = "".join(f"<li>{item}</li>" for item in tldr)
-    tldr_he_html = "".join(f"<li>{item}</li>" for item in tldr_he)
+    tldr_en_html = "".join(f"<li>{_esc(item)}</li>" for item in tldr)
+    tldr_he_html = "".join(f"<li>{_esc(item)}</li>" for item in tldr_he)
 
     # ── Social + xAI: People Talking Today ──────────────────────────────────
     xai_data = xai_data or {}
@@ -298,21 +304,21 @@ def _build_html(tldr, news_items, community_pulse, topic,
         link_en  = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
         link_he  = f'<a href="{url}" class="x-link" target="_blank">צפה בפוסט →</a>' if url else ""
         initial  = name[0].upper() if name else "?"
-        org_badge = f'<span class="person-org-badge">{org}</span>' if org else ""
-        eng_badge = f'<span class="engagement-badge">🔥 {engagement}</span>' if engagement else ""
-        date_html = f'<span class="pub-date">📅 {date}</span>' if date else ""
-        subtitle  = f"@{handle}" + (f" · {role}" if role else "")
+        org_badge = f'<span class="person-org-badge">{_esc(org)}</span>' if org else ""
+        eng_badge = f'<span class="engagement-badge">🔥 {_esc(engagement)}</span>' if engagement else ""
+        date_html = f'<span class="pub-date">📅 {_esc(date)}</span>' if date else ""
+        subtitle  = f"@{_esc(handle)}" + (f" · {_esc(role)}" if role else "")
         people_cards_html += f"""<div class="person-card">
 <div class="person-header">
-<span class="person-avatar">{initial}</span>
-<div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">{name}</span>{org_badge}</div><span class="person-handle">{subtitle}</span></div>
+<span class="person-avatar">{_esc(initial)}</span>
+<div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">{_esc(name)}</span>{org_badge}</div><span class="person-handle">{subtitle}</span></div>
 </div>
 {date_html}
-<p class="person-post en-content">"{post}"</p>
-<p class="person-post he-content" style="display:none;direction:rtl;text-align:right">"{post_he if post_he else post}"</p>
+<p class="person-post en-content">"{_esc(post)}"</p>
+<p class="person-post he-content" style="display:none;direction:rtl;text-align:right">"{_esc(post_he if post_he else post)}"</p>
 {eng_badge}
-<p class="person-why en-content">{why}</p>
-<p class="person-why he-content" style="display:none;direction:rtl;text-align:right">{why_he if why_he else why}</p>
+<p class="person-why en-content">{_esc(why)}</p>
+<p class="person-why he-content" style="display:none;direction:rtl;text-align:right">{_esc(why_he if why_he else why)}</p>
 <span class="en-content">{link_en}</span>
 <span class="he-content" style="display:none">{link_he}</span>
 </div>"""
@@ -337,9 +343,9 @@ def _build_html(tldr, news_items, community_pulse, topic,
         score_label = "hot" if score == 1 else f"▲ {score:,}"
         reddit_rows_html += (
             f'<div class="reddit-row">'
-            f'<span class="reddit-sub">{sub}</span>'
-            f'<a href="{url}" class="reddit-title" target="_blank">{title}</a>'
-            f'<span class="reddit-score">{score_label}</span>'
+            f'<span class="reddit-sub">{_esc(sub)}</span>'
+            f'<a href="{_esc(url)}" class="reddit-title" target="_blank">{_esc(title)}</a>'
+            f'<span class="reddit-score">{_esc(score_label)}</span>'
             f'</div>'
         )
 
@@ -362,8 +368,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
         date    = v.get("published_date", "")
 
         # Extract channel and views from summary "[Channel · 1.1M views] ..."
-        import re as _re
-        channel_match = _re.match(r'\[([^\]]+)\]\s*(.*)', summary, _re.DOTALL)
+        channel_match = re.match(r'\[([^\]]+)\]\s*(.*)', summary, re.DOTALL)
         if channel_match:
             channel_info = channel_match.group(1)
             desc = channel_match.group(2).strip()
@@ -372,24 +377,24 @@ def _build_html(tldr, news_items, community_pulse, topic,
             desc = summary.strip()
 
         # Clean up description — remove tracking URLs and sponsor text
-        desc = _re.sub(r'https?://\S+', '', desc).strip()
-        desc = _re.sub(r'(?i)(try|get|check out|sign up|use code|sponsored by|thank you .{0,30} for sponsoring|use my link|free forever|partner|promo code).*$', '', desc, flags=_re.MULTILINE).strip()
-        desc = _re.sub(r'(?i)^.*?(referral|discount|coupon).*$', '', desc, flags=_re.MULTILINE).strip()
-        desc = _re.sub(r'^[#\s]+$', '', desc, flags=_re.MULTILINE).strip()
+        desc = re.sub(r'https?://\S+', '', desc).strip()
+        desc = re.sub(r'(?i)(try|get|check out|sign up|use code|sponsored by|thank you .{0,30} for sponsoring|use my link|free forever|partner|promo code).*$', '', desc, flags=re.MULTILINE).strip()
+        desc = re.sub(r'(?i)^.*?(referral|discount|coupon).*$', '', desc, flags=re.MULTILINE).strip()
+        desc = re.sub(r'^[#\s]+$', '', desc, flags=re.MULTILINE).strip()
         # Take first meaningful line, no hard truncation
         lines = [l.strip() for l in desc.split('\n') if l.strip()]
         desc = lines[0] if lines else ""
 
-        vendor_tag = f'<span class="pulse-vendor">{vendor}</span>' if vendor and vendor != "Other" else ""
+        vendor_tag = f'<span class="pulse-vendor">{_esc(vendor)}</span>' if vendor and vendor != "Other" else ""
         desc_he = youtube_descs_he[yt_idx] if yt_idx < len(youtube_descs_he) else ""
-        desc_en_html = f'<div class="yt-desc en-content">{desc}</div>' if desc else ""
-        desc_he_html = f'<div class="yt-desc he-content" style="display:none;direction:rtl;text-align:right">{desc_he}</div>' if desc_he else ""
+        desc_en_html = f'<div class="yt-desc en-content">{_esc(desc)}</div>' if desc else ""
+        desc_he_html = f'<div class="yt-desc he-content" style="display:none;direction:rtl;text-align:right">{_esc(desc_he)}</div>' if desc_he else ""
         youtube_rows_html += (
             f'<div class="yt-row">'
             f'<div class="yt-icon">▶</div>'
             f'<div class="yt-content">'
-            f'<a href="{url}" class="yt-title" target="_blank">{title}</a>'
-            f'<div class="yt-meta">{channel_info}{" · " + date if date else ""} {vendor_tag}</div>'
+            f'<a href="{_esc(url)}" class="yt-title" target="_blank">{_esc(title)}</a>'
+            f'<div class="yt-meta">{_esc(channel_info)}{" · " + _esc(date) if date else ""} {vendor_tag}</div>'
             f'{desc_en_html}{desc_he_html}'
             f'</div>'
             f'</div>'
@@ -405,12 +410,11 @@ def _build_html(tldr, news_items, community_pulse, topic,
     # ── GitHub Trending ─────────────────────────────────────────────────
     github_data = github_data or []
     # Filter: skip minor patch releases (v1.2.3 patches), keep major/trending
-    import re as _ghre
     _filtered_gh = []
     for g in github_data:
         title = g.get("headline", "")
         # Skip minor patches like "released v5.5.3" or "langchain-core==1.2.28"
-        if _ghre.search(r'released.*\d+\.\d+\.\d+', title) and not _ghre.search(r'\b[vV]?\d+\.0\.0|[vV]?\d+\.0\b|major|breaking', title):
+        if re.search(r'released.*\d+\.\d+\.\d+', title) and not re.search(r'\b[vV]?\d+\.0\.0|[vV]?\d+\.0\b|major|breaking', title):
             continue
         _filtered_gh.append(g)
     github_rows_html = ""
@@ -421,8 +425,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
         date    = g.get("published_date", "")
 
         # Extract stars/language from summary "[1.2K stars · Python] ..."
-        import re as _re
-        meta_match = _re.match(r'\[([^\]]+)\]\s*(.*)', summary, _re.DOTALL)
+        meta_match = re.match(r'\[([^\]]+)\]\s*(.*)', summary, re.DOTALL)
         if meta_match:
             meta_info = meta_match.group(1)
             desc = meta_match.group(2).strip()
@@ -438,9 +441,9 @@ def _build_html(tldr, news_items, community_pulse, topic,
             f'<div class="gh-row">'
             f'<div class="gh-icon">{icon}</div>'
             f'<div class="gh-content">'
-            f'<a href="{url}" class="gh-title" target="_blank">{title}</a>'
-            f'<div class="gh-meta">{meta_info}{" · " + date if date else ""}</div>'
-            + (f'<div class="gh-desc">{desc}</div>' if desc else '')
+            f'<a href="{_esc(url)}" class="gh-title" target="_blank">{_esc(title)}</a>'
+            f'<div class="gh-meta">{_esc(meta_info)}{" · " + _esc(date) if date else ""}</div>'
+            + (f'<div class="gh-desc">{_esc(desc)}</div>' if desc else '')
             + f'</div>'
             f'</div>'
         )
@@ -469,16 +472,16 @@ def _build_html(tldr, news_items, community_pulse, topic,
         if len(post) > 300:
             post = post[:297] + "..."
 
-        topic_tag = f'<span class="pulse-vendor">{topic}</span>' if topic else ""
-        eng_html = f'<span class="xt-engagement">{engagement}</span>' if engagement else ""
-        link_html = f'<a href="{url}" class="x-link" target="_blank">View post →</a>' if url else ""
+        topic_tag = f'<span class="pulse-vendor">{_esc(topic)}</span>' if topic else ""
+        eng_html = f'<span class="xt-engagement">{_esc(engagement)}</span>' if engagement else ""
+        link_html = f'<a href="{_esc(url)}" class="x-link" target="_blank">View post →</a>' if url else ""
         xai_trending_html += (
             f'<div class="xt-row">'
             f'<div class="xt-icon">𝕏</div>'
             f'<div class="xt-content">'
-            f'<div class="xt-author">{name} <span class="xt-handle">{author}</span></div>'
-            f'<p class="xt-post">"{post}"</p>'
-            f'<div class="xt-meta">{eng_html}{" · " + date if date else ""} {topic_tag}</div>'
+            f'<div class="xt-author">{_esc(name)} <span class="xt-handle">{_esc(author)}</span></div>'
+            f'<p class="xt-post">"{_esc(post)}"</p>'
+            f'<div class="xt-meta">{eng_html}{" · " + _esc(date) if date else ""} {topic_tag}</div>'
             f'{link_html}'
             f'</div>'
             f'</div>'
@@ -508,8 +511,8 @@ def _build_html(tldr, news_items, community_pulse, topic,
         new_badge   = '<span class="new-badge">NEW</span>' if is_today else ""
         date_html   = f'<span class="pub-date">📅 {pub_date}</span>' if pub_date else ""
         sources_html = "".join(
-            f'<a href="{u}" target="_blank" class="source-link">'
-            f'{u[:65]}{"..." if len(u) > 65 else ""}</a>'
+            f'<a href="{_esc(u)}" target="_blank" class="source-link">'
+            f'{_esc(u[:65])}{"..." if len(u) > 65 else ""}</a>'
             for u in urls if u
         )
         sources_block = f'<div class="sources">{sources_html}</div>' if sources_html else ""
@@ -519,14 +522,14 @@ def _build_html(tldr, news_items, community_pulse, topic,
 
         cards += f"""<div class="news-card">
 <div class="card-header">
-<span class="badge" style="background:{bg};color:#fff">{vendor}</span>
+<span class="badge" style="background:{bg};color:#fff">{_esc(vendor)}</span>
 {new_badge}
-<h3 class="en-content">{headline}</h3>
-<h3 class="he-content" style="display:none;direction:rtl;text-align:right">{headline_he}</h3>
+<h3 class="en-content">{_esc(headline)}</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">{_esc(headline_he)}</h3>
 </div>
 {date_html}
-<p class="summary en-content">{summary}</p>
-<p class="summary he-content" style="display:none;direction:rtl;text-align:right">{summary_he}</p>
+<p class="summary en-content">{_esc(summary)}</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">{_esc(summary_he)}</p>
 {sources_block}
 </div>
 """
@@ -557,17 +560,16 @@ def _build_html(tldr, news_items, community_pulse, topic,
     community_he_html = _community_pulse_html(community_pulse_he)
 
     def _url_label(u: str) -> str:
-        import re as _re
         if "x.com/" in u or "twitter.com/" in u:
-            m = _re.search(r'(?:x|twitter)\.com/([^/]+)/status', u)
+            m = re.search(r'(?:x|twitter)\.com/([^/]+)/status', u)
             return f"𝕏 @{m.group(1)}" if m else "𝕏 post"
         if "reddit.com/" in u:
-            m = _re.search(r'reddit\.com/r/([^/]+)', u)
+            m = re.search(r'reddit\.com/r/([^/]+)', u)
             return f"Reddit · r/{m.group(1)}" if m else "Reddit thread"
         if "news.ycombinator.com" in u:
             return "Hacker News discussion"
         if "github.com/" in u:
-            m = _re.search(r'github\.com/([^/]+/[^/]+)', u)
+            m = re.search(r'github\.com/([^/]+/[^/]+)', u)
             return f"GitHub · {m.group(1)}" if m else "GitHub"
         if "linkedin.com/" in u:
             return "LinkedIn post"

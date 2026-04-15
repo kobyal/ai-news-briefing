@@ -8,6 +8,7 @@ class NewsItem(BaseModel):
     headline: str
     published_date: str
     summary: str
+    detail: str = ""
     urls: List[str]
 
 
@@ -34,4 +35,5 @@ class HebrewBriefing(BaseModel):
     tldr_he: List[str]
     headlines_he: List[str]
     summaries_he: List[str] = []
+    details_he: List[str] = []
     community_pulse_he: str

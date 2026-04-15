@@ -32,8 +32,10 @@ TRACKED_HANDLES = [
     {"name": "Google DeepMind", "handle": "GoogleDeepMind", "org": "Google", "role": "Official account"},
     {"name": "Demis Hassabis", "handle": "demishassabis", "org": "Google DeepMind", "role": "CEO"},
     {"name": "Claude", "handle": "claudeai", "org": "Anthropic", "role": "Official account"},
-    {"name": "Uri Eliabayev", "handle": "urieli17", "org": "Anthropic", "role": "Claude engineer"},
+
     {"name": "Anthropic", "handle": "AnthropicAI", "org": "Anthropic", "role": "Official account"},
+    {"name": "AWS", "handle": "awscloud", "org": "AWS", "role": "Official account"},
+    {"name": "Swami Sivasubramanian", "handle": "SwamiSivasubram", "org": "AWS", "role": "VP of Agentic AI"},
 ]
 
 
@@ -88,6 +90,9 @@ def _grok_search(prompt: str, label: str = "", handles: list[str] | None = None)
                 for content in item.get("content", []):
                     if content.get("type") == "output_text":
                         text = content.get("text", "")
+                        # Strip Grok citation XML tags from response
+                        text = re.sub(r'<grok:render[^>]*>.*?</grok:render>', '', text, flags=re.DOTALL)
+                        text = re.sub(r'</?grok:[^>]*>', '', text)
                         elapsed = time.time() - t0
                         print(f"    ✓  {label:<35} {elapsed:4.1f}s  [x_search]")
                         return text
@@ -153,8 +158,9 @@ def _fetch_people(api_key: str) -> list[dict]:
         name = person["name"]
         handle = person["handle"]
         prompt = (
-            f"Search X/Twitter for the most recent post by @{handle} ({name}) about AI "
+            f"Search X/Twitter for the most recent post by @{handle} ({name}) "
             f"from the past {days} days (today is {today}). "
+            f"Any post about AI, tech, their products, or industry news counts. "
             f"I need the ACTUAL tweet — not a made-up one. "
             f"Return ONLY a JSON object:\n"
             f'{{"post": "exact quote from their actual tweet", '

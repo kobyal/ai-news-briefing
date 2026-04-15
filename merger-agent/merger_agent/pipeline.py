@@ -360,6 +360,39 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
             label="Translator-B (summaries)",
         )
 
+    # ── Call D: details (in-depth analysis) ────────────────────────────────────
+    def _translate_details():
+        details = [it.get("detail", "") for it in items]
+        if not any(details):
+            return '{"details_he": []}'
+        details_input = json.dumps(
+            {"details": details},
+            ensure_ascii=False, indent=2,
+        )
+        return _agent(
+            input_text=(
+                "אתה כתב טכנולוגיה בכיר ב-Geektime. כתוב מחדש את הניתוחים המעמיקים הבאים בעברית — לא תרגום, כתיבה מאפס.\n\n"
+                "הקורא: מפתח/ת ישראלי/ת שעובד/ת עם AI ביומיום.\n\n"
+                "כללים:\n"
+                "- שמות חברות ומוצרים — תמיד באנגלית (Claude, OpenAI, AWS, Bedrock, Gemini וכו׳)\n"
+                "- מונחים טכניים באנגלית: AI, API, LLM, benchmark, agent, open-source, cybersecurity, inference, token, prompt, deploy, fine-tune, alignment, sandbox, zero-day\n"
+                "- launched = 'השיקה' תמיד. לעולם לא 'הטיסה'.\n"
+                "- כתוב בגוף שלישי פעיל: 'השיקה', 'חשפה', 'הכריזה' (לא 'הושקה', 'הוכרזה')\n"
+                "- שמור על 2-3 פסקאות לכל ניתוח — אל תקצר.\n"
+                "- אם המשפט נשמע מתורגם — כתוב אותו מחדש.\n\n"
+                + details_input
+                + '\n\nהחזר JSON בלבד: {"details_he": ["ניתוח 1", "ניתוח 2", ...]}'
+            ),
+            model=_TRANSLATOR_MODEL(),
+            instructions=(
+                "Output ONLY a valid JSON object with key details_he (array of strings). "
+                "No markdown fences. CRITICAL: escape all \" inside strings as \\\"."
+            ),
+            json_mode=True,
+            max_steps=1,
+            label="Translator-D (details)",
+        )
+
     # ── Call C: people highlights + community pulse items ─────────────────────
     def _translate_people_and_pulse():
         social = social_data or {}
@@ -427,10 +460,12 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
 
     result_short = "{}"
     result_summaries = "{}"
+    result_details = "{}"
     result_people = "{}"
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    with ThreadPoolExecutor(max_workers=4) as pool:
         f_short     = pool.submit(_translate_short)
         f_summaries = pool.submit(_translate_summaries)
+        f_details   = pool.submit(_translate_details)
         f_people    = pool.submit(_translate_people_and_pulse)
         try:
             result_short     = f_short.result()
@@ -441,6 +476,10 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
         except Exception as e:
             print(f"  [Translator-B] failed: {e}")
         try:
+            result_details   = f_details.result()
+        except Exception as e:
+            print(f"  [Translator-D] failed: {e}")
+        try:
             result_people    = f_people.result()
         except Exception as e:
             print(f"  [Translator-C] failed: {e}")
@@ -450,6 +489,9 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
     summaries_he = _parse(result_summaries).get("summaries_he", [])
     if summaries_he:
         he["summaries_he"] = summaries_he
+    details_he = _parse(result_details).get("details_he", [])
+    if details_he:
+        he["details_he"] = details_he
     people_parsed = _parse(result_people)
     if people_parsed.get("people_he"):
         he["people_he"] = people_parsed["people_he"]

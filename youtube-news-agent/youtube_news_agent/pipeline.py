@@ -20,7 +20,7 @@ from pathlib import Path
 import requests
 
 _TODAY = lambda: datetime.now().strftime("%B %d, %Y")
-_LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
+_LOOKBACK_DAYS = lambda: int(os.environ.get("YOUTUBE_LOOKBACK_DAYS", os.environ.get("LOOKBACK_DAYS", "7")))
 
 # ---------------------------------------------------------------------------
 # Quality AI YouTube channels — curated list
@@ -62,8 +62,21 @@ AI_CHANNELS = {
 
     # Official vendor channels
     "Google DeepMind": "UUVHFbqXqoYvEWM1Ddxl0QDg",
+    "Google Cloud Tech": "UUJS9pqu9BzkAMNTmzNMNhvg",
+    "Google for Developers": "UU_x5XG1OV2P6uZZ5FSM9Ttw",
     "OpenAI": "UUXnFR3s-a-YIcbpL8E5N9HA",
     "NVIDIA": "UUCHX5YhceI5bTHG0GmzZRQQ",
+    "Claude": "UUV03SRZXJEz-hchIAogeJOg",
+    "Amazon Web Services": "UUd6MoB9NC6uYN2grvUNT-Zg",
+    "AWS Events": "UUdoadna9HFHsxXWhafhNvKw",
+
+    # Hebrew AI channels
+    "CloudAI Hebrew": "UUe_KktK0vsy8jTfLiI9ukFg",
+    "TrashTech": "UUwywdccdYsNS_Cs6tS0U_dg",
+    "YUV AI": "UU4xudd2ZKjw-OdzR72UY74w",
+
+    # Additional English channels
+    "Lex Fridman": "UUSHZKyawb77ixDdsGog4iWA",
 }
 
 # Targeted searches (only as supplement — max 4 to save quota)
@@ -128,8 +141,13 @@ _ALWAYS_AI_CHANNELS = {
     "Prompt Engineering", "WorldofAI", "The AI Advantage", "Matt Wolfe",
     "Yannic Kilcher", "Machine Learning Street Talk", "All About AI",
     "Cole Medin", "Sam Witteveen", "Cognitive Revolution Podcast",
-    "OpenAI", "Google DeepMind",
+    "OpenAI", "Google DeepMind", "Google Cloud Tech", "Google for Developers",
+    "Claude", "Amazon Web Services", "AWS Events",
+    "CloudAI Hebrew", "TrashTech", "YUV AI", "Lex Fridman",
 }
+
+# Hebrew channels — skip English filter for these
+_HEBREW_CHANNELS = {"CloudAI Hebrew", "TrashTech", "YUV AI"}
 
 
 def _is_ai_relevant(title: str, description: str = "", channel: str = "") -> bool:
@@ -212,11 +230,11 @@ def _fetch_channel_videos(api_key: str) -> list[dict]:
                 except Exception:
                     continue
 
-                # Filter spam, non-English, and non-AI content
+                # Filter spam, non-English (except Hebrew channels), and non-AI content
                 desc_text = snippet.get("description", "")
                 if _is_spam(title, desc_text):
                     continue
-                if not _is_english(title):
+                if channel_name not in _HEBREW_CHANNELS and not _is_english(title):
                     continue
                 if not _is_ai_relevant(title, desc_text, channel_name):
                     continue
@@ -408,7 +426,7 @@ def run_pipeline() -> dict:
 
     # Format output
     news_items = []
-    for v in filtered[:15]:
+    for v in filtered[:20]:
         views_str = _format_views(v.get("views", 0))
         channel = v.get("channel", "")
         summary = v.get("description", "")

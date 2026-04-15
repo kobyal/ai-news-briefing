@@ -305,7 +305,7 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
     )
 
 
-def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: list = None) -> str:
+def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: list = None, xai_data: dict = None) -> str:
     print("\n[3/4] Translator — three parallel calls (headers+pulse / summaries / people+pulse-items)...")
     full  = _parse(merged_json)
     items = full.get("news_items", [])
@@ -395,14 +395,16 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
             label="Translator-D (details)",
         )
 
-    # ── Call C: people highlights + community pulse items ─────────────────────
+    # ── Call C: people highlights + community pulse items + twitter descs ─────
     def _translate_people_and_pulse():
         social = social_data or {}
         people = social.get("people_highlights", []) or []
         pulse_items = full.get("community_pulse_items", []) or []
         yt_items = youtube_data or []
+        xai = xai_data or {}
+        trending = xai.get("trending", []) or []
 
-        if not people and not pulse_items and not yt_items:
+        if not people and not pulse_items and not yt_items and not trending:
             return "{}"
 
         translate_input = {}
@@ -433,6 +435,20 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
             if yt_descs:
                 translate_input["youtube_descs"] = yt_descs
 
+        if trending:
+            # Short post summaries for Hebrew readers (not full translation)
+            twitter_posts = []
+            for tp in trending[:10]:
+                post = tp.get("post", "") or tp.get("tweet", "")
+                post = re.sub(r'<grok:render[\s\S]*?</grok:render>', '', post)
+                post = re.sub(r'</?(?:grok:[^>]*|argument[^>]*)>', '', post)
+                author = tp.get("name", "") or tp.get("author", "")
+                topic = tp.get("topic", "")
+                if post:
+                    twitter_posts.append(f"{author}: {post[:200]}" + (f" [{topic}]" if topic else ""))
+            if twitter_posts:
+                translate_input["twitter_posts"] = twitter_posts
+
         return _agent(
             input_text=(
                 "אתה כתב טכנולוגיה בכיר ב-Geektime. כתוב מחדש את התוכן הבא בעברית — לא תרגום, כתיבה מאפס.\n\n"
@@ -447,7 +463,8 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
                 + '\n\nהחזר JSON בלבד עם:\n'
                   '- people_he: [{\"post_he\": \"...\", \"why_he\": \"...\"}] (אותו סדר)\n'
                   '- pulse_items_he: [{\"headline_he\": \"...\", \"body_he\": \"...\"}] (אותו סדר)\n'
-                  '- youtube_descs_he: [\"תיאור 1\", \"תיאור 2\", ...] (אותו סדר, רק אם youtube_descs קיים)'
+                  '- youtube_descs_he: [\"תיאור 1\", \"תיאור 2\", ...] (אותו סדר, רק אם youtube_descs קיים)\n'
+                  '- twitter_descs_he: [\"משפט אחד שמסביר במה הפוסט עוסק\", ...] (אותו סדר, רק אם twitter_posts קיים — לא תרגום! שורה אחת קצרה שמסבירה על מה הפוסט מדבר)'
             ),
             model=_TRANSLATOR_MODEL(),
             instructions=(
@@ -500,6 +517,8 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
         he["pulse_items_he"] = people_parsed["pulse_items_he"]
     if people_parsed.get("youtube_descs_he"):
         he["youtube_descs_he"] = people_parsed["youtube_descs_he"]
+    if people_parsed.get("twitter_descs_he"):
+        he["twitter_descs_he"] = people_parsed["twitter_descs_he"]
 
     try:
         return json.dumps(he, ensure_ascii=False)
@@ -598,7 +617,7 @@ def run_pipeline() -> dict:
         print(f"  URL validation: {total_urls - stripped_urls}/{total_urls} passed, {stripped_urls} stripped")
 
     try:
-        hebrew_json = _step3_translate(merged_json, social_data=social_briefing, youtube_data=youtube_data)
+        hebrew_json = _step3_translate(merged_json, social_data=social_briefing, youtube_data=youtube_data, xai_data=xai_data)
     except Exception as e:
         print(f"  [Translator] failed ({e}) — publishing without Hebrew")
         hebrew_json = "{}"

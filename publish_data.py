@@ -12,7 +12,8 @@ def _latest(pattern):
     files = sorted(glob.glob(pattern, recursive=True), reverse=True)
     if files:
         print(f"  {files[0]}")
-        return json.load(open(files[0], encoding="utf-8"))
+        with open(files[0], encoding="utf-8") as f:
+            return json.load(f)
     return {}
 
 print("Finding latest outputs:")

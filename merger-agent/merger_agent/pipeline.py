@@ -13,12 +13,14 @@ Steps
 """
 import json
 import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import anthropic
+import requests
 
 from .prompts import MERGER_PROMPT, TRANSLATOR_PROMPT, VENDOR_ENUM
 from .schemas import BriefingContent, HebrewBriefing
@@ -58,7 +60,7 @@ def _find_latest_json(output_dir: Path) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
-# Core: single Perplexity Agent API call (same as perplexity pipeline)
+# Core: Anthropic API call
 # ---------------------------------------------------------------------------
 
 def _agent(
@@ -416,15 +418,14 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
             ]
         if yt_items:
             # Extract descriptions (strip [Channel · views] prefix)
-            import re as _re
             yt_descs = []
             for v in yt_items[:8]:
                 summary = v.get("summary", "")
-                m = _re.match(r'\[([^\]]+)\]\s*(.*)', summary, _re.DOTALL)
+                m = re.match(r'\[([^\]]+)\]\s*(.*)', summary, re.DOTALL)
                 desc = m.group(2).strip() if m else summary.strip()
                 # Clean sponsor text
-                desc = _re.sub(r'https?://\S+', '', desc).strip()
-                desc = _re.sub(r'(?i)(try|get|check out|sign up|use code|sponsored by|thank you .{0,30} for sponsoring).*$', '', desc, flags=_re.MULTILINE).strip()
+                desc = re.sub(r'https?://\S+', '', desc).strip()
+                desc = re.sub(r'(?i)(try|get|check out|sign up|use code|sponsored by|thank you .{0,30} for sponsoring).*$', '', desc, flags=re.MULTILINE).strip()
                 lines = [l.strip() for l in desc.split('\n') if l.strip()]
                 desc = lines[0] if lines else ""
                 if desc:
@@ -580,7 +581,7 @@ def run_pipeline() -> dict:
         for url in item.get("urls", []):
             total_urls += 1
             try:
-                resp = __import__("requests").head(url, timeout=8, allow_redirects=True,
+                resp = requests.head(url, timeout=8, allow_redirects=True,
                     headers={"User-Agent": "Mozilla/5.0 (compatible; ai-news-briefing/1.0)"})
                 if resp.status_code < 400:
                     valid_urls.append(url)

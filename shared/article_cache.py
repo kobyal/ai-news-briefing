@@ -7,7 +7,6 @@ Auto-cleans cache dirs older than 3 days on startup.
 import fcntl
 import hashlib
 import json
-import os
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path

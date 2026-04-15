@@ -1,6 +1,6 @@
 """Pydantic schemas for the Merger pipeline (same structure as source pipelines)."""
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class NewsItem(BaseModel):
@@ -8,7 +8,10 @@ class NewsItem(BaseModel):
     headline: str
     published_date: str
     summary: str
-    detail: str = ""
+    detail: str = Field(
+        ...,
+        description="2-3 paragraphs of in-depth analysis with specific numbers, quotes, technical details, competitive context, and implications.",
+    )
     urls: List[str]
 
 

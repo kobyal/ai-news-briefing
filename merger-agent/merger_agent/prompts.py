@@ -85,6 +85,10 @@ Produce ONE merged briefing as a JSON object. Rules:
    - headline: specific and descriptive
    - published_date: exact date (e.g. "April 4, 2026"). "Date unknown" if not available.
    - summary: 2-4 sentences, concrete details from all sources combined
+   - detail: 2-3 paragraphs in-depth analysis. Include specific numbers, quotes, technical details,
+     competitive context, and implications. This is the "full article" view — give the reader enough
+     depth that they understand the story fully without clicking through to sources.
+     Use the FULL ARTICLE CONTENT above to write richer detail with facts the summary omits.
    - urls: 1-4 deduplicated source URLs; at least 1 per story
 
 Return ONLY valid JSON — no markdown fences, no explanation, just the JSON object.
@@ -124,9 +128,10 @@ TRANSLATOR_PROMPT = """\
 תוכן לכתיבה מחדש בעברית:
 {briefing_json}
 
-החזר JSON תקין בלבד עם ארבעה שדות:
+החזר JSON תקין בלבד עם חמישה שדות:
 - tldr_he: רשימה של 8-10 משפטי בולט בעברית (מתורגם מ-tldr)
 - headlines_he: רשימה של כותרות בעברית באותו סדר כמו headlines (מחרוזת אחת לכל כותרת)
 - summaries_he: רשימה של תקצירים בעברית באותו סדר כמו summaries (פסקה אחת לכל כתבה)
+- details_he: רשימה של ניתוחים מעמיקים בעברית באותו סדר כמו details (2-3 פסקאות לכל כתבה)
 - community_pulse_he: מחרוזת עברית עם נקודות בולט (• לפני כל נקודה)
 """

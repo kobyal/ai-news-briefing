@@ -573,7 +573,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
             return f"GitHub · {m.group(1)}" if m else "GitHub"
         if "linkedin.com/" in u:
             return "LinkedIn post"
-        m = _re.search(r'https?://(?:www\.)?([^/]+)', u)
+        m = re.search(r'https?://(?:www\.)?([^/]+)', u)
         return m.group(1) if m else u[:50]
 
     community_sources_html = "".join(

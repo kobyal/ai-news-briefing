@@ -347,7 +347,7 @@ python3 run.py
 
 ### 8. YouTube News Agent (`youtube-news-agent/`)
 
-Video discovery layer that pulls from `26` curated channels, adds `4` targeted searches, fetches stats, filters aggressively, and emits a JSON section for direct rendering in the merged HTML.
+Video discovery layer that pulls from `35` curated channels (including Hebrew channels and official vendor channels), adds `4` targeted searches, fetches stats, filters aggressively, and emits a JSON section for direct rendering in the merged HTML. Uses a 7-day lookback (independent of other agents' 3-day default).
 
 ```mermaid
 flowchart LR
@@ -617,10 +617,11 @@ The frontend is a **Next.js** static-export app in `web/`. It fetches data from 
 | Route | Description |
 |-------|-------------|
 | `/` | Homepage — TL;DR, stories grid, vendor filter, community/social sections |
-| `/stories` | Full story archive with hero + grid layout |
-| `/community` | People highlights, Reddit, community pulse |
-| `/media` | YouTube, GitHub trending, X/Twitter |
-| `/archive` | Calendar view of past briefings |
+| `/community/` | X/Twitter trending + people posts (deduplicated, with Hebrew descriptions) |
+| `/media/` | Latest AI videos (2-col grid), curated YouTube channels (15) + podcasts (8) |
+| `/github/` | GitHub Trending (coming soon) |
+| `/archive/` | Calendar view of past briefings |
+| `/story?id=` | Individual story detail page |
 | `/[date]` | Individual day briefing |
 
 ### Local development
@@ -667,7 +668,7 @@ cdk deploy --all
 | Israel Time | UTC | Lambda | Purpose |
 |-------------|-----|--------|---------|
 | 06:00 | 03:00 | `ai-news-trigger` | Kick off GitHub Actions pipeline (budget mode by default) |
-| 06:20 | 03:20 | `ai-news-ingest` | Ingest to DynamoDB after pipeline completes |
+| 06:30 | 03:30 | `ai-news-ingest` | Ingest to DynamoDB after pipeline completes (~18 min + GH Pages deploy) |
 
 ### GitHub Actions workflow modes
 

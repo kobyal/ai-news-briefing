@@ -89,7 +89,9 @@ Produce ONE merged briefing as a JSON object. Rules:
      competitive context, and implications. This is the "full article" view — give the reader enough
      depth that they understand the story fully without clicking through to sources.
      Use the FULL ARTICLE CONTENT above to write richer detail with facts the summary omits.
-   - urls: 1-4 deduplicated source URLs; at least 1 per story
+   - urls: 1-4 deduplicated source URLs. CRITICAL: every story MUST have at least 1 URL.
+     Stories without source URLs look unverifiable — always include the best source link.
+     If the original sources don't have URLs, use the vendor's official blog/newsroom URL.
 
 Return ONLY valid JSON — no markdown fences, no explanation, just the JSON object.
 """

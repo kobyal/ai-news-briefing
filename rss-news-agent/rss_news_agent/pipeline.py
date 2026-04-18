@@ -94,18 +94,18 @@ def _step1_fetch(lookback_days: int) -> tuple[list, list]:
 def _step2_synthesise(vendor_articles: list, community_articles: list) -> str:
     print("\n[2/4] BriefingWriter — synthesising RSS articles into structured JSON...")
 
-    # Build context for LLM — top 40 vendor articles + top 10 community
+    # Build context for LLM — top 60 vendor articles + top 20 community
     vendor_ctx = "\n\n".join(
         f"[{i+1}] VENDOR: {a['vendor']}\n"
         f"HEADLINE: {a['headline']}\n"
         f"DATE: {a['published_date']}\n"
         f"SUMMARY: {a['summary'][:400]}\n"
         f"URL: {a['urls'][0] if a['urls'] else ''}"
-        for i, a in enumerate(vendor_articles[:40])
+        for i, a in enumerate(vendor_articles[:60])
     )
     community_ctx = "\n\n".join(
         f"• {a['headline']} ({a['published_date']}) — {a['summary']}\n  URL: {a['urls'][0]}"
-        for a in community_articles[:10]
+        for a in community_articles[:20]
     )
 
     prompt = f"""Today is {_TODAY()}. You are an AI news editor.
@@ -120,13 +120,13 @@ COMMUNITY POSTS:
 
 Write a structured briefing JSON with:
 1. tldr: 5-6 bullets covering the most important stories. Each: vendor + what happened + why it matters (15-25 words).
-2. news_items: 8-12 items. Select the most significant stories from the vendor articles. For each:
+2. news_items: 12-18 items. Select the most significant stories from the vendor articles. For each:
    - vendor: "Anthropic" | "AWS" | "OpenAI" | "Google" | "Azure" | "Meta" | "xAI" | "NVIDIA" | "Mistral" | "Apple" | "Hugging Face" | "Other"
    - headline: specific and descriptive
    - published_date: exact date from source
    - summary: 2-4 sentences with concrete details
    - urls: 1-3 URLs from the article list above (use the [N] index to pick matching URLs). Each URL once only.
-3. community_pulse: 4-6 bullet points (each starting with "• ") covering specific developer reactions, hot HN threads, or Reddit discussions from the community posts above. Be concrete — mention actual topics and sentiment.
+3. community_pulse: 6-8 bullet points (each starting with "• ") covering specific developer reactions, hot HN threads, or Reddit discussions from the community posts above. Be concrete — mention actual subreddit names, HN scores, topics, and community sentiment.
 4. community_urls: 2-4 URLs from the community posts.
 
 Return ONLY valid JSON. No markdown fences."""
@@ -182,7 +182,7 @@ def _step3_translate(briefing_json: str) -> str:
     )
 
 
-def _step4_publish(briefing_json: str, hebrew_json: str) -> dict:
+def _step4_publish(briefing_json: str, hebrew_json: str, community_articles: list = None) -> dict:
     print("\n[4/4] Publisher — building HTML newsletter...")
     result = build_and_save_html(briefing_json, hebrew_json, topic="AI")
 
@@ -190,8 +190,29 @@ def _step4_publish(briefing_json: str, hebrew_json: str) -> dict:
     json_path = html_path.replace(".html", ".json")
     data = _parse(briefing_json)
     he   = _parse(hebrew_json)
+
+    # Save raw Reddit/community posts so the merger can populate "Hot on Reddit"
+    reddit_posts = []
+    for a in (community_articles or []):
+        url = (a.get("urls") or [""])[0]
+        if "reddit.com" not in url:
+            continue
+        sub_match = __import__("re").search(r"reddit\.com/r/([^/]+)", url)
+        reddit_posts.append({
+            "subreddit": sub_match.group(1) if sub_match else a.get("vendor", ""),
+            "title":     a.get("headline", ""),
+            "url":       url,
+            "score":     a.get("_score", 0),  # comments count (scores are fuzzed by Reddit)
+            "date":      a.get("published_date", ""),
+        })
+
     with open(json_path, "w", encoding="utf-8") as f:
-        json.dump({"source": "rss", "briefing": data, "briefing_he": he}, f, ensure_ascii=False)
+        json.dump({
+            "source": "rss",
+            "briefing": data,
+            "briefing_he": he,
+            "reddit_posts": reddit_posts,
+        }, f, ensure_ascii=False)
     result["json_saved_to"] = json_path
     return result
 
@@ -212,7 +233,7 @@ def run_pipeline() -> dict:
     vendor_articles, community_articles = _step1_fetch(_LOOKBACK_DAYS())
     briefing_json = _step2_synthesise(vendor_articles, community_articles)
     hebrew_json   = _step3_translate(briefing_json)
-    result        = _step4_publish(briefing_json, hebrew_json)
+    result        = _step4_publish(briefing_json, hebrew_json, community_articles)
 
     elapsed = time.time() - t_start
     print(f"\n{'='*60}")

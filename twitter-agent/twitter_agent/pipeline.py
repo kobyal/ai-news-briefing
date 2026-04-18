@@ -64,17 +64,31 @@ EP_USER_TWEETS         = "https://x.com/i/api/graphql/QWF3SzpHmykQHsQMixG0cg/Use
 EP_SEARCH              = "https://x.com/i/api/graphql/R0u1RWRf748KzyGBXvOYRA/SearchTimeline"
 
 TRACKED_HANDLES = [
+    # ── OpenAI ────────────────────────────────────────────────────────────────
     {"name": "Sam Altman",          "handle": "sama",           "org": "OpenAI",      "role": "CEO"},
-    {"name": "Dario Amodei",        "handle": "DarioAmodei",    "org": "Anthropic",   "role": "CEO"},
-    {"name": "Andrej Karpathy",     "handle": "karpathy",       "org": "Independent", "role": "AI educator"},
     {"name": "OpenAI",              "handle": "OpenAI",         "org": "OpenAI",      "role": "Official"},
+    {"name": "Greg Brockman",       "handle": "gdb",            "org": "OpenAI",      "role": "President"},
+    # ── Anthropic ─────────────────────────────────────────────────────────────
+    {"name": "Dario Amodei",        "handle": "DarioAmodei",    "org": "Anthropic",   "role": "CEO"},
     {"name": "Anthropic",           "handle": "AnthropicAI",    "org": "Anthropic",   "role": "Official"},
     {"name": "Boris Cherny",        "handle": "bcherny",        "org": "Anthropic",   "role": "Claude Code lead"},
+    # ── Google ────────────────────────────────────────────────────────────────
     {"name": "Google DeepMind",     "handle": "GoogleDeepMind", "org": "Google",      "role": "Official"},
     {"name": "Demis Hassabis",      "handle": "demishassabis",  "org": "Google",      "role": "CEO"},
+    {"name": "Jeff Dean",           "handle": "JeffDean",       "org": "Google",      "role": "Chief Scientist"},
+    # ── AWS / Amazon ──────────────────────────────────────────────────────────
     {"name": "AWS",                 "handle": "awscloud",       "org": "AWS",         "role": "Official"},
     {"name": "Swami Sivasubramanian","handle": "SwamiSivasubram","org": "AWS",         "role": "VP Agentic AI"},
+    # ── Meta ──────────────────────────────────────────────────────────────────
     {"name": "Yann LeCun",          "handle": "ylecun",         "org": "Meta",        "role": "Chief AI Scientist"},
+    # ── NVIDIA / others ───────────────────────────────────────────────────────
+    {"name": "Jim Fan",             "handle": "drjimfan",       "org": "NVIDIA",      "role": "Senior Research Manager"},
+    # ── Independent researchers / influencers ─────────────────────────────────
+    {"name": "Andrej Karpathy",     "handle": "karpathy",       "org": "Independent", "role": "AI educator"},
+    {"name": "Simon Willison",      "handle": "simonw",         "org": "Independent", "role": "AI commentator"},
+    {"name": "Ethan Mollick",       "handle": "emollick",       "org": "Wharton",     "role": "AI researcher"},
+    {"name": "François Chollet",    "handle": "fchollet",       "org": "Google",      "role": "Keras creator"},
+    {"name": "Lex Fridman",         "handle": "lexfridman",     "org": "Independent", "role": "AI podcaster"},
 ]
 
 AI_SEARCH_QUERIES = [
@@ -303,7 +317,7 @@ def run_pipeline() -> dict:
     # --- People highlights ---
     print(f"\n[1/2] Fetching {len(TRACKED_HANDLES)} AI leaders on X...")
     people = []
-    with ThreadPoolExecutor(max_workers=5) as pool:
+    with ThreadPoolExecutor(max_workers=8) as pool:
         futures = {pool.submit(_fetch_person, p, auth_token, ct0, cutoff_ts): p for p in TRACKED_HANDLES}
         for fut in as_completed(futures):
             result = fut.result()

@@ -32,8 +32,11 @@ except ImportError:
 FEEDS = [
     # ---- Anthropic -------------------------------------------------------
     ("https://www.anthropic.com/rss.xml",                                  "Anthropic",     "rss"),
+    ("https://github.com/anthropics/claude-code/releases.atom",            "Anthropic",     "rss"),
+    ("https://github.com/anthropics/anthropic-sdk-python/releases.atom",   "Anthropic",     "rss"),
     # ---- OpenAI ----------------------------------------------------------
     ("https://openai.com/news/rss.xml",                                    "OpenAI",        "rss"),
+    ("https://github.com/openai/openai-python/releases.atom",              "OpenAI",        "rss"),
     # ---- Google ----------------------------------------------------------
     ("https://deepmind.google/blog/rss.xml",                               "Google",        "rss"),
     ("https://blog.research.google/feeds/posts/default",                   "Google",        "rss"),
@@ -73,6 +76,7 @@ FEEDS = [
     ("https://developer.nvidia.com/blog/feed/",                            "NVIDIA",        "rss"),
     # ---- Mistral ---------------------------------------------------------
     ("https://mistral.ai/feed/",                                           "Mistral",       "rss"),
+    ("https://github.com/mistralai/mistral-common/releases.atom",          "Mistral",       "rss"),
     # ---- Apple -----------------------------------------------------------
     ("https://machinelearning.apple.com/rss.xml",                          "Apple",         "rss"),
     ("https://9to5mac.com/tag/apple-intelligence/feed/",                   "Apple",         "rss"),

@@ -86,7 +86,7 @@ def _agent(
         try:
             resp = client.messages.create(
                 model=model,
-                max_tokens=16384,
+                max_tokens=32000,
                 system=system_prompt,
                 messages=[{"role": "user", "content": input_text}],
                 timeout=600,  # 10 min timeout
@@ -246,6 +246,13 @@ def _step1_load_sources() -> tuple:
                 "top_reddit": [],
             }
             print(f"  Found: Social/xAI ({len(xai_people)} people, {len(xai_trending)} trending)")
+
+    # Reddit posts from RSS agent (Arctic Shift) — populate Hot on Reddit section
+    if rss_data:
+        reddit_posts = rss_data.get("reddit_posts", [])
+        if reddit_posts:
+            social_briefing["top_reddit"] = reddit_posts
+            print(f"  Found: Reddit posts from RSS ({len(reddit_posts)} posts)")
 
     # Enriched articles from Article Reader
     enriched_articles = _load_article_reader()
@@ -575,8 +582,9 @@ def run_pipeline() -> dict:
             raise RuntimeError(f"Merger returned invalid JSON after retry: {repr(merged_json[:200])}")
 
     # Filter out stale stories (older than 3 days)
+    # Use start-of-day cutoff so stories from exactly N days ago are kept
     parsed = _parse(merged_json)
-    cutoff = datetime.now() - timedelta(days=3)
+    cutoff = (datetime.now() - timedelta(days=3)).replace(hour=0, minute=0, second=0, microsecond=0)
     original_count = len(parsed.get("news_items", []))
     fresh_items = []
     for item in parsed.get("news_items", []):

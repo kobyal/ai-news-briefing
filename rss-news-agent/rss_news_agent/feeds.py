@@ -304,11 +304,17 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
 
     url already contains the subreddit param, e.g.:
       https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=MachineLearning
+
+    Uses a 7-day lookback (regardless of pipeline lookback_days) so posts have had
+    time to accumulate upvotes — gives the "Hot on Reddit" section meaningful scores.
     """
     if not _HAS_REQUESTS:
         return []
 
-    after_ts = int(since.timestamp())
+    # Use at least 7-day window for Reddit so high-voted posts surface, not just brand-new ones
+    min_since = datetime.now(tz=timezone.utc) - timedelta(days=7)
+    reddit_since = min(since, min_since)  # take the earlier date
+    after_ts = int(reddit_since.timestamp())
     params = {
         "limit": 50,
         "after": after_ts,
@@ -335,6 +341,9 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
 
         if not title or not permalink:
             continue
+        # Skip removed/deleted posts
+        if title.startswith("[") or not post.get("author") or post.get("removed_by_category"):
+            continue
 
         reddit_link = f"https://reddit.com{permalink}"
         urls = [reddit_link]
@@ -343,14 +352,15 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
 
         pub = datetime.fromtimestamp(int(ts), tz=timezone.utc) if ts else None
         vendor = _infer_vendor(title, post.get("selftext", ""), "Other")
+        num_comments = post.get("num_comments", 0)
         articles.append({
             "vendor":         vendor,
             "headline":       title,
             "published_date": pub.strftime("%B %d, %Y") if pub else "Date unknown",
-            "summary":        f"r/{sub} — {score} upvotes, {post.get('num_comments', 0)} comments.",
+            "summary":        f"r/{sub} — {score} upvotes, {num_comments} comments.",
             "urls":           urls,
             "_pub_dt":        pub,
-            "_score":         score,
+            "_score":         num_comments,  # use comments as engagement proxy (scores fuzzed)
             "_is_community":  True,
         })
         if len(articles) >= max_items:

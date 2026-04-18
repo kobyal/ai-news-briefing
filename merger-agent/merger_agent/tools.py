@@ -331,8 +331,10 @@ def _build_html(tldr, news_items, community_pulse, topic,
     # ── Social: Hot on Reddit ───────────────────────────────────────────────
     top_reddit = [
         p for p in (social_data.get("top_reddit", []) or [])
-        if p.get("score", 0) > 0 and p.get("title")
+        if p.get("title")
         and "no reddit posts" not in p.get("title", "").lower()
+        and "removed by moderator" not in p.get("title", "").lower()
+        and not p.get("title", "").startswith("[")
     ]
     reddit_rows_html = ""
     for p in top_reddit[:8]:
@@ -340,7 +342,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
         title = p.get("title", "")
         score = p.get("score", 0)
         url   = p.get("url", "")
-        score_label = "hot" if score == 1 else f"▲ {score:,}"
+        score_label = f"💬 {score:,}" if score > 0 else ""
         reddit_rows_html += (
             f'<div class="reddit-row">'
             f'<span class="reddit-sub">{_esc(sub)}</span>'
@@ -352,7 +354,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
     reddit_section_html = ""
     if reddit_rows_html:
         reddit_section_html = f"""<div class="reddit-card">
-<div class="section-label" style="margin-top:0">🟠 Hot on Reddit</div>
+<div class="section-label" style="margin-top:0">🟠 From Reddit</div>
 {reddit_rows_html}
 </div>"""
 

@@ -26,7 +26,7 @@ except ImportError:
 
 # ---------------------------------------------------------------------------
 # Feed registry — (url, vendor_tag, type)
-# type: "rss" | "hn" | "hf_papers" | "reddit"
+# type: "rss" | "hn" | "hf_papers" | "pullpush"
 # ---------------------------------------------------------------------------
 
 FEEDS = [
@@ -114,10 +114,8 @@ FEEDS = [
     # ---- Community / research signal -------------------------------------
     ("https://hacker-news.firebaseio.com/v0/topstories.json",              "Other",         "hn"),
     ("https://huggingface.co/api/daily_papers",                            "Hugging Face",  "hf_papers"),
-    ("https://www.reddit.com/r/MachineLearning/hot.json",                  "Other",         "reddit"),
-    ("https://www.reddit.com/r/LocalLLaMA/hot.json",                       "Other",         "reddit"),
-    ("https://www.reddit.com/r/artificial/hot.json",                       "Other",         "reddit"),
-    ("https://www.reddit.com/r/singularity/hot.json",                      "Other",         "reddit"),
+    # PullPush: no-auth Reddit search — replaces unauthenticated hot.json (blocked by Reddit)
+    ("https://api.pullpush.io/reddit/search/submission/",                  "Other",         "pullpush"),
 ]
 
 import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
@@ -291,42 +289,70 @@ def _fetch_hf_papers(url: str, since: datetime) -> List[dict]:
         return []
 
 
-def _fetch_reddit(url: str, vendor_tag: str, since: datetime, max_items: int = 15) -> List[dict]:
-    """Fetch Reddit hot posts from a subreddit JSON endpoint."""
+def _fetch_pullpush(url: str, since: datetime, max_items: int = 30) -> List[dict]:
+    """Search Reddit via PullPush (no auth required) for AI-related posts."""
     if not _HAS_REQUESTS:
         return []
+
+    AI_QUERY = (
+        "chatgpt OR claude OR gemini OR openai OR anthropic OR llm OR "
+        "mistral OR llama OR gpt OR nvidia OR \"machine learning\" OR "
+        "\"artificial intelligence\" OR \"deep learning\" OR \"hugging face\""
+    )
+
+    after_ts = int(since.timestamp())
+    params = {
+        "q":         AI_QUERY,
+        "after":     after_ts,
+        "size":      100,
+        "sort_type": "score",
+        "sort":      "desc",
+        "score":     ">10",  # cut low-signal noise
+    }
+
     try:
         headers = {"User-Agent": "ai-briefing-bot/1.0"}
-        data = _requests.get(url, headers=headers, timeout=10).json()
-        posts = data.get("data", {}).get("children", [])
-        articles = []
-        cutoff_ts = since.timestamp()
-        for post in posts[:50]:
-            d = post.get("data", {})
-            ts = d.get("created_utc", 0)
-            if ts < cutoff_ts:
-                continue
-            title  = d.get("title", "")
-            link   = d.get("url") or f"https://reddit.com{d.get('permalink', '')}"
-            score  = d.get("score", 0)
-            sub    = d.get("subreddit", "")
-            vendor = _infer_vendor(title, "", vendor_tag)
-            articles.append({
-                "vendor":         vendor,
-                "headline":       title,
-                "published_date": datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%B %d, %Y"),
-                "summary":        f"r/{sub} — {score} upvotes, {d.get('num_comments', 0)} comments.",
-                "urls":           [f"https://reddit.com{d.get('permalink', '')}", link],
-                "_pub_dt":        datetime.fromtimestamp(ts, tz=timezone.utc),
-                "_score":         score,
-                "_is_community":  True,
-            })
-            if len(articles) >= max_items:
-                break
-        return articles
+        resp = _requests.get(url, params=params, headers=headers, timeout=15)
+        resp.raise_for_status()
+        posts = resp.json().get("data", [])
     except Exception as e:
-        print(f"  [Reddit] Error {url}: {e}")
+        print(f"  [PullPush] Error: {e}")
         return []
+
+    articles = []
+    for post in posts:
+        ts    = post.get("created_utc", 0)
+        title = post.get("title", "")
+        sub   = post.get("subreddit", "")
+        score = post.get("score", 0)
+        permalink = post.get("permalink", "")
+        ext_url = post.get("url", "")
+
+        if not title or not permalink:
+            continue
+
+        reddit_link = f"https://reddit.com{permalink}"
+        urls = [reddit_link]
+        if ext_url and ext_url != reddit_link and not ext_url.startswith("https://www.reddit.com"):
+            urls.append(ext_url)
+
+        pub = datetime.fromtimestamp(ts, tz=timezone.utc) if ts else None
+        vendor = _infer_vendor(title, post.get("selftext", ""), "Other")
+        articles.append({
+            "vendor":         vendor,
+            "headline":       title,
+            "published_date": pub.strftime("%B %d, %Y") if pub else "Date unknown",
+            "summary":        f"r/{sub} — {score} upvotes, {post.get('num_comments', 0)} comments.",
+            "urls":           urls,
+            "_pub_dt":        pub,
+            "_score":         score,
+            "_is_community":  True,
+        })
+        if len(articles) >= max_items:
+            break
+
+    print(f"  [PullPush] {len(articles)} posts")
+    return articles
 
 
 # ---------------------------------------------------------------------------
@@ -356,8 +382,8 @@ def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
                 futures.append(pool.submit(_fetch_hn, url, since))
             elif feed_type == "hf_papers":
                 futures.append(pool.submit(_fetch_hf_papers, url, since))
-            elif feed_type == "reddit":
-                futures.append(pool.submit(_fetch_reddit, url, vendor_tag, since))
+            elif feed_type == "pullpush":
+                futures.append(pool.submit(_fetch_pullpush, url, since))
 
         for f in concurrent.futures.as_completed(futures):
             try:

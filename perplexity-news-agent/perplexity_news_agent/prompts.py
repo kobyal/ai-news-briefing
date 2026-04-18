@@ -28,7 +28,8 @@ SUMMARY: [2-3 sentences with concrete details — model names, numbers, capabili
 SOURCES: [list the citation URLs, one per line]
 
 If nothing was published in the last {{lookback_days}} day(s), report the most recent story \
-and note its actual date. If a vendor had no significant news, write "No major news found."
+IF it is from within the past 7 days, and note its actual date. \
+If the most recent story is older than 7 days, or a vendor had no significant news, write "No major news found."
 """
 
 COMMUNITY_RESEARCHER_PROMPT = """\

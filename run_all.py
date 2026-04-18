@@ -27,7 +27,8 @@ AGENTS = {
     "newsapi":    ("newsapi-agent/run.py",            "free",  "NewsAPI (free tier)"),
     "youtube":    ("youtube-news-agent/run.py",       "free",  "YouTube Data API (free quota)"),
     "github":     ("github-trending-agent/run.py",    "free",  "GitHub API (free)"),
-    "xai":        ("xai-twitter-agent/run.py",        "paid",  "xAI Grok-4 (~$0.35/run)"),
+    "xai":        ("xai-twitter-agent/run.py",        "paid",  "xAI Grok-4 (~$0.35/run) — disabled"),
+    "twitter":    ("twitter-agent/run.py",             "free",  "X GraphQL direct (no API key)"),
     # Merger (always runs last)
     "merger":     ("merger-agent/run.py",             "paid",  "Anthropic Claude"),
 }
@@ -38,7 +39,7 @@ AGENT_DISPLAY = {
     "article": "Article Reader Agent",
     "exa": "Exa News Agent", "newsapi": "NewsAPI Agent",
     "youtube": "YouTube News Agent", "github": "GitHub Trending Agent",
-    "xai": "xAI Twitter Agent", "merger": "Merger Agent",
+    "xai": "xAI Twitter Agent", "twitter": "Twitter Agent", "merger": "Merger Agent",
 }
 
 

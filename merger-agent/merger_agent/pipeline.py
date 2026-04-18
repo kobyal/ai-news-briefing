@@ -224,10 +224,13 @@ def _step1_load_sources() -> tuple:
         if github_data:
             print(f"  Found: GitHub ({len(github_data)} items)")
 
-    # xAI Twitter — serves as social source (people + trending + community)
+    # Twitter/social — check twitter-agent first, fall back to xai-twitter-agent
     xai_data = {}
     social_briefing = {}
-    xai_raw = _find_latest_json(_ROOT / "xai-twitter-agent" / "output")
+    xai_raw = (
+        _find_latest_json(_ROOT / "twitter-agent" / "output")
+        or _find_latest_json(_ROOT / "xai-twitter-agent" / "output")
+    )
     if xai_raw:
         xai_briefing = xai_raw.get("briefing", xai_raw)
         xai_people = xai_briefing.get("people_highlights", [])

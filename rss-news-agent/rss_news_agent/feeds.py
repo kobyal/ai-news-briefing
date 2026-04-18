@@ -26,7 +26,7 @@ except ImportError:
 
 # ---------------------------------------------------------------------------
 # Feed registry — (url, vendor_tag, type)
-# type: "rss" | "hn" | "hf_papers" | "pullpush"
+# type: "rss" | "hn" | "hf_papers" | "arctic"
 # ---------------------------------------------------------------------------
 
 FEEDS = [
@@ -114,8 +114,14 @@ FEEDS = [
     # ---- Community / research signal -------------------------------------
     ("https://hacker-news.firebaseio.com/v0/topstories.json",              "Other",         "hn"),
     ("https://huggingface.co/api/daily_papers",                            "Hugging Face",  "hf_papers"),
-    # PullPush: no-auth Reddit search — replaces unauthenticated hot.json (blocked by Reddit)
-    ("https://api.pullpush.io/reddit/search/submission/",                  "Other",         "pullpush"),
+    # Arctic Shift: no-auth Reddit archive — recent posts by subreddit (replaces blocked hot.json)
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=MachineLearning", "Other", "arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=LocalLLaMA",      "Other", "arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=artificial",      "Other", "arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=singularity",     "Other", "arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ChatGPT",         "Other", "arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ClaudeAI",        "Other", "arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=OpenAI",          "Other", "arctic"),
 ]
 
 import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
@@ -289,34 +295,29 @@ def _fetch_hf_papers(url: str, since: datetime) -> List[dict]:
         return []
 
 
-def _fetch_pullpush(url: str, since: datetime, max_items: int = 30) -> List[dict]:
-    """Search Reddit via PullPush (no auth required) for AI-related posts."""
+def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[dict]:
+    """Fetch Reddit posts via Arctic Shift archive API (no auth required).
+
+    url already contains the subreddit param, e.g.:
+      https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=MachineLearning
+    """
     if not _HAS_REQUESTS:
         return []
 
-    AI_QUERY = (
-        "chatgpt OR claude OR gemini OR openai OR anthropic OR llm OR "
-        "mistral OR llama OR gpt OR nvidia OR \"machine learning\" OR "
-        "\"artificial intelligence\" OR \"deep learning\" OR \"hugging face\""
-    )
-
     after_ts = int(since.timestamp())
     params = {
-        "q":         AI_QUERY,
-        "after":     after_ts,
-        "size":      100,
-        "sort_type": "score",
-        "sort":      "desc",
-        "score":     ">10",  # cut low-signal noise
+        "limit": 50,
+        "after": after_ts,
     }
 
     try:
         headers = {"User-Agent": "ai-briefing-bot/1.0"}
         resp = _requests.get(url, params=params, headers=headers, timeout=15)
         resp.raise_for_status()
-        posts = resp.json().get("data", [])
+        posts = resp.json().get("data") or []
     except Exception as e:
-        print(f"  [PullPush] Error: {e}")
+        sub = url.split("subreddit=")[-1]
+        print(f"  [ArcticShift] r/{sub} error: {e}")
         return []
 
     articles = []
@@ -333,10 +334,10 @@ def _fetch_pullpush(url: str, since: datetime, max_items: int = 30) -> List[dict
 
         reddit_link = f"https://reddit.com{permalink}"
         urls = [reddit_link]
-        if ext_url and ext_url != reddit_link and not ext_url.startswith("https://www.reddit.com"):
+        if ext_url and not ext_url.startswith("https://www.reddit.com"):
             urls.append(ext_url)
 
-        pub = datetime.fromtimestamp(ts, tz=timezone.utc) if ts else None
+        pub = datetime.fromtimestamp(int(ts), tz=timezone.utc) if ts else None
         vendor = _infer_vendor(title, post.get("selftext", ""), "Other")
         articles.append({
             "vendor":         vendor,
@@ -351,7 +352,6 @@ def _fetch_pullpush(url: str, since: datetime, max_items: int = 30) -> List[dict
         if len(articles) >= max_items:
             break
 
-    print(f"  [PullPush] {len(articles)} posts")
     return articles
 
 
@@ -382,8 +382,8 @@ def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
                 futures.append(pool.submit(_fetch_hn, url, since))
             elif feed_type == "hf_papers":
                 futures.append(pool.submit(_fetch_hf_papers, url, since))
-            elif feed_type == "pullpush":
-                futures.append(pool.submit(_fetch_pullpush, url, since))
+            elif feed_type == "arctic":
+                futures.append(pool.submit(_fetch_arctic_shift, url, since))
 
         for f in concurrent.futures.as_completed(futures):
             try:

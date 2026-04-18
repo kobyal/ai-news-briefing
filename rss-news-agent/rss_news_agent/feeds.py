@@ -30,17 +30,23 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 FEEDS = [
-    # ---- Official vendor blogs -------------------------------------------
+    # ---- Anthropic -------------------------------------------------------
     ("https://www.anthropic.com/rss.xml",                                  "Anthropic",     "rss"),
+    # ---- OpenAI ----------------------------------------------------------
     ("https://openai.com/news/rss.xml",                                    "OpenAI",        "rss"),
+    # ---- Google ----------------------------------------------------------
     ("https://deepmind.google/blog/rss.xml",                               "Google",        "rss"),
     ("https://blog.research.google/feeds/posts/default",                   "Google",        "rss"),
+    ("https://research.google/blog/rss",                                   "Google",        "rss"),
     ("https://developers.googleblog.com/feeds/posts/default",              "Google",        "rss"),
+    ("https://blog.google/technology/ai/rss/",                             "Google",        "rss"),
+    ("https://blog.tensorflow.org/feeds/posts/default",                    "Google",        "rss"),
+    # ---- AWS -------------------------------------------------------------
     ("https://aws.amazon.com/about-aws/whats-new/recent/feed/",            "AWS",           "rss"),
     ("https://aws.amazon.com/blogs/machine-learning/feed/",                "AWS",           "rss"),
     ("https://aws.amazon.com/blogs/machine-learning/tag/generative-ai/feed/", "AWS",        "rss"),
     ("https://aws.amazon.com/blogs/aws/feed/",                             "AWS",           "rss"),
-    ("https://www.aboutamazon.com/news/aws/rss",                           "AWS",           "rss"),
+    ("https://www.aboutamazon.com/news/artificial-intelligence/rss",       "AWS",           "rss"),
     ("https://aws.amazon.com/blogs/big-data/feed/",                        "AWS",           "rss"),
     ("https://aws.amazon.com/blogs/architecture/feed/",                    "AWS",           "rss"),
     ("https://aws.amazon.com/blogs/compute/feed/",                         "AWS",           "rss"),
@@ -48,15 +54,31 @@ FEEDS = [
     ("https://aws.amazon.com/blogs/business-productivity/feed/",           "AWS",           "rss"),
     ("https://aws.amazon.com/blogs/database/feed/",                        "AWS",           "rss"),
     ("https://aws.amazon.com/blogs/containers/feed/",                      "AWS",           "rss"),
+    ("https://aws.amazon.com/blogs/hpc/feed/",                             "AWS",           "rss"),
+    ("https://aws.amazon.com/blogs/opensource/feed/",                      "AWS",           "rss"),
+    ("https://aws.amazon.com/blogs/security/feed/",                        "AWS",           "rss"),
+    ("https://aws.amazon.com/blogs/developer/feed/",                       "AWS",           "rss"),
+    # ---- Azure / Microsoft -----------------------------------------------
     ("https://blogs.microsoft.com/ai/feed/",                               "Azure",         "rss"),
     ("https://blogs.microsoft.com/blog/feed/",                             "Azure",         "rss"),
+    ("https://azure.microsoft.com/en-us/blog/feed/",                       "Azure",         "rss"),
+    ("https://www.microsoft.com/en-us/research/blog/feed/",                "Azure",         "rss"),
+    ("https://devblogs.microsoft.com/semantic-kernel/feed/",               "Azure",         "rss"),
+    # ---- Meta ------------------------------------------------------------
     ("https://ai.meta.com/blog/feed/",                                     "Meta",          "rss"),
     ("https://engineering.fb.com/feed/",                                   "Meta",          "rss"),
+    ("https://pytorch.org/blog/feed.xml",                                  "Meta",          "rss"),
+    # ---- NVIDIA ----------------------------------------------------------
     ("https://blogs.nvidia.com/blog/category/deep-learning/feed/",         "NVIDIA",        "rss"),
     ("https://developer.nvidia.com/blog/feed/",                            "NVIDIA",        "rss"),
+    # ---- Mistral ---------------------------------------------------------
     ("https://mistral.ai/feed/",                                           "Mistral",       "rss"),
+    # ---- Apple -----------------------------------------------------------
     ("https://machinelearning.apple.com/rss.xml",                          "Apple",         "rss"),
+    ("https://9to5mac.com/tag/apple-intelligence/feed/",                   "Apple",         "rss"),
+    # ---- Hugging Face ----------------------------------------------------
     ("https://huggingface.co/blog/feed.xml",                               "Hugging Face",  "rss"),
+    # ---- Alibaba / Qwen --------------------------------------------------
     ("https://qwenlm.github.io/feed.xml",                                  "Alibaba",       "rss"),
     # ---- News aggregators / tech press -----------------------------------
     ("https://techcrunch.com/category/artificial-intelligence/feed/",      "Other",         "rss"),
@@ -64,19 +86,31 @@ FEEDS = [
     ("https://planet-ai.net/rss.xml",                                      "Other",         "rss"),
     ("https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",  "Other",         "rss"),
     ("https://feeds.arstechnica.com/arstechnica/technology-lab",           "Other",         "rss"),
-    ("https://www.technologyreview.com/feed/",                             "Other",         "rss"),
+    ("https://www.technologyreview.com/topic/artificial-intelligence/feed/", "Other",       "rss"),
     ("https://www.wired.com/feed/tag/ai/latest/rss",                       "Other",         "rss"),
     ("https://the-decoder.com/feed/",                                      "Other",         "rss"),
     ("https://siliconangle.com/feed/",                                     "Other",         "rss"),
+    ("https://artificialintelligence-news.com/feed/",                      "Other",         "rss"),
+    ("https://marktechpost.com/feed/",                                     "Other",         "rss"),
+    ("https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss",  "Other",         "rss"),
+    ("https://thenewstack.io/feed/",                                       "Other",         "rss"),
+    ("https://syncedreview.com/feed/",                                     "Other",         "rss"),
     # NOTE: The Information requires a paid subscription; may return 403.
     ("https://www.theinformation.com/feed",                                "Other",         "rss"),
     # ---- Research / academic ---------------------------------------------
     ("http://arxiv.org/rss/cs.AI",                                         "Other",         "rss"),
     ("http://arxiv.org/rss/cs.CL",                                         "Other",         "rss"),
-    # ---- Newsletters / Substacks / influential commentators --------------
+    ("http://arxiv.org/rss/cs.LG",                                         "Other",         "rss"),
+    ("https://bair.berkeley.edu/blog/feed.xml",                            "Other",         "rss"),
+    ("https://lilianweng.github.io/index.xml",                             "Other",         "rss"),
+    ("https://www.alignmentforum.org/feed.xml",                            "Other",         "rss"),
+    # ---- Newsletters / Substacks -----------------------------------------
     ("https://importai.substack.com/feed",                                 "Other",         "rss"),
     ("https://www.deeplearning.ai/the-batch/feed/",                        "Other",         "rss"),
     ("https://simonwillison.net/atom/everything/",                         "Other",         "rss"),
+    ("https://lastweekin.ai/feed",                                         "Other",         "rss"),
+    ("https://thesequence.substack.com/feed",                              "Other",         "rss"),
+    ("https://www.interconnects.ai/feed",                                  "Other",         "rss"),
     # ---- Community / research signal -------------------------------------
     ("https://hacker-news.firebaseio.com/v0/topstories.json",              "Other",         "hn"),
     ("https://huggingface.co/api/daily_papers",                            "Hugging Face",  "hf_papers"),

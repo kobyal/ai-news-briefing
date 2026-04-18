@@ -31,19 +31,24 @@ except ImportError:
 
 FEEDS = [
     # ---- Official vendor blogs -------------------------------------------
+    ("https://www.anthropic.com/rss.xml",                                  "Anthropic",     "rss"),
     ("https://openai.com/news/rss.xml",                                    "OpenAI",        "rss"),
     ("https://deepmind.google/blog/rss.xml",                               "Google",        "rss"),
     ("https://blog.research.google/feeds/posts/default",                   "Google",        "rss"),
+    ("https://developers.googleblog.com/feeds/posts/default",              "Google",        "rss"),
     ("https://aws.amazon.com/blogs/machine-learning/feed/",                "AWS",           "rss"),
-    ("https://aws.amazon.com/blogs/aws/feed/",                            "AWS",           "rss"),
-    ("https://www.aboutamazon.com/news/aws/rss",                          "AWS",           "rss"),
+    ("https://aws.amazon.com/blogs/aws/feed/",                             "AWS",           "rss"),
+    ("https://www.aboutamazon.com/news/aws/rss",                           "AWS",           "rss"),
     ("https://blogs.microsoft.com/ai/feed/",                               "Azure",         "rss"),
+    ("https://blogs.microsoft.com/blog/feed/",                             "Azure",         "rss"),
     ("https://ai.meta.com/blog/feed/",                                     "Meta",          "rss"),
+    ("https://engineering.fb.com/feed/",                                   "Meta",          "rss"),
     ("https://blogs.nvidia.com/blog/category/deep-learning/feed/",         "NVIDIA",        "rss"),
+    ("https://developer.nvidia.com/blog/feed/",                            "NVIDIA",        "rss"),
     ("https://mistral.ai/feed/",                                           "Mistral",       "rss"),
     ("https://machinelearning.apple.com/rss.xml",                          "Apple",         "rss"),
     ("https://huggingface.co/blog/feed.xml",                               "Hugging Face",  "rss"),
-    ("https://x.ai/blog/rss.xml",                                         "xAI",           "rss"),
+    ("https://qwenlm.github.io/feed.xml",                                  "Alibaba",       "rss"),
     # ---- News aggregators / tech press -----------------------------------
     ("https://techcrunch.com/category/artificial-intelligence/feed/",      "Other",         "rss"),
     ("https://venturebeat.com/category/ai/feed/",                          "Other",         "rss"),
@@ -52,20 +57,24 @@ FEEDS = [
     ("https://feeds.arstechnica.com/arstechnica/technology-lab",           "Other",         "rss"),
     ("https://www.technologyreview.com/feed/",                             "Other",         "rss"),
     ("https://www.wired.com/feed/tag/ai/latest/rss",                       "Other",         "rss"),
-    # NOTE: The Information requires a paid subscription; feed may return
-    #       partial content or 403. Kept here for completeness.
+    ("https://the-decoder.com/feed/",                                      "Other",         "rss"),
+    ("https://siliconangle.com/feed/",                                     "Other",         "rss"),
+    # NOTE: The Information requires a paid subscription; may return 403.
     ("https://www.theinformation.com/feed",                                "Other",         "rss"),
     # ---- Research / academic ---------------------------------------------
     ("http://arxiv.org/rss/cs.AI",                                         "Other",         "rss"),
     ("http://arxiv.org/rss/cs.CL",                                         "Other",         "rss"),
-    # ---- Newsletters / Substacks -----------------------------------------
+    # ---- Newsletters / Substacks / influential commentators --------------
     ("https://importai.substack.com/feed",                                 "Other",         "rss"),
     ("https://www.deeplearning.ai/the-batch/feed/",                        "Other",         "rss"),
+    ("https://simonwillison.net/atom/everything/",                         "Other",         "rss"),
     # ---- Community / research signal -------------------------------------
     ("https://hacker-news.firebaseio.com/v0/topstories.json",              "Other",         "hn"),
     ("https://huggingface.co/api/daily_papers",                            "Hugging Face",  "hf_papers"),
     ("https://www.reddit.com/r/MachineLearning/hot.json",                  "Other",         "reddit"),
     ("https://www.reddit.com/r/LocalLLaMA/hot.json",                       "Other",         "reddit"),
+    ("https://www.reddit.com/r/artificial/hot.json",                       "Other",         "reddit"),
+    ("https://www.reddit.com/r/singularity/hot.json",                      "Other",         "reddit"),
 ]
 
 import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))

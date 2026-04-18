@@ -1,17 +1,15 @@
-# AI News Briefing - 10 Collection Agents + Final Merger
+# AI News Briefing - 9 Collection Agents + Final Merger
 
-This repo runs **10 collection/enrichment agents in parallel**, then a final **Merger Agent** turns the latest outputs into one bilingual AI briefing in English and Hebrew.
+This repo runs **9 collection/enrichment agents in parallel**, then a final **Merger Agent** turns the latest outputs into one bilingual AI briefing in English and Hebrew.
 
 The current architecture is:
 - **4 core source pipelines**: ADK, Perplexity, RSS, Tavily
-- **6 supplemental agents**: Article Reader, Exa, NewsAPI, YouTube, GitHub Trending, xAI Twitter
+- **5 supplemental agents**: Article Reader, Exa, NewsAPI, YouTube, GitHub Trending
 - **1 final merger**: loads the latest outputs, deduplicates stories, translates to Hebrew, and publishes the combined HTML
-
-The xAI Twitter agent also serves as the social data source (people highlights, trending posts, community pulse).
 
 **Live site:** [duus0s1bicxag.cloudfront.net](https://duus0s1bicxag.cloudfront.net/) (CloudFront) | [kobyal.github.io/ai-news-briefing](https://kobyal.github.io/ai-news-briefing) (GitHub Pages — raw HTML)
 
-**Suggested GitHub About text:** `10-agent AI news collection + merger pipeline: ADK, Perplexity, RSS, Tavily, Article Reader, Exa, NewsAPI, YouTube, GitHub Trending, xAI Twitter -> bilingual EN/Hebrew briefing + docs/data JSON.`
+**Suggested GitHub About text:** `9-agent AI news collection + merger pipeline: ADK, Perplexity, RSS, Tavily, Article Reader, Exa, NewsAPI, YouTube, GitHub Trending -> bilingual EN/Hebrew briefing + docs/data JSON.`
 
 ---
 
@@ -54,13 +52,12 @@ flowchart TD
         D["Tavily"]
     end
 
-    subgraph extra["6 supplemental agents"]
+    subgraph extra["5 supplemental agents"]
         F["Article Reader"]
         G["Exa"]
         H["NewsAPI"]
         I["YouTube"]
         J["GitHub Trending"]
-        K["xAI Twitter (also social source)"]
     end
 
     A --> M
@@ -71,13 +68,11 @@ flowchart TD
     H --> M
     F --> M
 
-    K --> P
     I --> P
     J --> P
 
     M["Final Merger Agent"] --> P["docs/index.html"]
     M --> D2
-    K --> D2
     I --> D2
     J --> D2["docs/data/*.json"]
 ```
@@ -95,7 +90,6 @@ flowchart TD
 | NewsAPI | Yes | No | Through merged briefing |
 | YouTube | No | Yes | Yes |
 | GitHub Trending | No | Yes | Yes |
-| xAI Twitter | Social data for merger | Yes (`trending_posts`, `people_highlights`) | Yes (social + twitter) |
 
 ---
 
@@ -106,13 +100,13 @@ flowchart LR
     subgraph collect["Collection"]
         A1["ADK google_search"]
         A2["Perplexity web_search"]
-        A3["RSS + HN + Reddit"]
+        A3["RSS + HN + Reddit (Arctic Shift)"]
         A4["Tavily news search"]
         A6["Exa semantic search"]
         A7["NewsAPI"]
         A8["YouTube Data API"]
         A9["GitHub Search + Releases API"]
-        A10["Grok + X search (social source)"]
+        A10["Reddit via Arctic Shift (no-auth)"]
         A11["Article Reader: Jina + Firecrawl"]
     end
 
@@ -229,11 +223,11 @@ python3 run.py
 
 ### 3. RSS News Agent (`rss-news-agent/`)
 
-Deterministic fetch pipeline for vendor blogs, tech feeds, Hacker News, and Reddit. No search LLM is used; LLM work only starts at synthesis.
+Deterministic fetch pipeline for vendor blogs, tech feeds, Hacker News, and Reddit (via Arctic Shift — no auth required). Covers 75+ feeds. No search LLM is used; LLM work only starts at synthesis.
 
 ```mermaid
 flowchart LR
-    A["RSS + HN + Reddit fetch"] --> B["Filter and rank"]
+    A["RSS + HN + Reddit (Arctic Shift) fetch"] --> B["Filter and rank"]
     B --> C["BriefingWriter"]
     C --> D["Translator"]
     D --> E["Publisher"]
@@ -391,27 +385,9 @@ python3 run.py
 - `GITHUB_TOKEN` optional for higher rate limits
 - `LOOKBACK_DAYS`
 
-### 10. xAI Twitter Agent (`xai-twitter-agent/`)
+### 10. xAI Twitter Agent (`xai-twitter-agent/`) — currently disabled
 
-Uses Grok to look for:
-- recent posts from `15` tracked AI leaders
-- viral AI posts on X
-- AI Twitter community signals
-
-The agent saves JSON output. `publish_data.py` includes it in `docs/data`, the merger renders trending posts as a dedicated section, and xAI people are merged into the "People Talking Today" cards.
-
-```mermaid
-flowchart LR
-    A["15 tracked handles"] --> D["Save JSON"]
-    B["Viral AI post search"] --> D
-    C["Community signal search"] --> D
-```
-
-**Run**
-```bash
-cd xai-twitter-agent
-python3 run.py
-```
+Uses Grok to search recent posts from tracked AI leaders and viral X posts. Disabled by default (`--skip xai`) due to cost (~$0.35/run). Re-enable by removing `--skip xai` from `run_all.py` in the workflow once an alternative or lower-cost approach is available.
 
 **Key env**
 - `XAI_API_KEY`
@@ -545,8 +521,8 @@ The daily schedule is driven entirely by EventBridge (no GitHub Actions cron):
 
 | Israel time | UTC | Lambda | Action |
 |---|---|---|---|
-| 06:00 | 03:00 | `ai-news-trigger` | Dispatches GitHub Actions workflow |
-| 06:20 | 03:20 | `ai-news-ingest` | Ingests published data into DynamoDB |
+| 09:00 | 06:00 | `ai-news-trigger` | Dispatches GitHub Actions workflow |
+| 09:30 | 06:30 | `ai-news-ingest` | Ingests published data into DynamoDB |
 
 The GitHub Actions workflow (`daily_briefing.yml`) only responds to `workflow_dispatch` — no cron. Steps:
 1. install dependencies
@@ -667,13 +643,13 @@ cdk deploy --all
 
 | Israel Time | UTC | Lambda | Purpose |
 |-------------|-----|--------|---------|
-| 06:00 | 03:00 | `ai-news-trigger` | Kick off GitHub Actions pipeline (budget mode by default) |
-| 06:30 | 03:30 | `ai-news-ingest` | Ingest to DynamoDB after pipeline completes (~18 min + GH Pages deploy) |
+| 09:00 | 06:00 | `ai-news-trigger` | Kick off GitHub Actions pipeline (budget mode by default) |
+| 09:30 | 06:30 | `ai-news-ingest` | Ingest to DynamoDB after pipeline completes (~18 min + GH Pages deploy) |
 
 ### GitHub Actions workflow modes
 
 | Mode | What runs | Cost per run |
 |------|-----------|-------------|
-| `budget` (default) | All agents except xAI | ~$1.44 |
-| `all` | Everything including xAI | ~$2.39 |
+| default | All 9 agents (xAI skipped) | ~$1.44 |
+| `--skip xai` (explicit) | Same as default | ~$1.44 |
 | `merge-only` | Just the merger | ~$0.10 |

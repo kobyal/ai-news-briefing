@@ -9,6 +9,7 @@ from email.mime.text import MIMEText
 RECIPIENT    = "kobyal@gmail.com"
 SENDER       = "kobyal@gmail.com"
 APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
+WEBSITE_URL  = "https://duus0s1bicxag.cloudfront.net"
 PAGES_BASE   = "https://kobyal.github.io/ai-news-briefing"
 
 # Find latest merged HTML
@@ -18,7 +19,7 @@ if not files:
     exit(0)
 
 latest   = files[-1]   # e.g. merger-agent/output/2026-04-04/merged_115728.html
-page_url = f"{PAGES_BASE}/index.html"
+report_url = f"{PAGES_BASE}/index.html"
 date     = datetime.now().strftime("%B %d, %Y")
 
 msg = MIMEMultipart("alternative")
@@ -29,10 +30,13 @@ msg["To"]      = RECIPIENT
 body_plain = f"""\
 Your AI Daily Briefing for {date} is ready.
 
-View it here (EN + Hebrew toggle):
-{page_url}
+Open the web app (EN + Hebrew, full experience):
+{WEBSITE_URL}
 
-Sources: ADK · Perplexity · RSS · Tavily · Exa · NewsAPI · YouTube · GitHub · xAI Twitter
+Raw briefing report:
+{report_url}
+
+Sources: ADK · Perplexity · RSS · Tavily · Exa · NewsAPI · YouTube · GitHub · Reddit
 Merged by Claude Sonnet 4
 
 ---
@@ -41,12 +45,15 @@ github.com/kobyal/ai-news-briefing
 
 body_html = f"""\
 <html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
-<h2 style="color:#1e3a5f">🎯 AI Daily Briefing — {date}</h2>
+<h2 style="color:#1e3a5f">🤖 AI Daily Briefing — {date}</h2>
 <p>Your multi-source AI news briefing is ready.</p>
-<p><a href="{page_url}" style="display:inline-block;background:#1e3a5f;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Read Today's Briefing →</a></p>
+<p>
+  <a href="{WEBSITE_URL}" style="display:inline-block;background:#d97706;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-right:12px">Open Web App →</a>
+  <a href="{report_url}" style="display:inline-block;background:#1e3a5f;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Raw Report →</a>
+</p>
 <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0">
 <p style="font-size:13px;color:#64748b">
-Sources: ADK · Perplexity · RSS · Tavily · Exa · NewsAPI · YouTube · GitHub · xAI Twitter · merged by Claude Sonnet 4<br>
+Sources: ADK · Perplexity · RSS · Tavily · Exa · NewsAPI · YouTube · GitHub · Reddit · merged by Claude Sonnet 4<br>
 <a href="https://github.com/kobyal/ai-news-briefing">github.com/kobyal/ai-news-briefing</a>
 </p>
 </body></html>

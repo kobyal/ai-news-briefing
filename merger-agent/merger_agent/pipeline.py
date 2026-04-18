@@ -602,7 +602,8 @@ def run_pipeline() -> dict:
             try:
                 resp = requests.head(url, timeout=8, allow_redirects=True,
                     headers={"User-Agent": "Mozilla/5.0 (compatible; ai-news-briefing/1.0)"})
-                if resp.status_code < 400:
+                # Accept 2xx/3xx + 403/405 (many news sites block HEAD but URL is valid)
+                if resp.status_code < 400 or resp.status_code in (403, 405):
                     valid_urls.append(url)
                 else:
                     stripped_urls += 1

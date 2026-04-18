@@ -520,9 +520,9 @@ def _build_html(tldr, news_items, community_pulse, topic,
         headline_he = headlines_he[idx] if idx < len(headlines_he) else headline
         summary_he  = summaries_he[idx] if idx < len(summaries_he) else summary
 
-        cards += f"""<div class="news-card">
+        cards += f"""<div class="news-card" data-vendor="{_esc(vendor.lower())}">
 <div class="card-header">
-<span class="badge" style="background:{bg};color:#fff">{_esc(vendor)}</span>
+<span class="badge vendor-chip-btn" style="background:{bg};color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="{_esc(vendor.lower())}">{_esc(vendor)}</span>
 {new_badge}
 <h3 class="en-content">{_esc(headline)}</h3>
 <h3 class="he-content" style="display:none;direction:rtl;text-align:right">{_esc(headline_he)}</h3>
@@ -690,11 +690,14 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .pulse-person{{font-size:11px;color:#64748b}}
 .pulse-tags{{display:flex;gap:6px;align-items:center}}
 .footer{{text-align:center;padding:20px;font-size:12px;color:#94a3b8}}
+.vf-chip{{display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;border:2px solid transparent;opacity:.75;transition:all .15s}}
+.vf-chip:hover{{opacity:1}}
+.vf-chip.active{{border-color:#fff;opacity:1;box-shadow:0 0 0 2px currentColor}}
 </style></head><body>
 <div class="header">
-<h1>⚡ {topic} Combined Briefing</h1>
+<h1>🤖 {topic} Combined Briefing</h1>
 <div class="date">{date_display}</div>
-<div class="sources-badge">Merged from <b>11 AI agents</b> · ADK · Perplexity · RSS · Tavily · Social · Exa · NewsAPI · YouTube · GitHub · Grok/X · Article Reader</div>
+<div class="sources-badge">Merged from <b>10 AI agents</b> · ADK · Perplexity · RSS · Tavily · Exa · NewsAPI · YouTube · GitHub · Article Reader</div>
 <div class="toggle">
 <button class="tbtn active" onclick="setLang('en',this)">EN</button>
 <button class="tbtn" onclick="setLang('he',this)">עברית</button>
@@ -707,6 +710,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <ul id="tldr-he" dir="rtl" style="display:none">{tldr_he_html}</ul>
 </div>
 <div class="section-label" id="news-label">Latest News</div>
+<div id="vendor-filter" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center"></div>
 {cards}
 {people_section_html}
 {reddit_section_html}
@@ -758,5 +762,28 @@ function setLang(l,btn){{
   document.querySelectorAll('.en-content').forEach(function(el){{el.style.display=en?'':'none';}});
   document.querySelectorAll('.he-content').forEach(function(el){{el.style.display=en?'none':'';}});
 }}
+var _vf=null;
+function filterVendor(v){{
+  _vf=(_vf===v)?null:v;
+  document.querySelectorAll('.vf-chip').forEach(function(c){{c.classList.toggle('active',c.dataset.v===_vf);}});
+  document.querySelectorAll('.news-card').forEach(function(card){{
+    card.style.display=(!_vf||card.dataset.vendor===_vf)?'':'none';
+  }});
+}}
+(function(){{
+  var seen={{}};var bar=document.getElementById('vendor-filter');
+  document.querySelectorAll('.news-card[data-vendor]').forEach(function(card){{
+    var v=card.dataset.vendor;
+    if(!v||seen[v])return;seen[v]=1;
+    var badge=card.querySelector('.vendor-chip-btn');
+    var bg=badge?badge.style.background:'#64748b';
+    var chip=document.createElement('span');
+    chip.className='vf-chip';chip.dataset.v=v;
+    chip.style.background=bg;chip.style.color='#fff';
+    chip.textContent=badge?badge.textContent:v;
+    chip.onclick=function(){{filterVendor(v);}};
+    bar.appendChild(chip);
+  }});
+}})();
 </script>
 </body></html>"""

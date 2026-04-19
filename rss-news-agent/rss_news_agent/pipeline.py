@@ -194,17 +194,25 @@ def _step4_publish(briefing_json: str, hebrew_json: str, community_articles: lis
     # Save top Reddit posts sorted by comment count (community_articles already sorted by _score)
     import re as _re
     reddit_posts = []
+    subreddit_counts: dict = {}
+    MAX_PER_SUB = 3
+    MIN_COMMENTS = 20
     for a in (community_articles or []):
         url = (a.get("urls") or [""])[0]
         if "reddit.com" not in url:
             continue
         title = a.get("headline", "")
         # Skip removed/deleted/low-quality posts
-        if not title or title.startswith("[") or a.get("_score", 0) < 5:
+        if not title or title.startswith("[") or a.get("_score", 0) < MIN_COMMENTS:
             continue
         sub_match = _re.search(r"reddit\.com/r/([^/]+)", url)
+        sub = sub_match.group(1) if sub_match else a.get("vendor", "")
+        # Cap per subreddit to avoid one subreddit flooding the list
+        if subreddit_counts.get(sub, 0) >= MAX_PER_SUB:
+            continue
+        subreddit_counts[sub] = subreddit_counts.get(sub, 0) + 1
         reddit_posts.append({
-            "subreddit": sub_match.group(1) if sub_match else a.get("vendor", ""),
+            "subreddit": sub,
             "title":     title,
             "url":       url,
             "score":     a.get("_score", 0),  # comments count (scores are fuzzed by Reddit)

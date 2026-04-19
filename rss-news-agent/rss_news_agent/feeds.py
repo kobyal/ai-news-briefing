@@ -124,8 +124,11 @@ FEEDS = [
     ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=artificial",      "Other", "arctic"),
     ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=singularity",     "Other", "arctic"),
     ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ChatGPT",         "Other", "arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ClaudeAI",        "Other", "arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=OpenAI",          "Other", "arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ClaudeAI",        "Anthropic", "arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=OpenAI",          "OpenAI", "arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=GoogleGemini",    "Google", "arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=Anthropic",       "Anthropic", "arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ArtificialIntelligence", "Other", "arctic"),
 ]
 
 import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))

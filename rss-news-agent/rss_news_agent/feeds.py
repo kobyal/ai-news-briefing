@@ -311,12 +311,13 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
     if not _HAS_REQUESTS:
         return []
 
-    # Use at least 7-day window for Reddit so high-voted posts surface, not just brand-new ones
+    # Use at least 7-day window for Reddit so posts have time to accumulate comments
     min_since = datetime.now(tz=timezone.utc) - timedelta(days=7)
     reddit_since = min(since, min_since)  # take the earlier date
     after_ts = int(reddit_since.timestamp())
+    # Fetch 200 posts so we can sort by comment count and pick the most engaged
     params = {
-        "limit": 50,
+        "limit": 200,
         "after": after_ts,
     }
 
@@ -363,10 +364,10 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
             "_score":         num_comments,  # use comments as engagement proxy (scores fuzzed)
             "_is_community":  True,
         })
-        if len(articles) >= max_items:
-            break
 
-    return articles
+    # Sort by comment count (most engaged posts first), then take top max_items
+    articles.sort(key=lambda a: a.get("_score", 0), reverse=True)
+    return articles[:max_items]
 
 
 # ---------------------------------------------------------------------------

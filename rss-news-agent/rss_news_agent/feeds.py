@@ -118,17 +118,17 @@ FEEDS = [
     # ---- Community / research signal -------------------------------------
     ("https://hacker-news.firebaseio.com/v0/topstories.json",              "Other",         "hn"),
     ("https://huggingface.co/api/daily_papers",                            "Hugging Face",  "hf_papers"),
-    # Arctic Shift: no-auth Reddit archive — recent posts by subreddit (replaces blocked hot.json)
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=MachineLearning", "Other", "arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=LocalLLaMA",      "Other", "arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=artificial",      "Other", "arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=singularity",     "Other", "arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ChatGPT",         "Other", "arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ClaudeAI",        "Anthropic", "arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=OpenAI",          "OpenAI", "arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=GoogleGemini",    "Google", "arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=Anthropic",       "Anthropic", "arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ArtificialIntelligence", "Other", "arctic"),
+    # Reddit hot.json — live scores and comment counts
+    ("MachineLearning",        "Other",       "reddit_hot"),
+    ("LocalLLaMA",             "Other",       "reddit_hot"),
+    ("artificial",             "Other",       "reddit_hot"),
+    ("singularity",            "Other",       "reddit_hot"),
+    ("ChatGPT",                "Other",       "reddit_hot"),
+    ("ClaudeAI",               "Anthropic",   "reddit_hot"),
+    ("OpenAI",                 "OpenAI",      "reddit_hot"),
+    ("GoogleGemini",           "Google",      "reddit_hot"),
+    ("Anthropic",              "Anthropic",   "reddit_hot"),
+    ("AINews",                  "Other",       "reddit_hot"),
 ]
 
 import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
@@ -373,6 +373,55 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
     return articles[:max_items]
 
 
+def _fetch_reddit_hot(subreddit: str, max_items: int = 25) -> List[dict]:
+    """Fetch hot posts from Reddit's public JSON API (no auth required)."""
+    if not _HAS_REQUESTS:
+        return []
+    url = f"https://www.reddit.com/r/{subreddit}/hot.json"
+    try:
+        resp = _requests.get(url, params={"limit": max_items},
+                             headers={"User-Agent": "ai-briefing-bot/1.0"}, timeout=15)
+        resp.raise_for_status()
+        children = resp.json().get("data", {}).get("children", [])
+    except Exception as e:
+        print(f"  [Reddit hot] r/{subreddit} error: {e}")
+        return []
+
+    articles = []
+    for child in children:
+        post = child.get("data", {})
+        title = post.get("title", "")
+        permalink = post.get("permalink", "")
+        score = post.get("score", 0)
+        num_comments = post.get("num_comments", 0)
+        created = post.get("created_utc", 0)
+
+        if not title or not permalink:
+            continue
+        if post.get("stickied") or post.get("removed_by_category"):
+            continue
+
+        pub = datetime.fromtimestamp(int(created), tz=timezone.utc) if created else None
+        reddit_link = f"https://reddit.com{permalink}"
+        vendor = _infer_vendor(title, post.get("selftext", ""), "Other")
+
+        articles.append({
+            "vendor":         vendor,
+            "headline":       title,
+            "published_date": pub.strftime("%B %d, %Y") if pub else "Date unknown",
+            "summary":        f"r/{subreddit} — {score} upvotes, {num_comments} comments.",
+            "detail":         "",
+            "urls":           [reddit_link],
+            "source":         f"Reddit r/{subreddit}",
+            "_pub_dt":        pub,
+            "_score":         num_comments,
+            "_is_community":  True,
+        })
+
+    articles.sort(key=lambda a: a.get("_score", 0), reverse=True)
+    return articles
+
+
 # ---------------------------------------------------------------------------
 # Main fetch entry point
 # ---------------------------------------------------------------------------
@@ -400,8 +449,8 @@ def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
                 futures.append(pool.submit(_fetch_hn, url, since))
             elif feed_type == "hf_papers":
                 futures.append(pool.submit(_fetch_hf_papers, url, since))
-            elif feed_type == "arctic":
-                futures.append(pool.submit(_fetch_arctic_shift, url, since))
+            elif feed_type == "reddit_hot":
+                futures.append(pool.submit(_fetch_reddit_hot, url))
 
         for f in concurrent.futures.as_completed(futures):
             try:

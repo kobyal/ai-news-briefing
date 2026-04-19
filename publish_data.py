@@ -30,8 +30,9 @@ github_items = (github_raw.get("briefing", {}) if isinstance(github_raw, dict) e
 
 # Twitter/social source (people + trending + community)
 twitter_briefing = (twitter_raw.get("briefing", {}) if isinstance(twitter_raw, dict) else {}) if twitter_raw else {}
-# Reddit posts from RSS agent (Arctic Shift)
-reddit_posts = (rss_raw.get("reddit_posts", []) if isinstance(rss_raw, dict) else []) if rss_raw else []
+# Reddit posts from RSS agent (Arctic Shift) — top 20 by comment count
+_raw_reddit = (rss_raw.get("reddit_posts", []) if isinstance(rss_raw, dict) else []) if rss_raw else []
+reddit_posts = sorted(_raw_reddit, key=lambda p: p.get("score", 0), reverse=True)[:20]
 social_data = {
     "people_highlights": twitter_briefing.get("people_highlights", []),
     "community_pulse": twitter_briefing.get("community_pulse", ""),

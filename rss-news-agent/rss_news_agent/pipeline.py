@@ -191,20 +191,27 @@ def _step4_publish(briefing_json: str, hebrew_json: str, community_articles: lis
     data = _parse(briefing_json)
     he   = _parse(hebrew_json)
 
-    # Save raw Reddit/community posts so the merger can populate "Hot on Reddit"
+    # Save top Reddit posts sorted by comment count (community_articles already sorted by _score)
+    import re as _re
     reddit_posts = []
     for a in (community_articles or []):
         url = (a.get("urls") or [""])[0]
         if "reddit.com" not in url:
             continue
-        sub_match = __import__("re").search(r"reddit\.com/r/([^/]+)", url)
+        title = a.get("headline", "")
+        # Skip removed/deleted/low-quality posts
+        if not title or title.startswith("[") or a.get("_score", 0) < 5:
+            continue
+        sub_match = _re.search(r"reddit\.com/r/([^/]+)", url)
         reddit_posts.append({
             "subreddit": sub_match.group(1) if sub_match else a.get("vendor", ""),
-            "title":     a.get("headline", ""),
+            "title":     title,
             "url":       url,
             "score":     a.get("_score", 0),  # comments count (scores are fuzzed by Reddit)
             "date":      a.get("published_date", ""),
         })
+        if len(reddit_posts) >= 20:  # top 20 by comment count
+            break
 
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump({

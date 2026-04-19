@@ -20,23 +20,27 @@ print("Finding latest outputs:")
 merger = _latest("merger-agent/output/**/*.json")
 youtube_raw = _latest("youtube-news-agent/output/**/*.json")
 github_raw = _latest("github-trending-agent/output/**/*.json")
-xai_raw = _latest("xai-twitter-agent/output/**/*.json")
+rss_raw = _latest("rss-news-agent/output/**/*.json")
+# twitter-agent is the active social source; fall back to xai-twitter-agent
+twitter_raw = _latest("twitter-agent/output/**/*.json") or _latest("xai-twitter-agent/output/**/*.json")
 
 # Extract news_items from standard agent format
 youtube_items = (youtube_raw.get("briefing", {}) if isinstance(youtube_raw, dict) else {}).get("news_items", [])
 github_items = (github_raw.get("briefing", {}) if isinstance(github_raw, dict) else {}).get("news_items", [])
 
-# xAI serves as the social source (people + trending + community)
-xai_briefing = (xai_raw.get("briefing", {}) if isinstance(xai_raw, dict) else {})
+# Twitter/social source (people + trending + community)
+twitter_briefing = (twitter_raw.get("briefing", {}) if isinstance(twitter_raw, dict) else {}) if twitter_raw else {}
+# Reddit posts from RSS agent (Arctic Shift)
+reddit_posts = (rss_raw.get("reddit_posts", []) if isinstance(rss_raw, dict) else []) if rss_raw else []
 social_data = {
-    "people_highlights": xai_briefing.get("people_highlights", []),
-    "community_pulse": xai_briefing.get("community_pulse", ""),
-    "top_reddit": [],
+    "people_highlights": twitter_briefing.get("people_highlights", []),
+    "community_pulse": twitter_briefing.get("community_pulse", ""),
+    "top_reddit": reddit_posts,
 }
 twitter_data = {
-    "people": xai_briefing.get("people_highlights", []),
-    "trending": xai_briefing.get("trending_posts", xai_briefing.get("trending_topics", [])),
-    "community": xai_briefing.get("community_pulse", ""),
+    "people": twitter_briefing.get("people_highlights", []),
+    "trending": twitter_briefing.get("trending_posts", twitter_briefing.get("trending_topics", [])),
+    "community": twitter_briefing.get("community_pulse", ""),
 }
 
 published = {
@@ -60,4 +64,6 @@ with open("docs/data/latest.json", "w", encoding="utf-8") as f:
 n = len(merger.get("briefing", {}).get("news_items", []))
 yt = len(youtube_items)
 gh = len(github_items)
-print(f"\nPublished {path} ({n} stories, {yt} videos, {gh} repos)")
+tw = len(twitter_data.get("people", []))
+rd = len(reddit_posts)
+print(f"\nPublished {path} ({n} stories, {yt} videos, {gh} repos, {tw} twitter people, {rd} reddit posts)")

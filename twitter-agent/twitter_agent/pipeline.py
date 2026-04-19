@@ -125,7 +125,7 @@ def _gql(url: str, variables: dict, features: dict, ct0: str, auth_token: str) -
 # User timeline fetch
 # ---------------------------------------------------------------------------
 
-def _parse_tweets(data: dict, cutoff_ts: float, handle: str) -> list[dict]:
+def _parse_tweets(data: dict, cutoff_ts: float, handle: str, allow_rt: bool = False) -> list[dict]:
     results = []
     instructions = (
         data.get("data", {})
@@ -135,6 +135,7 @@ def _parse_tweets(data: dict, cutoff_ts: float, handle: str) -> list[dict]:
             .get("timeline", {})
             .get("instructions", [])
     )
+    is_org = any(kw in handle.lower() for kw in ["openai", "anthropic", "google", "deepmind", "aws", "nvidia", "meta"])
     for instruction in instructions:
         for entry in instruction.get("entries", []):
             tweet = (
@@ -151,10 +152,8 @@ def _parse_tweets(data: dict, cutoff_ts: float, handle: str) -> list[dict]:
             retweets = legacy.get("retweet_count", 0)
             created = legacy.get("created_at", "")
             tid = legacy.get("id_str", "")
-            # Skip retweets for individuals; allow for official org accounts
-            if text.startswith("RT @") and not any(
-                kw in handle.lower() for kw in ["openai", "anthropic", "google", "deepmind", "aws", "nvidia", "meta"]
-            ):
+            # Skip retweets for individuals unless allow_rt=True (fallback)
+            if text.startswith("RT @") and not is_org and not allow_rt:
                 continue
             if not created or not tid:
                 continue
@@ -193,6 +192,9 @@ def _fetch_person(person: dict, auth_token: str, ct0: str, cutoff_ts: float) -> 
                      FEATURES, ct0, auth_token)
 
         tweets = _parse_tweets(data2, cutoff_ts, handle)
+        if not tweets:
+            # Fallback: include retweets if no original posts found
+            tweets = _parse_tweets(data2, cutoff_ts, handle, allow_rt=True)
         if not tweets:
             return None
 

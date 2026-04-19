@@ -67,4 +67,3 @@ with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
     server.sendmail(SENDER, RECIPIENT, msg.as_string())
 
 print(f"Email sent → {RECIPIENT}")
-print(f"URL: {page_url}")

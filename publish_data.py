@@ -4,7 +4,30 @@ publish_data.py — combine all agent outputs into docs/data/YYYY-MM-DD.json
 import json
 import glob
 import os
+import urllib.request
+import urllib.parse
 from datetime import datetime
+
+
+def _translate_deepl(texts: list, api_key: str) -> list:
+    """Translate a batch of texts to Hebrew via DeepL free API."""
+    if not texts or not api_key:
+        return [""] * len(texts)
+    url = "https://api-free.deepl.com/v2/translate"
+    params = [("target_lang", "HE")]
+    for text in texts:
+        params.append(("text", (text or "")[:500]))
+    data = urllib.parse.urlencode(params).encode("utf-8")
+    try:
+        req = urllib.request.Request(url, data=data, method="POST")
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        req.add_header("Authorization", f"DeepL-Auth-Key {api_key}")
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+        return [t["text"] for t in result.get("translations", [])]
+    except Exception as e:
+        print(f"  DeepL error: {e}")
+        return [""] * len(texts)
 
 date_str = datetime.utcnow().strftime("%Y-%m-%d")
 
@@ -17,17 +40,19 @@ def _latest(pattern):
     return {}
 
 def _best_rss(pattern):
-    """Pick the RSS output with the most Reddit posts; fall back to latest."""
+    """Pick the RSS output with the most quality Reddit posts (score>=20); fall back to latest."""
     files = sorted(glob.glob(pattern, recursive=True), reverse=True)
     best, best_count = None, -1
     for f in files[:6]:  # check up to 6 most recent files
         try:
             with open(f, encoding="utf-8") as fh:
                 d = json.load(fh)
-            count = len(d.get("reddit_posts", []))
+            # Count only quality posts (same threshold as publish filter)
+            quality = [p for p in d.get("reddit_posts", []) if p.get("score", 0) >= 20]
+            count = len(quality)
             if count > best_count:
                 best, best_count = d, count
-                print(f"  {f} ({count} reddit posts)")
+                print(f"  {f} ({count} quality reddit posts)")
             if best_count > 0 and f == files[0]:
                 break  # latest already has posts, no need to look further
         except Exception:
@@ -55,6 +80,17 @@ _raw_reddit = [p for p in _raw_reddit
                and not p.get("title", "").startswith("[")        # skip removed/mod posts
                and len(p.get("title", "")) > 15]                 # skip trivially short titles
 reddit_posts = sorted(_raw_reddit, key=lambda p: p.get("score", 0), reverse=True)[:20]
+
+# DeepL translations (Reddit titles + X posts → Hebrew)
+_deepl_key = os.environ.get("DEEPL_API_KEY", "")
+if _deepl_key and reddit_posts:
+    print("Translating Reddit titles to Hebrew via DeepL...")
+    _titles = [p.get("title", "") for p in reddit_posts]
+    _titles_he = _translate_deepl(_titles, _deepl_key)
+    for p, t_he in zip(reddit_posts, _titles_he):
+        p["title_he"] = t_he
+    print(f"  Translated {len(_titles_he)} Reddit titles")
+
 social_data = {
     "people_highlights": twitter_briefing.get("people_highlights", []),
     "community_pulse": twitter_briefing.get("community_pulse", ""),
@@ -65,6 +101,16 @@ twitter_data = {
     "trending": twitter_briefing.get("trending_posts", twitter_briefing.get("trending_topics", [])),
     "community": twitter_briefing.get("community_pulse", ""),
 }
+
+if _deepl_key:
+    _tw_items = twitter_data["trending"] + twitter_data["people"]
+    _tw_posts = [(i.get("post") or i.get("text") or "") for i in _tw_items]
+    if _tw_posts:
+        print(f"Translating {len(_tw_posts)} X posts to Hebrew via DeepL...")
+        _tw_he = _translate_deepl(_tw_posts, _deepl_key)
+        for item, t_he in zip(_tw_items, _tw_he):
+            item["post_he"] = t_he
+        print(f"  Translated {len(_tw_he)} X posts")
 
 published = {
     "date":        date_str,

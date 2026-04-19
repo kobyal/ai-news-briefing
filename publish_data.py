@@ -16,11 +16,29 @@ def _latest(pattern):
             return json.load(f)
     return {}
 
+def _best_rss(pattern):
+    """Pick the RSS output with the most Reddit posts; fall back to latest."""
+    files = sorted(glob.glob(pattern, recursive=True), reverse=True)
+    best, best_count = None, -1
+    for f in files[:6]:  # check up to 6 most recent files
+        try:
+            with open(f, encoding="utf-8") as fh:
+                d = json.load(fh)
+            count = len(d.get("reddit_posts", []))
+            if count > best_count:
+                best, best_count = d, count
+                print(f"  {f} ({count} reddit posts)")
+            if best_count > 0 and f == files[0]:
+                break  # latest already has posts, no need to look further
+        except Exception:
+            continue
+    return best or {}
+
 print("Finding latest outputs:")
 merger = _latest("merger-agent/output/**/*.json")
 youtube_raw = _latest("youtube-news-agent/output/**/*.json")
 github_raw = _latest("github-trending-agent/output/**/*.json")
-rss_raw = _latest("rss-news-agent/output/**/*.json")
+rss_raw = _best_rss("rss-news-agent/output/**/*.json")
 # twitter-agent is the active social source; fall back to xai-twitter-agent
 twitter_raw = _latest("twitter-agent/output/**/*.json") or _latest("xai-twitter-agent/output/**/*.json")
 

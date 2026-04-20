@@ -614,6 +614,36 @@ def run_pipeline() -> dict:
         merged_json = json.dumps(parsed, ensure_ascii=False)
         print(f"  Kept {len(fresh_items)}/{original_count} stories after freshness filter")
 
+    # Enforce URL whitelist — drop any URL the merger invented that isn't in the source briefings.
+    # Prevents cross-story URL assignment (e.g. Grok story linking to an Anthropic article).
+    def _norm_url(u: str) -> str:
+        return (u or "").split("#")[0].rstrip("/").lower()
+    whitelist = set()
+    for briefing in [adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing]:
+        for item in briefing.get("news_items", []):
+            for u in item.get("urls", []):
+                whitelist.add(_norm_url(u))
+    for src in extra_sources:
+        for item in src["briefing"].get("news_items", []):
+            for u in item.get("urls", []):
+                whitelist.add(_norm_url(u))
+    for url in enriched_articles.keys():
+        whitelist.add(_norm_url(url))
+
+    parsed = _parse(merged_json)
+    hallucinated = 0
+    for item in parsed.get("news_items", []):
+        kept = [u for u in item.get("urls", []) if _norm_url(u) in whitelist]
+        dropped = [u for u in item.get("urls", []) if _norm_url(u) not in whitelist]
+        if dropped:
+            hallucinated += len(dropped)
+            for u in dropped:
+                print(f"  ✂ Hallucinated URL dropped from '{item.get('headline', '?')[:50]}': {u[:80]}")
+        item["urls"] = kept
+    if hallucinated:
+        merged_json = json.dumps(parsed, ensure_ascii=False)
+        print(f"  URL whitelist: stripped {hallucinated} URLs not found in any source briefing")
+
     # Validate URLs — strip broken ones (404, timeouts)
     parsed = _parse(merged_json)
     total_urls = 0

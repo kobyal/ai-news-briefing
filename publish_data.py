@@ -156,49 +156,96 @@ if _fixed:
     print(f"Auto-corrected {_fixed} 'Other' vendor tags based on headline/summary keywords")
 
 # Fetch real OG images for articles missing them or with broken relative paths
-def _fetch_og_image(urls: list) -> str:
-    """Try all URLs to find an og:image or twitter:image meta tag."""
-    for url in urls:
-        try:
-            req = urllib.request.Request(url, headers={
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-            })
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                html = resp.read(80_000).decode("utf-8", errors="ignore")
-            for pattern in [
-                r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
-                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
-                r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)["\']',
-                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']twitter:image["\']',
-            ]:
-                m = re.search(pattern, html, re.I)
-                if m:
-                    img = m.group(1).strip()
-                    # Skip generic site logos that aren't real article images
-                    if img.startswith("http") and "arxiv-logo" not in img and "placeholder" not in img:
-                        return img
-        except Exception:
-            continue
+_TITLE_PATTERNS = [
+    r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']',
+    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:title["\']',
+    r'<title[^>]*>([^<]+)</title>',
+]
+_OG_IMAGE_PATTERNS = [
+    r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+    r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)["\']',
+    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']twitter:image["\']',
+]
+_STOPWORDS = {"the","a","an","and","or","but","for","with","on","in","at","to","of","is","are","was","were","be","been","new","launches","launched","announces","announced","releases","released","unveils","adds","brings","gets","from","into","over","under","this","that","these","those","it","its"}
+
+def _fetch_page(url: str) -> tuple[str, str]:
+    """Return (html, title). Returns ('', '') on failure."""
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            html = resp.read(80_000).decode("utf-8", errors="ignore")
+        title = ""
+        for pat in _TITLE_PATTERNS:
+            m = re.search(pat, html, re.I)
+            if m:
+                title = m.group(1).strip()
+                break
+        return html, title
+    except Exception:
+        return "", ""
+
+def _story_keywords(item: dict) -> set:
+    """Significant keywords from vendor + headline (≥4 chars, not stopwords)."""
+    text = f"{item.get('vendor','')} {item.get('headline','')}".lower()
+    tokens = re.findall(r"[a-z][a-z0-9]+", text)
+    return {t for t in tokens if len(t) >= 4 and t not in _STOPWORDS}
+
+def _title_matches_story(title: str, kws: set) -> bool:
+    """True if the page title shares ≥1 keyword with the story."""
+    if not title or not kws:
+        return True  # can't judge — allow
+    title_lower = title.lower()
+    return any(k in title_lower for k in kws)
+
+def _extract_og_image(html: str) -> str:
+    for pattern in _OG_IMAGE_PATTERNS:
+        m = re.search(pattern, html, re.I)
+        if m:
+            img = m.group(1).strip()
+            if img.startswith("http") and "arxiv-logo" not in img and "placeholder" not in img:
+                return img
     return ""
 
-def _needs_og(item: dict) -> bool:
-    og = item.get("og_image", "")
-    return not og or not og.startswith("http")
+def _fetch_og_for_story(item: dict) -> tuple[str, list]:
+    """Try all URLs. Drop any URL whose page title doesn't match the story. Return (og_image, kept_urls)."""
+    kws = _story_keywords(item)
+    kept_urls = []
+    og_image = ""
+    for url in item.get("urls", []):
+        html, title = _fetch_page(url)
+        if not html:
+            kept_urls.append(url)  # keep URL — might just be a fetch failure, don't penalize
+            continue
+        if not _title_matches_story(title, kws):
+            print(f"  ✂ URL mismatch for '{item.get('headline','?')[:40]}': title='{title[:60]}' url={url[:60]}")
+            continue  # drop URL — wrong topic
+        kept_urls.append(url)
+        if not og_image:
+            og_image = _extract_og_image(html) or og_image
+    return og_image, kept_urls
 
-_items_needing_og = [(i, item) for i, item in enumerate(_news_items) if _needs_og(item)]
-if _items_needing_og:
-    print(f"Fetching OG images for {len(_items_needing_og)} articles...")
-    _og_fixed = 0
-    # Fetch in parallel — try ALL URLs per item
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = {pool.submit(_fetch_og_image, item.get("urls", [])): idx for idx, item in _items_needing_og}
-        for fut in as_completed(futures):
-            idx = futures[fut]
-            og = fut.result()
-            if og:
-                _news_items[idx]["og_image"] = og
-                _og_fixed += 1
-    print(f"  Fetched {_og_fixed}/{len(_items_needing_og)} OG images")
+# Validate ALL stories' URLs against their content, and fetch OG image in the same pass.
+print(f"Validating URLs and fetching OG images for {len(_news_items)} stories...")
+_mismatches = 0
+_og_fetched = 0
+with ThreadPoolExecutor(max_workers=8) as pool:
+    futures = {pool.submit(_fetch_og_for_story, item): idx for idx, item in enumerate(_news_items)}
+    for fut in as_completed(futures):
+        idx = futures[fut]
+        og, kept = fut.result()
+        item = _news_items[idx]
+        before = len(item.get("urls", []))
+        _mismatches += (before - len(kept))
+        item["urls"] = kept
+        item["source_count"] = len(kept)
+        existing = item.get("og_image", "")
+        if (not existing or not existing.startswith("http")) and og:
+            item["og_image"] = og
+            _og_fetched += 1
+print(f"  URL sanity: dropped {_mismatches} mismatched URLs | OG images fetched: {_og_fetched}")
 
 published = {
     "date":        date_str,

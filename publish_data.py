@@ -156,22 +156,28 @@ if _fixed:
     print(f"Auto-corrected {_fixed} 'Other' vendor tags based on headline/summary keywords")
 
 # Fetch real OG images for articles missing them or with broken relative paths
-def _fetch_og_image(url: str) -> str:
-    """Fetch og:image meta tag from a URL."""
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; AIBriefingBot/1.0)"})
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            html = resp.read(50_000).decode("utf-8", errors="ignore")
-        # Match <meta property="og:image" content="...">
-        m = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html, re.I)
-        if not m:
-            m = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html, re.I)
-        if m:
-            img = m.group(1).strip()
-            if img.startswith("http"):
-                return img
-    except Exception:
-        pass
+def _fetch_og_image(urls: list) -> str:
+    """Try all URLs to find an og:image or twitter:image meta tag."""
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+            })
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                html = resp.read(80_000).decode("utf-8", errors="ignore")
+            for pattern in [
+                r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+                r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)["\']',
+                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']twitter:image["\']',
+            ]:
+                m = re.search(pattern, html, re.I)
+                if m:
+                    img = m.group(1).strip()
+                    if img.startswith("http"):
+                        return img
+        except Exception:
+            continue
     return ""
 
 def _needs_og(item: dict) -> bool:
@@ -182,15 +188,9 @@ _items_needing_og = [(i, item) for i, item in enumerate(_news_items) if _needs_o
 if _items_needing_og:
     print(f"Fetching OG images for {len(_items_needing_og)} articles...")
     _og_fixed = 0
-    # Collect all article URLs to fetch
-    _fetch_tasks = []
-    for idx, item in _items_needing_og:
-        urls = item.get("urls", [])
-        if urls:
-            _fetch_tasks.append((idx, urls[0]))
-    # Fetch in parallel
+    # Fetch in parallel — try ALL URLs per item
     with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = {pool.submit(_fetch_og_image, url): idx for idx, url in _fetch_tasks}
+        futures = {pool.submit(_fetch_og_image, item.get("urls", [])): idx for idx, item in _items_needing_og}
         for fut in as_completed(futures):
             idx = futures[fut]
             og = fut.result()

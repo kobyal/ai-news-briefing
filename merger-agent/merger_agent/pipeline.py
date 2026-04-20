@@ -60,6 +60,11 @@ def _find_latest_json(output_dir: Path) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# Usage tracking
+# ---------------------------------------------------------------------------
+_usage_log: list[dict] = []
+
+# ---------------------------------------------------------------------------
 # Core: Anthropic API call
 # ---------------------------------------------------------------------------
 
@@ -108,6 +113,8 @@ def _agent(
     usage = resp.usage if resp else None
     tokens = f"  in={usage.input_tokens} out={usage.output_tokens}" if usage else ""
     print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model}{tokens}  stop={stop}")
+    if usage:
+        _usage_log.append({"step": label, "model": model, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens})
 
     if stop == "max_tokens":
         print(f"    ⚠  [{label}] Response truncated (max_tokens) — output may be incomplete")
@@ -640,5 +647,14 @@ def run_pipeline() -> dict:
     print(f" Done in {elapsed:.0f}s")
     print(f" Output: {result['saved_to']}")
     print("=" * 60)
+
+    # Save usage report
+    if _usage_log:
+        usage_path = os.path.join(os.path.dirname(result["saved_to"]), "usage.json")
+        total_in = sum(u["input_tokens"] for u in _usage_log)
+        total_out = sum(u["output_tokens"] for u in _usage_log)
+        with open(usage_path, "w") as f:
+            json.dump({"agent": "merger", "api": "Anthropic", "total_input_tokens": total_in, "total_output_tokens": total_out, "calls": _usage_log}, f, indent=2)
+        print(f" Usage: {total_in:,} in + {total_out:,} out tokens ({len(_usage_log)} calls)")
 
     return result

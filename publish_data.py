@@ -174,7 +174,8 @@ def _fetch_og_image(urls: list) -> str:
                 m = re.search(pattern, html, re.I)
                 if m:
                     img = m.group(1).strip()
-                    if img.startswith("http"):
+                    # Skip generic site logos that aren't real article images
+                    if img.startswith("http") and "arxiv-logo" not in img and "placeholder" not in img:
                         return img
         except Exception:
             continue

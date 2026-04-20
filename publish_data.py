@@ -122,9 +122,40 @@ if _deepl_key:
             item["post_he"] = t_he
         print(f"  Translated {len(_tw_he)} X posts")
 
+# Auto-correct vendor for "Other" items when headline/summary clearly names a vendor
+_VENDOR_KEYWORDS = {
+    "anthropic": "Anthropic", "claude": "Anthropic",
+    "openai": "OpenAI", "gpt-": "OpenAI", "chatgpt": "OpenAI", "sora": "OpenAI", "codex": "OpenAI",
+    "google": "Google", "gemini": "Google", "deepmind": "Google",
+    "aws": "AWS", "amazon": "AWS", "bedrock": "AWS",
+    "azure": "Azure", "microsoft": "Microsoft", "copilot": "Microsoft",
+    "meta": "Meta", "llama": "Meta",
+    "xai": "xAI", "grok": "xAI",
+    "nvidia": "NVIDIA",
+    "mistral": "Mistral",
+    "apple": "Apple",
+    "hugging face": "Hugging Face",
+    "deepseek": "DeepSeek",
+    "samsung": "Samsung",
+    "alibaba": "Alibaba", "qwen": "Alibaba",
+}
+_briefing = merger.get("briefing", {})
+_news_items = _briefing.get("news_items", [])
+_fixed = 0
+for item in _news_items:
+    if item.get("vendor", "") == "Other":
+        text = (item.get("headline", "") + " " + item.get("summary", "")).lower()
+        for kw, vendor in _VENDOR_KEYWORDS.items():
+            if kw in text:
+                item["vendor"] = vendor
+                _fixed += 1
+                break
+if _fixed:
+    print(f"Auto-corrected {_fixed} 'Other' vendor tags based on headline/summary keywords")
+
 published = {
     "date":        date_str,
-    "briefing":    merger.get("briefing", {}),
+    "briefing":    _briefing,
     "briefing_he": merger.get("briefing_he", {}),
     "social":      social_data,
     "social_he":   {},

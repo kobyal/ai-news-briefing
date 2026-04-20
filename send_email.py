@@ -121,6 +121,71 @@ def _check_apis() -> list[dict]:
         except Exception as e:
             checks.append({"name": "Perplexity", "status": "error", "detail": str(e)[:40]})
 
+    # xAI (Grok)
+    xai_key = os.environ.get("XAI_API_KEY", "")
+    if xai_key:
+        try:
+            req = urllib.request.Request("https://api.x.ai/v1/models")
+            req.add_header("Authorization", f"Bearer {xai_key}")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                checks.append({"name": "xAI", "status": "ok", "detail": "active"})
+        except Exception as e:
+            checks.append({"name": "xAI", "status": "error", "detail": str(e)[:40]})
+
+    # Exa (check both keys)
+    for i, key_name in enumerate(["EXA_API_KEY", "EXA_API_KEY2"], 1):
+        key = os.environ.get(key_name, "")
+        if not key:
+            continue
+        try:
+            data = json.dumps({"query": "test", "numResults": 1}).encode()
+            req = urllib.request.Request("https://api.exa.ai/search", data=data, headers={"x-api-key": key, "Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                checks.append({"name": f"Exa #{i}", "status": "ok", "detail": "active"})
+        except Exception as e:
+            checks.append({"name": f"Exa #{i}", "status": "error", "detail": str(e)[:40]})
+
+    # NewsAPI (check both keys)
+    for i, key_name in enumerate(["NEWSAPI_KEY", "NEWSAPI_KEY2"], 1):
+        key = os.environ.get(key_name, "")
+        if not key:
+            continue
+        try:
+            req = urllib.request.Request(f"https://newsapi.org/v2/top-headlines?country=us&pageSize=1&apiKey={key}")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                d = json.loads(resp.read())
+            if d.get("status") == "ok":
+                checks.append({"name": f"NewsAPI #{i}", "status": "ok", "detail": "active"})
+            else:
+                checks.append({"name": f"NewsAPI #{i}", "status": "error", "detail": d.get("message", "unknown")[:40]})
+        except Exception as e:
+            checks.append({"name": f"NewsAPI #{i}", "status": "error", "detail": str(e)[:40]})
+
+    # YouTube Data API
+    yt_key = os.environ.get("YOUTUBE_API_KEY", "")
+    if yt_key:
+        try:
+            req = urllib.request.Request(f"https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={yt_key}")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                checks.append({"name": "YouTube", "status": "ok", "detail": "active"})
+        except Exception as e:
+            err = str(e)
+            if "403" in err or "quota" in err.lower():
+                checks.append({"name": "YouTube", "status": "exhausted", "detail": "quota exceeded"})
+            else:
+                checks.append({"name": "YouTube", "status": "error", "detail": err[:40]})
+
+    # Jina
+    jina_key = os.environ.get("JINA_API_KEY", "")
+    if jina_key:
+        try:
+            req = urllib.request.Request("https://r.jina.ai/https://example.com")
+            req.add_header("Authorization", f"Bearer {jina_key}")
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                checks.append({"name": "Jina", "status": "ok", "detail": "active"})
+        except Exception as e:
+            checks.append({"name": "Jina", "status": "error", "detail": str(e)[:40]})
+
     return checks
 
 print("Checking API status...")

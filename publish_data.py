@@ -4,9 +4,11 @@ publish_data.py — combine all agent outputs into docs/data/YYYY-MM-DD.json
 import json
 import glob
 import os
+import re
 import urllib.request
 import urllib.parse
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def _translate_deepl(texts: list, api_key: str) -> list:
@@ -152,6 +154,50 @@ for item in _news_items:
                 break
 if _fixed:
     print(f"Auto-corrected {_fixed} 'Other' vendor tags based on headline/summary keywords")
+
+# Fetch real OG images for articles missing them or with broken relative paths
+def _fetch_og_image(url: str) -> str:
+    """Fetch og:image meta tag from a URL."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; AIBriefingBot/1.0)"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            html = resp.read(50_000).decode("utf-8", errors="ignore")
+        # Match <meta property="og:image" content="...">
+        m = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html, re.I)
+        if not m:
+            m = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html, re.I)
+        if m:
+            img = m.group(1).strip()
+            if img.startswith("http"):
+                return img
+    except Exception:
+        pass
+    return ""
+
+def _needs_og(item: dict) -> bool:
+    og = item.get("og_image", "")
+    return not og or not og.startswith("http")
+
+_items_needing_og = [(i, item) for i, item in enumerate(_news_items) if _needs_og(item)]
+if _items_needing_og:
+    print(f"Fetching OG images for {len(_items_needing_og)} articles...")
+    _og_fixed = 0
+    # Collect all article URLs to fetch
+    _fetch_tasks = []
+    for idx, item in _items_needing_og:
+        urls = item.get("urls", [])
+        if urls:
+            _fetch_tasks.append((idx, urls[0]))
+    # Fetch in parallel
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(_fetch_og_image, url): idx for idx, url in _fetch_tasks}
+        for fut in as_completed(futures):
+            idx = futures[fut]
+            og = fut.result()
+            if og:
+                _news_items[idx]["og_image"] = og
+                _og_fixed += 1
+    print(f"  Fetched {_og_fixed}/{len(_items_needing_og)} OG images")
 
 published = {
     "date":        date_str,

@@ -106,7 +106,7 @@ def _check_apis() -> list[dict]:
             req = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models?key={google_key}")
             with urllib.request.urlopen(req, timeout=5) as resp:
                 d = json.loads(resp.read())
-            checks.append({"name": "Google", "status": "ok", "detail": f"{len(d.get('models',[]))} models"})
+            checks.append({"name": "Google", "status": "ok", "detail": "active"})
         except Exception as e:
             checks.append({"name": "Google", "status": "error", "detail": str(e)[:40]})
 

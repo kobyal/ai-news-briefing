@@ -114,7 +114,12 @@ def _agent(
     tokens = f"  in={usage.input_tokens} out={usage.output_tokens}" if usage else ""
     print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model}{tokens}  stop={stop}")
     if usage:
-        _usage_log.append({"step": label, "model": model, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens})
+        # Estimate cost: Haiku in=$0.80/M out=$4/M, Sonnet in=$3/M out=$15/M, Opus in=$15/M out=$75/M
+        _price = {"haiku": (0.80, 4.0), "sonnet": (3.0, 15.0), "opus": (15.0, 75.0)}
+        _tier = "haiku" if "haiku" in model else "opus" if "opus" in model else "sonnet"
+        _pin, _pout = _price[_tier]
+        _cost = (usage.input_tokens * _pin + usage.output_tokens * _pout) / 1_000_000
+        _usage_log.append({"step": label, "model": model, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "cost_usd": round(_cost, 4)})
 
     if stop == "max_tokens":
         print(f"    ⚠  [{label}] Response truncated (max_tokens) — output may be incomplete")
@@ -653,8 +658,9 @@ def run_pipeline() -> dict:
         usage_path = os.path.join(os.path.dirname(result["saved_to"]), "usage.json")
         total_in = sum(u["input_tokens"] for u in _usage_log)
         total_out = sum(u["output_tokens"] for u in _usage_log)
+        total_cost = sum(u.get("cost_usd", 0) for u in _usage_log)
         with open(usage_path, "w") as f:
-            json.dump({"agent": "merger", "api": "Anthropic", "total_input_tokens": total_in, "total_output_tokens": total_out, "calls": _usage_log}, f, indent=2)
-        print(f" Usage: {total_in:,} in + {total_out:,} out tokens ({len(_usage_log)} calls)")
+            json.dump({"agent": "merger", "api": "Anthropic", "total_input_tokens": total_in, "total_output_tokens": total_out, "total_cost_usd": round(total_cost, 4), "calls": _usage_log}, f, indent=2)
+        print(f" Usage: {total_in:,} in + {total_out:,} out tokens, ~${total_cost:.4f} ({len(_usage_log)} calls)")
 
     return result

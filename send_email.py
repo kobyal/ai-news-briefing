@@ -34,6 +34,7 @@ def _collect_usage() -> list[dict]:
         "tavily-news-agent/output/**/usage.json",
         "perplexity-news-agent/output/**/usage.json",
         "adk-news-agent/output/**/usage.json",
+        "exa-news-agent/output/**/usage.json",
     ]:
         files = sorted(glob.glob(pattern, recursive=True), reverse=True)
         if files:
@@ -85,7 +86,7 @@ def _check_apis() -> list[dict]:
             else:
                 checks.append({"name": f"Tavily #{i}", "status": "error", "detail": err[:40]})
 
-    # Anthropic (just verify key works)
+    # Anthropic — get rate limits from response headers
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if anthropic_key:
         try:
@@ -95,7 +96,9 @@ def _check_apis() -> list[dict]:
             req.add_header("anthropic-version", "2023-06-01")
             req.add_header("Content-Type", "application/json")
             with urllib.request.urlopen(req, timeout=10) as resp:
-                checks.append({"name": "Anthropic", "status": "ok", "detail": "active"})
+                tok_limit = resp.headers.get("anthropic-ratelimit-tokens-limit", "?")
+                req_limit = resp.headers.get("anthropic-ratelimit-requests-limit", "?")
+                checks.append({"name": "Anthropic", "status": "ok", "detail": f"{tok_limit} tok/min, {req_limit} req/min"})
         except Exception as e:
             checks.append({"name": "Anthropic", "status": "error", "detail": str(e)[:40]})
 
@@ -210,9 +213,15 @@ for c in api_checks:
 
 # Usage section
 usage_rows = ""
+total_run_cost = 0
 for u in usage_data:
     total = u.get("total_input_tokens", 0) + u.get("total_output_tokens", 0)
-    usage_rows += f'<tr><td style="padding:3px 8px;font-size:12px">{u["agent"]}</td><td style="padding:3px 8px;font-size:12px;color:#64748b">{u.get("api","?")}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace">{total:,} tokens</td></tr>\n'
+    cost = u.get("total_cost_usd", 0)
+    total_run_cost += cost
+    cost_str = f"${cost:.4f}" if cost else ""
+    usage_rows += f'<tr><td style="padding:3px 8px;font-size:12px">{u["agent"]}</td><td style="padding:3px 8px;font-size:12px;color:#64748b">{u.get("api","?")}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace">{total:,} tok</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#b45309">{cost_str}</td></tr>\n'
+if usage_rows and total_run_cost > 0:
+    usage_rows += f'<tr style="border-top:1px solid #e2e8f0"><td colspan="3" style="padding:3px 8px;font-size:12px;font-weight:700">Total</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;font-weight:700;color:#b45309">${total_run_cost:.4f}</td></tr>\n'
 
 status_section = ""
 if api_rows or usage_rows:

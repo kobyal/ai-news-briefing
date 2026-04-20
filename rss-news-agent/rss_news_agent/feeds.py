@@ -403,7 +403,8 @@ def _fetch_reddit_hot(subreddit: str, max_items: int = 25) -> List[dict]:
 
         pub = datetime.fromtimestamp(int(created), tz=timezone.utc) if created else None
         reddit_link = f"https://reddit.com{permalink}"
-        vendor = _infer_vendor(title, post.get("selftext", ""), "Other")
+        selftext = (post.get("selftext") or "").strip()
+        vendor = _infer_vendor(title, selftext, "Other")
 
         articles.append({
             "vendor":         vendor,
@@ -416,6 +417,7 @@ def _fetch_reddit_hot(subreddit: str, max_items: int = 25) -> List[dict]:
             "_pub_dt":        pub,
             "_score":         num_comments,
             "_is_community":  True,
+            "_selftext":      selftext[:300] if selftext else "",
         })
 
     articles.sort(key=lambda a: a.get("_score", 0), reverse=True)

@@ -217,6 +217,7 @@ def _step4_publish(briefing_json: str, hebrew_json: str, community_articles: lis
             "url":       url,
             "score":     a.get("_score", 0),  # comments count (scores are fuzzed by Reddit)
             "date":      a.get("published_date", ""),
+            "body":      a.get("_selftext", ""),
         })
         if len(reddit_posts) >= 20:  # top 20 by comment count
             break

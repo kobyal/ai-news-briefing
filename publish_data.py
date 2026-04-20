@@ -90,6 +90,16 @@ if _deepl_key and reddit_posts:
     for p, t_he in zip(reddit_posts, _titles_he):
         p["title_he"] = t_he
     print(f"  Translated {len(_titles_he)} Reddit titles")
+    # Translate body snippets
+    _bodies = [p.get("body", "")[:200] for p in reddit_posts]
+    _has_body = any(b for b in _bodies)
+    if _has_body:
+        print("Translating Reddit body snippets to Hebrew via DeepL...")
+        _bodies_he = _translate_deepl(_bodies, _deepl_key)
+        for p, b_he in zip(reddit_posts, _bodies_he):
+            if b_he:
+                p["body_he"] = b_he
+        print(f"  Translated {sum(1 for b in _bodies_he if b)} Reddit body snippets")
 
 social_data = {
     "people_highlights": twitter_briefing.get("people_highlights", []),

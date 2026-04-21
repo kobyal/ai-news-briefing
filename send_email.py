@@ -163,10 +163,10 @@ def _check_apis() -> list[dict]:
             if cost_pair is None:
                 detail_parts.append("set ANTHROPIC_ADMIN_API_KEY for MTD + last-run cost")
             checks.append({"name": "Anthropic", "status": "ok", "detail": " · ".join(detail_parts),
-                           "console_url": "https://console.anthropic.com/settings/keys"})
+                           "console_url": "https://platform.claude.com/settings/keys"})
         except Exception as e:
             checks.append({"name": "Anthropic", "status": "error", "detail": str(e)[:40],
-                           "console_url": "https://console.anthropic.com/settings/keys"})
+                           "console_url": "https://platform.claude.com/settings/keys"})
 
     # ── Providers without programmatic usage APIs — probe a real endpoint, show plan + console link ─
     # Each tuple: (env_key, display_name, (method, url, headers, body), plan_note, console_url)

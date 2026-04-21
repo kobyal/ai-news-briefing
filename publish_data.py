@@ -34,7 +34,9 @@ def _translate_deepl(texts: list, api_key: str) -> list:
 date_str = datetime.utcnow().strftime("%Y-%m-%d")
 
 def _latest(pattern):
-    files = sorted(glob.glob(pattern, recursive=True), reverse=True)
+    # usage.json files sit alongside real outputs and alphabetically sort LAST — exclude them.
+    files = [f for f in sorted(glob.glob(pattern, recursive=True), reverse=True)
+             if os.path.basename(f) != "usage.json"]
     if files:
         print(f"  {files[0]}")
         with open(files[0], encoding="utf-8") as f:
@@ -43,7 +45,8 @@ def _latest(pattern):
 
 def _best_rss(pattern):
     """Pick the RSS output with the most quality Reddit posts (score>=20); fall back to latest."""
-    files = sorted(glob.glob(pattern, recursive=True), reverse=True)
+    files = [f for f in sorted(glob.glob(pattern, recursive=True), reverse=True)
+             if os.path.basename(f) != "usage.json"]
     best, best_count = None, -1
     for f in files[:6]:  # check up to 6 most recent files
         try:

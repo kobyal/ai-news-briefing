@@ -53,13 +53,15 @@ def _pct(used: float, limit: float) -> str:
     return f" ({p:.0f}%)" if p >= 1 else f" (<1%)"
 
 
-def _anthropic_mtd_cost_usd() -> float | None:
-    """Returns month-to-date spend in USD via the Admin API. Requires ANTHROPIC_ADMIN_API_KEY."""
+def _anthropic_mtd_cost_usd() -> tuple[float, float] | None:
+    """Returns (mtd_total_usd, yesterday_usd) via the Admin API.
+    Requires ANTHROPIC_ADMIN_API_KEY. 'Yesterday' = previous UTC day's bucket,
+    which approximates the cost of the most recent pipeline run."""
     admin_key = os.environ.get("ANTHROPIC_ADMIN_API_KEY", "")
     if not admin_key:
         return None
     try:
-        from datetime import timezone
+        from datetime import timezone, timedelta
         now = datetime.now(timezone.utc)
         start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         starting_at = start.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -69,15 +71,15 @@ def _anthropic_mtd_cost_usd() -> float | None:
         req.add_header("anthropic-version", "2023-06-01")
         with urllib.request.urlopen(req, timeout=10) as resp:
             d = json.loads(resp.read())
-        # Sum all cost amounts (returned in cents as decimal strings) across all buckets
         total_cents = 0.0
+        yesterday_cents = 0.0
+        yesterday_iso_prefix = (now - timedelta(days=1)).strftime("%Y-%m-%d")
         for bucket in d.get("data", []):
-            for item in bucket.get("results", []):
-                try:
-                    total_cents += float(item.get("amount", "0"))
-                except (ValueError, TypeError):
-                    continue
-        return total_cents / 100
+            bucket_total = sum(float(it.get("amount", "0") or 0) for it in bucket.get("results", []))
+            total_cents += bucket_total
+            if bucket.get("starting_at", "").startswith(yesterday_iso_prefix):
+                yesterday_cents = bucket_total
+        return (total_cents / 100, yesterday_cents / 100)
     except Exception as e:
         print(f"  Admin cost_report failed: {e}")
         return None
@@ -141,10 +143,13 @@ def _check_apis() -> list[dict]:
     # ── Anthropic — rate limits + month-to-date cost (Admin API) ────────
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if anthropic_key:
-        mtd_cost = _anthropic_mtd_cost_usd()
+        cost_pair = _anthropic_mtd_cost_usd()
         detail_parts = []
-        if mtd_cost is not None:
-            detail_parts.append(f"${mtd_cost:.2f} MTD")
+        if cost_pair is not None:
+            mtd, yday = cost_pair
+            detail_parts.append(f"${mtd:.2f} MTD")
+            if yday > 0:
+                detail_parts.append(f"last run ~${yday:.2f}")
         try:
             data = json.dumps({"model": "claude-haiku-4-5-20251001", "max_tokens": 1, "messages": [{"role": "user", "content": "1"}]}).encode()
             req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=data)
@@ -155,42 +160,56 @@ def _check_apis() -> list[dict]:
                 tok_limit = resp.headers.get("anthropic-ratelimit-tokens-limit", "?")
                 req_limit = resp.headers.get("anthropic-ratelimit-requests-limit", "?")
                 detail_parts.append(f"{tok_limit} tok/min · {req_limit} req/min")
-            if mtd_cost is None:
-                detail_parts.append("set ANTHROPIC_ADMIN_API_KEY for MTD cost")
+            if cost_pair is None:
+                detail_parts.append("set ANTHROPIC_ADMIN_API_KEY for MTD + last-run cost")
             checks.append({"name": "Anthropic", "status": "ok", "detail": " · ".join(detail_parts),
-                           "console_url": "https://console.anthropic.com/settings/admin-keys"})
+                           "console_url": "https://console.anthropic.com/settings/keys"})
         except Exception as e:
             checks.append({"name": "Anthropic", "status": "error", "detail": str(e)[:40],
-                           "console_url": "https://platform.claude.com/workspaces/default/cost"})
+                           "console_url": "https://console.anthropic.com/settings/keys"})
 
-    # ── Providers without programmatic usage APIs — show plan + console ─
+    # ── Providers without programmatic usage APIs — probe a real endpoint, show plan + console link ─
+    # Each tuple: (env_key, display_name, (method, url, headers, body), plan_note, console_url)
+    def _build_probe(method, url, headers, body):
+        req = urllib.request.Request(url, method=method, data=body)
+        for k, v in headers.items():
+            req.add_header(k, v)
+        return req
+
+    google_key = os.environ.get("GOOGLE_API_KEY", "")
+    pplx_key = os.environ.get("PERPLEXITY_API_KEY", "")
+    xai_key = os.environ.get("XAI_API_KEY", "")
+    yt_key = os.environ.get("YOUTUBE_API_KEY", "")
+    jina_key = os.environ.get("JINA_API_KEY", "")
     OTHERS = [
-        ("GOOGLE_API_KEY", "Google Gemini", "https://generativelanguage.googleapis.com/v1beta/models?key={key}",
+        ("Google Gemini", google_key,
+         ("GET", f"https://generativelanguage.googleapis.com/v1beta/models?key={google_key}", {}, None),
          "PAYG · check spend cap", "https://aistudio.google.com/spend"),
-        ("PERPLEXITY_API_KEY", "Perplexity", "https://api.perplexity.ai/v1/models",
+        ("Perplexity", pplx_key,
+         ("GET", "https://api.perplexity.ai/v1/models", {"Authorization": f"Bearer {pplx_key}"}, None),
          "PAYG · check credit balance", "https://console.perplexity.ai/billing"),
-        ("XAI_API_KEY", "xAI (Grok)", "https://api.x.ai/v1/models",
+        ("xAI (Grok)", xai_key,
+         ("GET", "https://api.x.ai/v1/models", {"Authorization": f"Bearer {xai_key}"}, None),
          "PAYG · check credits", "https://console.x.ai/team/default/usage"),
-        ("YOUTUBE_API_KEY", "YouTube", "https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={key}",
+        ("YouTube", yt_key,
+         ("GET", f"https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={yt_key}", {}, None),
          "10,000 units/day quota", "https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas"),
-        ("JINA_API_KEY", "Jina", "https://api.jina.ai/v1/models",
+        ("Jina", jina_key,
+         ("POST", "https://api.jina.ai/v1/embeddings",
+          {"Authorization": f"Bearer {jina_key}", "Content-Type": "application/json"},
+          json.dumps({"model": "jina-embeddings-v3", "input": ["ping"]}).encode()),
          "Free tier · check balance", "https://jina.ai/api-dashboard"),
     ]
-    for env_key, name, probe_url, plan_note, console_url in OTHERS:
-        key = os.environ.get(env_key, "")
+    for name, key, (method, url, headers, body), plan_note, console_url in OTHERS:
         if not key:
             continue
         try:
-            url = probe_url.replace("{key}", key)
-            req = urllib.request.Request(url)
-            if "Bearer" not in url and "key=" not in url:
-                req.add_header("Authorization", f"Bearer {key}")
-            with urllib.request.urlopen(req, timeout=5):
+            with urllib.request.urlopen(_build_probe(method, url, headers, body), timeout=8):
                 checks.append({"name": name, "status": "ok", "detail": plan_note, "console_url": console_url})
         except Exception as e:
             err = str(e)
             status = "exhausted" if ("403" in err or "429" in err or "quota" in err.lower()) else "error"
-            checks.append({"name": name, "status": status, "detail": err[:50], "console_url": console_url})
+            checks.append({"name": name, "status": status, "detail": err[:60], "console_url": console_url})
 
     # ── Exa — search endpoint probe, known to 403 when key revoked ─────
     for i, key_name in enumerate(["EXA_API_KEY", "EXA_API_KEY2"], 1):
@@ -252,7 +271,7 @@ for c in api_checks:
     name_cell = c["name"]
     console = c.get("console_url")
     if console:
-        name_cell = f'<a href="{console}" style="color:#0f172a;text-decoration:none">{c["name"]}</a>'
+        name_cell = f'<a href="{console}" style="color:#2563eb;text-decoration:underline">{c["name"]}</a>'
     api_rows += f'<tr><td style="padding:3px 8px;font-size:12px">{icon} {name_cell}</td><td style="padding:3px 8px;font-size:12px;color:{color}">{c["detail"]}</td></tr>\n'
 
 # Usage section

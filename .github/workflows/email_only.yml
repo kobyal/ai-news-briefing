@@ -1,0 +1,36 @@
+name: Send Email Only
+
+on:
+  workflow_dispatch:
+
+jobs:
+  email:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Send email
+        env:
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_ADMIN_API_KEY: ${{ secrets.ANTHROPIC_ADMIN_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          TAVILY_API_KEY2: ${{ secrets.TAVILY_API_KEY2 }}
+          TAVILY_API_KEY3: ${{ secrets.TAVILY_API_KEY3 }}
+          DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          EXA_API_KEY2: ${{ secrets.EXA_API_KEY2 }}
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          NEWSAPI_KEY2: ${{ secrets.NEWSAPI_KEY2 }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+        run: python3 send_email.py

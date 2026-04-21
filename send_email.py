@@ -46,11 +46,48 @@ def _collect_usage() -> list[dict]:
     return results
 
 # ── Check API key health ──────────────────────────────────────────────
+def _pct(used: float, limit: float) -> str:
+    if not limit:
+        return ""
+    p = 100 * used / limit
+    return f" ({p:.0f}%)" if p >= 1 else f" (<1%)"
+
+
+def _anthropic_mtd_cost_usd() -> float | None:
+    """Returns month-to-date spend in USD via the Admin API. Requires ANTHROPIC_ADMIN_API_KEY."""
+    admin_key = os.environ.get("ANTHROPIC_ADMIN_API_KEY", "")
+    if not admin_key:
+        return None
+    try:
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        starting_at = start.strftime("%Y-%m-%dT%H:%M:%SZ")
+        url = f"https://api.anthropic.com/v1/organizations/cost_report?starting_at={starting_at}&bucket_width=1d&limit=31"
+        req = urllib.request.Request(url)
+        req.add_header("x-api-key", admin_key)
+        req.add_header("anthropic-version", "2023-06-01")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            d = json.loads(resp.read())
+        # Sum all cost amounts (returned in cents as decimal strings) across all buckets
+        total_cents = 0.0
+        for bucket in d.get("data", []):
+            for item in bucket.get("results", []):
+                try:
+                    total_cents += float(item.get("amount", "0"))
+                except (ValueError, TypeError):
+                    continue
+        return total_cents / 100
+    except Exception as e:
+        print(f"  Admin cost_report failed: {e}")
+        return None
+
+
 def _check_apis() -> list[dict]:
-    """Quick health check for paid APIs. Returns list of {name, status, detail}."""
+    """Health + consumption for each API. Returns list of {name, status, detail, console_url}."""
     checks = []
 
-    # DeepL (has explicit usage endpoint)
+    # ── DeepL — usage endpoint returns chars used/limit ────────────────
     deepl_key = os.environ.get("DEEPL_API_KEY", "")
     if deepl_key:
         try:
@@ -60,35 +97,54 @@ def _check_apis() -> list[dict]:
                 d = json.loads(resp.read())
             used = d.get("character_count", 0)
             limit = d.get("character_limit", 1)
-            pct = int(100 * used / limit) if limit else 0
-            checks.append({"name": "DeepL", "status": "ok", "detail": f"{used:,}/{limit:,} chars ({pct}%)"})
+            checks.append({"name": "DeepL", "status": "ok",
+                           "detail": f"{used:,}/{limit:,} chars{_pct(used, limit)}",
+                           "console_url": "https://www.deepl.com/account/usage"})
         except Exception as e:
-            checks.append({"name": "DeepL", "status": "error", "detail": str(e)[:40]})
+            checks.append({"name": "DeepL", "status": "error", "detail": str(e)[:40], "console_url": "https://www.deepl.com/account/usage"})
 
-    # Tavily (check all keys)
+    # ── Tavily — GET /usage returns plan + paygo credit usage ──────────
     for i, key_name in enumerate(["TAVILY_API_KEY", "TAVILY_API_KEY2", "TAVILY_API_KEY3"], 1):
         key = os.environ.get(key_name, "")
         if not key:
             continue
         try:
-            data = json.dumps({"api_key": key, "query": "test", "max_results": 1}).encode()
-            req = urllib.request.Request("https://api.tavily.com/search", data=data, headers={"Content-Type": "application/json"})
+            req = urllib.request.Request("https://api.tavily.com/usage")
+            req.add_header("Authorization", f"Bearer {key}")
             with urllib.request.urlopen(req, timeout=8) as resp:
                 d = json.loads(resp.read())
-            if d.get("results") is not None:
-                checks.append({"name": f"Tavily #{i}", "status": "ok", "detail": "active"})
+            acct = d.get("account", {}) or {}
+            plan = acct.get("current_plan", "Unknown")
+            plan_used = acct.get("plan_usage", 0) or 0
+            plan_limit = acct.get("plan_limit", 0) or 0
+            paygo_used = acct.get("paygo_usage", 0) or 0
+            paygo_limit = acct.get("paygo_limit", 0) or 0
+            # Prefer plan usage; append paygo if any
+            parts = []
+            if plan_limit:
+                parts.append(f"{plan_used:,}/{plan_limit:,} credits{_pct(plan_used, plan_limit)} · {plan}")
+            elif plan_used:
+                parts.append(f"{plan_used:,} credits · {plan}")
             else:
-                checks.append({"name": f"Tavily #{i}", "status": "warn", "detail": d.get("detail", "unknown")[:40]})
+                parts.append(plan)
+            if paygo_used or paygo_limit:
+                parts.append(f"paygo {paygo_used:,}/{paygo_limit or '∞'}")
+            status = "exhausted" if plan_limit and plan_used >= plan_limit else "ok"
+            checks.append({"name": f"Tavily #{i}", "status": status, "detail": " · ".join(parts),
+                           "console_url": "https://app.tavily.com/home"})
         except Exception as e:
             err = str(e)
-            if "usage limit" in err or "403" in err or "429" in err:
-                checks.append({"name": f"Tavily #{i}", "status": "exhausted", "detail": "quota exceeded"})
-            else:
-                checks.append({"name": f"Tavily #{i}", "status": "error", "detail": err[:40]})
+            status = "exhausted" if ("usage limit" in err or "432" in err or "429" in err) else "error"
+            checks.append({"name": f"Tavily #{i}", "status": status, "detail": err[:60],
+                           "console_url": "https://app.tavily.com/home"})
 
-    # Anthropic — get rate limits from response headers
+    # ── Anthropic — rate limits + month-to-date cost (Admin API) ────────
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if anthropic_key:
+        mtd_cost = _anthropic_mtd_cost_usd()
+        detail_parts = []
+        if mtd_cost is not None:
+            detail_parts.append(f"${mtd_cost:.2f} MTD")
         try:
             data = json.dumps({"model": "claude-haiku-4-5-20251001", "max_tokens": 1, "messages": [{"role": "user", "content": "1"}]}).encode()
             req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=data)
@@ -98,44 +154,45 @@ def _check_apis() -> list[dict]:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 tok_limit = resp.headers.get("anthropic-ratelimit-tokens-limit", "?")
                 req_limit = resp.headers.get("anthropic-ratelimit-requests-limit", "?")
-                checks.append({"name": "Anthropic", "status": "ok", "detail": f"{tok_limit} tok/min, {req_limit} req/min"})
+                detail_parts.append(f"{tok_limit} tok/min · {req_limit} req/min")
+            if mtd_cost is None:
+                detail_parts.append("set ANTHROPIC_ADMIN_API_KEY for MTD cost")
+            checks.append({"name": "Anthropic", "status": "ok", "detail": " · ".join(detail_parts),
+                           "console_url": "https://console.anthropic.com/settings/admin-keys"})
         except Exception as e:
-            checks.append({"name": "Anthropic", "status": "error", "detail": str(e)[:40]})
+            checks.append({"name": "Anthropic", "status": "error", "detail": str(e)[:40],
+                           "console_url": "https://platform.claude.com/workspaces/default/cost"})
 
-    # Google Gemini
-    google_key = os.environ.get("GOOGLE_API_KEY", "")
-    if google_key:
+    # ── Providers without programmatic usage APIs — show plan + console ─
+    OTHERS = [
+        ("GOOGLE_API_KEY", "Google Gemini", "https://generativelanguage.googleapis.com/v1beta/models?key={key}",
+         "PAYG · check spend cap", "https://aistudio.google.com/spend"),
+        ("PERPLEXITY_API_KEY", "Perplexity", "https://api.perplexity.ai/v1/models",
+         "PAYG · check credit balance", "https://console.perplexity.ai/billing"),
+        ("XAI_API_KEY", "xAI (Grok)", "https://api.x.ai/v1/models",
+         "PAYG · check credits", "https://console.x.ai/team/default/usage"),
+        ("YOUTUBE_API_KEY", "YouTube", "https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={key}",
+         "10,000 units/day quota", "https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas"),
+        ("JINA_API_KEY", "Jina", "https://api.jina.ai/v1/models",
+         "Free tier · check balance", "https://jina.ai/api-dashboard"),
+    ]
+    for env_key, name, probe_url, plan_note, console_url in OTHERS:
+        key = os.environ.get(env_key, "")
+        if not key:
+            continue
         try:
-            req = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models?key={google_key}")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                d = json.loads(resp.read())
-            checks.append({"name": "Google", "status": "ok", "detail": "active"})
+            url = probe_url.replace("{key}", key)
+            req = urllib.request.Request(url)
+            if "Bearer" not in url and "key=" not in url:
+                req.add_header("Authorization", f"Bearer {key}")
+            with urllib.request.urlopen(req, timeout=5):
+                checks.append({"name": name, "status": "ok", "detail": plan_note, "console_url": console_url})
         except Exception as e:
-            checks.append({"name": "Google", "status": "error", "detail": str(e)[:40]})
+            err = str(e)
+            status = "exhausted" if ("403" in err or "429" in err or "quota" in err.lower()) else "error"
+            checks.append({"name": name, "status": status, "detail": err[:50], "console_url": console_url})
 
-    # Perplexity
-    pplx_key = os.environ.get("PERPLEXITY_API_KEY", "")
-    if pplx_key:
-        try:
-            req = urllib.request.Request("https://api.perplexity.ai/v1/models")
-            req.add_header("Authorization", f"Bearer {pplx_key}")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                checks.append({"name": "Perplexity", "status": "ok", "detail": "active"})
-        except Exception as e:
-            checks.append({"name": "Perplexity", "status": "error", "detail": str(e)[:40]})
-
-    # xAI (Grok)
-    xai_key = os.environ.get("XAI_API_KEY", "")
-    if xai_key:
-        try:
-            req = urllib.request.Request("https://api.x.ai/v1/models")
-            req.add_header("Authorization", f"Bearer {xai_key}")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                checks.append({"name": "xAI", "status": "ok", "detail": "active"})
-        except Exception as e:
-            checks.append({"name": "xAI", "status": "error", "detail": str(e)[:40]})
-
-    # Exa (check both keys)
+    # ── Exa — search endpoint probe, known to 403 when key revoked ─────
     for i, key_name in enumerate(["EXA_API_KEY", "EXA_API_KEY2"], 1):
         key = os.environ.get(key_name, "")
         if not key:
@@ -143,12 +200,16 @@ def _check_apis() -> list[dict]:
         try:
             data = json.dumps({"query": "test", "numResults": 1}).encode()
             req = urllib.request.Request("https://api.exa.ai/search", data=data, headers={"x-api-key": key, "Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                checks.append({"name": f"Exa #{i}", "status": "ok", "detail": "active"})
+            with urllib.request.urlopen(req, timeout=8):
+                checks.append({"name": f"Exa #{i}", "status": "ok", "detail": "PAYG · check spend",
+                               "console_url": "https://dashboard.exa.ai/usage?tab=spend"})
         except Exception as e:
-            checks.append({"name": f"Exa #{i}", "status": "error", "detail": str(e)[:40]})
+            err = str(e)
+            status = "exhausted" if ("403" in err or "429" in err) else "error"
+            checks.append({"name": f"Exa #{i}", "status": status, "detail": err[:50],
+                           "console_url": "https://dashboard.exa.ai/usage?tab=spend"})
 
-    # NewsAPI (check both keys)
+    # ── NewsAPI — only exposes daily quota via response behavior, show known free tier ─
     for i, key_name in enumerate(["NEWSAPI_KEY", "NEWSAPI_KEY2"], 1):
         key = os.environ.get(key_name, "")
         if not key:
@@ -158,36 +219,15 @@ def _check_apis() -> list[dict]:
             with urllib.request.urlopen(req, timeout=5) as resp:
                 d = json.loads(resp.read())
             if d.get("status") == "ok":
-                checks.append({"name": f"NewsAPI #{i}", "status": "ok", "detail": "active"})
+                checks.append({"name": f"NewsAPI #{i}", "status": "ok", "detail": "100 req/day quota",
+                               "console_url": "https://newsapi.org/account"})
             else:
-                checks.append({"name": f"NewsAPI #{i}", "status": "error", "detail": d.get("message", "unknown")[:40]})
+                checks.append({"name": f"NewsAPI #{i}", "status": "error",
+                               "detail": d.get("message", "unknown")[:50],
+                               "console_url": "https://newsapi.org/account"})
         except Exception as e:
-            checks.append({"name": f"NewsAPI #{i}", "status": "error", "detail": str(e)[:40]})
-
-    # YouTube Data API
-    yt_key = os.environ.get("YOUTUBE_API_KEY", "")
-    if yt_key:
-        try:
-            req = urllib.request.Request(f"https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={yt_key}")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                checks.append({"name": "YouTube", "status": "ok", "detail": "active"})
-        except Exception as e:
-            err = str(e)
-            if "403" in err or "quota" in err.lower():
-                checks.append({"name": "YouTube", "status": "exhausted", "detail": "quota exceeded"})
-            else:
-                checks.append({"name": "YouTube", "status": "error", "detail": err[:40]})
-
-    # Jina
-    jina_key = os.environ.get("JINA_API_KEY", "")
-    if jina_key:
-        try:
-            req = urllib.request.Request("https://r.jina.ai/https://example.com")
-            req.add_header("Authorization", f"Bearer {jina_key}")
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                checks.append({"name": "Jina", "status": "ok", "detail": "active"})
-        except Exception as e:
-            checks.append({"name": "Jina", "status": "error", "detail": str(e)[:40]})
+            checks.append({"name": f"NewsAPI #{i}", "status": "error", "detail": str(e)[:50],
+                           "console_url": "https://newsapi.org/account"})
 
     return checks
 
@@ -209,7 +249,11 @@ api_rows = ""
 for c in api_checks:
     icon = {"ok": "🟢", "warn": "🟡", "exhausted": "🔴", "error": "❌"}.get(c["status"], "⚪")
     color = {"ok": "#16a34a", "warn": "#d97706", "exhausted": "#dc2626", "error": "#dc2626"}.get(c["status"], "#64748b")
-    api_rows += f'<tr><td style="padding:3px 8px;font-size:12px">{icon} {c["name"]}</td><td style="padding:3px 8px;font-size:12px;color:{color}">{c["detail"]}</td></tr>\n'
+    name_cell = c["name"]
+    console = c.get("console_url")
+    if console:
+        name_cell = f'<a href="{console}" style="color:#0f172a;text-decoration:none">{c["name"]}</a>'
+    api_rows += f'<tr><td style="padding:3px 8px;font-size:12px">{icon} {name_cell}</td><td style="padding:3px 8px;font-size:12px;color:{color}">{c["detail"]}</td></tr>\n'
 
 # Usage section
 usage_rows = ""

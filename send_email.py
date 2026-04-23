@@ -322,6 +322,87 @@ if fallback_events:
     for f in fallback_events:
         print(f"  {f['agent']}: {f['from']} → {f['to']}  ×{f['count']}")
 
+
+def _active_sources_today() -> list[str]:
+    """List sources whose agent produced a non-empty JSON output today."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    agents = [
+        ("adk-news-agent", "ADK"),
+        ("perplexity-news-agent", "Perplexity"),
+        ("rss-news-agent", "RSS"),
+        ("tavily-news-agent", "Tavily"),
+        ("exa-news-agent", "Exa"),
+        ("newsapi-agent", "NewsAPI"),
+        ("youtube-news-agent", "YouTube"),
+        ("github-trending-agent", "GitHub"),
+        ("twitter-agent", "X"),
+    ]
+    # RSS agent produces Reddit posts as a sub-section — surface separately
+    rss_has_reddit = False
+    rss_dir = f"rss-news-agent/output/{today}"
+    if os.path.isdir(rss_dir):
+        for fn in os.listdir(rss_dir):
+            if fn == "usage.json" or not fn.endswith(".json"):
+                continue
+            try:
+                with open(os.path.join(rss_dir, fn)) as f:
+                    d = json.load(f)
+                if d.get("reddit_posts"):
+                    rss_has_reddit = True
+                    break
+            except Exception:
+                continue
+    out = []
+    for dir_name, label in agents:
+        day_dir = f"{dir_name}/output/{today}"
+        if not os.path.isdir(day_dir):
+            continue
+        # Any non-usage JSON counts as "this agent ran today"
+        for fn in os.listdir(day_dir):
+            if fn.endswith(".json") and fn != "usage.json":
+                out.append(label)
+                break
+    if rss_has_reddit and "Reddit" not in out:
+        # Insert Reddit right after RSS for readability
+        try:
+            idx = out.index("RSS") + 1
+            out.insert(idx, "Reddit")
+        except ValueError:
+            out.append("Reddit")
+    return out
+
+
+def _merger_model() -> str:
+    """Read the actual model used by the merger this run from usage.json."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    path = f"merger-agent/output/{today}/usage.json"
+    try:
+        with open(path) as f:
+            d = json.load(f)
+        calls = d.get("calls", [])
+        # Merger writer call is typically the highest-token one
+        if calls:
+            writer = max(calls, key=lambda c: c.get("input_tokens", 0) + c.get("output_tokens", 0))
+            model = writer.get("model", "")
+            # Friendly label
+            if "sonnet-4-5" in model: return "Claude Sonnet 4.5"
+            if "sonnet-4-6" in model: return "Claude Sonnet 4.6"
+            if "sonnet-4-7" in model: return "Claude Sonnet 4.7"
+            if "sonnet-4" in model:   return "Claude Sonnet 4"
+            if "opus-4-7" in model:   return "Claude Opus 4.7"
+            if "opus-4" in model:     return "Claude Opus 4"
+            if "haiku-4-5" in model:  return "Claude Haiku 4.5"
+            return model or "Claude Sonnet 4"
+    except Exception:
+        pass
+    return "Claude Sonnet 4"
+
+
+_sources_label = " · ".join(_active_sources_today()) or "RSS · Reddit · Twitter"
+_merger_label = _merger_model()
+print(f"Active sources today: {_sources_label}")
+print(f"Merger model: {_merger_label}")
+
 # ── Build email ───────────────────────────────────────────────────────
 def _render_row(c: dict) -> str:
     icon = {"ok": "🟢", "warn": "🟡", "exhausted": "🔴", "error": "❌"}.get(c["status"], "⚪")
@@ -378,8 +459,8 @@ Open the web app (EN + Hebrew, full experience):
 Raw briefing report:
 {report_url}
 
-Sources: ADK · Perplexity · RSS · Tavily · Exa · NewsAPI · YouTube · GitHub · Reddit
-Merged by Claude Sonnet 4
+Sources: {_sources_label}
+Merged by {_merger_label}
 
 ---
 github.com/kobyal/ai-news-briefing
@@ -396,7 +477,7 @@ body_html = f"""\
 {status_section}
 <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0">
 <p style="font-size:13px;color:#64748b">
-Sources: ADK · Perplexity · RSS · Tavily · Exa · NewsAPI · YouTube · GitHub · Reddit · merged by Claude Sonnet 4<br>
+Sources: {_sources_label} · merged by {_merger_label}<br>
 <a href="https://github.com/kobyal/ai-news-briefing">github.com/kobyal/ai-news-briefing</a>
 </p>
 </body></html>

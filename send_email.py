@@ -228,8 +228,10 @@ def _check_apis() -> list[dict]:
             checks.append({"name": "YouTube", "status": status, "detail": err[:60],
                            "console_url": "https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas", "tier": "free"})
 
-    # ── FREE: Jina — we actually use Reader (r.jina.ai), so probe THAT,
-    # not /v1/embeddings (different product tier; can 403 even when Reader works).
+    # ── FREE: Jina — Reader endpoint works WITHOUT auth for free tier.
+    # A 403 here means the paid-tier key is rejected, but article_reader falls
+    # through to Firecrawl so article enrichment continues — hence "warn", not "exhausted".
+    firecrawl_present = bool(os.environ.get("FIRECRAWL_API_KEY", ""))
     for i, key_name in enumerate(["JINA_API_KEY", "JINA_API_KEY2"], 1):
         key = os.environ.get(key_name, "")
         if not key:
@@ -243,26 +245,49 @@ def _check_apis() -> list[dict]:
                                "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
         except Exception as e:
             err = str(e)
-            status = "exhausted" if ("403" in err or "429" in err) else "error"
-            checks.append({"name": f"Jina #{i}", "status": status, "detail": err[:60],
-                           "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
+            if "403" in err or "429" in err:
+                # Key rejected but Firecrawl fallback (or unauth Reader) still works.
+                if firecrawl_present:
+                    detail = f"{err[:40]} · Firecrawl covers"
+                else:
+                    detail = f"{err[:40]} · unauth Reader fallback"
+                checks.append({"name": f"Jina #{i}", "status": "warn", "detail": detail,
+                               "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
+            else:
+                checks.append({"name": f"Jina #{i}", "status": "error", "detail": err[:60],
+                               "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
 
-    # ── FREE: Exa — both keys 403 when revoked ─────────────────────────
+    # ── FREE: Exa — probe via exa_py SDK (same code path the agent uses),
+    # not raw HTTP with guessed field names. Previous raw probe was 403-ing
+    # because of a numResults/num_results mismatch, falsely reporting "revoked".
     for i, key_name in enumerate(["EXA_API_KEY", "EXA_API_KEY2"], 1):
         key = os.environ.get(key_name, "")
         if not key:
             continue
         try:
-            data = json.dumps({"query": "test", "numResults": 1}).encode()
-            req = urllib.request.Request("https://api.exa.ai/search", data=data,
-                                          headers={"x-api-key": key, "Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=8):
-                checks.append({"name": f"Exa #{i}", "status": "ok", "detail": "PAYG · check spend",
+            from exa_py import Exa
+            Exa(api_key=key).search("test", num_results=1)
+            checks.append({"name": f"Exa #{i}", "status": "ok", "detail": "PAYG · check spend",
+                           "console_url": "https://dashboard.exa.ai/usage?tab=spend", "tier": "free"})
+        except ImportError:
+            # exa_py not available in the email step — fall back to raw HTTP with the
+            # correct snake_case field name the API actually accepts.
+            try:
+                body = json.dumps({"query": "test", "num_results": 1, "type": "auto"}).encode()
+                req = urllib.request.Request("https://api.exa.ai/search", data=body,
+                                              headers={"x-api-key": key, "Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=8):
+                    checks.append({"name": f"Exa #{i}", "status": "ok", "detail": "PAYG · check spend",
+                                   "console_url": "https://dashboard.exa.ai/usage?tab=spend", "tier": "free"})
+            except Exception as e:
+                err = str(e)
+                status = "exhausted" if ("403" in err or "429" in err) else "error"
+                checks.append({"name": f"Exa #{i}", "status": status, "detail": err[:60],
                                "console_url": "https://dashboard.exa.ai/usage?tab=spend", "tier": "free"})
         except Exception as e:
             err = str(e)
             status = "exhausted" if ("403" in err or "429" in err) else "error"
-            checks.append({"name": f"Exa #{i}", "status": status, "detail": err[:50],
+            checks.append({"name": f"Exa #{i}", "status": status, "detail": err[:60],
                            "console_url": "https://dashboard.exa.ai/usage?tab=spend", "tier": "free"})
 
     # ── FREE: NewsAPI — no usage endpoint, show known free tier cap ────

@@ -26,13 +26,51 @@ SEARCH_QUERIES = [
 ]
 
 
+def _track_fallback(from_key: str, to_key: str, reason: str) -> None:
+    try:
+        import sys, pathlib
+        sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent))
+        from shared.fallback_tracker import track
+        track("exa", from_key, to_key, reason[:100])
+    except Exception:
+        pass
+
+
+def _tavily_fallback(queries: list[str], start_date: str) -> list[dict]:
+    """When both Exa keys fail, use the Tavily searcher — it has its own
+    3-key + DuckDuckGo chain, so this gives Exa a real backup instead of [].
+    Returns results shaped to match Exa's output."""
+    try:
+        import sys, pathlib
+        sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent))
+        from tavily_news_agent.tavily_news_agent.searcher import TavilySearcher
+    except Exception as e:
+        print(f"  Tavily fallback unavailable: {e}")
+        return []
+    searcher = TavilySearcher()
+    out = []
+    for q in queries:
+        for r in searcher.search(q, days=3, max_results=3) or []:
+            out.append({
+                "title": r.get("title", ""),
+                "url": r.get("url", ""),
+                "text": (r.get("content", "") or "")[:800],
+                "published_date": "",
+                "score": r.get("score", 0.5),
+                "author": "",
+            })
+    return out
+
+
 def _search_exa() -> list[dict]:
-    """Search Exa.ai for AI news articles."""
+    """Search Exa.ai for AI news articles. Falls through to Tavily when both Exa keys fail."""
     api_key = os.environ.get("EXA_API_KEY", "")
     backup_key = os.environ.get("EXA_API_KEY2", "")
     if not api_key:
-        print("  EXA_API_KEY not set — skipping")
-        return []
+        print("  EXA_API_KEY not set — falling straight to Tavily fallback")
+        start_date = (datetime.now() - timedelta(days=_LOOKBACK_DAYS())).strftime("%Y-%m-%d")
+        _track_fallback("EXA_API_KEY", "Tavily", "EXA_API_KEY unset")
+        return _tavily_fallback(SEARCH_QUERIES, start_date)
 
     try:
         from exa_py import Exa
@@ -41,11 +79,12 @@ def _search_exa() -> list[dict]:
         return []
 
     exa = Exa(api_key=api_key)
-    _backup_key = backup_key  # for fallback
+    _backup_key = backup_key
     lookback = _LOOKBACK_DAYS()
     start_date = (datetime.now() - timedelta(days=lookback)).strftime("%Y-%m-%d")
 
     all_results = []
+    failed_queries: list[str] = []
     for query in SEARCH_QUERIES:
         try:
             result = exa.search(
@@ -68,6 +107,7 @@ def _search_exa() -> list[dict]:
             # Try backup key on failure
             if _backup_key and not getattr(exa, '_using_backup', False):
                 print(f"  Primary key failed ({e}) — switching to EXA_API_KEY2")
+                _track_fallback("EXA_API_KEY", "EXA_API_KEY2", str(e)[:80])
                 exa = Exa(api_key=_backup_key)
                 exa._using_backup = True
                 try:
@@ -84,9 +124,18 @@ def _search_exa() -> list[dict]:
                     continue
                 except Exception as e2:
                     print(f"  Backup key also failed: {e2}")
+                    failed_queries.append(query)
             else:
+                # Both keys already known-bad, or no backup — queue for Tavily fallback
                 print(f"  Search error for '{query[:30]}': {e}")
+                failed_queries.append(query)
             continue
+
+    # Tier 3: if any queries failed both Exa keys, try Tavily (which has its own 3-key + DDG chain)
+    if failed_queries:
+        print(f"  Falling through to Tavily for {len(failed_queries)} failed queries")
+        _track_fallback("EXA_API_KEY2", "Tavily", f"{len(failed_queries)} queries failed both Exa keys")
+        all_results.extend(_tavily_fallback(failed_queries, start_date))
 
     return all_results
 

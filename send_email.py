@@ -109,18 +109,66 @@ def _load_dashboard_mtd() -> dict:
     return {}
 
 
+def _cost_by_provider_since(start_date: str) -> dict:
+    """Sum cost from every agent's usage.json files whose directory >= start_date.
+    Returns {api_name: usd_total}. Authoritative per-call data from our own tracking."""
+    from collections import defaultdict
+    totals = defaultdict(float)
+    for pattern in [
+        "merger-agent/output/*/usage.json",
+        "rss-news-agent/output/*/usage.json",
+        "tavily-news-agent/output/*/usage.json",
+        "perplexity-news-agent/output/*/usage.json",
+        "adk-news-agent/output/*/usage.json",
+    ]:
+        for f in glob.glob(pattern):
+            day = os.path.basename(os.path.dirname(f))
+            if day < start_date:
+                continue
+            try:
+                d = json.load(open(f))
+            except Exception:
+                continue
+            # Prefer per-call api labels (perplexity now mixes Perplexity + Anthropic)
+            if "calls" in d and isinstance(d["calls"], list) and any("api" in c for c in d["calls"]):
+                for c in d["calls"]:
+                    api = c.get("api") or d.get("api", "Anthropic")
+                    totals[api] += float(c.get("cost_usd", 0) or 0)
+            else:
+                api = d.get("api", "Anthropic")
+                totals[api] += float(d.get("total_cost_usd", 0) or 0)
+    return dict(totals)
+
+
 def _check_apis() -> list[dict]:
     """Health + consumption for each API. Returns list of {name, status, detail, console_url, tier}.
     tier is "paid" or "free" — drives the two-table split in the email."""
     checks = []
     mtd = _load_dashboard_mtd().get("providers", {}) or {}
 
-    def _mtd_suffix(provider_name: str) -> str:
-        """Return ' · $X.XX MTD · <detail>' or empty string if no manual data."""
+    # Daily + 7-day totals computed from our own per-call usage.json files (authoritative for what WE spent)
+    _today = datetime.now().strftime("%Y-%m-%d")
+    _7d_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    today_by_api = _cost_by_provider_since(_today)
+    week_by_api = _cost_by_provider_since(_7d_ago)
+
+    def _cost_line(provider_name: str) -> str:
+        """Compose ' · today $X · 7d $Y · MTD $Z · <dashboard detail>'.
+        Uses usage.json for today/7d (per-run authoritative) and dashboard_mtd.json for monthly."""
+        parts = []
+        t = today_by_api.get(provider_name, 0)
+        w = week_by_api.get(provider_name, 0)
+        if t > 0:
+            parts.append(f"today ${t:.4f}")
+        if w > 0:
+            parts.append(f"7d ${w:.4f}")
         p = mtd.get(provider_name)
-        if not p:
-            return ""
-        return f" · ${float(p.get('mtd_usd', 0)):.2f} MTD · {p.get('detail','')}"
+        if p:
+            parts.append(f"MTD ${float(p.get('mtd_usd',0)):.2f}")
+            detail = p.get("detail", "")
+            if detail:
+                parts.append(detail)
+        return " · ".join(parts)
 
     # ── PAID: Anthropic — rate limits + month-to-date cost (Admin API) ──
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -144,7 +192,7 @@ def _check_apis() -> list[dict]:
                 detail_parts.append(f"{tok_limit} tok/min · {req_limit} req/min")
             if cost_pair is None:
                 # No admin key → fall back to manual dashboard_mtd.json value
-                detail_parts.append(_mtd_suffix("Anthropic").lstrip(" ·").strip() or "set ANTHROPIC_ADMIN_API_KEY for MTD")
+                detail_parts.append(_cost_line("Anthropic") or "set ANTHROPIC_ADMIN_API_KEY for MTD")
             checks.append({"name": "Anthropic", "status": "ok", "detail": " · ".join(detail_parts),
                            "console_url": "https://platform.claude.com/settings/keys", "tier": "paid"})
         except Exception as e:
@@ -179,8 +227,7 @@ def _check_apis() -> list[dict]:
         try:
             with urllib.request.urlopen(_build_probe(method, url, headers, body), timeout=8):
                 # Prefer real MTD numbers from dashboard_mtd.json, fall back to plan note
-                mtd_detail = _mtd_suffix(name).lstrip(" ·").strip()
-                detail = mtd_detail if mtd_detail else "PAYG · update private/dashboard_mtd.json"
+                detail = _cost_line(name) or "PAYG · update private/dashboard_mtd.json"
                 checks.append({"name": name, "status": "ok", "detail": detail, "console_url": console_url, "tier": "paid"})
         except Exception as e:
             err = str(e)

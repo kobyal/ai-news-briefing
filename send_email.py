@@ -90,10 +90,37 @@ def _anthropic_mtd_cost_usd() -> tuple[float, float] | None:
 _WARN_THRESHOLD_PCT = 80
 
 
+def _load_dashboard_mtd() -> dict:
+    """Manual MTD numbers the user refreshes from provider dashboards weekly.
+    Resolution order: DASHBOARD_MTD_JSON env var (set as GH secret for CI),
+    then private/dashboard_mtd.json (gitignored, local only)."""
+    raw = os.environ.get("DASHBOARD_MTD_JSON", "")
+    if raw:
+        try:
+            return json.loads(raw)
+        except Exception:
+            pass
+    for path in ("private/dashboard_mtd.json", os.path.expanduser("~/.ai-news-briefing-mtd.json")):
+        if os.path.exists(path):
+            try:
+                return json.load(open(path))
+            except Exception:
+                pass
+    return {}
+
+
 def _check_apis() -> list[dict]:
     """Health + consumption for each API. Returns list of {name, status, detail, console_url, tier}.
     tier is "paid" or "free" — drives the two-table split in the email."""
     checks = []
+    mtd = _load_dashboard_mtd().get("providers", {}) or {}
+
+    def _mtd_suffix(provider_name: str) -> str:
+        """Return ' · $X.XX MTD · <detail>' or empty string if no manual data."""
+        p = mtd.get(provider_name)
+        if not p:
+            return ""
+        return f" · ${float(p.get('mtd_usd', 0)):.2f} MTD · {p.get('detail','')}"
 
     # ── PAID: Anthropic — rate limits + month-to-date cost (Admin API) ──
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -116,7 +143,8 @@ def _check_apis() -> list[dict]:
                 req_limit = resp.headers.get("anthropic-ratelimit-requests-limit", "?")
                 detail_parts.append(f"{tok_limit} tok/min · {req_limit} req/min")
             if cost_pair is None:
-                detail_parts.append("set ANTHROPIC_ADMIN_API_KEY for MTD + last-run cost")
+                # No admin key → fall back to manual dashboard_mtd.json value
+                detail_parts.append(_mtd_suffix("Anthropic").lstrip(" ·").strip() or "set ANTHROPIC_ADMIN_API_KEY for MTD")
             checks.append({"name": "Anthropic", "status": "ok", "detail": " · ".join(detail_parts),
                            "console_url": "https://platform.claude.com/settings/keys", "tier": "paid"})
         except Exception as e:
@@ -137,20 +165,23 @@ def _check_apis() -> list[dict]:
     PAID_OTHERS = [
         ("Google Gemini", google_key,
          ("GET", f"https://generativelanguage.googleapis.com/v1beta/models?key={google_key}", {}, None),
-         "PAYG · check spend cap", "https://aistudio.google.com/spend"),
+         "https://aistudio.google.com/spend"),
         ("Perplexity", pplx_key,
          ("GET", "https://api.perplexity.ai/v1/models", {"Authorization": f"Bearer {pplx_key}"}, None),
-         "PAYG · check credit balance", "https://console.perplexity.ai/group/10174651-356d-4504-a319-cab5ad331920/billing"),
+         "https://console.perplexity.ai/group/10174651-356d-4504-a319-cab5ad331920/billing"),
         ("xAI (Grok)", xai_key,
          ("GET", "https://api.x.ai/v1/models", {"Authorization": f"Bearer {xai_key}"}, None),
-         "PAYG · check credits", "https://console.x.ai/team/7992d610-7c06-49b6-bf25-153940e9313f/billing"),
+         "https://console.x.ai/team/7992d610-7c06-49b6-bf25-153940e9313f/billing"),
     ]
-    for name, key, (method, url, headers, body), plan_note, console_url in PAID_OTHERS:
+    for name, key, (method, url, headers, body), console_url in PAID_OTHERS:
         if not key:
             continue
         try:
             with urllib.request.urlopen(_build_probe(method, url, headers, body), timeout=8):
-                checks.append({"name": name, "status": "ok", "detail": plan_note, "console_url": console_url, "tier": "paid"})
+                # Prefer real MTD numbers from dashboard_mtd.json, fall back to plan note
+                mtd_detail = _mtd_suffix(name).lstrip(" ·").strip()
+                detail = mtd_detail if mtd_detail else "PAYG · update private/dashboard_mtd.json"
+                checks.append({"name": name, "status": "ok", "detail": detail, "console_url": console_url, "tier": "paid"})
         except Exception as e:
             err = str(e)
             status = "exhausted" if ("403" in err or "429" in err or "quota" in err.lower()) else "error"

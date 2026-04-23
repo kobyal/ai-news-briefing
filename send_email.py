@@ -228,9 +228,10 @@ def _check_apis() -> list[dict]:
             checks.append({"name": "YouTube", "status": status, "detail": err[:60],
                            "console_url": "https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas", "tier": "free"})
 
-    # ── FREE: Jina — Reader endpoint works WITHOUT auth for free tier.
-    # A 403 here means the paid-tier key is rejected, but article_reader falls
-    # through to Firecrawl so article enrichment continues — hence "warn", not "exhausted".
+    # ── FREE: Jina — probe Reader endpoint. CRITICAL: urllib's default
+    # User-Agent (Python-urllib/3.x) gets blocked by Jina's bot filter with
+    # 403, even for valid keys. Passing a browser-like UA is enough to pass
+    # the probe reliably.
     firecrawl_present = bool(os.environ.get("FIRECRAWL_API_KEY", ""))
     for i, key_name in enumerate(["JINA_API_KEY", "JINA_API_KEY2"], 1):
         key = os.environ.get(key_name, "")
@@ -240,13 +241,14 @@ def _check_apis() -> list[dict]:
             req = urllib.request.Request("https://r.jina.ai/https://example.com")
             req.add_header("Authorization", f"Bearer {key}")
             req.add_header("Accept", "text/markdown")
+            req.add_header("User-Agent", "ai-news-briefing/1.0")  # bypass bot filter
             with urllib.request.urlopen(req, timeout=8):
                 checks.append({"name": f"Jina #{i}", "status": "ok", "detail": "Reader · free tier",
                                "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
         except Exception as e:
             err = str(e)
             if "403" in err or "429" in err:
-                # Key rejected but Firecrawl fallback (or unauth Reader) still works.
+                # Key genuinely rejected. Firecrawl (or unauth Reader) can still serve article reads.
                 if firecrawl_present:
                     detail = f"{err[:40]} · Firecrawl covers"
                 else:

@@ -46,6 +46,9 @@ _LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 _TODAY         = lambda: datetime.now().strftime("%B %d, %Y")
 _MONTH_YEAR    = lambda: datetime.now().strftime("%B %Y")
 
+# Track per-call usage/cost across the run — written to usage.json at the end.
+_usage_log: list[dict] = []
+
 
 def _fmt(template: str) -> str:
     from shared.vendors import VENDOR_ENUM
@@ -127,11 +130,20 @@ def _agent(
                 if part.get("type") == "output_text":
                     text += part.get("text", "")
 
-    # Cost reporting
-    cost_info  = data.get("usage", {}).get("cost", {})
-    cost_str   = f"  ${cost_info.get('total_cost', 0):.4f}" if cost_info else ""
+    # Cost reporting — Perplexity's response includes authoritative usage.cost.total_cost
+    usage_obj  = data.get("usage", {}) or {}
+    cost_info  = usage_obj.get("cost", {}) or {}
+    cost_usd   = float(cost_info.get("total_cost", 0) or 0)
+    cost_str   = f"  ${cost_usd:.4f}" if cost_usd else ""
     model_used = data.get("model", model)
     print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model_used}{cost_str}")
+    _usage_log.append({
+        "step": label,
+        "model": model_used,
+        "input_tokens": usage_obj.get("prompt_tokens", 0) or 0,
+        "output_tokens": usage_obj.get("completion_tokens", 0) or 0,
+        "cost_usd": round(cost_usd, 4),
+    })
 
     return text
 
@@ -257,5 +269,19 @@ def run_pipeline() -> dict:
     print(f" Done in {elapsed:.0f}s")
     print(f" Output: {result['saved_to']}")
     print("=" * 60)
+
+    # Write usage.json alongside the HTML output so publish_data / email can aggregate cost.
+    if _usage_log:
+        usage_path = os.path.join(os.path.dirname(result["saved_to"]), "usage.json")
+        total_in = sum(u.get("input_tokens", 0) for u in _usage_log)
+        total_out = sum(u.get("output_tokens", 0) for u in _usage_log)
+        total_cost = sum(u.get("cost_usd", 0) for u in _usage_log)
+        with open(usage_path, "w") as f:
+            json.dump({
+                "agent": "perplexity", "api": "Perplexity",
+                "total_input_tokens": total_in, "total_output_tokens": total_out,
+                "total_cost_usd": round(total_cost, 4),
+                "calls": _usage_log,
+            }, f, indent=2)
 
     return result

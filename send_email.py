@@ -289,13 +289,33 @@ def _check_apis() -> list[dict]:
 
 
 def _collect_fallbacks() -> list[dict]:
-    """Load any fallback events recorded this run. Returns aggregated counts."""
+    """Load any fallback events recorded this run. Reads /tmp first, then falls
+    back to the committed per-day file so cross-step/cross-job visibility works."""
+    events: list[dict] = []
+    # Preferred: live tracker file (same job, same runner)
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from shared.fallback_tracker import read_events
+        events = read_events()
     except Exception:
-        return []
-    events = read_events()
+        events = []
+    # Fallback: today's committed copy (email step runs after commit+push in daily_briefing.yml)
+    if not events:
+        today = datetime.now().strftime("%Y-%m-%d")
+        path = f"docs/data/_fallbacks_{today}.jsonl"
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            events.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+            except Exception:
+                pass
     # Aggregate by (agent, from, to)
     counts: dict = {}
     for e in events:
@@ -398,17 +418,66 @@ def _render_row(c: dict) -> str:
 paid_rows = "".join(_render_row(c) for c in api_checks if c.get("tier") == "paid")
 free_rows = "".join(_render_row(c) for c in api_checks if c.get("tier") == "free")
 
-# Usage section
+# Usage section — per-agent rows + total + daily diff
 usage_rows = ""
 total_run_cost = 0
+by_api: dict = {}
 for u in usage_data:
     total = u.get("total_input_tokens", 0) + u.get("total_output_tokens", 0)
     cost = u.get("total_cost_usd", 0)
     total_run_cost += cost
+    api = u.get("api", "?")
+    by_api[api] = by_api.get(api, 0) + cost
     cost_str = f"${cost:.4f}" if cost else ""
-    usage_rows += f'<tr><td style="padding:3px 8px;font-size:12px">{u["agent"]}</td><td style="padding:3px 8px;font-size:12px;color:#64748b">{u.get("api","?")}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace">{total:,} tok</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#b45309">{cost_str}</td></tr>\n'
-if usage_rows and total_run_cost > 0:
-    usage_rows += f'<tr style="border-top:1px solid #e2e8f0"><td colspan="3" style="padding:3px 8px;font-size:12px;font-weight:700">Total</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;font-weight:700;color:#b45309">${total_run_cost:.4f}</td></tr>\n'
+    usage_rows += f'<tr><td style="padding:3px 8px;font-size:12px">{u["agent"]}</td><td style="padding:3px 8px;font-size:12px;color:#64748b">{api}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace">{total:,} tok</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#b45309">{cost_str}</td></tr>\n'
+
+# Persist today's totals and compute vs previous day
+_HISTORY_PATH = "docs/data/_cost_history.jsonl"
+_today_iso = datetime.now().strftime("%Y-%m-%d")
+previous_entry = None
+try:
+    if os.path.exists(_HISTORY_PATH):
+        with open(_HISTORY_PATH) as f:
+            lines = [l.strip() for l in f if l.strip()]
+        # Find most recent entry for a different date than today
+        for line in reversed(lines):
+            try:
+                e = json.loads(line)
+                if e.get("date") != _today_iso:
+                    previous_entry = e
+                    break
+            except json.JSONDecodeError:
+                continue
+except Exception:
+    pass
+
+if total_run_cost > 0:
+    diff_html = ""
+    if previous_entry is not None:
+        prev_total = float(previous_entry.get("total_usd", 0) or 0)
+        delta = total_run_cost - prev_total
+        if prev_total:
+            pct = 100 * delta / prev_total
+            arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "·")
+            color = "#dc2626" if delta > 0 else ("#16a34a" if delta < 0 else "#64748b")
+            diff_html = f' <span style="color:{color};font-weight:600">{arrow} ${abs(delta):.4f} ({pct:+.1f}% vs {previous_entry.get("date","prev")})</span>'
+    usage_rows += f'<tr style="border-top:1px solid #e2e8f0"><td colspan="3" style="padding:3px 8px;font-size:12px;font-weight:700">Total</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;font-weight:700;color:#b45309">${total_run_cost:.4f}{diff_html}</td></tr>\n'
+    # Append today's entry (only once per date — overwrite existing if re-run)
+    try:
+        os.makedirs(os.path.dirname(_HISTORY_PATH), exist_ok=True)
+        existing = []
+        if os.path.exists(_HISTORY_PATH):
+            with open(_HISTORY_PATH) as f:
+                existing = [json.loads(l) for l in f if l.strip()]
+        existing = [e for e in existing if e.get("date") != _today_iso]
+        existing.append({"date": _today_iso, "total_usd": round(total_run_cost, 4), "by_api": {k: round(v, 4) for k, v in by_api.items()}})
+        # Keep last 90 days
+        existing = existing[-90:]
+        with open(_HISTORY_PATH, "w") as f:
+            for e in existing:
+                f.write(json.dumps(e) + "\n")
+    except Exception as e:
+        print(f"  Cost history write failed: {e}")
 
 # Fallback events section
 fallback_rows = ""

@@ -95,6 +95,19 @@ jobs:
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
         run: python3 publish_data.py
 
+      - name: Persist fallback events to docs/data/
+        run: |
+          mkdir -p docs/data
+          DATE=$(date +'%Y-%m-%d')
+          if [ -f /tmp/_fallbacks.jsonl ]; then
+            cp /tmp/_fallbacks.jsonl "docs/data/_fallbacks_${DATE}.jsonl"
+            echo "Persisted $(wc -l < /tmp/_fallbacks.jsonl) fallback events"
+          else
+            # Write empty so the file exists for the email step to reference
+            : > "docs/data/_fallbacks_${DATE}.jsonl"
+            echo "No fallback events this run"
+          fi
+
       - name: Commit and push outputs
         run: |
           git config user.name "github-actions[bot]"

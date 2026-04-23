@@ -137,37 +137,46 @@ def _clean_jina_response(text: str) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 def _fetch_jina(url: str) -> Optional[ArticleContent]:
-    """Fetch article via Jina Reader (free, no API key needed)."""
+    """Fetch article via Jina Reader. Rotates through JINA_API_KEY then _KEY2 on 403/429."""
     with _JINA_SEM:
-        try:
-            headers = {
-                "User-Agent": "ai-news-briefing/1.0",
-                "Accept": "text/markdown",
-            }
-            jina_key = os.environ.get("JINA_API_KEY", "")
-            if jina_key:
-                headers["Authorization"] = f"Bearer {jina_key}"
+        keys = [(name, os.environ.get(name, "")) for name in ("JINA_API_KEY", "JINA_API_KEY2")]
+        keys = [(n, k) for n, k in keys if k]
+        if not keys:
+            keys = [("(none)", "")]  # no-auth path still works against r.jina.ai
+        last_status = None
+        for idx, (key_name, key) in enumerate(keys):
+            try:
+                headers = {"User-Agent": "ai-news-briefing/1.0", "Accept": "text/markdown"}
+                if key:
+                    headers["Authorization"] = f"Bearer {key}"
+                resp = requests.get(f"https://r.jina.ai/{url}", headers=headers, timeout=15)
+                if resp.status_code in (403, 429) and idx + 1 < len(keys):
+                    # key rejected/rate-limited — rotate to next key
+                    try:
+                        from .fallback_tracker import track
+                        track("article_reader", key_name, keys[idx + 1][0], f"jina HTTP {resp.status_code}")
+                    except Exception:
+                        pass
+                    last_status = resp.status_code
+                    continue
+                if not resp.ok:
+                    return None
 
-            resp = requests.get(
-                f"https://r.jina.ai/{url}",
-                headers=headers,
-                timeout=15,
-            )
-            if not resp.ok:
+                title, body = _clean_jina_response(resp.text)
+                if not _is_valid_content(body):
+                    return None
+
+                full_len = len(body)
+                body = _truncate(body, _MAX_CHARS)
+                return ArticleContent(
+                    url=url, title=title, text=body,
+                    source="jina", char_count=full_len,
+                )
+            except (requests.Timeout, requests.ConnectionError, Exception):
+                if idx + 1 < len(keys):
+                    continue
                 return None
-
-            title, body = _clean_jina_response(resp.text)
-            if not _is_valid_content(body):
-                return None
-
-            full_len = len(body)
-            body = _truncate(body, _MAX_CHARS)
-            return ArticleContent(
-                url=url, title=title, text=body,
-                source="jina", char_count=full_len,
-            )
-        except (requests.Timeout, requests.ConnectionError, Exception):
-            return None
+        return None
 
 
 def _fetch_firecrawl(url: str) -> Optional[ArticleContent]:
@@ -219,6 +228,11 @@ def read_article(url: str) -> ArticleContent:
 
     # Fallback to Firecrawl
     if not result:
+        try:
+            from .fallback_tracker import track
+            track("article_reader", "jina", "firecrawl", "jina returned None")
+        except Exception:
+            pass
         result = _fetch_firecrawl(url)
 
     # Cache successful reads

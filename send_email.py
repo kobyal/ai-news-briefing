@@ -3,6 +3,7 @@ import glob
 import json
 import os
 import smtplib
+import sys
 import urllib.request
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
@@ -85,62 +86,16 @@ def _anthropic_mtd_cost_usd() -> tuple[float, float] | None:
         return None
 
 
+# Mark status "warn" (yellow) when usage hits this percent of the limit
+_WARN_THRESHOLD_PCT = 80
+
+
 def _check_apis() -> list[dict]:
-    """Health + consumption for each API. Returns list of {name, status, detail, console_url}."""
+    """Health + consumption for each API. Returns list of {name, status, detail, console_url, tier}.
+    tier is "paid" or "free" — drives the two-table split in the email."""
     checks = []
 
-    # ── DeepL — usage endpoint returns chars used/limit ────────────────
-    deepl_key = os.environ.get("DEEPL_API_KEY", "")
-    if deepl_key:
-        try:
-            req = urllib.request.Request("https://api-free.deepl.com/v2/usage")
-            req.add_header("Authorization", f"DeepL-Auth-Key {deepl_key}")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                d = json.loads(resp.read())
-            used = d.get("character_count", 0)
-            limit = d.get("character_limit", 1)
-            checks.append({"name": "DeepL", "status": "ok",
-                           "detail": f"{used:,}/{limit:,} chars{_pct(used, limit)}",
-                           "console_url": "https://www.deepl.com/account/usage"})
-        except Exception as e:
-            checks.append({"name": "DeepL", "status": "error", "detail": str(e)[:40], "console_url": "https://www.deepl.com/account/usage"})
-
-    # ── Tavily — GET /usage returns plan + paygo credit usage ──────────
-    for i, key_name in enumerate(["TAVILY_API_KEY", "TAVILY_API_KEY2", "TAVILY_API_KEY3"], 1):
-        key = os.environ.get(key_name, "")
-        if not key:
-            continue
-        try:
-            req = urllib.request.Request("https://api.tavily.com/usage")
-            req.add_header("Authorization", f"Bearer {key}")
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                d = json.loads(resp.read())
-            acct = d.get("account", {}) or {}
-            plan = acct.get("current_plan", "Unknown")
-            plan_used = acct.get("plan_usage", 0) or 0
-            plan_limit = acct.get("plan_limit", 0) or 0
-            paygo_used = acct.get("paygo_usage", 0) or 0
-            paygo_limit = acct.get("paygo_limit", 0) or 0
-            # Prefer plan usage; append paygo if any
-            parts = []
-            if plan_limit:
-                parts.append(f"{plan_used:,}/{plan_limit:,} credits{_pct(plan_used, plan_limit)} · {plan}")
-            elif plan_used:
-                parts.append(f"{plan_used:,} credits · {plan}")
-            else:
-                parts.append(plan)
-            if paygo_used or paygo_limit:
-                parts.append(f"paygo {paygo_used:,}/{paygo_limit or '∞'}")
-            status = "exhausted" if plan_limit and plan_used >= plan_limit else "ok"
-            checks.append({"name": f"Tavily #{i}", "status": status, "detail": " · ".join(parts),
-                           "console_url": "https://app.tavily.com/home"})
-        except Exception as e:
-            err = str(e)
-            status = "exhausted" if ("usage limit" in err or "432" in err or "429" in err) else "error"
-            checks.append({"name": f"Tavily #{i}", "status": status, "detail": err[:60],
-                           "console_url": "https://app.tavily.com/home"})
-
-    # ── Anthropic — rate limits + month-to-date cost (Admin API) ────────
+    # ── PAID: Anthropic — rate limits + month-to-date cost (Admin API) ──
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if anthropic_key:
         cost_pair = _anthropic_mtd_cost_usd()
@@ -163,13 +118,12 @@ def _check_apis() -> list[dict]:
             if cost_pair is None:
                 detail_parts.append("set ANTHROPIC_ADMIN_API_KEY for MTD + last-run cost")
             checks.append({"name": "Anthropic", "status": "ok", "detail": " · ".join(detail_parts),
-                           "console_url": "https://platform.claude.com/settings/keys"})
+                           "console_url": "https://platform.claude.com/settings/keys", "tier": "paid"})
         except Exception as e:
             checks.append({"name": "Anthropic", "status": "error", "detail": str(e)[:40],
-                           "console_url": "https://platform.claude.com/settings/keys"})
+                           "console_url": "https://platform.claude.com/settings/keys", "tier": "paid"})
 
-    # ── Providers without programmatic usage APIs — probe a real endpoint, show plan + console link ─
-    # Each tuple: (env_key, display_name, (method, url, headers, body), plan_note, console_url)
+    # ── PAID: Google Gemini / Perplexity / xAI — probe models endpoint ─
     def _build_probe(method, url, headers, body):
         req = urllib.request.Request(url, method=method, data=body)
         for k, v in headers.items():
@@ -180,8 +134,7 @@ def _check_apis() -> list[dict]:
     pplx_key = os.environ.get("PERPLEXITY_API_KEY", "")
     xai_key = os.environ.get("XAI_API_KEY", "")
     yt_key = os.environ.get("YOUTUBE_API_KEY", "")
-    jina_key = os.environ.get("JINA_API_KEY", "")
-    OTHERS = [
+    PAID_OTHERS = [
         ("Google Gemini", google_key,
          ("GET", f"https://generativelanguage.googleapis.com/v1beta/models?key={google_key}", {}, None),
          "PAYG · check spend cap", "https://aistudio.google.com/spend"),
@@ -191,44 +144,128 @@ def _check_apis() -> list[dict]:
         ("xAI (Grok)", xai_key,
          ("GET", "https://api.x.ai/v1/models", {"Authorization": f"Bearer {xai_key}"}, None),
          "PAYG · check credits", "https://console.x.ai/team/7992d610-7c06-49b6-bf25-153940e9313f/billing"),
-        ("YouTube", yt_key,
-         ("GET", f"https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={yt_key}", {}, None),
-         "10,000 units/day quota", "https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas"),
-        ("Jina", jina_key,
-         ("POST", "https://api.jina.ai/v1/embeddings",
-          {"Authorization": f"Bearer {jina_key}", "Content-Type": "application/json"},
-          json.dumps({"model": "jina-embeddings-v3", "input": ["ping"]}).encode()),
-         "Free tier · check balance", "https://jina.ai/api-dashboard"),
     ]
-    for name, key, (method, url, headers, body), plan_note, console_url in OTHERS:
+    for name, key, (method, url, headers, body), plan_note, console_url in PAID_OTHERS:
         if not key:
             continue
         try:
             with urllib.request.urlopen(_build_probe(method, url, headers, body), timeout=8):
-                checks.append({"name": name, "status": "ok", "detail": plan_note, "console_url": console_url})
+                checks.append({"name": name, "status": "ok", "detail": plan_note, "console_url": console_url, "tier": "paid"})
         except Exception as e:
             err = str(e)
             status = "exhausted" if ("403" in err or "429" in err or "quota" in err.lower()) else "error"
-            checks.append({"name": name, "status": status, "detail": err[:60], "console_url": console_url})
+            checks.append({"name": name, "status": status, "detail": err[:60], "console_url": console_url, "tier": "paid"})
 
-    # ── Exa — search endpoint probe, known to 403 when key revoked ─────
+    # ── FREE: DeepL — authoritative chars used/limit ───────────────────
+    deepl_key = os.environ.get("DEEPL_API_KEY", "")
+    if deepl_key:
+        try:
+            req = urllib.request.Request("https://api-free.deepl.com/v2/usage")
+            req.add_header("Authorization", f"DeepL-Auth-Key {deepl_key}")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                d = json.loads(resp.read())
+            used = d.get("character_count", 0)
+            limit = d.get("character_limit", 1)
+            pct = 100 * used / limit if limit else 0
+            status = "exhausted" if used >= limit else ("warn" if pct >= _WARN_THRESHOLD_PCT else "ok")
+            checks.append({"name": "DeepL", "status": status,
+                           "detail": f"{used:,}/{limit:,} chars{_pct(used, limit)}",
+                           "console_url": "https://www.deepl.com/account/usage", "tier": "free"})
+        except Exception as e:
+            checks.append({"name": "DeepL", "status": "error", "detail": str(e)[:40],
+                           "console_url": "https://www.deepl.com/account/usage", "tier": "free"})
+
+    # ── FREE: Tavily — authoritative plan + paygo credit usage ──────────
+    for i, key_name in enumerate(["TAVILY_API_KEY", "TAVILY_API_KEY2", "TAVILY_API_KEY3"], 1):
+        key = os.environ.get(key_name, "")
+        if not key:
+            continue
+        try:
+            req = urllib.request.Request("https://api.tavily.com/usage")
+            req.add_header("Authorization", f"Bearer {key}")
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                d = json.loads(resp.read())
+            acct = d.get("account", {}) or {}
+            plan = acct.get("current_plan", "Unknown")
+            plan_used = acct.get("plan_usage", 0) or 0
+            plan_limit = acct.get("plan_limit", 0) or 0
+            paygo_used = acct.get("paygo_usage", 0) or 0
+            paygo_limit = acct.get("paygo_limit", 0) or 0
+            parts = []
+            if plan_limit:
+                parts.append(f"{plan_used:,}/{plan_limit:,} credits{_pct(plan_used, plan_limit)} · {plan}")
+            elif plan_used:
+                parts.append(f"{plan_used:,} credits · {plan}")
+            else:
+                parts.append(plan)
+            if paygo_used or paygo_limit:
+                parts.append(f"paygo {paygo_used:,}/{paygo_limit or '∞'}")
+            pct = 100 * plan_used / plan_limit if plan_limit else 0
+            if plan_limit and plan_used >= plan_limit:
+                status = "exhausted"
+            elif pct >= _WARN_THRESHOLD_PCT:
+                status = "warn"
+            else:
+                status = "ok"
+            checks.append({"name": f"Tavily #{i}", "status": status, "detail": " · ".join(parts),
+                           "console_url": "https://app.tavily.com/home", "tier": "free"})
+        except Exception as e:
+            err = str(e)
+            status = "exhausted" if ("usage limit" in err or "432" in err or "429" in err) else "error"
+            checks.append({"name": f"Tavily #{i}", "status": status, "detail": err[:60],
+                           "console_url": "https://app.tavily.com/home", "tier": "free"})
+
+    # ── FREE: YouTube — 10k unit/day quota, no programmatic check ──────
+    if yt_key:
+        try:
+            req = urllib.request.Request(f"https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={yt_key}")
+            with urllib.request.urlopen(req, timeout=5):
+                checks.append({"name": "YouTube", "status": "ok", "detail": "10,000 units/day quota",
+                               "console_url": "https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas", "tier": "free"})
+        except Exception as e:
+            err = str(e)
+            status = "exhausted" if ("403" in err or "429" in err or "quota" in err.lower()) else "error"
+            checks.append({"name": "YouTube", "status": status, "detail": err[:60],
+                           "console_url": "https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas", "tier": "free"})
+
+    # ── FREE: Jina — probe each key, rotates in article_reader on 403/429 ─
+    for i, key_name in enumerate(["JINA_API_KEY", "JINA_API_KEY2"], 1):
+        key = os.environ.get(key_name, "")
+        if not key:
+            continue
+        try:
+            body = json.dumps({"model": "jina-embeddings-v3", "input": ["ping"]}).encode()
+            req = urllib.request.Request("https://api.jina.ai/v1/embeddings", method="POST", data=body)
+            req.add_header("Authorization", f"Bearer {key}")
+            req.add_header("Content-Type", "application/json")
+            with urllib.request.urlopen(req, timeout=8):
+                checks.append({"name": f"Jina #{i}", "status": "ok", "detail": "Free tier · check balance",
+                               "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
+        except Exception as e:
+            err = str(e)
+            status = "exhausted" if ("403" in err or "429" in err) else "error"
+            checks.append({"name": f"Jina #{i}", "status": status, "detail": err[:60],
+                           "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
+
+    # ── FREE: Exa — both keys 403 when revoked ─────────────────────────
     for i, key_name in enumerate(["EXA_API_KEY", "EXA_API_KEY2"], 1):
         key = os.environ.get(key_name, "")
         if not key:
             continue
         try:
             data = json.dumps({"query": "test", "numResults": 1}).encode()
-            req = urllib.request.Request("https://api.exa.ai/search", data=data, headers={"x-api-key": key, "Content-Type": "application/json"})
+            req = urllib.request.Request("https://api.exa.ai/search", data=data,
+                                          headers={"x-api-key": key, "Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=8):
                 checks.append({"name": f"Exa #{i}", "status": "ok", "detail": "PAYG · check spend",
-                               "console_url": "https://dashboard.exa.ai/usage?tab=spend"})
+                               "console_url": "https://dashboard.exa.ai/usage?tab=spend", "tier": "free"})
         except Exception as e:
             err = str(e)
             status = "exhausted" if ("403" in err or "429" in err) else "error"
             checks.append({"name": f"Exa #{i}", "status": status, "detail": err[:50],
-                           "console_url": "https://dashboard.exa.ai/usage?tab=spend"})
+                           "console_url": "https://dashboard.exa.ai/usage?tab=spend", "tier": "free"})
 
-    # ── NewsAPI — only exposes daily quota via response behavior, show known free tier ─
+    # ── FREE: NewsAPI — no usage endpoint, show known free tier cap ────
     for i, key_name in enumerate(["NEWSAPI_KEY", "NEWSAPI_KEY2"], 1):
         key = os.environ.get(key_name, "")
         if not key:
@@ -239,22 +276,39 @@ def _check_apis() -> list[dict]:
                 d = json.loads(resp.read())
             if d.get("status") == "ok":
                 checks.append({"name": f"NewsAPI #{i}", "status": "ok", "detail": "100 req/day quota",
-                               "console_url": "https://newsapi.org/account"})
+                               "console_url": "https://newsapi.org/account", "tier": "free"})
             else:
                 checks.append({"name": f"NewsAPI #{i}", "status": "error",
                                "detail": d.get("message", "unknown")[:50],
-                               "console_url": "https://newsapi.org/account"})
+                               "console_url": "https://newsapi.org/account", "tier": "free"})
         except Exception as e:
             checks.append({"name": f"NewsAPI #{i}", "status": "error", "detail": str(e)[:50],
-                           "console_url": "https://newsapi.org/account"})
+                           "console_url": "https://newsapi.org/account", "tier": "free"})
 
     return checks
+
+
+def _collect_fallbacks() -> list[dict]:
+    """Load any fallback events recorded this run. Returns aggregated counts."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from shared.fallback_tracker import read_events
+    except Exception:
+        return []
+    events = read_events()
+    # Aggregate by (agent, from, to)
+    counts: dict = {}
+    for e in events:
+        k = (e.get("agent", "?"), e.get("from", "?"), e.get("to", "?"))
+        counts[k] = counts.get(k, 0) + 1
+    return [{"agent": a, "from": f, "to": t, "count": n} for (a, f, t), n in counts.items()]
 
 print("Checking API status...")
 api_checks = _check_apis()
 for c in api_checks:
     icon = {"ok": "✅", "warn": "⚠️", "exhausted": "🔴", "error": "❌"}.get(c["status"], "?")
-    print(f"  {icon} {c['name']}: {c['detail']}")
+    tier_tag = "[$]" if c.get("tier") == "paid" else "[free]"
+    print(f"  {icon} {tier_tag} {c['name']}: {c['detail']}")
 
 usage_data = _collect_usage()
 if usage_data:
@@ -262,17 +316,24 @@ if usage_data:
     for u in usage_data:
         print(f"  {u['agent']}: {u.get('total_input_tokens',0):,} in + {u.get('total_output_tokens',0):,} out")
 
+fallback_events = _collect_fallbacks()
+if fallback_events:
+    print("Fallback events this run:")
+    for f in fallback_events:
+        print(f"  {f['agent']}: {f['from']} → {f['to']}  ×{f['count']}")
+
 # ── Build email ───────────────────────────────────────────────────────
-# API status section for HTML email
-api_rows = ""
-for c in api_checks:
+def _render_row(c: dict) -> str:
     icon = {"ok": "🟢", "warn": "🟡", "exhausted": "🔴", "error": "❌"}.get(c["status"], "⚪")
     color = {"ok": "#16a34a", "warn": "#d97706", "exhausted": "#dc2626", "error": "#dc2626"}.get(c["status"], "#64748b")
     name_cell = c["name"]
     console = c.get("console_url")
     if console:
         name_cell = f'<a href="{console}" style="color:#2563eb;text-decoration:underline">{c["name"]}</a>'
-    api_rows += f'<tr><td style="padding:3px 8px;font-size:12px">{icon} {name_cell}</td><td style="padding:3px 8px;font-size:12px;color:{color}">{c["detail"]}</td></tr>\n'
+    return f'<tr><td style="padding:3px 8px;font-size:12px">{icon} {name_cell}</td><td style="padding:3px 8px;font-size:12px;color:{color}">{c["detail"]}</td></tr>\n'
+
+paid_rows = "".join(_render_row(c) for c in api_checks if c.get("tier") == "paid")
+free_rows = "".join(_render_row(c) for c in api_checks if c.get("tier") == "free")
 
 # Usage section
 usage_rows = ""
@@ -286,11 +347,20 @@ for u in usage_data:
 if usage_rows and total_run_cost > 0:
     usage_rows += f'<tr style="border-top:1px solid #e2e8f0"><td colspan="3" style="padding:3px 8px;font-size:12px;font-weight:700">Total</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;font-weight:700;color:#b45309">${total_run_cost:.4f}</td></tr>\n'
 
+# Fallback events section
+fallback_rows = ""
+for f in fallback_events:
+    fallback_rows += f'<tr><td style="padding:3px 8px;font-size:12px;color:#d97706">🟡 {f["agent"]}</td><td style="padding:3px 8px;font-size:12px;color:#64748b;font-family:monospace">{f["from"]} → {f["to"]}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#d97706">×{f["count"]}</td></tr>\n'
+
 status_section = ""
-if api_rows or usage_rows:
+if paid_rows or free_rows or usage_rows or fallback_rows:
     status_section = '<hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0">\n'
-    if api_rows:
-        status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-bottom:4px">API STATUS</p>\n<table style="border-collapse:collapse">\n{api_rows}</table>\n'
+    if paid_rows:
+        status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-bottom:4px">API STATUS · PAID</p>\n<table style="border-collapse:collapse">\n{paid_rows}</table>\n'
+    if free_rows:
+        status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-top:12px;margin-bottom:4px">API STATUS · FREE TIER</p>\n<table style="border-collapse:collapse">\n{free_rows}</table>\n'
+    if fallback_rows:
+        status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-top:12px;margin-bottom:4px">FALLBACKS FIRED (this run)</p>\n<table style="border-collapse:collapse">\n{fallback_rows}</table>\n'
     if usage_rows:
         status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-top:12px;margin-bottom:4px">TOKEN USAGE (this run)</p>\n<table style="border-collapse:collapse">\n{usage_rows}</table>\n'
 

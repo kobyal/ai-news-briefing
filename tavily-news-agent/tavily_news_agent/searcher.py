@@ -50,8 +50,17 @@ class TavilySearcher:
             from tavily import TavilyClient
             next_key = self._backup_keys[self._key_index]
             self._client = TavilyClient(api_key=next_key)
+            prev_label = "TAVILY_API_KEY" if self._key_index == 0 else f"TAVILY_API_KEY{self._key_index + 1}"
             self._key_index += 1
-            print(f"  [Tavily] Switched to TAVILY_API_KEY{self._key_index + 1} (backup {self._key_index})")
+            next_label = f"TAVILY_API_KEY{self._key_index + 1}"
+            print(f"  [Tavily] Switched to {next_label} (backup {self._key_index})")
+            try:
+                import sys, pathlib
+                sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent))
+                from shared.fallback_tracker import track
+                track("tavily", prev_label, next_label, "quota/rate-limit")
+            except Exception:
+                pass
             return True
         return False
 
@@ -87,6 +96,13 @@ class TavilySearcher:
                     time.sleep(delay)
                     continue
                 print(f"  [Tavily] Error after retries: {e} — falling back to DuckDuckGo")
+                try:
+                    import sys, pathlib
+                    sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent))
+                    from shared.fallback_tracker import track
+                    track("tavily", "tavily", "duckduckgo", str(e)[:80])
+                except Exception:
+                    pass
                 return self._ddg_search(query, max_results)
 
     def _ddg_search(self, query: str, max_results: int) -> List[dict]:

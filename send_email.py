@@ -228,18 +228,18 @@ def _check_apis() -> list[dict]:
             checks.append({"name": "YouTube", "status": status, "detail": err[:60],
                            "console_url": "https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas", "tier": "free"})
 
-    # ── FREE: Jina — probe each key, rotates in article_reader on 403/429 ─
+    # ── FREE: Jina — we actually use Reader (r.jina.ai), so probe THAT,
+    # not /v1/embeddings (different product tier; can 403 even when Reader works).
     for i, key_name in enumerate(["JINA_API_KEY", "JINA_API_KEY2"], 1):
         key = os.environ.get(key_name, "")
         if not key:
             continue
         try:
-            body = json.dumps({"model": "jina-embeddings-v3", "input": ["ping"]}).encode()
-            req = urllib.request.Request("https://api.jina.ai/v1/embeddings", method="POST", data=body)
+            req = urllib.request.Request("https://r.jina.ai/https://example.com")
             req.add_header("Authorization", f"Bearer {key}")
-            req.add_header("Content-Type", "application/json")
+            req.add_header("Accept", "text/markdown")
             with urllib.request.urlopen(req, timeout=8):
-                checks.append({"name": f"Jina #{i}", "status": "ok", "detail": "Free tier · check balance",
+                checks.append({"name": f"Jina #{i}", "status": "ok", "detail": "Reader · free tier",
                                "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
         except Exception as e:
             err = str(e)

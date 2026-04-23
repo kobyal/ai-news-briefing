@@ -337,21 +337,6 @@ def _active_sources_today() -> list[str]:
         ("github-trending-agent", "GitHub"),
         ("twitter-agent", "X"),
     ]
-    # RSS agent produces Reddit posts as a sub-section — surface separately
-    rss_has_reddit = False
-    rss_dir = f"rss-news-agent/output/{today}"
-    if os.path.isdir(rss_dir):
-        for fn in os.listdir(rss_dir):
-            if fn == "usage.json" or not fn.endswith(".json"):
-                continue
-            try:
-                with open(os.path.join(rss_dir, fn)) as f:
-                    d = json.load(f)
-                if d.get("reddit_posts"):
-                    rss_has_reddit = True
-                    break
-            except Exception:
-                continue
     out = []
     for dir_name, label in agents:
         day_dir = f"{dir_name}/output/{today}"
@@ -362,13 +347,10 @@ def _active_sources_today() -> list[str]:
             if fn.endswith(".json") and fn != "usage.json":
                 out.append(label)
                 break
-    if rss_has_reddit and "Reddit" not in out:
-        # Insert Reddit right after RSS for readability
-        try:
-            idx = out.index("RSS") + 1
-            out.insert(idx, "Reddit")
-        except ValueError:
-            out.append("Reddit")
+    # RSS agent scrapes Reddit hot as part of its run — surface Reddit separately
+    if "RSS" in out:
+        idx = out.index("RSS") + 1
+        out.insert(idx, "Reddit")
     return out
 
 

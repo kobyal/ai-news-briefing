@@ -153,21 +153,29 @@ def _check_apis() -> list[dict]:
     week_by_api = _cost_by_provider_since(_7d_ago)
 
     def _cost_line(provider_name: str) -> str:
-        """Compose ' · today $X · 7d $Y · MTD $Z · <dashboard detail>'.
-        Uses usage.json for today/7d (per-run authoritative) and dashboard_mtd.json for monthly."""
+        """today $X · 7d $Y · MTD $Z · <detail>
+
+        today/7d: authoritative from our usage.json if we have it, else fall back
+        to today_usd from dashboard_mtd.json (user-entered from dashboards).
+        MTD: always from dashboard_mtd.json (lagging, user refreshes weekly)."""
         parts = []
-        t = today_by_api.get(provider_name, 0)
-        w = week_by_api.get(provider_name, 0)
-        if t > 0:
-            parts.append(f"today ${t:.4f}")
-        if w > 0:
-            parts.append(f"7d ${w:.4f}")
-        p = mtd.get(provider_name)
-        if p:
-            parts.append(f"MTD ${float(p.get('mtd_usd',0)):.2f}")
-            detail = p.get("detail", "")
-            if detail:
-                parts.append(detail)
+        p = mtd.get(provider_name, {}) or {}
+        # TODAY: prefer our usage.json tracking; fall back to manually-entered today_usd
+        auto_today = today_by_api.get(provider_name, 0)
+        manual_today = float(p.get("today_usd", 0) or 0)
+        today = auto_today if auto_today > 0 else manual_today
+        if today > 0:
+            src = "auto" if auto_today > 0 else "manual"
+            parts.append(f"today ${today:.4f} ({src})")
+        # 7d: from usage.json only (can't guess this from a single dashboard number)
+        week = week_by_api.get(provider_name, 0)
+        if week > 0:
+            parts.append(f"7d ${week:.4f}")
+        # MTD: always dashboard_mtd.json if present
+        if p.get("mtd_usd"):
+            parts.append(f"MTD ${float(p['mtd_usd']):.2f}")
+        if p.get("detail"):
+            parts.append(p["detail"])
         return " · ".join(parts)
 
     # ── PAID: Anthropic — rate limits + month-to-date cost (Admin API) ──

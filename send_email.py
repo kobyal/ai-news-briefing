@@ -5,7 +5,7 @@ import os
 import smtplib
 import sys
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 

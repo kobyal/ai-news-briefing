@@ -8,13 +8,19 @@ Steps:
 """
 import json
 import os
+import sys
 import time
 from datetime import datetime
+from pathlib import Path
 
 import anthropic
 
 from .searcher import fetch_all_vendor_news, Article
 from .tools import build_and_save_html, _parse
+
+# Shared subscription path — shells to `claude -p` when MERGER_VIA_CLAUDE_CODE=1
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from shared import anthropic_cc  # noqa: E402
 
 _LOOKBACK_DAYS    = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 _TODAY            = lambda: datetime.now().strftime("%B %d, %Y")
@@ -27,6 +33,10 @@ _usage_log: list[dict] = []
 
 def _llm(prompt: str, *, model: str, json_mode: bool = False, label: str = "") -> str:
     """Single Anthropic messages.create() call."""
+    if anthropic_cc.is_enabled():
+        return anthropic_cc.agent(
+            prompt, json_mode=json_mode, label=label, usage_log=_usage_log,
+        )
     if not _API_KEY():
         raise RuntimeError("ANTHROPIC_API_KEY not set — add it to .env or GitHub secrets")
 

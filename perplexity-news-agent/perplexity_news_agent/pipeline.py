@@ -17,6 +17,7 @@ Models are configurable via .env:
 """
 import json
 import os
+import subprocess
 import time
 from datetime import datetime
 
@@ -56,6 +57,89 @@ _usage_log: list[dict] = []
 # Anthropic direct pricing per 1M tokens (keep in sync with merger-agent)
 _ANTHROPIC_PRICES = {"haiku": (1.0, 5.0), "sonnet": (3.0, 15.0), "opus": (15.0, 75.0)}
 
+# Subscription-path config — used when MERGER_VIA_CLAUDE_CODE=1 is set.
+_CC_MODEL  = lambda: os.environ.get("MERGER_CC_MODEL",  "claude-opus-4-7")
+_CC_EFFORT = lambda: os.environ.get("MERGER_CC_EFFORT", "low")
+
+
+def _anthropic_via_claude_code(
+    input_text: str,
+    *,
+    instructions: str = None,
+    json_mode: bool = False,
+    label: str = "",
+) -> str:
+    """Shells out to `claude -p` using OAuth keychain — no ANTHROPIC_API_KEY read.
+
+    Uses MERGER_CC_MODEL (default claude-opus-4-7) and MERGER_CC_EFFORT (low).
+    Extracts only the first assistant message to mirror the API path's
+    max_tokens semantics (no auto-continuation across turns).
+    """
+    system_prompt = instructions or ""
+    if json_mode:
+        system_prompt = (system_prompt + "\n" if system_prompt else "") + \
+                        "Respond with ONLY a valid JSON object. No markdown fences, no explanation."
+
+    cmd = [
+        "claude", "-p",
+        "--model", _CC_MODEL(),
+        "--output-format", "stream-json",
+        "--verbose",
+        "--system-prompt", system_prompt or "You are a helpful assistant. Return only the requested output.",
+        "--tools", "",
+        "--no-session-persistence",
+        "--disable-slash-commands",
+        "--effort", _CC_EFFORT(),
+    ]
+    t0 = time.time()
+    try:
+        r = subprocess.run(cmd, input=input_text, capture_output=True,
+                           text=True, timeout=1800)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"[{label}] claude -p timed out after 1800s")
+    if r.returncode != 0:
+        raise RuntimeError(f"[{label}] claude -p failed (rc={r.returncode}): {r.stderr[:500]}")
+
+    assistant_texts: list[str] = []
+    result_event = None
+    for line in r.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if obj.get("type") == "assistant":
+            msg = obj.get("message", {}) or {}
+            blocks = [b.get("text", "") for b in (msg.get("content") or []) if b.get("type") == "text"]
+            if blocks:
+                assistant_texts.append("".join(blocks))
+        elif obj.get("type") == "result":
+            result_event = obj
+
+    text = assistant_texts[0] if assistant_texts else ""
+    elapsed = time.time() - t0
+    usage = (result_event or {}).get("usage", {}) or {}
+    in_tok = usage.get("input_tokens", 0)
+    out_tok = usage.get("output_tokens", 0)
+    stop = (result_event or {}).get("stop_reason", "unknown")
+    n_msgs = len(assistant_texts)
+    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={_CC_MODEL()} (sub)  in={in_tok} out={out_tok}  stop={stop}  msgs={n_msgs}")
+    if n_msgs > 1:
+        print(f"    ⚠  [{label}] Claude Code auto-continued — using first turn only")
+
+    _usage_log.append({
+        "step": label,
+        "model": _CC_MODEL(),
+        "api": "Anthropic (subscription)",
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "cost_usd": 0.0,
+        "via": "subscription",
+    })
+    return text
+
 
 def _anthropic_direct(
     input_text: str,
@@ -68,11 +152,15 @@ def _anthropic_direct(
     """Call Anthropic directly (no Perplexity proxy).
 
     Used for writer + translator steps that don't need Perplexity's web_search.
-    Cheaper: Anthropic Haiku 4.5 is $1/$5 per 1M vs Perplexity proxying the same
-    model at an effective markup (~$6.29/month observed on Perplexity bill for
-    identical work). We map the env-var string 'anthropic/claude-sonnet-4-6' →
-    Anthropic SDK model id 'claude-sonnet-4-6' by dropping the prefix.
+
+    Routes to the Claude Code subscription path (OAuth keychain, no API key)
+    when MERGER_VIA_CLAUDE_CODE=1 is set. Otherwise falls back to the
+    anthropic SDK with ANTHROPIC_API_KEY.
     """
+    if os.environ.get("MERGER_VIA_CLAUDE_CODE") == "1":
+        return _anthropic_via_claude_code(input_text, instructions=instructions,
+                                           json_mode=json_mode, label=label)
+
     # Lazy import so test environments that don't have anthropic don't break the module
     import anthropic
     anthropic_model = model.split("/", 1)[-1] if "/" in model else model

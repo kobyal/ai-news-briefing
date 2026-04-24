@@ -9,6 +9,7 @@ Steps:
 """
 import json
 import os
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +18,10 @@ import anthropic
 
 from .feeds import fetch_all, VENDOR_KEYWORDS
 from .tools import build_and_save_html, _parse
+
+# Shared subscription path — shells to `claude -p` when MERGER_VIA_CLAUDE_CODE=1
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from shared import anthropic_cc  # noqa: E402
 
 _API_KEY   = lambda: os.environ.get("ANTHROPIC_API_KEY", "")
 _WRITER_MODEL     = lambda: os.environ.get("RSS_WRITER_MODEL",     "claude-haiku-4-5-20251001")
@@ -36,6 +41,11 @@ _usage_log: list[dict] = []
 
 def _agent(input_text: str, *, model: str, instructions: str = None,
            json_mode: bool = False, label: str = "") -> str:
+    if anthropic_cc.is_enabled():
+        return anthropic_cc.agent(
+            input_text, instructions=instructions, json_mode=json_mode,
+            label=label, usage_log=_usage_log,
+        )
     if not _API_KEY():
         raise RuntimeError("ANTHROPIC_API_KEY not set — add it to .env or GitHub secrets")
 

@@ -14,6 +14,7 @@ Steps
 import json
 import os
 import re
+import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -27,12 +28,20 @@ from .schemas import BriefingContent, HebrewBriefing
 from .tools import build_and_save_html, _parse
 
 # ---------------------------------------------------------------------------
-# Config — Direct Anthropic API (no Perplexity proxy)
+# Config — Two execution paths (mutually exclusive, selected at call time):
+#   1. Subscription via `claude -p` — OAuth keychain, uses MERGER_CC_MODEL.
+#      Activated when MERGER_VIA_CLAUDE_CODE=1. Never reads ANTHROPIC_API_KEY.
+#   2. API key via anthropic SDK — uses MERGER_WRITER_MODEL + ANTHROPIC_API_KEY.
+#      This is the default; CI uses this path.
 # ---------------------------------------------------------------------------
 
 _API_KEY   = lambda: os.environ.get("ANTHROPIC_API_KEY", "")
 _WRITER_MODEL     = lambda: os.environ.get("MERGER_WRITER_MODEL",     "claude-sonnet-4-20250514")
 _TRANSLATOR_MODEL = lambda: os.environ.get("MERGER_TRANSLATOR_MODEL", "claude-sonnet-4-20250514")
+
+_VIA_CC     = lambda: os.environ.get("MERGER_VIA_CLAUDE_CODE") == "1"
+_CC_MODEL   = lambda: os.environ.get("MERGER_CC_MODEL",  "claude-opus-4-7")
+_CC_EFFORT  = lambda: os.environ.get("MERGER_CC_EFFORT", "low")
 
 _ROOT = Path(__file__).parent.parent.parent  # repo root
 
@@ -42,13 +51,18 @@ _ROOT = Path(__file__).parent.parent.parent  # repo root
 # ---------------------------------------------------------------------------
 
 def _find_latest_json(output_dir: Path) -> dict | None:
-    """Walk output/YYYY-MM-DD/ directories newest-first, return first .json found."""
+    """Walk output/YYYY-MM-DD/ directories newest-first, return first .json found.
+
+    Skips usage*.json — those are cost-tracking files with no news_items and
+    would be picked first by reverse-alphabetical sort ('u' > 'b').
+    """
     if not output_dir.exists():
         return None
     for date_dir in sorted(output_dir.iterdir(), reverse=True):
         if not date_dir.is_dir():
             continue
-        for json_file in sorted(date_dir.glob("*.json"), reverse=True):
+        candidates = [p for p in date_dir.glob("*.json") if not p.name.startswith("usage")]
+        for json_file in sorted(candidates, reverse=True):
             try:
                 with open(json_file, encoding="utf-8") as f:
                     data = json.load(f)
@@ -77,6 +91,23 @@ def _agent(
     json_mode: bool = False,
     label: str = "",
 ) -> str:
+    """Router: subscription path when MERGER_VIA_CLAUDE_CODE=1, API key otherwise."""
+    if _VIA_CC():
+        return _agent_via_claude_code(input_text, instructions=instructions,
+                                       json_mode=json_mode, label=label)
+    return _agent_via_anthropic_sdk(input_text, model=model, instructions=instructions,
+                                     json_mode=json_mode, label=label)
+
+
+def _agent_via_anthropic_sdk(
+    input_text: str,
+    *,
+    model: str,
+    instructions: str = None,
+    json_mode: bool = False,
+    label: str = "",
+) -> str:
+    """Original execution path — uses ANTHROPIC_API_KEY + anthropic SDK."""
     if not _API_KEY():
         raise RuntimeError("ANTHROPIC_API_KEY not set — add it to .env or GitHub secrets")
 
@@ -119,12 +150,106 @@ def _agent(
         _tier = "haiku" if "haiku" in model else "opus" if "opus" in model else "sonnet"
         _pin, _pout = _price[_tier]
         _cost = (usage.input_tokens * _pin + usage.output_tokens * _pout) / 1_000_000
-        _usage_log.append({"step": label, "model": model, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "cost_usd": round(_cost, 4)})
+        _usage_log.append({"step": label, "model": model, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "cost_usd": round(_cost, 4), "via": "api_key"})
 
     if stop == "max_tokens":
         print(f"    ⚠  [{label}] Response truncated (max_tokens) — output may be incomplete")
 
     # Validate JSON output if json_mode was requested
+    if json_mode and text:
+        stripped = text.strip()
+        if not (stripped.startswith("{") or stripped.startswith("[")):
+            print(f"    ⚠  [{label}] Expected JSON but got: {repr(stripped[:80])}")
+
+    return text
+
+
+def _agent_via_claude_code(
+    input_text: str,
+    *,
+    instructions: str = None,
+    json_mode: bool = False,
+    label: str = "",
+) -> str:
+    """Subscription path — shells out to `claude -p` using OAuth keychain creds.
+
+    Uses MERGER_CC_MODEL (default claude-opus-4-7) and MERGER_CC_EFFORT (default low).
+    Never reads ANTHROPIC_API_KEY; never bills pay-per-token.
+
+    Output capture strategy: parses stream-json and extracts the FIRST assistant
+    message's text only. This intentionally mirrors the API-key path's
+    max_tokens=32000 semantics — if the model would have auto-continued on a
+    second turn, we ignore the continuation and let downstream JSON-repair deal
+    with any truncation (same as the API path).
+    """
+    model = _CC_MODEL()
+    effort = _CC_EFFORT()
+    system_prompt = instructions or "You are a helpful assistant. Return only the requested output."
+
+    cmd = [
+        "claude", "-p",
+        "--model", model,
+        "--output-format", "stream-json",
+        "--verbose",
+        "--system-prompt", system_prompt,
+        "--tools", "",
+        "--no-session-persistence",
+        "--disable-slash-commands",
+        "--effort", effort,
+    ]
+
+    t0 = time.time()
+    try:
+        r = subprocess.run(cmd, input=input_text, capture_output=True,
+                           text=True, timeout=1800)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"[{label}] claude -p timed out after 1800s")
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"[{label}] claude -p failed (rc={r.returncode}): {r.stderr[:500]}"
+        )
+
+    assistant_texts: list[str] = []
+    result_event = None
+    for line in r.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if obj.get("type") == "assistant":
+            msg = obj.get("message", {}) or {}
+            blocks = [b.get("text", "") for b in (msg.get("content") or []) if b.get("type") == "text"]
+            if blocks:
+                assistant_texts.append("".join(blocks))
+        elif obj.get("type") == "result":
+            result_event = obj
+
+    text = assistant_texts[0] if assistant_texts else ""
+    elapsed = time.time() - t0
+    usage = (result_event or {}).get("usage", {}) or {}
+    in_tok = usage.get("input_tokens", 0)
+    out_tok = usage.get("output_tokens", 0)
+    stop = (result_event or {}).get("stop_reason", "unknown")
+    n_msgs = len(assistant_texts)
+
+    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model} (sub)  in={in_tok} out={out_tok}  stop={stop}  msgs={n_msgs}")
+
+    if n_msgs > 1:
+        print(f"    ⚠  [{label}] Claude Code auto-continued past max_tokens — using first turn only (rest discarded)")
+
+    _usage_log.append({
+        "step": label,
+        "model": model,
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "cost_usd": 0.0,  # subscription-covered, no pay-per-token
+        "via": "subscription",
+        "reported_cost_informational": (result_event or {}).get("total_cost_usd"),
+    })
+
     if json_mode and text:
         stripped = text.strip()
         if not (stripped.startswith("{") or stripped.startswith("[")):
@@ -733,8 +858,25 @@ def run_pipeline() -> dict:
         total_in = sum(u["input_tokens"] for u in _usage_log)
         total_out = sum(u["output_tokens"] for u in _usage_log)
         total_cost = sum(u.get("cost_usd", 0) for u in _usage_log)
+        api = "Anthropic (subscription)" if _VIA_CC() else "Anthropic"
         with open(usage_path, "w") as f:
-            json.dump({"agent": "merger", "api": "Anthropic", "total_input_tokens": total_in, "total_output_tokens": total_out, "total_cost_usd": round(total_cost, 4), "calls": _usage_log}, f, indent=2)
+            json.dump({"agent": "merger", "api": api, "total_input_tokens": total_in, "total_output_tokens": total_out, "total_cost_usd": round(total_cost, 4), "calls": _usage_log}, f, indent=2)
         print(f" Usage: {total_in:,} in + {total_out:,} out tokens, ~${total_cost:.4f} ({len(_usage_log)} calls)")
+
+    # Write daily marker when subscription path ran successfully, so the
+    # scheduled CI run can skip the merger step and reuse this output.
+    if _VIA_CC() and _usage_log:
+        marker_dir = Path(result["saved_to"]).parent
+        marker = marker_dir / ".via_subscription.done"
+        marker.write_text(json.dumps({
+            "completed_at": datetime.now().isoformat(timespec="seconds"),
+            "model": _CC_MODEL(),
+            "effort": _CC_EFFORT(),
+            "merged_output": Path(result["saved_to"]).name,
+            "total_input_tokens": sum(u["input_tokens"] for u in _usage_log),
+            "total_output_tokens": sum(u["output_tokens"] for u in _usage_log),
+            "calls": len(_usage_log),
+        }, indent=2))
+        print(f" Marker: {marker.relative_to(_ROOT)}")
 
     return result

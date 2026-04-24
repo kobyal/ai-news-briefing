@@ -74,7 +74,8 @@ async def _run_async():
         total_in = sum(c["input_tokens"] for c in calls)
         total_out = sum(c["output_tokens"] for c in calls)
         total_cost = sum(c["cost_usd"] for c in calls)
-        with open(os.path.join(out_dir, "usage.json"), "w") as f:
+        usage_filename = f"usage_{datetime.now().strftime('%H%M%S')}.json"
+        with open(os.path.join(out_dir, usage_filename), "w") as f:
             json.dump({
                 "agent": "adk", "api": "Google Gemini",
                 "total_input_tokens": total_in, "total_output_tokens": total_out,

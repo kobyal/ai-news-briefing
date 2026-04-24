@@ -349,7 +349,7 @@ def run_pipeline() -> dict:
 
     # Write usage.json alongside the HTML output so publish_data / email can aggregate cost.
     if _usage_log:
-        usage_path = os.path.join(os.path.dirname(result["saved_to"]), "usage.json")
+        usage_path = os.path.join(os.path.dirname(result["saved_to"]), f"usage_{datetime.now().strftime('%H%M%S')}.json")
         total_in = sum(u.get("input_tokens", 0) for u in _usage_log)
         total_out = sum(u.get("output_tokens", 0) for u in _usage_log)
         total_cost = sum(u.get("cost_usd", 0) for u in _usage_log)

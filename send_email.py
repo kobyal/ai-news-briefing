@@ -25,26 +25,71 @@ latest   = files[-1]
 report_url = f"{PAGES_BASE}/index.html"
 date     = datetime.now().strftime("%B %d, %Y")
 
-# ── Collect per-agent usage from usage.json files ──────────────────────
+# ── Collect per-agent usage from usage*.json files ──────────────────────
 def _collect_usage() -> list[dict]:
-    """Read usage.json from each agent's latest output dir."""
+    """Per-agent totals, summed across TODAY's runs only (multi-run-safe).
+
+    Files are timestamped (usage_HHMMSS.json) so multiple runs in one day
+    each get their own file. Legacy usage.json (single-run days) still works.
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
     results = []
-    for pattern in [
-        "merger-agent/output/**/usage.json",
-        "rss-news-agent/output/**/usage.json",
-        "tavily-news-agent/output/**/usage.json",
-        "perplexity-news-agent/output/**/usage.json",
-        "adk-news-agent/output/**/usage.json",
-        "exa-news-agent/output/**/usage.json",
+    for agent_dir in [
+        "merger-agent", "rss-news-agent", "tavily-news-agent",
+        "perplexity-news-agent", "adk-news-agent", "exa-news-agent",
     ]:
-        files = sorted(glob.glob(pattern, recursive=True), reverse=True)
-        if files:
+        pattern = f"{agent_dir}/output/{today}/usage*.json"
+        files = sorted(glob.glob(pattern))
+        if not files:
+            continue
+        # Sum across runs for this agent, today
+        agg = {"agent": agent_dir.split("-")[0].replace("perplexity", "perplexity"),
+               "api": "", "total_input_tokens": 0, "total_output_tokens": 0,
+               "total_cost_usd": 0.0, "calls": [], "runs": len(files)}
+        api_set = set()
+        for f in files:
             try:
-                with open(files[0]) as f:
-                    results.append(json.load(f))
+                d = json.load(open(f))
             except Exception:
-                pass
+                continue
+            agg["total_input_tokens"] += d.get("total_input_tokens", 0) or 0
+            agg["total_output_tokens"] += d.get("total_output_tokens", 0) or 0
+            agg["total_cost_usd"] += float(d.get("total_cost_usd", 0) or 0)
+            api_set.add(d.get("api", ""))
+            agg["calls"].extend(d.get("calls", []) or [])
+            if not agg["agent"]:
+                agg["agent"] = d.get("agent", agent_dir.split("-")[0])
+        agg["agent"] = d.get("agent", agent_dir.split("-")[0])
+        agg["api"] = " + ".join(sorted(a for a in api_set if a)) or "Unknown"
+        agg["total_cost_usd"] = round(agg["total_cost_usd"], 4)
+        results.append(agg)
     return results
+
+
+def _per_run_breakdown() -> list[dict]:
+    """Returns one entry per (run_timestamp) with merged cost across all agents for that run.
+    Enables the email to render multi-run days as separate rows with deltas."""
+    from collections import defaultdict
+    today = datetime.now().strftime("%Y-%m-%d")
+    by_ts: dict = defaultdict(lambda: {"agents": {}, "cost": 0.0, "tokens": 0})
+    for agent_dir in ["merger-agent", "rss-news-agent", "tavily-news-agent",
+                      "perplexity-news-agent", "adk-news-agent"]:
+        for f in sorted(glob.glob(f"{agent_dir}/output/{today}/usage*.json")):
+            base = os.path.basename(f)
+            # Extract HHMMSS or fall back to 'legacy'
+            ts = base.replace("usage_", "").replace(".json", "")
+            if ts == "usage":
+                ts = "legacy"
+            try:
+                d = json.load(open(f))
+            except Exception:
+                continue
+            cost = float(d.get("total_cost_usd", 0) or 0)
+            tok = (d.get("total_input_tokens", 0) or 0) + (d.get("total_output_tokens", 0) or 0)
+            by_ts[ts]["agents"][agent_dir.split("-")[0]] = cost
+            by_ts[ts]["cost"] += cost
+            by_ts[ts]["tokens"] += tok
+    return [{"run": ts, **v} for ts, v in sorted(by_ts.items())]
 
 # ── Check API key health ──────────────────────────────────────────────
 def _pct(used: float, limit: float) -> str:
@@ -110,16 +155,18 @@ def _load_dashboard_mtd() -> dict:
 
 
 def _cost_by_provider_since(start_date: str) -> dict:
-    """Sum cost from every agent's usage.json files whose directory >= start_date.
-    Returns {api_name: usd_total}. Authoritative per-call data from our own tracking."""
+    """Sum cost from every agent's usage*.json files whose directory >= start_date.
+    Returns {api_name: usd_total}. Now sums across multi-run days — each run's
+    usage_HHMMSS.json is an additive data point, not an overwrite.
+    Authoritative per-call data from our own tracking."""
     from collections import defaultdict
     totals = defaultdict(float)
     for pattern in [
-        "merger-agent/output/*/usage.json",
-        "rss-news-agent/output/*/usage.json",
-        "tavily-news-agent/output/*/usage.json",
-        "perplexity-news-agent/output/*/usage.json",
-        "adk-news-agent/output/*/usage.json",
+        "merger-agent/output/*/usage*.json",
+        "rss-news-agent/output/*/usage*.json",
+        "tavily-news-agent/output/*/usage*.json",
+        "perplexity-news-agent/output/*/usage*.json",
+        "adk-news-agent/output/*/usage*.json",
     ]:
         for f in glob.glob(pattern):
             day = os.path.basename(os.path.dirname(f))
@@ -531,7 +578,8 @@ def _render_row(c: dict) -> str:
 paid_rows = "".join(_render_row(c) for c in api_checks if c.get("tier") == "paid")
 free_rows = "".join(_render_row(c) for c in api_checks if c.get("tier") == "free")
 
-# Usage section — per-agent rows + total + daily diff
+# Usage section — per-agent rows + total + daily diff.
+# usage_data is already aggregated across all of today's runs per agent.
 usage_rows = ""
 total_run_cost = 0
 by_api: dict = {}
@@ -542,7 +590,20 @@ for u in usage_data:
     api = u.get("api", "?")
     by_api[api] = by_api.get(api, 0) + cost
     cost_str = f"${cost:.4f}" if cost else ""
-    usage_rows += f'<tr><td style="padding:3px 8px;font-size:12px">{u["agent"]}</td><td style="padding:3px 8px;font-size:12px;color:#64748b">{api}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace">{total:,} tok</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#b45309">{cost_str}</td></tr>\n'
+    # Show run count when a multi-run day — makes reruns visible instead of silently averaged.
+    runs = u.get("runs", 1)
+    agent_cell = f'{u["agent"]} <span style="color:#9ca3af;font-size:10px">({runs} runs)</span>' if runs > 1 else u["agent"]
+    usage_rows += f'<tr><td style="padding:3px 8px;font-size:12px">{agent_cell}</td><td style="padding:3px 8px;font-size:12px;color:#64748b">{api}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace">{total:,} tok</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#b45309">{cost_str}</td></tr>\n'
+
+# Per-run breakdown (only rendered when >1 run happened today)
+per_run = _per_run_breakdown()
+per_run_rows = ""
+if len(per_run) > 1:
+    for r in per_run:
+        ts = r.get("run", "?")
+        ts_disp = f"{ts[:2]}:{ts[2:4]}:{ts[4:6]}" if len(ts) == 6 and ts.isdigit() else ts
+        agents_str = ", ".join(f"{a}=${c:.4f}" for a, c in sorted(r.get("agents", {}).items(), key=lambda kv: -kv[1]) if c > 0)
+        per_run_rows += f'<tr><td style="padding:3px 8px;font-size:12px;font-family:monospace">run {ts_disp}</td><td style="padding:3px 8px;font-size:12px;color:#64748b">{agents_str}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#b45309">${r.get("cost",0):.4f}</td></tr>\n'
 
 # Persist today's totals and compute vs previous day
 _HISTORY_PATH = "docs/data/_cost_history.jsonl"
@@ -607,7 +668,10 @@ if paid_rows or free_rows or usage_rows or fallback_rows:
     if fallback_rows:
         status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-top:12px;margin-bottom:4px">FALLBACKS FIRED (this run)</p>\n<table style="border-collapse:collapse">\n{fallback_rows}</table>\n'
     if usage_rows:
-        status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-top:12px;margin-bottom:4px">TOKEN USAGE (this run)</p>\n<table style="border-collapse:collapse">\n{usage_rows}</table>\n'
+        label = "TOKEN USAGE (today, summed across runs)" if any(u.get("runs", 1) > 1 for u in usage_data) else "TOKEN USAGE (this run)"
+        status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-top:12px;margin-bottom:4px">{label}</p>\n<table style="border-collapse:collapse">\n{usage_rows}</table>\n'
+    if per_run_rows:
+        status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-top:12px;margin-bottom:4px">PER-RUN BREAKDOWN</p>\n<table style="border-collapse:collapse">\n{per_run_rows}</table>\n'
 
 msg = MIMEMultipart("alternative")
 msg["Subject"] = f"AI Daily Briefing — {date}"

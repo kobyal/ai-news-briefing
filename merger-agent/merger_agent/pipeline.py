@@ -685,7 +685,8 @@ def run_pipeline() -> dict:
 
     # Save usage report
     if _usage_log:
-        usage_path = os.path.join(os.path.dirname(result["saved_to"]), "usage.json")
+        # Timestamped filename so multi-run days don't overwrite prior runs.
+        usage_path = os.path.join(os.path.dirname(result["saved_to"]), f"usage_{datetime.now().strftime('%H%M%S')}.json")
         total_in = sum(u["input_tokens"] for u in _usage_log)
         total_out = sum(u["output_tokens"] for u in _usage_log)
         total_cost = sum(u.get("cost_usd", 0) for u in _usage_log)

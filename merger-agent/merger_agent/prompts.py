@@ -26,6 +26,9 @@ ADDITIONAL SOURCES (Exa semantic search, NewsAPI, YouTube AI channels, GitHub tr
 FULL ARTICLE CONTENT (use these to write richer, more detailed summaries with specific facts, numbers, and quotes):
 {enriched_articles}
 
+RECENT HEADLINES (what we already published on prior days — use this to AVOID DEJA-VU):
+{recent_headlines}
+
 TASK:
 Produce ONE merged briefing as a JSON object. Rules:
 
@@ -43,6 +46,22 @@ Produce ONE merged briefing as a JSON object. Rules:
 3. RANKING — PRIORITIZE FRESHNESS. Stories from today or yesterday should rank ABOVE older stories
    even if the older story is "bigger" news. Within the same day, order by importance/impact.
    Aim for breadth: include stories from different vendors where possible.
+
+3a. AVOID DEJA-VU — cross-reference each candidate story against the RECENT HEADLINES section above:
+   - If a candidate covers the EXACT SAME EVENT as a headline from the last 3 days AND there's no new
+     concrete development (new benchmark numbers, new partner, new quote, new controversy): DROP it.
+     It's not news anymore. Readers already saw it.
+   - If a candidate is a genuine UPDATE to a recent story (new benchmark number, new partner, reaction,
+     lawsuit, price change, etc.): KEEP it, but phrase the headline as a CONTINUATION — not a fresh launch.
+     Good: "Claude Opus 4.7 now tops new LMSys eval after 3 days on leaderboard"
+     Good: "Mythos vulnerability: CISA issues advisory, third patch shipped"
+     Good: "Meta's Muse Spark — engineer backlash grows, open-source fork proposed"
+     Bad:  "Claude Opus 4.7 released with enhanced coding" (already covered — don't reannounce)
+     The summary MUST specifically state what's new since last time.
+   - If a candidate is a different angle on a known story (e.g. yesterday was launch, today is user
+     reception or pricing detail): KEEP with a fresh headline that names the new angle.
+
+   Newspapers don't re-report yesterday's front page as today's front page. Neither do we.
 
 4. tldr — write 8-10 bullets summarising the most important stories from the merged set.
    Each bullet: vendor + what happened + why it matters (15-25 words).

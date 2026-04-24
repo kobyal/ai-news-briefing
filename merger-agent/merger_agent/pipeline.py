@@ -280,6 +280,33 @@ def _step1_load_sources() -> tuple:
     return adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data, github_data, xai_data
 
 
+def _recent_headlines(n_days: int = 3) -> str:
+    """Last N days of published headlines so the merger can avoid deja-vu and use
+    'UPDATE:' / continuation framing when a story is still trending. Reads from
+    docs/data/{date}.json (the live published JSON), not merger raw output."""
+    import glob as _g
+    out_lines = []
+    today = datetime.now().date()
+    for delta in range(1, n_days + 1):
+        day = (today - timedelta(days=delta)).strftime("%Y-%m-%d")
+        path = f"docs/data/{day}.json"
+        try:
+            with open(path) as fh:
+                d = json.load(fh)
+        except Exception:
+            continue
+        items = d.get("briefing", {}).get("news_items", []) or d.get("stories", []) or []
+        if not items:
+            continue
+        out_lines.append(f"[{day}] ({len(items)} stories):")
+        for s in items[:25]:  # cap each day
+            vendor = s.get("vendor", "?")
+            headline = (s.get("headline") or "").strip()
+            if headline:
+                out_lines.append(f"  · [{vendor}] {headline[:140]}")
+    return "\n".join(out_lines) if out_lines else "(no recent briefings available)"
+
+
 def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
                  tavily_briefing: dict, social_briefing: dict,
                  enriched_articles: dict = None, extra_sources: list = None) -> str:
@@ -314,6 +341,7 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
     prompt = prompt.replace("{enriched_articles}", enriched_context)
     prompt = prompt.replace("{extra_sources}", extra_context)
     prompt = prompt.replace("{vendor_enum}", VENDOR_ENUM)
+    prompt = prompt.replace("{recent_headlines}", _recent_headlines(3))
     return _agent(
         input_text=f"{prompt}\n\nJSON SCHEMA:\n{schema_desc}",
         model=_WRITER_MODEL(),

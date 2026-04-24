@@ -253,6 +253,25 @@ with ThreadPoolExecutor(max_workers=8) as pool:
             _og_fetched += 1
 print(f"  URL sanity: dropped {_mismatches} mismatched URLs | OG images fetched: {_og_fetched}")
 
+# Fallback chain for stories still without an og:image — vendor stock pool then Unsplash.
+# Better than a blank gradient. Frontend still shows the gradient if this returns None.
+try:
+    import sys as _sys
+    _sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from shared.image_fallback import find_fallback as _find_fallback
+    _fb_count = 0
+    for item in _news_items:
+        if item.get("og_image") and str(item["og_image"]).startswith("http"):
+            continue
+        fb = _find_fallback(item)
+        if fb:
+            item["og_image"] = fb
+            _fb_count += 1
+    if _fb_count:
+        print(f"  Image fallback: {_fb_count} stories filled from vendor stock pool / Unsplash")
+except Exception as _e:
+    print(f"  Image fallback skipped: {_e}")
+
 published = {
     "date":        date_str,
     "briefing":    _briefing,

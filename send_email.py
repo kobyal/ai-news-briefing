@@ -22,7 +22,8 @@ if not files:
     exit(0)
 
 latest   = files[-1]
-report_url = f"{PAGES_BASE}/index.html"
+# docs/index.html is now a redirect to CloudFront; raw merged HTML lives at docs/report/
+report_url = f"{PAGES_BASE}/report/latest.html"
 date     = datetime.now().strftime("%B %d, %Y")
 
 # ── Collect per-agent usage from usage*.json files ──────────────────────

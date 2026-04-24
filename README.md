@@ -7,7 +7,11 @@ The current architecture is:
 - **5 supplemental agents**: Article Reader, Exa, NewsAPI, YouTube, GitHub Trending
 - **1 final merger**: loads the latest outputs, deduplicates stories, translates to Hebrew, and publishes the combined HTML
 
-**Live site:** [duus0s1bicxag.cloudfront.net](https://duus0s1bicxag.cloudfront.net/) (CloudFront) | [kobyal.github.io/ai-news-briefing](https://kobyal.github.io/ai-news-briefing) (GitHub Pages — raw HTML)
+**Live site:** [duus0s1bicxag.cloudfront.net](https://duus0s1bicxag.cloudfront.net/) (CloudFront — full Next.js app) · [kobyal.github.io/ai-news-briefing](https://kobyal.github.io/ai-news-briefing) redirects there · raw per-day merged HTML at `kobyal.github.io/ai-news-briefing/report/latest.html`
+
+**Operational docs:**
+- [COSTS.md](./COSTS.md) — per-run + MTD cost breakdown, how to refresh dashboard snapshots
+- [FALLBACKS.md](./FALLBACKS.md) — every rotation path per service + tracker contract
 
 **Suggested GitHub About text:** `9-agent AI news collection + merger pipeline: ADK, Perplexity, RSS, Tavily, Article Reader, Exa, NewsAPI, YouTube, GitHub Trending -> bilingual EN/Hebrew briefing + docs/data JSON.`
 
@@ -164,9 +168,9 @@ flowchart LR
 | YouTube | no LLM | YouTube Data API v3 |
 | GitHub Trending | no LLM | GitHub REST APIs |
 | xAI Twitter | `grok-4` via Responses API with `x_search` tool | xAI API |
-| Merger | `MERGER_WRITER_MODEL` default `claude-sonnet-4-20250514`, `MERGER_TRANSLATOR_MODEL` default `claude-sonnet-4-20250514` | Anthropic API |
+| Merger | `MERGER_WRITER_MODEL` default `claude-sonnet-4-6`, `MERGER_TRANSLATOR_MODEL` default `claude-sonnet-4-6` | Anthropic API |
 
-The CI workflow currently sets both merger steps to `claude-sonnet-4-20250514`.
+The CI workflow sets both merger steps to `claude-sonnet-4-6`. See [COSTS.md](./COSTS.md) for measured per-run costs.
 
 ---
 
@@ -385,9 +389,17 @@ python3 run.py
 - `GITHUB_TOKEN` optional for higher rate limits
 - `LOOKBACK_DAYS`
 
-### 10. xAI Twitter Agent (`xai-twitter-agent/`) — currently disabled
+### 10. Twitter Agent (`twitter-agent/`) — active, free
 
-Uses Grok to search recent posts from tracked AI leaders and viral X posts. Disabled by default (`--skip xai`) due to cost (~$0.35/run). Re-enable by removing `--skip xai` from `run_all.py` in the workflow once an alternative or lower-cost approach is available.
+Scrapes X/Twitter GraphQL directly using logged-in cookies (`auth_token` + `ct0`) — no paid API required. Pulls recent posts from a curated list of AI leaders (Yann LeCun, Sam Altman, Greg Brockman, Francois Chollet, Simon Willison, etc.) plus trending AI search. People timeline path is stable; the search/trending path occasionally 404s when X rotates its GraphQL query IDs.
+
+**Key env**
+- `TWITTER_AUTH_TOKEN`, `TWITTER_CT0` (cookies from a logged-in x.com session)
+- `LOOKBACK_DAYS`
+
+### 11. xAI Twitter Agent (`xai-twitter-agent/`) — currently disabled
+
+Uses Grok to search recent posts from tracked AI leaders. Disabled by default (`--skip xai`) due to cost (~$0.35/run) because `twitter-agent/` already covers the same use case for free. Re-enable by removing `--skip xai` from the workflow if we need the xAI search path specifically.
 
 **Key env**
 - `XAI_API_KEY`
@@ -648,8 +660,28 @@ cdk deploy --all
 
 ### GitHub Actions workflow modes
 
-| Mode | What runs | Cost per run |
+| Mode | What runs | Cost per run (measured 2026-04-24) |
 |------|-----------|-------------|
-| default | All 9 agents (xAI skipped) | ~$1.44 |
-| `--skip xai` (explicit) | Same as default | ~$1.44 |
-| `merge-only` | Just the merger | ~$0.10 |
+| default | All agents (xAI Grok skipped, twitter-agent active) | **~$1.01** |
+| `--skip xai` (explicit) | Same as default | ~$1.01 |
+| `merge-only` | Just the merger | ~$0.76 |
+
+Per-agent breakdown:
+
+| Agent | Cost/run | API |
+|-------|---------:|-----|
+| merger-agent | $0.7566 | Anthropic Sonnet 4.6 |
+| perplexity-news-agent | $0.1216 | Perplexity Sonar + Anthropic direct |
+| rss-news-agent | $0.0473 | Anthropic Haiku 4.5 |
+| tavily-news-agent | $0.0434 | Anthropic Haiku 4.5 |
+| adk-news-agent | $0.0420 | Google Gemini 2.5 Flash |
+| twitter / youtube / github / exa / newsapi | $0.00 | free-tier / no LLM |
+
+See [COSTS.md](./COSTS.md) for the full picture (MTD, history, refresh instructions, 3×/day math).
+
+### Operational features (added Apr 2026)
+
+- **Per-run cost tracking** — every LLM-using agent writes `usage_HHMMSS.json` to its output dir; multi-run days preserve each run's data separately.
+- **Fallback tracker** — `shared/fallback_tracker.py` records every key rotation (Tavily key1→key2, Jina→Firecrawl, Exa→Tavily). Daily email surfaces counts.
+- **Dashboard MTD** — `private/dashboard_mtd.json` (gitignored, mirrored to GH secret `DASHBOARD_MTD_JSON`) carries MTD numbers the email displays alongside live today/7d totals.
+- **Three-layer URL defense** — merger prompt forbids inventing URLs; `merger-agent/pipeline.py` drops any URL not in source briefings; `publish_data.py` drops URLs whose page title shares zero keywords with the story. Prevents cross-story URL mis-assignment.

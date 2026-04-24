@@ -133,7 +133,9 @@ _VENDOR_KEYWORDS = {
     "anthropic": "Anthropic", "claude": "Anthropic",
     "openai": "OpenAI", "gpt-": "OpenAI", "chatgpt": "OpenAI", "sora": "OpenAI", "codex": "OpenAI",
     "google": "Google", "gemini": "Google", "deepmind": "Google",
-    "aws": "AWS", "amazon": "AWS", "bedrock": "AWS",
+    # "amazon" intentionally omitted — Bezos' Project Prometheus mentions Amazon in bios and was being
+    # mis-tagged as AWS. Keep only service-specific keywords here.
+    "aws": "AWS", "bedrock": "AWS",
     "azure": "Azure", "microsoft": "Microsoft", "copilot": "Microsoft",
     "meta": "Meta", "llama": "Meta",
     "xai": "xAI", "grok": "xAI",

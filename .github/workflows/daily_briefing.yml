@@ -84,7 +84,7 @@ jobs:
             python run_all.py --skip xai  # xai disabled (cost); twitter agent is free replacement
           fi
 
-      - name: Archive raw merged HTML + write GH Pages redirect to CloudFront
+      - name: Publish latest merged HTML to GH Pages + per-day archive
         run: |
           mkdir -p docs docs/report
           DATE=$(date +'%Y-%m-%d')
@@ -92,23 +92,14 @@ jobs:
           if [ -z "$LATEST" ]; then
             echo "No merged output found"; exit 1
           fi
-          # Archive the raw merged HTML per-day — linked from the email as "raw report" fallback.
+          # docs/index.html = today's raw merged briefing. Standalone, readable, no CloudFront
+          # dependency — serves as a data backup if the Next.js app ever breaks.
+          cp "$LATEST" docs/index.html
+          # Per-day archive preserves old briefings so /report/2026-04-24.html etc. stay accessible
+          # even after tomorrow's run overwrites docs/index.html.
           cp "$LATEST" "docs/report/${DATE}.html"
           cp "$LATEST" "docs/report/latest.html"
-          # docs/index.html is a redirect to the full Next.js app on CloudFront. Previously we
-          # copied the raw merger HTML here, which drifted out of sync with the richer /community,
-          # /stories, /github, /media routes on CloudFront.
-          cat > docs/index.html <<'EOF'
-          <!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=https://duus0s1bicxag.cloudfront.net/">
-          <title>AI Daily Briefing</title>
-          <link rel="canonical" href="https://duus0s1bicxag.cloudfront.net/">
-          </head><body>
-          <p>Redirecting to <a href="https://duus0s1bicxag.cloudfront.net/">the full briefing</a>.</p>
-          <p>Raw report: <a href="./report/latest.html">latest</a></p>
-          </body></html>
-          EOF
-          echo "Wrote docs/index.html (redirect) + docs/report/${DATE}.html + docs/report/latest.html"
+          echo "Wrote docs/index.html + docs/report/${DATE}.html + docs/report/latest.html"
 
       - name: Publish combined data JSON to docs/data/ (for Lambda ingestion)
         env:

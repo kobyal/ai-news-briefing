@@ -16,55 +16,36 @@ import urllib.parse
 import urllib.request
 
 
-# Stable Wikimedia Commons image URLs (no API key, cc-by-sa or public domain).
-# Hand-picked to be brand-relevant, safe, and broadly different across vendors.
-# Extend as needed — just append URLs to the list; rotation is deterministic per story.
+# Vendor → canonical homepage (used for favicon fallback).
+# Google's /s2/favicons?sz=256 service is rock-solid and returns the site's
+# current brand icon at 256px. We tried Wikimedia Commons first (2026-04-24)
+# but their /thumb/ URLs now 400 on custom widths AND several official logo
+# paths 404'd. Favicons are less impressive than full logos, but always work,
+# are always brand-accurate, and degrade gracefully.
+_VENDOR_DOMAIN: dict[str, str] = {
+    "Anthropic":    "anthropic.com",
+    "OpenAI":       "openai.com",
+    "Google":       "deepmind.google",
+    "AWS":          "aws.amazon.com",
+    "Azure":        "azure.microsoft.com",
+    "Microsoft":    "microsoft.com",
+    "Meta":         "ai.meta.com",
+    "NVIDIA":       "nvidia.com",
+    "xAI":          "x.ai",
+    "Apple":        "apple.com",
+    "Mistral":      "mistral.ai",
+    "Hugging Face": "huggingface.co",
+    "Alibaba":      "alibabacloud.com",
+    "DeepSeek":     "deepseek.com",
+    "Samsung":      "samsung.com",
+}
+
+# The actual image URL to serve — Google's favicon service at 256px. Deterministic
+# per vendor (no rotation needed for single-URL pool). Extend per-vendor pool
+# later if we want variety.
 VENDOR_STOCK_POOL: dict[str, list[str]] = {
-    "Anthropic":    [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Anthropic_logo.svg/1200px-Anthropic_logo.svg.png",
-    ],
-    "OpenAI":       [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/OpenAI_Logo.svg/1200px-OpenAI_Logo.svg.png",
-    ],
-    "Google":       [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/1200px-Google_Gemini_logo.svg.png",
-    ],
-    "AWS":          [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Amazon_Web_Services_Logo.svg/1200px-Amazon_Web_Services_Logo.svg.png",
-    ],
-    "Azure":        [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Microsoft_Azure.svg/1200px-Microsoft_Azure.svg.png",
-    ],
-    "Microsoft":    [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Microsoft_logo_%282012%29.svg/1200px-Microsoft_logo_%282012%29.svg.png",
-    ],
-    "Meta":         [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Meta_Platforms_Inc._logo.svg/1200px-Meta_Platforms_Inc._logo.svg.png",
-    ],
-    "NVIDIA":       [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/Nvidia_logo.svg/1200px-Nvidia_logo.svg.png",
-    ],
-    "xAI":          [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/XAI-Logo.svg/1200px-XAI-Logo.svg.png",
-    ],
-    "Apple":        [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/1200px-Apple_logo_black.svg.png",
-    ],
-    "Mistral":      [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Mistral_AI_logo_%282025%E2%80%93%29.svg/1200px-Mistral_AI_logo_%282025%E2%80%93%29.svg.png",
-    ],
-    "Hugging Face": [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Huggingface_logo.svg/1200px-Huggingface_logo.svg.png",
-    ],
-    "Alibaba":      [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/Alibaba-cloud-logo.svg/1200px-Alibaba-cloud-logo.svg.png",
-    ],
-    "DeepSeek":     [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/DeepSeek_logo.svg/1200px-DeepSeek_logo.svg.png",
-    ],
-    "Samsung":      [
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Samsung_Logo.svg/1200px-Samsung_Logo.svg.png",
-    ],
+    vendor: [f"https://www.google.com/s2/favicons?domain={domain}&sz=256"]
+    for vendor, domain in _VENDOR_DOMAIN.items()
 }
 
 

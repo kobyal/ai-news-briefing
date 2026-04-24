@@ -611,11 +611,26 @@ def run_pipeline() -> dict:
     t_start = time.time()
 
     adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data, github_data, xai_data = _step1_load_sources()
-    # Merge with validation — retry once if JSON is invalid
+    # Merge with validation — retry once if JSON is invalid. Saves the failed
+    # output to disk first so we can diagnose what went wrong instead of
+    # losing it to the retry.
     merged_json = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources)
     parsed = _parse(merged_json)
     if not parsed or not parsed.get("news_items"):
-        print("  ⚠ Merge output invalid — retrying once...")
+        _fail_path = f"merger-agent/output/{datetime.now().strftime('%Y-%m-%d')}/merger_failed_{datetime.now().strftime('%H%M%S')}.txt"
+        try:
+            os.makedirs(os.path.dirname(_fail_path), exist_ok=True)
+            with open(_fail_path, "w", encoding="utf-8") as _fh:
+                _fh.write(merged_json or "")
+        except Exception:
+            pass
+        # Log the first/last chars so the workflow log shows the shape of the failure.
+        _snippet = (merged_json or "")
+        _head = _snippet[:200].replace("\n", "\\n")
+        _tail = _snippet[-200:].replace("\n", "\\n")
+        print(f"  ⚠ Merge output invalid — retrying once. Saved to {_fail_path}")
+        print(f"    head: {_head}")
+        print(f"    tail: {_tail}")
         merged_json = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources)
         parsed = _parse(merged_json)
         if not parsed or not parsed.get("news_items"):

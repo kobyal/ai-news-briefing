@@ -64,10 +64,27 @@ for _vendor, _keywords in VENDOR_KEYWORDS.items():
         KEYWORD_TO_VENDOR[_kw] = _vendor
 
 
+import re as _re
+
+# Pre-compile word-boundary patterns per keyword so "gpt-5" doesn't match "gpt-5.4"
+# and "google" doesn't match inside unrelated strings. Longer keywords win ties.
+_COMPILED_KEYWORDS = sorted(
+    (
+        # Also block trailing '.' so version prefixes "gpt-5" don't match "gpt-5.4" (comparison mentions).
+        (_re.compile(r'(?<![a-z0-9.])' + _re.escape(kw) + r'(?![a-z0-9.])', _re.IGNORECASE), vendor)
+        for kw, vendor in KEYWORD_TO_VENDOR.items()
+    ),
+    key=lambda item: -len(item[0].pattern),
+)
+
+
 def classify_vendor(text: str) -> str:
-    """Classify a text string (headline, title, etc.) into a vendor bucket."""
-    lower = text.lower()
-    for keyword, vendor in sorted(KEYWORD_TO_VENDOR.items(), key=lambda x: -len(x[0])):
-        if keyword in lower:
+    """Classify a text string (headline, title, etc.) into a vendor bucket.
+
+    Uses word-boundary matching — 'gpt-5' won't match 'gpt-5.4' (benchmark comparison),
+    'google' won't match inside 'googleplex', 'amazon' won't match inside 'amazonas'.
+    Longer keywords checked first so 'claude-4' wins over bare 'claude'."""
+    for pattern, vendor in _COMPILED_KEYWORDS:
+        if pattern.search(text):
             return vendor
     return "Other"

@@ -101,6 +101,15 @@ Produce ONE merged briefing as a JSON object. Rules:
    Include every distinct announcement. A vendor WILL have 2-4 stories if they made multiple announcements.
    For each:
    - vendor: {vendor_enum}
+     CRITICAL: vendor = the COMPANY THE STORY IS ABOUT (the subject/actor), NOT companies mentioned
+     in passing. Specifically:
+       * Benchmark comparisons: "X beats GPT-5 at bench Y" — vendor is X, NOT OpenAI.
+       * Bio context: "founded by former Google DeepMind researchers" — vendor is NOT Google.
+       * Investors/partners: "Jeff Bezos-backed startup Taurus" — vendor is NOT AWS or Amazon.
+       * Former roles: "ex-Anthropic CEO launches..." — vendor is the new company, not Anthropic.
+     If the subject company doesn't match any known vendor (e.g. Moonshot AI, Cohere, Inflection,
+     Taurus, Project Prometheus, a new research lab), use "Other". Better to say Other than to
+     grab-bag into a wrong vendor because of a keyword in the summary.
    - headline: specific and descriptive
    - published_date: exact date (e.g. "April 4, 2026"). "Date unknown" if not available.
    - summary: 2-4 sentences, concrete details from all sources combined

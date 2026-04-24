@@ -166,13 +166,46 @@ def wikipedia_subject_image(story: dict) -> str | None:
     return None
 
 
+def github_org_image(story: dict) -> str | None:
+    """If headline's first proper-noun matches an existing GitHub org, use GitHub's
+    auto-generated opengraph image (real branded landscape PNG). Good for open-source
+    story subjects that aren't on Wikipedia (Fathym, Cohere, small AI labs, etc.)."""
+    import re as _re, urllib.request as _ur
+    headline = story.get("headline", "") or ""
+    # Grab the leading proper noun (single capitalized word, 4+ chars)
+    m = _re.match(r"^([A-Z][A-Za-z0-9-]{3,})", headline)
+    if not m:
+        return None
+    candidate = m.group(1).lower()
+    # Try a few common org-name variants
+    for org in [candidate, f"{candidate}-dev", f"{candidate}-deno", f"{candidate}-ai", f"{candidate}-io"]:
+        try:
+            req = _ur.Request(f"https://api.github.com/orgs/{org}",
+                              headers={"User-Agent": "ai-briefing/1.0", "Accept": "application/vnd.github+json"})
+            with _ur.urlopen(req, timeout=4) as r:
+                if r.status == 200:
+                    return f"https://opengraph.githubassets.com/1/{org}"
+        except Exception:
+            continue
+    return None
+
+
 def find_fallback(story: dict) -> str | None:
-    """Fallback chain, best-to-worst:
-    1. Wikipedia subject photo (Bezos face for Bezos story, Kimi logo for Kimi, etc.)
-    2. Vendor stock pool (generic vendor icon)
-    3. Unsplash keyword search (optional, needs UNSPLASH_ACCESS_KEY)
-    4. None → frontend gradient fallback"""
+    """Fallback chain, best-to-worst. Used when the article's og:image fails.
+
+    1. Wikipedia subject photo — for named people/products/companies on Wikipedia
+       (Bezos, Altman, Kimi, GPT-5, Sam Altman, etc.)
+    2. GitHub org opengraph — for open-source projects by orgs that exist on GitHub
+       (Fathym → opengraph.githubassets.com/1/fathym-deno with branded image)
+    3. Vendor stock pool — Google favicon at 256px for known vendors (OpenAI,
+       Anthropic, Google, Meta, etc.)
+    4. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
+    5. None — frontend renders colored gradient + vendor icon
+    """
     url = wikipedia_subject_image(story)
+    if url:
+        return url
+    url = github_org_image(story)
     if url:
         return url
     url = vendor_pool_image(story)

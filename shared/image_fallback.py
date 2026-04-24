@@ -1,10 +1,13 @@
 """Fallback images when an article has no scrapable og:image.
 
-Chain (tried in order):
-  1. Article og:image (handled upstream in publish_data._fetch_og_image, not here)
-  2. Vendor-branded Wikimedia Commons images (stable URLs, no API, rotating per-story hash)
-  3. Unsplash keyword search (free tier, 50 req/hr, optional — needs UNSPLASH_ACCESS_KEY)
-  4. Caller falls through to the vendor-colored gradient the frontend renders
+Chain (tried in order), see `find_fallback()`:
+  1. Pre-warmed S3 cache — first-party, zero-latency lookup for ~30 common AI subjects
+     (Altman, Bezos, Jensen, Claude, ChatGPT, etc.). Populated by
+     scripts/prewarm_fallback_images.py. Always prefer this over external lookups.
+  2. Wikipedia subject photo — for named people/products not in the prewarm cache
+  3. GitHub org opengraph — for open-source projects by GitHub orgs
+  4. Vendor favicon pool — Google's 256px favicon for known vendors
+  5. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
 
 This file is intentionally tiny — just a map + a short keyword-query helper. No complex logic,
 no external SDK. Keeps the fallback surface small and predictable.
@@ -47,6 +50,40 @@ VENDOR_STOCK_POOL: dict[str, list[str]] = {
     vendor: [f"https://www.google.com/s2/favicons?domain={domain}&sz=256"]
     for vendor, domain in _VENDOR_DOMAIN.items()
 }
+
+
+_PREWARMED_MANIFEST_URL = "https://duus0s1bicxag.cloudfront.net/data/img/fallback/prewarmed/index.json"
+_prewarmed_cache: dict[str, str] | None = None
+
+
+def _load_prewarmed() -> dict[str, str]:
+    """Lazy-load prewarmed manifest once per process. Empty dict on failure."""
+    global _prewarmed_cache
+    if _prewarmed_cache is not None:
+        return _prewarmed_cache
+    try:
+        req = urllib.request.Request(_PREWARMED_MANIFEST_URL, headers={"User-Agent": "ai-briefing/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            _prewarmed_cache = json.loads(r.read()) or {}
+    except Exception:
+        _prewarmed_cache = {}
+    return _prewarmed_cache
+
+
+def prewarmed_image(story: dict) -> str | None:
+    """Case-insensitive substring match of headline against prewarmed manifest keys.
+    Longer keys win (e.g. 'sam altman' beats 'altman'). Returns CloudFront URL or None."""
+    manifest = _load_prewarmed()
+    if not manifest:
+        return None
+    headline = (story.get("headline") or "").lower()
+    if not headline:
+        return None
+    # Longer slugs first so 'jensen huang' wins over 'huang'
+    for slug in sorted(manifest.keys(), key=len, reverse=True):
+        if slug in headline:
+            return manifest[slug]
+    return None
 
 
 def _story_seed(story: dict) -> int:
@@ -193,15 +230,19 @@ def github_org_image(story: dict) -> str | None:
 def find_fallback(story: dict) -> str | None:
     """Fallback chain, best-to-worst. Used when the article's og:image fails.
 
-    1. Wikipedia subject photo — for named people/products/companies on Wikipedia
+    1. Pre-warmed S3 cache — first-party, zero-latency subject photos
+    2. Wikipedia subject photo — for named people/products/companies on Wikipedia
        (Bezos, Altman, Kimi, GPT-5, Sam Altman, etc.)
-    2. GitHub org opengraph — for open-source projects by orgs that exist on GitHub
+    3. GitHub org opengraph — for open-source projects by orgs that exist on GitHub
        (Fathym → opengraph.githubassets.com/1/fathym-deno with branded image)
-    3. Vendor stock pool — Google favicon at 256px for known vendors (OpenAI,
+    4. Vendor stock pool — Google favicon at 256px for known vendors (OpenAI,
        Anthropic, Google, Meta, etc.)
-    4. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
-    5. None — frontend renders colored gradient + vendor icon
+    5. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
+    6. None — frontend renders colored gradient + vendor icon
     """
+    url = prewarmed_image(story)
+    if url:
+        return url
     url = wikipedia_subject_image(story)
     if url:
         return url

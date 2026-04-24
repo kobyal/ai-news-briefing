@@ -27,11 +27,37 @@ report_url = f"{PAGES_BASE}/report/latest.html"
 date     = datetime.now().strftime("%B %d, %Y")
 
 # ── Collect per-agent usage from usage*.json files ──────────────────────
+# Anthropic API rates per 1M tokens — used to compute "what subscription calls
+# would have cost via the API" for the savings delta.
+_ANTHROPIC_PRICES = {"haiku": (0.80, 4.0), "sonnet": (3.0, 15.0), "opus": (15.0, 75.0)}
+
+
+def _model_tier(model: str) -> str:
+    m = (model or "").lower()
+    if "haiku" in m:
+        return "haiku"
+    if "opus" in m:
+        return "opus"
+    return "sonnet"
+
+
+def _friendly_model(model: str) -> str:
+    m = (model or "").lower()
+    if "opus-4-7" in m:    return "Opus 4.7"
+    if "opus-4-6" in m:    return "Opus 4.6"
+    if "opus-4" in m:      return "Opus 4"
+    if "sonnet-4-7" in m:  return "Sonnet 4.7"
+    if "sonnet-4-6" in m:  return "Sonnet 4.6"
+    if "sonnet-4" in m:    return "Sonnet 4"
+    if "haiku-4-5" in m:   return "Haiku 4.5"
+    return model or "Claude"
+
+
 def _collect_usage() -> list[dict]:
     """Per-agent totals, summed across TODAY's runs only (multi-run-safe).
 
-    Files are timestamped (usage_HHMMSS.json) so multiple runs in one day
-    each get their own file. Legacy usage.json (single-run days) still works.
+    Returns per-agent: tokens, actual cost, via (subscription|api_key|mixed),
+    models used, and savings (what subscription calls would have cost via API).
     """
     today = datetime.now().strftime("%Y-%m-%d")
     results = []
@@ -43,10 +69,12 @@ def _collect_usage() -> list[dict]:
         files = sorted(glob.glob(pattern))
         if not files:
             continue
-        # Sum across runs for this agent, today
-        agg = {"agent": agent_dir.split("-")[0].replace("perplexity", "perplexity"),
-               "api": "", "total_input_tokens": 0, "total_output_tokens": 0,
-               "total_cost_usd": 0.0, "calls": [], "runs": len(files)}
+        agg = {
+            "agent": agent_dir.split("-")[0],
+            "api": "", "total_input_tokens": 0, "total_output_tokens": 0,
+            "total_cost_usd": 0.0, "calls": [], "runs": len(files),
+            "saved_usd": 0.0, "via_set": set(), "model_set": set(),
+        }
         api_set = set()
         for f in files:
             try:
@@ -57,12 +85,26 @@ def _collect_usage() -> list[dict]:
             agg["total_output_tokens"] += d.get("total_output_tokens", 0) or 0
             agg["total_cost_usd"] += float(d.get("total_cost_usd", 0) or 0)
             api_set.add(d.get("api", ""))
-            agg["calls"].extend(d.get("calls", []) or [])
-            if not agg["agent"]:
-                agg["agent"] = d.get("agent", agent_dir.split("-")[0])
-        agg["agent"] = d.get("agent", agent_dir.split("-")[0])
+            for call in d.get("calls", []) or []:
+                agg["calls"].append(call)
+                via = call.get("via", "api_key")
+                agg["via_set"].add(via)
+                mdl = call.get("model", "")
+                if mdl:
+                    agg["model_set"].add(mdl)
+                # Compute "would-have-cost via API" for subscription calls.
+                if via == "subscription":
+                    pin, pout = _ANTHROPIC_PRICES[_model_tier(mdl)]
+                    saved = (call.get("input_tokens", 0) * pin
+                             + call.get("output_tokens", 0) * pout) / 1_000_000
+                    agg["saved_usd"] += saved
         agg["api"] = " + ".join(sorted(a for a in api_set if a)) or "Unknown"
         agg["total_cost_usd"] = round(agg["total_cost_usd"], 4)
+        agg["saved_usd"] = round(agg["saved_usd"], 4)
+        via_set = agg.pop("via_set")
+        agg["via"] = "subscription" if via_set == {"subscription"} else (
+                     "api_key"      if via_set == {"api_key"} else "mixed")
+        agg["model"] = ", ".join(_friendly_model(m) for m in sorted(agg.pop("model_set")))
         results.append(agg)
     return results
 
@@ -201,27 +243,14 @@ def _check_apis() -> list[dict]:
     week_by_api = _cost_by_provider_since(_7d_ago)
 
     def _cost_line(provider_name: str) -> str:
-        """today $X · 7d $Y · MTD $Z · <detail>
-
-        today/7d: authoritative from our usage.json if we have it, else fall back
-        to today_usd from dashboard_mtd.json (user-entered from dashboards).
-        MTD: always from dashboard_mtd.json (lagging, user refreshes weekly)."""
+        """today $X · <detail>  (daily only — 7d + MTD dropped per design)."""
         parts = []
         p = mtd.get(provider_name, {}) or {}
-        # TODAY: prefer our usage.json tracking; fall back to manually-entered today_usd
         auto_today = today_by_api.get(provider_name, 0)
         manual_today = float(p.get("today_usd", 0) or 0)
         today = auto_today if auto_today > 0 else manual_today
         if today > 0:
-            src = "auto" if auto_today > 0 else "manual"
-            parts.append(f"today ${today:.4f} ({src})")
-        # 7d: from usage.json only (can't guess this from a single dashboard number)
-        week = week_by_api.get(provider_name, 0)
-        if week > 0:
-            parts.append(f"7d ${week:.4f}")
-        # MTD: always dashboard_mtd.json if present
-        if p.get("mtd_usd"):
-            parts.append(f"MTD ${float(p['mtd_usd']):.2f}")
+            parts.append(f"today ${today:.4f}")
         if p.get("detail"):
             parts.append(p["detail"])
         return " · ".join(parts)
@@ -536,28 +565,31 @@ def _active_sources_today() -> list[str]:
 
 
 def _merger_model() -> str:
-    """Read the actual model used by the merger this run from usage.json."""
+    """Reads the LATEST merger usage file and reports model + path.
+
+    Returns e.g. 'Opus 4.7 (subscription)' or 'Sonnet 4.6 (api)'.
+    """
     today = datetime.now().strftime("%Y-%m-%d")
-    path = f"merger-agent/output/{today}/usage.json"
-    try:
-        with open(path) as f:
-            d = json.load(f)
-        calls = d.get("calls", [])
-        # Merger writer call is typically the highest-token one
-        if calls:
+    # Prefer the newest timestamped file; only fall back to legacy usage.json
+    # (which predates the timestamped-files convention) when none exist.
+    ts_files = sorted(glob.glob(f"merger-agent/output/{today}/usage_*.json"))
+    candidates = list(reversed(ts_files))
+    legacy = f"merger-agent/output/{today}/usage.json"
+    if not candidates and os.path.exists(legacy):
+        candidates = [legacy]
+    for path in candidates:
+        try:
+            with open(path) as f:
+                d = json.load(f)
+            calls = d.get("calls", []) or []
+            if not calls:
+                continue
             writer = max(calls, key=lambda c: c.get("input_tokens", 0) + c.get("output_tokens", 0))
-            model = writer.get("model", "")
-            # Friendly label
-            if "sonnet-4-5" in model: return "Claude Sonnet 4.5"
-            if "sonnet-4-6" in model: return "Claude Sonnet 4.6"
-            if "sonnet-4-7" in model: return "Claude Sonnet 4.7"
-            if "sonnet-4" in model:   return "Claude Sonnet 4"
-            if "opus-4-7" in model:   return "Claude Opus 4.7"
-            if "opus-4" in model:     return "Claude Opus 4"
-            if "haiku-4-5" in model:  return "Claude Haiku 4.5"
-            return model or "Claude Sonnet 4"
-    except Exception:
-        pass
+            model = _friendly_model(writer.get("model", ""))
+            path_tag = "subscription" if writer.get("via") == "subscription" else "api"
+            return f"Claude {model} ({path_tag})"
+        except Exception:
+            continue
     return "Claude Sonnet 4"
 
 
@@ -582,19 +614,38 @@ free_rows = "".join(_render_row(c) for c in api_checks if c.get("tier") == "free
 # Usage section — per-agent rows + total + daily diff.
 # usage_data is already aggregated across all of today's runs per agent.
 usage_rows = ""
-total_run_cost = 0
+total_run_cost = 0.0
+total_saved_usd = 0.0
 by_api: dict = {}
 for u in usage_data:
     total = u.get("total_input_tokens", 0) + u.get("total_output_tokens", 0)
     cost = u.get("total_cost_usd", 0)
+    saved = u.get("saved_usd", 0)
     total_run_cost += cost
+    total_saved_usd += saved
     api = u.get("api", "?")
     by_api[api] = by_api.get(api, 0) + cost
-    cost_str = f"${cost:.4f}" if cost else ""
-    # Show run count when a multi-run day — makes reruns visible instead of silently averaged.
+    cost_str = f"${cost:.4f}" if cost else "$0.0000"
     runs = u.get("runs", 1)
     agent_cell = f'{u["agent"]} <span style="color:#9ca3af;font-size:10px">({runs} runs)</span>' if runs > 1 else u["agent"]
-    usage_rows += f'<tr><td style="padding:3px 8px;font-size:12px">{agent_cell}</td><td style="padding:3px 8px;font-size:12px;color:#64748b">{api}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace">{total:,} tok</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#b45309">{cost_str}</td></tr>\n'
+    via = u.get("via", "api_key")
+    model = u.get("model", "")
+    via_tag = {
+        "subscription": '<span style="color:#16a34a;font-weight:600">sub</span>',
+        "api_key":      '<span style="color:#b45309;font-weight:600">api</span>',
+        "mixed":        '<span style="color:#d97706;font-weight:600">mix</span>',
+    }.get(via, via)
+    path_cell = f'{via_tag} · <span style="color:#64748b">{model}</span>' if model else via_tag
+    saved_cell = f'<span style="color:#16a34a">~${saved:.4f} saved</span>' if saved > 0 else ''
+    usage_rows += (
+        f'<tr>'
+        f'<td style="padding:3px 8px;font-size:12px">{agent_cell}</td>'
+        f'<td style="padding:3px 8px;font-size:12px">{path_cell}</td>'
+        f'<td style="padding:3px 8px;font-size:12px;font-family:monospace">{total:,} tok</td>'
+        f'<td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#b45309">{cost_str}</td>'
+        f'<td style="padding:3px 8px;font-size:12px;font-family:monospace">{saved_cell}</td>'
+        f'</tr>\n'
+    )
 
 # Per-run breakdown (only rendered when >1 run happened today)
 per_run = _per_run_breakdown()
@@ -626,9 +677,9 @@ try:
 except Exception:
     pass
 
-if total_run_cost > 0:
+if usage_rows:
     diff_html = ""
-    if previous_entry is not None:
+    if previous_entry is not None and total_run_cost > 0:
         prev_total = float(previous_entry.get("total_usd", 0) or 0)
         delta = total_run_cost - prev_total
         if prev_total:
@@ -636,7 +687,14 @@ if total_run_cost > 0:
             arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "·")
             color = "#dc2626" if delta > 0 else ("#16a34a" if delta < 0 else "#64748b")
             diff_html = f' <span style="color:{color};font-weight:600">{arrow} ${abs(delta):.4f} ({pct:+.1f}% vs {previous_entry.get("date","prev")})</span>'
-    usage_rows += f'<tr style="border-top:1px solid #e2e8f0"><td colspan="3" style="padding:3px 8px;font-size:12px;font-weight:700">Total</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;font-weight:700;color:#b45309">${total_run_cost:.4f}{diff_html}</td></tr>\n'
+    saved_cell = f'<span style="color:#16a34a;font-weight:700">~${total_saved_usd:.4f} saved</span>' if total_saved_usd > 0 else ''
+    usage_rows += (
+        f'<tr style="border-top:1px solid #e2e8f0">'
+        f'<td colspan="3" style="padding:3px 8px;font-size:12px;font-weight:700">Total</td>'
+        f'<td style="padding:3px 8px;font-size:12px;font-family:monospace;font-weight:700;color:#b45309">${total_run_cost:.4f}{diff_html}</td>'
+        f'<td style="padding:3px 8px;font-size:12px;font-family:monospace">{saved_cell}</td>'
+        f'</tr>\n'
+    )
     # Append today's entry (only once per date — overwrite existing if re-run)
     try:
         os.makedirs(os.path.dirname(_HISTORY_PATH), exist_ok=True)

@@ -86,14 +86,98 @@ def unsplash_image(query: str) -> str | None:
         return None
 
 
+def _extract_person_name(headline: str) -> str | None:
+    """Return a plausible 'FirstName LastName' if headline looks person-centric.
+
+    Matches patterns like 'Jeff Bezos' X', 'Sam Altman announces Y',
+    'Dario Amodei says Z'. Use verb stems to match both '-s' and '-ed' tenses."""
+    import re as _re
+    # Verb stems — match both present ('announces') and past ('announced') etc.
+    VERB_STEMS = r"(?:back|said?|says?|announc|unveil|launch|release|reveal|warn|predict|join|leave|call|tweet|post|claim|deny|reject|confirm|deploy)"
+    pattern = rf"(?:^|\s)([A-Z][a-z]{{2,}}\s+[A-Z][a-z]+)(?:'s|\s+{VERB_STEMS})"
+    m = _re.search(pattern, headline)
+    if m:
+        return m.group(1)
+    return None
+
+
+def wikipedia_subject_image(story: dict) -> str | None:
+    """Find a subject-appropriate photo via Wikipedia's search API.
+
+    Scope is intentionally narrow to avoid disambiguation traps:
+      - If the headline mentions a person's name ("Jeff Bezos' X", "Sam Altman
+        announces Y") → search Wikipedia for that person. Always try this, even
+        for stories tagged with a known vendor, because the person IS the subject.
+      - Else, if vendor is 'Other' or unknown → search Wikipedia by the leading
+        proper-noun chunk of the headline.
+      - Else (known vendor like Apple, Google, Meta) → return None so the vendor
+        pool/favicon handles it. Wikipedia search for single vendor names returns
+        disambiguation pages (apple-the-fruit, gemini-the-zodiac).
+
+    Returns the Wikipedia page's 'original' image URL or None.
+    """
+    import re as _re, json as _json, urllib.parse as _up, urllib.request as _ur
+    headline = story.get("headline", "") or ""
+    vendor = (story.get("vendor") or "").lower()
+    if not headline:
+        return None
+
+    queries: list[str] = []
+
+    # Priority 1: person mentioned in headline
+    person = _extract_person_name(headline)
+    if person:
+        queries.append(person)
+
+    # Priority 2: 'Other' vendor — search on leading proper-noun chunk
+    if vendor in ("other", "", "?") and not queries:
+        m = _re.match(r"^([A-Z][A-Za-z]{2,}(?:\s+[A-Z][A-Za-z]+){0,2})", headline)
+        if m and len(m.group(1)) >= 4:
+            # Also include the first named product after the company name
+            rest = headline[len(m.group(1)):]
+            prod = _re.search(r"\b([A-Z][A-Za-z]*(?:[-.][A-Za-z0-9]+)?)\b", rest)
+            if prod:
+                queries.append(f"{m.group(1)} {prod.group(1)}")
+            queries.append(m.group(1))
+
+    if not queries:
+        return None
+
+    api = "https://en.wikipedia.org/w/api.php"
+    tried: set = set()
+    for q in queries[:3]:
+        q = q.strip()
+        if not q or q in tried:
+            continue
+        tried.add(q)
+        try:
+            url = (f"{api}?action=query&format=json&prop=pageimages&piprop=original"
+                   f"&generator=search&gsrsearch={_up.quote(q)}&gsrlimit=1")
+            req = _ur.Request(url, headers={"User-Agent": "ai-briefing/1.0"})
+            with _ur.urlopen(req, timeout=5) as r:
+                d = _json.loads(r.read())
+            pages = (d.get("query") or {}).get("pages") or {}
+            for p in pages.values():
+                img = p.get("original", {}).get("source")
+                if img:
+                    return img
+        except Exception:
+            continue
+    return None
+
+
 def find_fallback(story: dict) -> str | None:
-    """Run the fallback chain: vendor pool → Unsplash keyword → None.
-    Returns an https URL or None to fall through to the frontend gradient."""
-    # 1. Vendor stock pool (stable, no API key, rotates deterministically)
+    """Fallback chain, best-to-worst:
+    1. Wikipedia subject photo (Bezos face for Bezos story, Kimi logo for Kimi, etc.)
+    2. Vendor stock pool (generic vendor icon)
+    3. Unsplash keyword search (optional, needs UNSPLASH_ACCESS_KEY)
+    4. None → frontend gradient fallback"""
+    url = wikipedia_subject_image(story)
+    if url:
+        return url
     url = vendor_pool_image(story)
     if url:
         return url
-    # 2. Unsplash keyword search (optional, skipped if UNSPLASH_ACCESS_KEY unset)
     query_parts = [story.get("vendor", ""), "AI", "technology"]
     headline = story.get("headline", "")
     if headline:

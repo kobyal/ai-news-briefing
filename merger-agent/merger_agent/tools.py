@@ -405,9 +405,56 @@ def _build_html(tldr, news_items, community_pulse, topic,
     youtube_section_html = ""
     if youtube_rows_html:
         youtube_section_html = f"""<div class="yt-card">
-<div class="section-label" style="margin-top:0" id="youtube-label">🎬 AI on YouTube</div>
+<div class="section-label" style="margin-top:0" id="youtube-label">🎬 Latest AI Videos</div>
 {youtube_rows_html}
 </div>"""
+
+    # ── Recommended YouTube Channels + Podcasts (curated, mirrors web/media) ────
+    try:
+        import sys as _sys
+        from pathlib import Path as _Path
+        _sys.path.insert(0, str(_Path(__file__).parent.parent.parent))
+        from shared.channels import youtube_channels as _yt_channels, podcasts as _podcasts
+    except Exception:
+        _yt_channels = lambda: []
+        _podcasts = lambda: []
+
+    def _channel_row(c: dict) -> str:
+        platform = c.get("platform", "youtube")
+        platform_color = "#dc2626" if platform == "youtube" else "#1DB954"
+        platform_label = "YouTube" if platform == "youtube" else "Spotify"
+        lang_tag = "🇮🇱" if c.get("lang") == "he" else "🇺🇸"
+        name_en = _esc(c.get("name", ""))
+        name_he = _esc(c.get("name_he", c.get("name", "")))
+        desc_en = _esc(c.get("desc", ""))
+        desc_he = _esc(c.get("desc_he", c.get("desc", "")))
+        url = c.get("url", "")
+        return (
+            f'<a href="{_esc(url)}" target="_blank" class="ch-row" style="border-left:3px solid {platform_color}">'
+            f'<div class="ch-name"><span class="en-content">{name_en}</span>'
+            f'<span class="he-content" style="display:none">{name_he}</span> '
+            f'<span class="ch-lang">{lang_tag}</span> '
+            f'<span class="ch-platform" style="color:{platform_color}">{platform_label}</span></div>'
+            f'<div class="ch-desc"><span class="en-content">{desc_en}</span>'
+            f'<span class="he-content" style="display:none;direction:rtl;text-align:right">{desc_he}</span></div>'
+            f'</a>'
+        )
+
+    yt_channel_rows = "".join(_channel_row(c) for c in _yt_channels())
+    podcast_rows    = "".join(_channel_row(c) for c in _podcasts())
+
+    yt_channels_section_html = ""
+    if yt_channel_rows:
+        yt_channels_section_html = (
+            f'<div class="yt-card"><div class="section-label" style="margin-top:0" id="yt-channels-label">📺 Recommended YouTube Channels</div>'
+            f'{yt_channel_rows}</div>'
+        )
+    podcasts_section_html = ""
+    if podcast_rows:
+        podcasts_section_html = (
+            f'<div class="yt-card"><div class="section-label" style="margin-top:0" id="podcasts-label">🎙️ Podcasts</div>'
+            f'{podcast_rows}</div>'
+        )
 
     # ── GitHub Trending ─────────────────────────────────────────────────
     github_data = github_data or []
@@ -668,6 +715,12 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .yt-title{{font-size:13px;color:#0f172a;text-decoration:none;font-weight:600;line-height:1.4;display:block}}
 .yt-title:hover{{color:#d97706}}
 .yt-meta{{font-size:11px;color:#94a3b8;margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}}
+.ch-row{{display:block;padding:8px 12px;margin:4px 0;border-radius:6px;background:#fafafa;text-decoration:none;color:inherit;transition:background .15s}}
+.ch-row:hover{{background:#f1f5f9}}
+.ch-name{{font-size:13px;font-weight:600;color:#1e293b;display:flex;align-items:center;gap:6px;flex-wrap:wrap}}
+.ch-lang{{font-size:11px}}
+.ch-platform{{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}}
+.ch-desc{{font-size:11px;color:#64748b;margin-top:2px}}
 .yt-desc{{font-size:12px;color:#6b7280;margin-top:3px;line-height:1.4}}
 /* X/Twitter Trending */
 .xt-card{{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
@@ -743,6 +796,8 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 {reddit_section_html}
 {('<div class="community-card"><h2 id="community-label">💬 Community Pulse</h2><div id="community-en" class="en-content">' + pulse_structured_html + '</div><div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">' + (pulse_structured_he_html or pulse_structured_html) + '</div></div>') if pulse_structured_html else (('<div class="community-card"><h2 id="community-label">💬 Community Pulse</h2><div id="community-en" class="en-content">' + community_en_html + '</div><div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">' + community_he_html + '</div>' + community_sources_block + '</div>') if community_en_html else '')}
 {youtube_section_html}
+{yt_channels_section_html}
+{podcasts_section_html}
 {github_section_html}
 </div>
 <div class="footer">
@@ -777,7 +832,11 @@ function setLang(l,btn){{
   var pl=document.getElementById('people-label');
   if(pl){{pl.textContent=en?'𝕏 Trending on X':'𝕏 חם ב-X';pl.dir=dir;pl.style.textAlign=align;}}
   var yl=document.getElementById('youtube-label');
-  if(yl){{yl.textContent=en?'🎬 AI on YouTube':'🎬 AI ביוטיוב';yl.dir=dir;yl.style.textAlign=align;}}
+  if(yl){{yl.textContent=en?'🎬 Latest AI Videos':'🎬 סרטוני AI אחרונים';yl.dir=dir;yl.style.textAlign=align;}}
+  var ycl=document.getElementById('yt-channels-label');
+  if(ycl){{ycl.textContent=en?'📺 Recommended YouTube Channels':'📺 ערוצי YouTube מומלצים';ycl.dir=dir;ycl.style.textAlign=align;}}
+  var pcl=document.getElementById('podcasts-label');
+  if(pcl){{pcl.textContent=en?'🎙️ Podcasts':'🎙️ פודקאסטים';pcl.dir=dir;pcl.style.textAlign=align;}}
   var gl=document.getElementById('github-label');
   if(gl){{gl.textContent=en?'📦 GitHub Trending':'📦 GitHub Trending';gl.dir=dir;gl.style.textAlign=align;}}
   var xl=document.getElementById('xai-label');

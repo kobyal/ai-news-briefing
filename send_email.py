@@ -12,7 +12,17 @@ from email.mime.text import MIMEText
 
 RECIPIENT    = "kobyal@gmail.com"
 SENDER       = "kobyal@gmail.com"
-APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
+try:
+    APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
+except KeyError:
+    print("ERROR: GMAIL_APP_PASSWORD not set.")
+    print("  Local run: add it to private/.env (no spaces, no quotes around the value)")
+    print("  CI run:    gh secret set GMAIL_APP_PASSWORD --repo kobyal/ai-news-briefing")
+    sys.exit(1)
+
+# Where this run is happening — surfaces in the email so a re-run from
+# your laptop doesn't get mistaken for the morning CI email.
+RUNNER = "CI" if os.environ.get("GITHUB_ACTIONS") == "true" else "local"
 WEBSITE_URL  = "https://duus0s1bicxag.cloudfront.net"
 PAGES_BASE   = "https://kobyal.github.io/ai-news-briefing"
 
@@ -808,7 +818,8 @@ if paid_rows or free_rows or usage_rows or fallback_rows:
         status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-top:12px;margin-bottom:4px">PER-RUN BREAKDOWN</p>\n<table style="border-collapse:collapse">\n{per_run_rows}</table>\n'
 
 msg = MIMEMultipart("alternative")
-msg["Subject"] = f"AI Daily Briefing — {date}"
+_subj_tag = " [LOCAL]" if RUNNER == "local" else ""
+msg["Subject"] = f"AI Daily Briefing — {date}{_subj_tag}"
 msg["From"]    = SENDER
 msg["To"]      = RECIPIENT
 
@@ -823,6 +834,7 @@ Raw briefing report:
 
 Sources: {_sources_label}
 Merged by {_merger_label}
+Sent from: {RUNNER}
 
 ---
 github.com/kobyal/ai-news-briefing
@@ -839,7 +851,7 @@ body_html = f"""\
 {status_section}
 <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0">
 <p style="font-size:13px;color:#64748b">
-Sources: {_sources_label} · merged by {_merger_label}<br>
+Sources: {_sources_label} · merged by {_merger_label} · sent from <b>{RUNNER}</b><br>
 <a href="https://github.com/kobyal/ai-news-briefing">github.com/kobyal/ai-news-briefing</a>
 </p>
 </body></html>

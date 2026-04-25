@@ -146,6 +146,10 @@ _VENDOR_KEYWORDS = {
     "deepseek": "DeepSeek",
     "samsung": "Samsung",
     "alibaba": "Alibaba", "qwen": "Alibaba",
+    # Vendors not in the merger's enum — promoted from "Other" so the SPA shows
+    # their proper icon instead of the generic AI-chip default.
+    "cohere": "Cohere",
+    "spacex": "SpaceX",
 }
 _briefing = merger.get("briefing", {})
 _news_items = _briefing.get("news_items", [])
@@ -240,6 +244,45 @@ def _is_vendor_first_party(url: str, vendor: str) -> bool:
     host = host.lower()
     return any(host == d or host.endswith("." + d) for d in domains)
 
+
+def _detect_title_subject_vendor(title: str) -> str | None:
+    """Find the EARLIEST (most prominent) vendor name mentioned in the title.
+
+    Used to detect cross-vendor URL leaks: e.g., a TechCrunch article titled
+    "Google Cloud Next: new TPU AI chips compete with NVIDIA" appearing under
+    an NVIDIA Vera Rubin story — the title's primary subject is Google, not
+    NVIDIA, so the URL is mis-attached.
+    """
+    if not title:
+        return None
+    title_lc = title.lower()
+    pairs = [
+        ("anthropic", "Anthropic"), ("claude", "Anthropic"),
+        ("openai", "OpenAI"), ("chatgpt", "OpenAI"), ("gpt-", "OpenAI"), ("sora", "OpenAI"), ("codex", "OpenAI"),
+        ("google", "Google"), ("gemini", "Google"), ("deepmind", "Google"),
+        ("aws", "AWS"), ("amazon web services", "AWS"), ("bedrock", "AWS"),
+        ("azure", "Azure"), ("microsoft", "Azure"),
+        ("meta", "Meta"), ("llama", "Meta"),
+        ("xai", "xAI"), ("grok", "xAI"),
+        ("nvidia", "NVIDIA"),
+        ("mistral", "Mistral"),
+        ("apple", "Apple"),
+        ("hugging face", "Hugging Face"),
+        ("alibaba", "Alibaba"), ("qwen", "Alibaba"),
+        ("deepseek", "DeepSeek"),
+        ("samsung", "Samsung"),
+        ("cohere", "Cohere"),
+        ("spacex", "SpaceX"),
+    ]
+    earliest_pos = 10**9
+    found = None
+    for kw, vendor in pairs:
+        idx = title_lc.find(kw)
+        if 0 <= idx < earliest_pos:
+            earliest_pos = idx
+            found = vendor
+    return found
+
 def _extract_og_image(html: str) -> str:
     for pattern in _OG_IMAGE_PATTERNS:
         m = re.search(pattern, html, re.I)
@@ -267,10 +310,32 @@ def _fetch_og_for_story(item: dict) -> tuple[str, list]:
             continue
         if _is_vendor_first_party(url, vendor):
             kept_urls.append(url)  # canonical source — always keep
-        elif not _title_matches_story(title, kws):
-            print(f"  ✂ URL mismatch for '{item.get('headline','?')[:40]}': title='{title[:60]}' url={url[:60]}")
-            continue  # drop URL — wrong topic
         else:
+            # Cross-vendor leak check: if the title's PRIMARY subject is a
+            # DIFFERENT vendor than the story's vendor, the URL might belong
+            # to someone else's story (NVIDIA-Vera-Rubin → Google-TPU case).
+            #
+            # Multi-vendor exception: a URL whose title focuses on a different
+            # vendor is still kept IF the URL slug itself contains at least one
+            # story-specific keyword (e.g. product name "siri", "graviton5",
+            # "vera", "rubin"). Generic words and vendor names alone don't count.
+            title_subject = _detect_title_subject_vendor(title)
+            if title_subject and title_subject != vendor:
+                _GENERIC = {"chips", "chip", "model", "models", "release", "launch",
+                            "deal", "news", "tech", "intelligence", "artificial",
+                            "announcement", "report", "reportedly"}
+                story_specific = {k for k in kws if k != vendor.lower() and k not in _GENERIC}
+                url_slug = url.lower()
+                if any(k in url_slug for k in story_specific):
+                    kept_urls.append(url)  # URL slug names a story-specific term — legit multi-vendor
+                    if not og_image:
+                        og_image = _extract_og_image(html) or og_image
+                    continue
+                print(f"  ✂ Wrong-vendor URL for '{item.get('headline','?')[:40]}' (vendor={vendor}): title's primary subject is {title_subject} url={url[:60]}")
+                continue
+            if not _title_matches_story(title, kws):
+                print(f"  ✂ URL mismatch for '{item.get('headline','?')[:40]}': title='{title[:60]}' url={url[:60]}")
+                continue  # drop URL — wrong topic
             kept_urls.append(url)
         if not og_image:
             og_image = _extract_og_image(html) or og_image

@@ -625,7 +625,10 @@ npm run dev   # → http://localhost:3000
 ```bash
 cd web
 npm run build                    # generates out/ (static export)
-aws s3 sync out s3://ai-news-briefing-web --delete
+# IMPORTANT: --exclude "data/*" is required because the data/ folder
+# (per-day JSON + OG-image mirrors) is written by the ingest Lambda and
+# does NOT live in web/out. Without this exclude, --delete will wipe it.
+aws s3 sync out s3://ai-news-briefing-web --delete --exclude "data/*"
 aws cloudfront create-invalidation --distribution-id E2XOWDA6B84582 --paths "/*"
 ```
 

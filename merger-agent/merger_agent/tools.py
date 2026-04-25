@@ -354,7 +354,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
     reddit_section_html = ""
     if reddit_rows_html:
         reddit_section_html = f"""<div class="reddit-card">
-<div class="section-label" style="margin-top:0">🟠 From Reddit</div>
+<div class="section-label" style="margin-top:0" id="reddit-label">🟠 Hot on Reddit</div>
 {reddit_rows_html}
 </div>"""
 
@@ -596,10 +596,12 @@ def _build_html(tldr, news_items, community_pulse, topic,
         return "reddit.com/" in (item.get("source_url") or "").lower()
 
     x_pulse_items = [it for it in community_pulse_items if _is_x(it)]
+    reddit_pulse_items = [it for it in community_pulse_items if _is_reddit(it)]
     other_pulse_items = [it for it in community_pulse_items if not _is_x(it) and not _is_reddit(it)]
 
     pulse_structured_html = _pulse_items_html(other_pulse_items)
     x_pulse_structured_html = _pulse_items_html(x_pulse_items)
+    reddit_pulse_structured_html = _pulse_items_html(reddit_pulse_items)
 
     # Hebrew structured pulse items — keep alignment with index in the original list
     def _build_he_items(items_subset: list[dict]) -> list[dict]:
@@ -623,9 +625,11 @@ def _build_html(tldr, news_items, community_pulse, topic,
 
     pulse_structured_he_html = ""
     x_pulse_structured_he_html = ""
+    reddit_pulse_structured_he_html = ""
     if community_pulse_items and pulse_items_he:
         pulse_structured_he_html = _pulse_items_html(_build_he_items(other_pulse_items))
         x_pulse_structured_he_html = _pulse_items_html(_build_he_items(x_pulse_items))
+        reddit_pulse_structured_he_html = _pulse_items_html(_build_he_items(reddit_pulse_items))
 
     # Flat fallback (backward compat + Hebrew)
     community_en_html = _community_pulse_html(community_pulse)
@@ -783,17 +787,18 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 </div>
 <div class="wrap">
 <div class="tldr-card">
-<h2 id="tldr-label">TL;DR</h2>
+<h2 id="tldr-label">Today's Brief</h2>
 <ul id="tldr-en">{tldr_en_html}</ul>
 <ul id="tldr-he" dir="rtl" style="display:none">{tldr_he_html}</ul>
 </div>
-<div class="section-label" id="news-label">Latest News</div>
+<div class="section-label" id="news-label">Stories</div>
 <div id="vendor-filter" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center"></div>
 {cards}
 {people_section_html}
 {xai_section_html}
 {('<div class="community-card"><h2 id="xpulse-label">𝕏 Buzzing on X</h2><div id="xpulse-en" class="en-content">' + x_pulse_structured_html + '</div><div id="xpulse-he" class="he-content" style="display:none;direction:rtl;text-align:right">' + (x_pulse_structured_he_html or x_pulse_structured_html) + '</div></div>') if x_pulse_structured_html else ''}
 {reddit_section_html}
+{('<div class="community-card"><h2 id="rpulse-label">🟠 Buzzing on Reddit</h2><div id="rpulse-en" class="en-content">' + reddit_pulse_structured_html + '</div><div id="rpulse-he" class="he-content" style="display:none;direction:rtl;text-align:right">' + (reddit_pulse_structured_he_html or reddit_pulse_structured_html) + '</div></div>') if reddit_pulse_structured_html else ''}
 {('<div class="community-card"><h2 id="community-label">💬 Community Pulse</h2><div id="community-en" class="en-content">' + pulse_structured_html + '</div><div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">' + (pulse_structured_he_html or pulse_structured_html) + '</div></div>') if pulse_structured_html else (('<div class="community-card"><h2 id="community-label">💬 Community Pulse</h2><div id="community-en" class="en-content">' + community_en_html + '</div><div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">' + community_he_html + '</div>' + community_sources_block + '</div>') if community_en_html else '')}
 {youtube_section_html}
 {yt_channels_section_html}
@@ -815,12 +820,19 @@ function setLang(l,btn){{
   var align=en?'left':'right';
   document.getElementById('tldr-en').style.display=en?'':'none';
   document.getElementById('tldr-he').style.display=en?'none':'';
-  document.getElementById('tldr-label').textContent=en?'TL;DR':'תקציר';
+  document.getElementById('tldr-label').textContent=en?'Today\\'s Brief':'תקציר היום';
   document.getElementById('tldr-label').dir=dir;
   document.getElementById('tldr-label').style.textAlign=align;
-  document.getElementById('news-label').textContent=en?'Latest News':'חדשות אחרונות';
+  document.getElementById('news-label').textContent=en?'Stories':'כתבות';
   document.getElementById('news-label').dir=dir;
   document.getElementById('news-label').style.textAlign=align;
+  var rl=document.getElementById('reddit-label');
+  if(rl){{rl.textContent=en?'🟠 Hot on Reddit':'🟠 לוהט ב-Reddit';rl.dir=dir;rl.style.textAlign=align;}}
+  var rpl=document.getElementById('rpulse-label');
+  if(rpl){{rpl.textContent=en?'🟠 Buzzing on Reddit':'🟠 מה מדברים ב-Reddit';rpl.dir=dir;rpl.style.textAlign=align;}}
+  var rpen=document.getElementById('rpulse-en'); if(rpen) rpen.style.display=en?'':'none';
+  var rphe=document.getElementById('rpulse-he'); if(rphe) rphe.style.display=en?'none':'';
+  document.querySelectorAll('.new-badge').forEach(function(el){{el.textContent=en?'NEW':'חדש';}});
   var cen=document.getElementById('community-en'); if(cen) cen.style.display=en?'':'none';
   var che=document.getElementById('community-he'); if(che) che.style.display=en?'none':'';
   var xen=document.getElementById('xpulse-en'); if(xen) xen.style.display=en?'':'none';

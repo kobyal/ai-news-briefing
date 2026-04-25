@@ -28,7 +28,41 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      # Skip the entire pipeline when a recent local subscription run already
+      # produced today's outputs. Honors a 5-hour freshness window: if the
+      # marker's completed_at is within 5h of NOW, the daily run is redundant
+      # (user covered it locally on Claude Max). Outside the window → run as
+      # usual so the briefing doesn't go stale.
+      - name: Check for recent local subscription run
+        id: skip_check
+        run: |
+          DATE=$(date -u +'%Y-%m-%d')
+          MARKER="merger-agent/output/${DATE}/.via_subscription.done"
+          WINDOW_SECONDS=$((5 * 3600))
+          if [ ! -f "$MARKER" ]; then
+            echo "no marker for $DATE — proceeding"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          COMPLETED_AT=$(python3 -c "import json,sys; print(json.load(open('$MARKER'))['completed_at'])")
+          AGE_SECONDS=$(python3 -c "
+          from datetime import datetime
+          completed = datetime.fromisoformat('$COMPLETED_AT')
+          # Treat as local time if naive (run.py writes naive ISO); compare against now
+          now = datetime.now() if completed.tzinfo is None else datetime.now(completed.tzinfo)
+          print(int((now - completed).total_seconds()))
+          ")
+          if [ "$AGE_SECONDS" -le "$WINDOW_SECONDS" ]; then
+            HOURS=$((AGE_SECONDS / 3600))
+            echo "marker $MARKER is ${HOURS}h old — within 5h window. SKIPPING."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "marker $MARKER is older than 5h — proceeding"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Python
+        if: steps.skip_check.outputs.skip != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -39,6 +73,7 @@ jobs:
             tavily-news-agent/requirements.txt
 
       - name: Install dependencies
+        if: steps.skip_check.outputs.skip != 'true'
         run: |
           pip install \
             -r adk-news-agent/requirements.txt \
@@ -50,6 +85,7 @@ jobs:
             firecrawl-py exa-py newsapi-python || true
 
       - name: Run all pipelines
+        if: steps.skip_check.outputs.skip != 'true'
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
@@ -85,6 +121,7 @@ jobs:
           fi
 
       - name: Publish latest merged HTML to GH Pages + per-day archive
+        if: steps.skip_check.outputs.skip != 'true'
         run: |
           mkdir -p docs docs/report
           DATE=$(date +'%Y-%m-%d')
@@ -102,11 +139,13 @@ jobs:
           echo "Wrote docs/index.html + docs/report/${DATE}.html + docs/report/latest.html"
 
       - name: Publish combined data JSON to docs/data/ (for Lambda ingestion)
+        if: steps.skip_check.outputs.skip != 'true'
         env:
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
         run: python3 publish_data.py
 
       - name: Persist fallback events to docs/data/
+        if: steps.skip_check.outputs.skip != 'true'
         run: |
           mkdir -p docs/data
           DATE=$(date +'%Y-%m-%d')
@@ -120,6 +159,7 @@ jobs:
           fi
 
       - name: Commit and push outputs
+        if: steps.skip_check.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -129,6 +169,7 @@ jobs:
           git push
 
       - name: Send email
+        if: steps.skip_check.outputs.skip != 'true'
         env:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

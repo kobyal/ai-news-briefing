@@ -318,9 +318,10 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
     min_since = datetime.now(tz=timezone.utc) - timedelta(days=7)
     reddit_since = min(since, min_since)  # take the earlier date
     after_ts = int(reddit_since.timestamp())
-    # Fetch 200 posts so we can sort by comment count and pick the most engaged
+    # ArcticShift caps limit at 100 (returns 400 above that). Fetch the max and
+    # let the downstream sort-by-comments pick the most engaged posts.
     params = {
-        "limit": 200,
+        "limit": 100,
         "after": after_ts,
     }
 

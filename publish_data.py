@@ -206,6 +206,40 @@ def _title_matches_story(title: str, kws: set) -> bool:
     title_lower = title.lower()
     return any(k in title_lower for k in kws)
 
+# Vendor → first-party domains. URLs hosted on these are inherently relevant
+# to the vendor's stories — skip the title-keyword check for them, otherwise
+# generic pages like anthropic.com/news ("Newsroom") get dropped even when
+# they're the canonical source for an announcement.
+_VENDOR_DOMAINS = {
+    "Anthropic":    ["anthropic.com"],
+    "OpenAI":       ["openai.com"],
+    "Google":       ["google.com", "googleblog.com", "blog.google", "deepmind.google", "deepmind.com"],
+    "AWS":          ["aws.amazon.com", "amazon.com"],
+    "Azure":        ["microsoft.com", "azure.com", "azure.microsoft.com"],
+    "Meta":         ["meta.com", "ai.meta.com", "about.fb.com", "facebook.com"],
+    "xAI":          ["x.ai"],
+    "NVIDIA":       ["nvidia.com", "blogs.nvidia.com", "developer.nvidia.com"],
+    "Mistral":      ["mistral.ai"],
+    "Apple":        ["apple.com", "machinelearning.apple.com"],
+    "Hugging Face": ["huggingface.co"],
+    "Alibaba":      ["alibaba.com", "alibabacloud.com", "qwen.ai", "qwenlm.github.io"],
+    "DeepSeek":     ["deepseek.com", "deepseek.ai", "api-docs.deepseek.com"],
+    "Samsung":      ["samsung.com", "research.samsung.com", "news.samsung.com"],
+}
+
+def _is_vendor_first_party(url: str, vendor: str) -> bool:
+    """True if URL is hosted on the story's vendor's canonical domain(s)."""
+    domains = _VENDOR_DOMAINS.get(vendor, [])
+    if not domains:
+        return False
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(url).hostname or ""
+    except Exception:
+        return False
+    host = host.lower()
+    return any(host == d or host.endswith("." + d) for d in domains)
+
 def _extract_og_image(html: str) -> str:
     for pattern in _OG_IMAGE_PATTERNS:
         m = re.search(pattern, html, re.I)
@@ -216,8 +250,14 @@ def _extract_og_image(html: str) -> str:
     return ""
 
 def _fetch_og_for_story(item: dict) -> tuple[str, list]:
-    """Try all URLs. Drop any URL whose page title doesn't match the story. Return (og_image, kept_urls)."""
+    """Try all URLs. Drop any URL whose page title doesn't match the story. Return (og_image, kept_urls).
+
+    Vendor first-party URLs (anthropic.com for Anthropic stories, openai.com for
+    OpenAI stories, etc.) bypass the title-match check — they're inherently
+    relevant even when the page title is just "Newsroom" or "Press".
+    """
     kws = _story_keywords(item)
+    vendor = item.get("vendor", "")
     kept_urls = []
     og_image = ""
     for url in item.get("urls", []):
@@ -225,10 +265,13 @@ def _fetch_og_for_story(item: dict) -> tuple[str, list]:
         if not html:
             kept_urls.append(url)  # keep URL — might just be a fetch failure, don't penalize
             continue
-        if not _title_matches_story(title, kws):
+        if _is_vendor_first_party(url, vendor):
+            kept_urls.append(url)  # canonical source — always keep
+        elif not _title_matches_story(title, kws):
             print(f"  ✂ URL mismatch for '{item.get('headline','?')[:40]}': title='{title[:60]}' url={url[:60]}")
             continue  # drop URL — wrong topic
-        kept_urls.append(url)
+        else:
+            kept_urls.append(url)
         if not og_image:
             og_image = _extract_og_image(html) or og_image
     return og_image, kept_urls

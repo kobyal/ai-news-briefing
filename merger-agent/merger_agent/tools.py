@@ -325,7 +325,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
 
     people_section_html = ""
     if people_cards_html:
-        people_section_html = f"""<div class="section-label" id="people-label">👤 People Talking Today</div>
+        people_section_html = f"""<div class="section-label" id="people-label">𝕏 Buzzing on X</div>
 {people_cards_html}"""
 
     # ── Social: Hot on Reddit ───────────────────────────────────────────────
@@ -492,7 +492,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
     xai_section_html = ""
     if xai_trending_html:
         xai_section_html = f"""<div class="xt-card">
-<div class="section-label" style="margin-top:0" id="xai-label">🐦 Trending on AI Twitter</div>
+<div class="section-label" style="margin-top:0" id="xai-label">𝕏 Trending on X</div>
 {xai_trending_html}
 </div>"""
 
@@ -714,16 +714,16 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <div class="section-label" id="news-label">Latest News</div>
 <div id="vendor-filter" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center"></div>
 {cards}
+{xai_section_html}
 {people_section_html}
 {reddit_section_html}
 <div class="community-card">
-<h2 id="community-label">🗣️ Community Pulse</h2>
+<h2 id="community-label">💬 Community Pulse</h2>
 <div id="community-en" class="en-content">{pulse_structured_html if pulse_structured_html else community_en_html}</div>
 <div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">{pulse_structured_he_html if pulse_structured_he_html else community_he_html}</div>
 {community_sources_block if not pulse_structured_html else ''}
 </div>
 {youtube_section_html}
-{xai_section_html}
 {github_section_html}
 </div>
 <div class="footer">
@@ -749,17 +749,17 @@ function setLang(l,btn){{
   document.getElementById('news-label').style.textAlign=align;
   document.getElementById('community-en').style.display=en?'':'none';
   document.getElementById('community-he').style.display=en?'none':'';
-  document.getElementById('community-label').textContent=en?'🗣️ Community Pulse':'🗣️ דופק הקהילה';
+  document.getElementById('community-label').textContent=en?'💬 Community Pulse':'💬 דופק הקהילה';
   document.getElementById('community-label').dir=dir;
   document.getElementById('community-label').style.textAlign=align;
   var pl=document.getElementById('people-label');
-  if(pl){{pl.textContent=en?'👤 People Talking Today':'👤 אנשים מדברים היום';pl.dir=dir;pl.style.textAlign=align;}}
+  if(pl){{pl.textContent=en?'𝕏 Buzzing on X':'𝕏 מה מדברים ב-X';pl.dir=dir;pl.style.textAlign=align;}}
   var yl=document.getElementById('youtube-label');
   if(yl){{yl.textContent=en?'🎬 AI on YouTube':'🎬 AI ביוטיוב';yl.dir=dir;yl.style.textAlign=align;}}
   var gl=document.getElementById('github-label');
   if(gl){{gl.textContent=en?'📦 GitHub Trending':'📦 GitHub Trending';gl.dir=dir;gl.style.textAlign=align;}}
   var xl=document.getElementById('xai-label');
-  if(xl){{xl.textContent=en?'🐦 Trending on AI Twitter':'🐦 טרנדינג ב-AI Twitter';xl.dir=dir;xl.style.textAlign=align;}}
+  if(xl){{xl.textContent=en?'𝕏 Trending on X':'𝕏 טרנדים ב-X';xl.dir=dir;xl.style.textAlign=align;}}
   document.querySelectorAll('.news-card,.person-card').forEach(function(el){{el.dir=en?'ltr':'rtl';}});
   document.querySelectorAll('.en-content').forEach(function(el){{el.style.display=en?'':'none';}});
   document.querySelectorAll('.he-content').forEach(function(el){{el.style.display=en?'none':'';}});

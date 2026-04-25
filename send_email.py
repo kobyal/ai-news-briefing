@@ -2,6 +2,7 @@
 import glob
 import json
 import os
+import re
 import smtplib
 import sys
 import urllib.request
@@ -242,8 +243,21 @@ def _check_apis() -> list[dict]:
     today_by_api = _cost_by_provider_since(_today)
     week_by_api = _cost_by_provider_since(_7d_ago)
 
+    def _credits_left(provider_name: str) -> str | None:
+        """Read credits_left_usd from dashboard_mtd, or parse from legacy detail string."""
+        p = mtd.get(provider_name, {}) or {}
+        if "credits_left_usd" in p:
+            try:
+                return f"${float(p['credits_left_usd']):.2f} left"
+            except Exception:
+                pass
+        m = re.search(r'\$([\d.]+)\s+credits?\s+left', p.get("detail", "") or "", re.IGNORECASE)
+        if m:
+            return f"${m.group(1)} left"
+        return None
+
     def _cost_line(provider_name: str) -> str:
-        """today $X · <detail>  (daily only — 7d + MTD dropped per design)."""
+        """today $X · $Y left  (daily + credits balance only — drops dashboard "detail" cruft)."""
         parts = []
         p = mtd.get(provider_name, {}) or {}
         auto_today = today_by_api.get(provider_name, 0)
@@ -251,38 +265,32 @@ def _check_apis() -> list[dict]:
         today = auto_today if auto_today > 0 else manual_today
         if today > 0:
             parts.append(f"today ${today:.4f}")
-        if p.get("detail"):
-            parts.append(p["detail"])
+        credits = _credits_left(provider_name)
+        if credits:
+            parts.append(credits)
         return " · ".join(parts)
 
-    # ── PAID: Anthropic — rate limits + month-to-date cost (Admin API) ──
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if anthropic_key:
-        cost_pair = _anthropic_mtd_cost_usd()
-        detail_parts = []
-        if cost_pair is not None:
-            mtd, yday = cost_pair
-            detail_parts.append(f"${mtd:.2f} MTD")
-            if yday > 0:
-                detail_parts.append(f"last run ~${yday:.2f}")
-        try:
-            data = json.dumps({"model": "claude-haiku-4-5-20251001", "max_tokens": 1, "messages": [{"role": "user", "content": "1"}]}).encode()
-            req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=data)
-            req.add_header("x-api-key", anthropic_key)
-            req.add_header("anthropic-version", "2023-06-01")
-            req.add_header("Content-Type", "application/json")
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                tok_limit = resp.headers.get("anthropic-ratelimit-tokens-limit", "?")
-                req_limit = resp.headers.get("anthropic-ratelimit-requests-limit", "?")
-                detail_parts.append(f"{tok_limit} tok/min · {req_limit} req/min")
-            if cost_pair is None:
-                # No admin key → fall back to manual dashboard_mtd.json value
-                detail_parts.append(_cost_line("Anthropic") or "set ANTHROPIC_ADMIN_API_KEY for MTD")
-            checks.append({"name": "Anthropic", "status": "ok", "detail": " · ".join(detail_parts),
-                           "console_url": "https://platform.claude.com/settings/keys", "tier": "paid"})
-        except Exception as e:
-            checks.append({"name": "Anthropic", "status": "error", "detail": str(e)[:40],
-                           "console_url": "https://platform.claude.com/settings/keys", "tier": "paid"})
+    # ── PAID: Anthropic — concise: today api/sub · models · credits left ──
+    # Renders even when ANTHROPIC_API_KEY is unset (subscription-only days).
+    api_today = today_by_api.get("Anthropic", 0)
+    sub_calls = [c for u in usage_data for c in u.get("calls", []) if c.get("via") == "subscription"]
+    api_calls = [c for u in usage_data for c in u.get("calls", []) if c.get("via") != "subscription" and "claude" in (c.get("model", "") or "").lower()]
+    sub_count = len(sub_calls)
+    api_count = len(api_calls)
+    models_used = sorted({_friendly_model(c.get("model", "")) for c in (sub_calls + api_calls) if c.get("model")})
+    parts = []
+    if api_today > 0 or api_count > 0:
+        parts.append(f"today ${api_today:.4f} (api)")
+    if sub_count > 0:
+        parts.append(f"$0 (sub, {sub_count} calls)")
+    if models_used:
+        parts.append("models: " + ", ".join(models_used))
+    credits = _credits_left("Anthropic")
+    if credits:
+        parts.append(credits)
+    checks.append({"name": "Anthropic", "status": "ok",
+                   "detail": " · ".join(parts) or "no calls today",
+                   "console_url": "https://platform.claude.com/settings/keys", "tier": "paid"})
 
     # ── PAID: Google Gemini / Perplexity / xAI — probe models endpoint ─
     def _build_probe(method, url, headers, body):
@@ -475,6 +483,45 @@ def _check_apis() -> list[dict]:
             checks.append({"name": f"NewsAPI #{i}", "status": "error", "detail": str(e)[:50],
                            "console_url": "https://newsapi.org/account", "tier": "free"})
 
+    # ── FREE: X/Twitter scrape — surfaces auth-cookie expiry as ⚠️ ─────
+    today = datetime.now().strftime("%Y-%m-%d")
+    twitter_files = sorted(glob.glob(f"twitter-agent/output/{today}/twitter_*.json"))
+    if twitter_files:
+        try:
+            d = json.load(open(twitter_files[-1]))
+            b = d.get("briefing", d) or {}
+            n_people = len(b.get("people_highlights", []) or [])
+            n_trending = len(b.get("trending_posts", []) or [])
+            if n_people > 0:
+                detail = f"{n_people} people · {n_trending} trending · auth ok"
+                status = "ok"
+            else:
+                detail = "0 people fetched — cookies likely expired, refresh TWITTER_AUTH_TOKEN/CT0"
+                status = "warn"
+            checks.append({"name": "X scrape", "status": status, "detail": detail,
+                           "console_url": "https://x.com/", "tier": "free"})
+        except Exception as e:
+            checks.append({"name": "X scrape", "status": "error", "detail": str(e)[:50],
+                           "console_url": "https://x.com/", "tier": "free"})
+
+    # ── FREE: Reddit (Arctic Shift no-auth) — surfaces 400/403 as ⚠️ ───
+    rss_files = sorted(glob.glob(f"rss-news-agent/output/{today}/rss_*.json"))
+    if rss_files:
+        try:
+            d = json.load(open(rss_files[-1]))
+            n_reddit = len((d.get("reddit_posts") or d.get("briefing", {}).get("reddit_posts", []) or []))
+            if n_reddit > 0:
+                checks.append({"name": "Reddit (ArcticShift)", "status": "ok",
+                               "detail": f"{n_reddit} posts fetched (no-auth)",
+                               "console_url": "https://arctic-shift.photon-reddit.com/", "tier": "free"})
+            else:
+                checks.append({"name": "Reddit (ArcticShift)", "status": "warn",
+                               "detail": "0 posts — ArcticShift API likely 4xx, Reddit content skipped today",
+                               "console_url": "https://arctic-shift.photon-reddit.com/", "tier": "free"})
+        except Exception as e:
+            checks.append({"name": "Reddit (ArcticShift)", "status": "error", "detail": str(e)[:50],
+                           "console_url": "https://arctic-shift.photon-reddit.com/", "tier": "free"})
+
     return checks
 
 
@@ -513,6 +560,12 @@ def _collect_fallbacks() -> list[dict]:
         counts[k] = counts.get(k, 0) + 1
     return [{"agent": a, "from": f, "to": t, "count": n} for (a, f, t), n in counts.items()]
 
+usage_data = _collect_usage()
+if usage_data:
+    print("Usage from this run (collected before API checks so they can reference it):")
+    for u in usage_data:
+        print(f"  {u['agent']}: {u.get('total_input_tokens',0):,} in + {u.get('total_output_tokens',0):,} out")
+
 print("Checking API status...")
 api_checks = _check_apis()
 for c in api_checks:
@@ -520,7 +573,6 @@ for c in api_checks:
     tier_tag = "[$]" if c.get("tier") == "paid" else "[free]"
     print(f"  {icon} {tier_tag} {c['name']}: {c['detail']}")
 
-usage_data = _collect_usage()
 if usage_data:
     print("Usage from this run:")
     for u in usage_data:
@@ -647,10 +699,12 @@ for u in usage_data:
         f'</tr>\n'
     )
 
-# Per-run breakdown (only rendered when >1 run happened today)
+# Per-run breakdown (only rendered when the SAME agent ran more than once today —
+# otherwise this section just duplicates TOKEN USAGE and adds noise)
 per_run = _per_run_breakdown()
 per_run_rows = ""
-if len(per_run) > 1:
+_max_runs_per_agent = max((u.get("runs", 1) for u in usage_data), default=1)
+if _max_runs_per_agent > 1 and len(per_run) > 1:
     for r in per_run:
         ts = r.get("run", "?")
         ts_disp = f"{ts[:2]}:{ts[2:4]}:{ts[4:6]}" if len(ts) == 6 and ts.isdigit() else ts
@@ -687,7 +741,28 @@ if usage_rows:
             arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "·")
             color = "#dc2626" if delta > 0 else ("#16a34a" if delta < 0 else "#64748b")
             diff_html = f' <span style="color:{color};font-weight:600">{arrow} ${abs(delta):.4f} ({pct:+.1f}% vs {previous_entry.get("date","prev")})</span>'
-    saved_cell = f'<span style="color:#16a34a;font-weight:700">~${total_saved_usd:.4f} saved</span>' if total_saved_usd > 0 else ''
+    # Compute "what would today cost if all Anthropic went via subscription".
+    # = total_run_cost minus all Anthropic-billed cost (that part becomes free).
+    anthropic_api_cost = sum(
+        c.get("cost_usd", 0) or 0
+        for u in usage_data
+        for c in u.get("calls", []) or []
+        if c.get("via") != "subscription" and "claude" in (c.get("model", "") or "").lower()
+    )
+    if_sub_cost = max(0.0, total_run_cost - anthropic_api_cost)
+    delta_to_sub = total_run_cost - if_sub_cost
+
+    if total_saved_usd > 0:
+        # Subscription run today — already saved
+        saved_cell = f'<span style="color:#16a34a;font-weight:700">~${total_saved_usd:.4f} saved</span>'
+    elif anthropic_api_cost > 0:
+        # API run — show what subscription would have cost
+        saved_cell = (
+            f'<span style="color:#64748b">→ <b>${if_sub_cost:.4f}</b> via sub '
+            f'<span style="color:#16a34a">(saves ${delta_to_sub:.4f})</span></span>'
+        )
+    else:
+        saved_cell = ''
     usage_rows += (
         f'<tr style="border-top:1px solid #e2e8f0">'
         f'<td colspan="3" style="padding:3px 8px;font-size:12px;font-weight:700">Total</td>'

@@ -325,7 +325,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
 
     people_section_html = ""
     if people_cards_html:
-        people_section_html = f"""<div class="section-label" id="people-label">𝕏 Buzzing on X</div>
+        people_section_html = f"""<div class="section-label" id="people-label">𝕏 Trending on X</div>
 {people_cards_html}"""
 
     # ── Social: Hot on Reddit ───────────────────────────────────────────────
@@ -536,26 +536,49 @@ def _build_html(tldr, news_items, community_pulse, topic,
 </div>
 """
 
-    # Structured pulse items (preferred) vs flat fallback
+    # Structured pulse items (preferred) vs flat fallback.
+    # Mirror the website's split: X-sourced items render as a "Buzzing on X"
+    # section; non-X, non-Reddit items render under "Community Pulse".
     community_pulse_items = community_pulse_items or []
-    pulse_structured_html = _pulse_items_html(community_pulse_items)
 
-    # Hebrew structured pulse items
-    pulse_structured_he_html = ""
-    if community_pulse_items and pulse_items_he:
-        he_items = []
-        for idx, item in enumerate(community_pulse_items[:7]):
-            pi_he = pulse_items_he[idx] if idx < len(pulse_items_he) else {}
-            he_items.append({
-                "headline": pi_he.get("headline_he", item.get("headline", "")),
-                "body":     pi_he.get("body_he", item.get("body", "")),
-                "heat":     item.get("heat", "mild"),
-                "source_url":   item.get("source_url", ""),
-                "source_label": item.get("source_label", ""),
-                "related_vendor": item.get("related_vendor", ""),
-                "related_person": item.get("related_person", ""),
+    def _is_x(item: dict) -> bool:
+        url = (item.get("source_url") or "").lower()
+        return "x.com/" in url or "twitter.com/" in url
+
+    def _is_reddit(item: dict) -> bool:
+        return "reddit.com/" in (item.get("source_url") or "").lower()
+
+    x_pulse_items = [it for it in community_pulse_items if _is_x(it)]
+    other_pulse_items = [it for it in community_pulse_items if not _is_x(it) and not _is_reddit(it)]
+
+    pulse_structured_html = _pulse_items_html(other_pulse_items)
+    x_pulse_structured_html = _pulse_items_html(x_pulse_items)
+
+    # Hebrew structured pulse items — keep alignment with index in the original list
+    def _build_he_items(items_subset: list[dict]) -> list[dict]:
+        out = []
+        for it in items_subset[:7]:
+            try:
+                idx = community_pulse_items.index(it)
+            except ValueError:
+                idx = -1
+            pi_he = pulse_items_he[idx] if 0 <= idx < len(pulse_items_he) else {}
+            out.append({
+                "headline": pi_he.get("headline_he", it.get("headline", "")),
+                "body":     pi_he.get("body_he", it.get("body", "")),
+                "heat":     it.get("heat", "mild"),
+                "source_url":   it.get("source_url", ""),
+                "source_label": it.get("source_label", ""),
+                "related_vendor": it.get("related_vendor", ""),
+                "related_person": it.get("related_person", ""),
             })
-        pulse_structured_he_html = _pulse_items_html(he_items)
+        return out
+
+    pulse_structured_he_html = ""
+    x_pulse_structured_he_html = ""
+    if community_pulse_items and pulse_items_he:
+        pulse_structured_he_html = _pulse_items_html(_build_he_items(other_pulse_items))
+        x_pulse_structured_he_html = _pulse_items_html(_build_he_items(x_pulse_items))
 
     # Flat fallback (backward compat + Hebrew)
     community_en_html = _community_pulse_html(community_pulse)
@@ -714,15 +737,11 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <div class="section-label" id="news-label">Latest News</div>
 <div id="vendor-filter" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center"></div>
 {cards}
-{xai_section_html}
 {people_section_html}
+{xai_section_html}
+{('<div class="community-card"><h2 id="xpulse-label">𝕏 Buzzing on X</h2><div id="xpulse-en" class="en-content">' + x_pulse_structured_html + '</div><div id="xpulse-he" class="he-content" style="display:none;direction:rtl;text-align:right">' + (x_pulse_structured_he_html or x_pulse_structured_html) + '</div></div>') if x_pulse_structured_html else ''}
 {reddit_section_html}
-<div class="community-card">
-<h2 id="community-label">💬 Community Pulse</h2>
-<div id="community-en" class="en-content">{pulse_structured_html if pulse_structured_html else community_en_html}</div>
-<div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">{pulse_structured_he_html if pulse_structured_he_html else community_he_html}</div>
-{community_sources_block if not pulse_structured_html else ''}
-</div>
+{('<div class="community-card"><h2 id="community-label">💬 Community Pulse</h2><div id="community-en" class="en-content">' + pulse_structured_html + '</div><div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">' + (pulse_structured_he_html or pulse_structured_html) + '</div></div>') if pulse_structured_html else (('<div class="community-card"><h2 id="community-label">💬 Community Pulse</h2><div id="community-en" class="en-content">' + community_en_html + '</div><div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right">' + community_he_html + '</div>' + community_sources_block + '</div>') if community_en_html else '')}
 {youtube_section_html}
 {github_section_html}
 </div>
@@ -747,19 +766,22 @@ function setLang(l,btn){{
   document.getElementById('news-label').textContent=en?'Latest News':'חדשות אחרונות';
   document.getElementById('news-label').dir=dir;
   document.getElementById('news-label').style.textAlign=align;
-  document.getElementById('community-en').style.display=en?'':'none';
-  document.getElementById('community-he').style.display=en?'none':'';
-  document.getElementById('community-label').textContent=en?'💬 Community Pulse':'💬 דופק הקהילה';
-  document.getElementById('community-label').dir=dir;
-  document.getElementById('community-label').style.textAlign=align;
+  var cen=document.getElementById('community-en'); if(cen) cen.style.display=en?'':'none';
+  var che=document.getElementById('community-he'); if(che) che.style.display=en?'none':'';
+  var xen=document.getElementById('xpulse-en'); if(xen) xen.style.display=en?'':'none';
+  var xhe=document.getElementById('xpulse-he'); if(xhe) xhe.style.display=en?'none':'';
+  var cl=document.getElementById('community-label');
+  if(cl){{cl.textContent=en?'💬 Community Pulse':'💬 דופק הקהילה';cl.dir=dir;cl.style.textAlign=align;}}
+  var xpl=document.getElementById('xpulse-label');
+  if(xpl){{xpl.textContent=en?'𝕏 Buzzing on X':'𝕏 מה מדברים ב-X';xpl.dir=dir;xpl.style.textAlign=align;}}
   var pl=document.getElementById('people-label');
-  if(pl){{pl.textContent=en?'𝕏 Buzzing on X':'𝕏 מה מדברים ב-X';pl.dir=dir;pl.style.textAlign=align;}}
+  if(pl){{pl.textContent=en?'𝕏 Trending on X':'𝕏 חם ב-X';pl.dir=dir;pl.style.textAlign=align;}}
   var yl=document.getElementById('youtube-label');
   if(yl){{yl.textContent=en?'🎬 AI on YouTube':'🎬 AI ביוטיוב';yl.dir=dir;yl.style.textAlign=align;}}
   var gl=document.getElementById('github-label');
   if(gl){{gl.textContent=en?'📦 GitHub Trending':'📦 GitHub Trending';gl.dir=dir;gl.style.textAlign=align;}}
   var xl=document.getElementById('xai-label');
-  if(xl){{xl.textContent=en?'𝕏 Trending on X':'𝕏 טרנדים ב-X';xl.dir=dir;xl.style.textAlign=align;}}
+  if(xl){{xl.textContent=en?'𝕏 Trending on X':'𝕏 חם ב-X';xl.dir=dir;xl.style.textAlign=align;}}
   document.querySelectorAll('.news-card,.person-card').forEach(function(el){{el.dir=en?'ltr':'rtl';}});
   document.querySelectorAll('.en-content').forEach(function(el){{el.style.display=en?'':'none';}});
   document.querySelectorAll('.he-content').forEach(function(el){{el.style.display=en?'none':'';}});

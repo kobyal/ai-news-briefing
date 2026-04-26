@@ -466,7 +466,7 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
     prompt = prompt.replace("{enriched_articles}", enriched_context)
     prompt = prompt.replace("{extra_sources}", extra_context)
     prompt = prompt.replace("{vendor_enum}", VENDOR_ENUM)
-    prompt = prompt.replace("{recent_headlines}", _recent_headlines(3))
+    prompt = prompt.replace("{recent_headlines}", _recent_headlines(5))
     return _agent(
         input_text=f"{prompt}\n\nJSON SCHEMA:\n{schema_desc}",
         model=_WRITER_MODEL(),

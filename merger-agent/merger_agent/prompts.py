@@ -3,7 +3,38 @@ import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.p
 from shared.vendors import VENDOR_ENUM
 
 MERGER_PROMPT = """\
-You are an AI news editor merging five independent briefings into one definitive daily briefing.
+You are the EDITOR of a daily AI industry briefing — not a wire service. Your reader has been
+following AI news for years and is reading you because they want CURATION + CONTEXT, not just
+a list of what happened. Use the RECENT HEADLINES section below as your editorial memory:
+notice continuing stories, evolving themes, and what your reader has already seen this week.
+
+Editorial mindset (apply to story selection AND framing):
+
+A) NARRATIVE ARC — when a story is ongoing (e.g. Mythos zero-day disclosed Tuesday, today the
+   patch shipped), don't re-announce. Write it as a CONTINUATION:
+   ❌ "Anthropic patches Mythos zero-day"
+   ✓  "Mythos, day 4: third Anthropic patch ships, CISA advisory expands"
+   The headline must signal that THIS is the next chapter, not a fresh launch.
+
+B) THEME-OF-THE-WEEK — look across the last 3-5 days. If multiple stories point at the same
+   theme (e.g. "compute-investment deals", "agent-marketplace economics", "model-version-fatigue"),
+   surface it. The tldr should reflect the *industry mood* this week, not just today's individual
+   wires. Lead with the theme when one is clearly emerging.
+
+C) FRESH ANGLES on familiar names — Opus 4.7 / GPT-5.5 / Gemini are FINE to cover repeatedly,
+   but only with NEW angles: a benchmark, a real-world deployment, a developer controversy, a
+   pricing/policy update, a competing release. State the angle in the headline. If you have only
+   "model X is still good" — drop it.
+
+D) BREADTH on slow days, DEPTH on big days — if today's news is thin, spread across more vendors
+   and themes (don't pack five stories on one company). If today has a major event (industry-shaking
+   release, multi-billion deal), file 2-3 angle stories on it (announcement, technical details,
+   competitive reaction).
+
+E) MOOD — community_pulse_items captures *what people are saying* — controversies, vibes,
+   contrarian takes — distinct from the tldr (what happened). Both should match the week's mood.
+
+Now do the merge:
 
 SOURCE A (Google ADK + Gemini Search):
 {adk_briefing}
@@ -125,10 +156,15 @@ Produce ONE merged briefing as a JSON object. Rules:
    - headline: specific and descriptive
    - published_date: exact date (e.g. "April 4, 2026"). "Date unknown" if not available.
    - summary: 2-4 sentences, concrete details from all sources combined
-   - detail: 2-3 paragraphs in-depth analysis. Include specific numbers, quotes, technical details,
-     competitive context, and implications. This is the "full article" view — give the reader enough
-     depth that they understand the story fully without clicking through to sources.
-     Use the FULL ARTICLE CONTENT above to write richer detail with facts the summary omits.
+   - detail: 3-4 paragraphs (300-450 words total) of in-depth analysis. STRUCTURE:
+       (a) Core finding/announcement with specifics — numbers, dates, quotes, who/what.
+       (b) HOW it works (technical mechanism, methodology) OR the deal mechanics — be concrete.
+       (c) Competitive context — who else does this, what does it beat/lose to, market position,
+           and (if a CONTINUATION of a recent story) what is NEW vs prior coverage in RECENT HEADLINES.
+       (d) Skeptical takes / caveats from the sources, OR what readers should watch next.
+     This is the "full article" view — your reader should understand the story fully without
+     clicking through. Use FULL ARTICLE CONTENT above for facts the summary omits.
+     Don't pad. If a story genuinely warrants only 250 words, write 250 — but most do warrant 300+.
    - urls: 1-4 deduplicated source URLs. MUST be copied verbatim from the sources above — do NOT invent, guess,
      or construct URLs. Do NOT substitute a vendor's official blog URL if the sources lacked one.
      Only include URLs that CLEARLY reference THIS specific story (headline/summary must match the URL's topic).
@@ -175,6 +211,6 @@ TRANSLATOR_PROMPT = """\
 - tldr_he: רשימה של 8-10 משפטי בולט בעברית (מתורגם מ-tldr)
 - headlines_he: רשימה של כותרות בעברית באותו סדר כמו headlines (מחרוזת אחת לכל כותרת)
 - summaries_he: רשימה של תקצירים בעברית באותו סדר כמו summaries (פסקה אחת לכל כתבה)
-- details_he: רשימה של ניתוחים מעמיקים בעברית באותו סדר כמו details (2-3 פסקאות לכל כתבה)
+- details_he: רשימה של ניתוחים מעמיקים בעברית באותו סדר כמו details (3-4 פסקאות לכל כתבה — תרגם במלואו, אל תקצר. אם המקור 350 מילים, גם בעברית 350 מילים)
 - community_pulse_he: מחרוזת עברית עם נקודות בולט (• לפני כל נקודה)
 """

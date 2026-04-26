@@ -578,6 +578,39 @@ def _check_count(have: int, expect: int) -> str:
     return f"✓{have}" if have == expect else f"⚠{have}"
 
 
+def _zero_streak(agent_dir: str, key_path: list, max_lookback: int = 7) -> int:
+    """Count consecutive recent days (starting today) where the agent's output
+    had zero items at key_path. Missing-output days are SKIPPED (may be
+    intentional off-days, e.g. CI didn't run on a weekend), not counted as zero.
+    A non-zero day breaks the streak.
+
+    Catches silent-failure patterns the user can't see day-to-day — e.g. Reddit
+    posts were 0 for 6 consecutive days (Apr 20-25) without anyone noticing."""
+    today = datetime.now().date()
+    streak = 0
+    for offset in range(max_lookback):
+        d_str = (today - timedelta(days=offset)).strftime("%Y-%m-%d")
+        files = sorted(glob.glob(f"{agent_dir}/output/{d_str}/*.json"))
+        files = [f for f in files if not os.path.basename(f).startswith(("usage", ".via"))]
+        if not files:
+            continue
+        try:
+            d = json.load(open(files[-1]))
+        except Exception:
+            continue
+        cur = d
+        for k in key_path:
+            if isinstance(cur, dict):
+                cur = cur.get(k, {})
+            else:
+                cur = []
+        n = len(cur) if isinstance(cur, list) else 0
+        if n > 0:
+            return streak
+        streak += 1
+    return streak
+
+
 def _collect_agent_delivery() -> list[dict]:
     """Per-agent delivery counts at each pipeline stage (raw → JSON → site).
 
@@ -630,11 +663,28 @@ def _collect_agent_delivery() -> list[dict]:
             rows.append({"agent": label, "raw": "—", "json": "—", "site": "—",
                          "status": "error", "note": "agent didn't run today"})
         elif not items:
+            streak = _zero_streak(dirname, ["briefing", "news_items"])
+            note = f"ran but 0 items ({streak}-day streak)" if streak >= 2 else "ran but produced 0 items"
             rows.append({"agent": label, "raw": "0", "json": "—", "site": "—",
-                         "status": "warn", "note": "ran but produced 0 items"})
+                         "status": "error" if streak >= 2 else "warn", "note": note})
         else:
             rows.append({"agent": label, "raw": str(len(items)), "json": "(merged)", "site": "(merged)",
                          "status": "ok", "note": "feeds merger"})
+
+    # rss-news-agent ALSO scrapes Reddit — separate row so a Reddit-only
+    # failure doesn't hide behind the news_items count being healthy.
+    rss_d = _latest("rss-news-agent")
+    rss_reddit = (rss_d.get("reddit_posts") or []) if isinstance(rss_d, dict) else []
+    if rss_d is not None and rss_d != {}:
+        if not rss_reddit:
+            streak = _zero_streak("rss-news-agent", ["reddit_posts"])
+            note = f"ArcticShift returned 0 ({streak}-day streak)" if streak >= 2 else "ArcticShift returned empty"
+            rows.append({"agent": "rss → reddit", "raw": "0", "json": "—", "site": "—",
+                         "status": "error" if streak >= 2 else "warn", "note": note})
+        else:
+            rows.append({"agent": "rss → reddit", "raw": str(len(rss_reddit)),
+                         "json": "(merged)", "site": "(merged)",
+                         "status": "ok", "note": "ArcticShift OK"})
 
     for dirname, label in [("article-reader-agent", "article-reader"), ("adk-news-agent", "adk")]:
         d = _latest(dirname)
@@ -670,7 +720,11 @@ def _collect_agent_delivery() -> list[dict]:
         if n_p == 0:
             status, note = "error", "0 people — refresh TWITTER_AUTH_TOKEN/CT0 from x.com"
         elif n_t == 0:
-            status, note = "warn", "trending=0 (scrape partial)"
+            t_streak = _zero_streak("twitter-agent", ["briefing", "trending_posts"])
+            if t_streak >= 2:
+                status, note = "error", f"trending=0 ({t_streak}-day streak — scrape broken)"
+            else:
+                status, note = "warn", "trending=0 (scrape partial)"
         else:
             status, note = "ok", ""
         rows.append({"agent": "twitter (X)",
@@ -682,25 +736,46 @@ def _collect_agent_delivery() -> list[dict]:
         rows.append({"agent": "twitter (X)", "raw": "—", "json": "—", "site": "—",
                      "status": "error", "note": "no output today"})
 
-    yt = _latest("youtube-news-agent")
-    yt_n = len(((yt.get("briefing") or {}).get("news_items")) or []) if isinstance(yt, dict) else 0
-    json_yt = len(json_data.get("youtube") or [])
-    site_yt = len(site_s0.get("youtube") or [])
-    rows.append({"agent": "youtube", "raw": str(yt_n),
-                 "json": _check_count(json_yt, yt_n),
-                 "site": _check_count(site_yt, yt_n),
-                 "status": "ok" if yt_n > 0 else "warn", "note": ""})
-
-    gh = _latest("github-trending-agent")
-    gh_n = len(((gh.get("briefing") or {}).get("news_items")) or []) if isinstance(gh, dict) else 0
-    json_gh = len(json_data.get("github") or [])
-    site_gh = len(site_s0.get("github") or [])
-    rows.append({"agent": "github trending", "raw": str(gh_n),
-                 "json": _check_count(json_gh, gh_n),
-                 "site": _check_count(site_gh, gh_n),
-                 "status": "ok" if gh_n > 0 else "warn", "note": ""})
+    for dirname, label, top_key in [
+        ("youtube-news-agent", "youtube", "youtube"),
+        ("github-trending-agent", "github trending", "github"),
+    ]:
+        d = _latest(dirname)
+        n = len(((d.get("briefing") or {}).get("news_items")) or []) if isinstance(d, dict) else 0
+        json_n = len(json_data.get(top_key) or [])
+        site_n = len(site_s0.get(top_key) or [])
+        if n == 0:
+            streak = _zero_streak(dirname, ["briefing", "news_items"])
+            note = f"0 items ({streak}-day streak)" if streak >= 2 else "0 items today"
+            status = "error" if streak >= 2 else "warn"
+        else:
+            note, status = "", "ok"
+        rows.append({"agent": label, "raw": str(n),
+                     "json": _check_count(json_n, n),
+                     "site": _check_count(site_n, n),
+                     "status": status, "note": note})
 
     return rows
+
+
+def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dict]:
+    """Top-of-email banner: roll up every issue across delivery + freshness + API
+    so the user sees red flags BEFORE scrolling to the per-table breakdowns.
+    Returns list of {label, detail, severity}."""
+    out = []
+    for r in agent_delivery:
+        if r.get("status") in ("error", "warn"):
+            out.append({"label": r["agent"], "detail": r["note"] or "issue", "severity": r["status"]})
+    for r in freshness_signals:
+        if r.get("status") in ("error", "warn"):
+            d = f"{r['value']} ({r['note']})" if r.get("note") else r["value"]
+            out.append({"label": r["label"], "detail": d, "severity": r["status"]})
+    for c in api_checks:
+        s = c.get("status")
+        if s in ("error", "exhausted", "warn"):
+            sev = "error" if s in ("error", "exhausted") else "warn"
+            out.append({"label": c["name"], "detail": c.get("detail", ""), "severity": sev})
+    return out
 
 
 def _collect_freshness() -> list[dict]:
@@ -1016,6 +1091,36 @@ fallback_rows = ""
 for f in fallback_events:
     fallback_rows += f'<tr><td style="padding:3px 8px;font-size:12px;color:#d97706">🟡 {f["agent"]}</td><td style="padding:3px 8px;font-size:12px;color:#64748b;font-family:monospace">{f["from"]} → {f["to"]}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#d97706">×{f["count"]}</td></tr>\n'
 
+problems = _collect_problems(agent_delivery, freshness_signals, api_checks)
+problems_banner = ""
+if problems:
+    n_err = sum(1 for p in problems if p["severity"] in ("error", "exhausted"))
+    n_warn = sum(1 for p in problems if p["severity"] == "warn")
+    severity_label = []
+    if n_err: severity_label.append(f"{n_err} error{'s' if n_err != 1 else ''}")
+    if n_warn: severity_label.append(f"{n_warn} warning{'s' if n_warn != 1 else ''}")
+    border_color = "#dc2626" if n_err else "#d97706"
+    bg_color = "#fef2f2" if n_err else "#fffbeb"
+    title_icon = "🔴" if n_err else "🟡"
+    items_html = ""
+    for p in problems:
+        bullet_color = "#dc2626" if p["severity"] in ("error", "exhausted") else "#d97706"
+        detail_clean = (p.get("detail") or "").replace("<", "&lt;").replace(">", "&gt;")
+        label_clean = (p.get("label") or "").replace("<", "&lt;").replace(">", "&gt;")
+        items_html += (
+            f'<li style="margin:3px 0;color:#374151;font-size:13px">'
+            f'<span style="color:{bullet_color};font-weight:700">●</span> '
+            f'<b>{label_clean}</b> — <span style="color:#6b7280">{detail_clean}</span>'
+            f'</li>'
+        )
+    problems_banner = (
+        f'<div style="border:2px solid {border_color};background:{bg_color};border-radius:10px;padding:14px 18px;margin:0 0 16px 0">\n'
+        f'<p style="margin:0 0 8px 0;font-weight:800;font-size:14px;color:{border_color}">'
+        f'{title_icon} PROBLEMS DETECTED — {", ".join(severity_label)}</p>\n'
+        f'<ul style="margin:0;padding-left:18px;list-style:none">{items_html}</ul>\n'
+        f'</div>\n'
+    )
+
 delivery_rows = ""
 for r in agent_delivery:
     icon = {"ok": "🟢", "warn": "🟡", "error": "❌", "off": "⚪"}.get(r["status"], "⚪")
@@ -1097,7 +1202,7 @@ github.com/kobyal/ai-news-briefing
 body_html = f"""\
 <html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
 <h2 style="color:#1e3a5f">🤖 AI Daily Briefing — {date}</h2>
-<p>Your multi-source AI news briefing is ready.</p>
+{problems_banner}<p>Your multi-source AI news briefing is ready.</p>
 <p>
   <a href="{WEBSITE_URL}" style="display:inline-block;background:#d97706;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-right:12px">Open Web App →</a>
   <a href="{report_url}" style="display:inline-block;background:#1e3a5f;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Raw Report →</a>

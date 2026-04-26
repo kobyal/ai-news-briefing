@@ -570,6 +570,212 @@ def _collect_fallbacks() -> list[dict]:
         counts[k] = counts.get(k, 0) + 1
     return [{"agent": a, "from": f, "to": t, "count": n} for (a, f, t), n in counts.items()]
 
+
+def _check_count(have: int, expect: int) -> str:
+    """Render ✓N or ⚠N depending on whether N matches what we expected to flow through."""
+    if expect == 0:
+        return f"{have}"
+    return f"✓{have}" if have == expect else f"⚠{have}"
+
+
+def _collect_agent_delivery() -> list[dict]:
+    """Per-agent delivery counts at each pipeline stage (raw → JSON → site).
+
+    Each row: {agent, raw, json, site, status, note}. status ∈ ok|warn|error|off.
+    Catches the "data was produced but didn't reach the website" class of silent
+    failures the user was previously blind to."""
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    json_data = {}
+    json_path = f"docs/data/{today}.json"
+    if os.path.exists(json_path):
+        try:
+            json_data = json.load(open(json_path))
+        except Exception:
+            pass
+    json_briefing = json_data.get("briefing", {}) or {}
+    json_twitter = json_data.get("twitter", {}) or {}
+
+    site_data = {}
+    try:
+        with urllib.request.urlopen(f"{WEBSITE_URL}/data/{today}.json", timeout=8) as r:
+            site_data = json.loads(r.read())
+    except Exception:
+        pass
+    site_stories = site_data.get("stories", []) or []
+    site_s0 = site_stories[0] if site_stories else {}
+    site_twitter = site_s0.get("twitter", {}) or {}
+
+    def _latest(agent_dir: str) -> dict:
+        files = sorted(glob.glob(f"{agent_dir}/output/{today}/*.json"))
+        files = [f for f in files if not os.path.basename(f).startswith(("usage", ".via"))]
+        if not files:
+            return {}
+        try:
+            return json.load(open(files[-1]))
+        except Exception:
+            return {}
+
+    rows = []
+    for dirname, label in [
+        ("perplexity-news-agent", "perplexity"),
+        ("rss-news-agent",        "rss-news"),
+        ("tavily-news-agent",     "tavily"),
+        ("exa-news-agent",        "exa"),
+        ("newsapi-agent",         "newsapi"),
+    ]:
+        d = _latest(dirname)
+        items = ((d.get("briefing") or {}).get("news_items") or []) if isinstance(d, dict) else []
+        if not d:
+            rows.append({"agent": label, "raw": "—", "json": "—", "site": "—",
+                         "status": "error", "note": "agent didn't run today"})
+        elif not items:
+            rows.append({"agent": label, "raw": "0", "json": "—", "site": "—",
+                         "status": "warn", "note": "ran but produced 0 items"})
+        else:
+            rows.append({"agent": label, "raw": str(len(items)), "json": "(merged)", "site": "(merged)",
+                         "status": "ok", "note": "feeds merger"})
+
+    for dirname, label in [("article-reader-agent", "article-reader"), ("adk-news-agent", "adk")]:
+        d = _latest(dirname)
+        if d and ((d.get("briefing") or {}).get("news_items")):
+            n = len(d["briefing"]["news_items"])
+            rows.append({"agent": label, "raw": str(n), "json": "(merged)", "site": "(merged)",
+                         "status": "ok", "note": "feeds merger"})
+        else:
+            rows.append({"agent": label, "raw": "—", "json": "—", "site": "—",
+                         "status": "off", "note": "off / sub-tool only"})
+
+    merger = _latest("merger-agent")
+    m_news = len(((merger.get("briefing") or {}).get("news_items")) or []) if isinstance(merger, dict) else 0
+    json_news = len(json_briefing.get("news_items") or [])
+    site_news = len(site_stories)
+    rows.append({
+        "agent": "merger", "raw": f"{m_news} stories",
+        "json": _check_count(json_news, m_news),
+        "site": _check_count(site_news, m_news),
+        "status": "ok" if m_news > 0 and json_news == m_news and site_news == m_news else "warn",
+        "note": "",
+    })
+
+    tw = _latest("twitter-agent")
+    if tw:
+        b = tw.get("briefing", {}) or {}
+        n_p = len(b.get("people_highlights") or [])
+        n_t = len(b.get("trending_posts") or [])
+        json_p = len(json_twitter.get("people") or [])
+        json_t = len(json_twitter.get("trending") or [])
+        site_p = len(site_twitter.get("people") or [])
+        site_t = len(site_twitter.get("trending") or [])
+        if n_p == 0:
+            status, note = "error", "0 people — refresh TWITTER_AUTH_TOKEN/CT0 from x.com"
+        elif n_t == 0:
+            status, note = "warn", "trending=0 (scrape partial)"
+        else:
+            status, note = "ok", ""
+        rows.append({"agent": "twitter (X)",
+                     "raw": f"{n_p} ppl · {n_t} trnd",
+                     "json": f"{json_p}p · {json_t}t",
+                     "site": f"{site_p}p · {site_t}t",
+                     "status": status, "note": note})
+    else:
+        rows.append({"agent": "twitter (X)", "raw": "—", "json": "—", "site": "—",
+                     "status": "error", "note": "no output today"})
+
+    yt = _latest("youtube-news-agent")
+    yt_n = len(((yt.get("briefing") or {}).get("news_items")) or []) if isinstance(yt, dict) else 0
+    json_yt = len(json_data.get("youtube") or [])
+    site_yt = len(site_s0.get("youtube") or [])
+    rows.append({"agent": "youtube", "raw": str(yt_n),
+                 "json": _check_count(json_yt, yt_n),
+                 "site": _check_count(site_yt, yt_n),
+                 "status": "ok" if yt_n > 0 else "warn", "note": ""})
+
+    gh = _latest("github-trending-agent")
+    gh_n = len(((gh.get("briefing") or {}).get("news_items")) or []) if isinstance(gh, dict) else 0
+    json_gh = len(json_data.get("github") or [])
+    site_gh = len(site_s0.get("github") or [])
+    rows.append({"agent": "github trending", "raw": str(gh_n),
+                 "json": _check_count(json_gh, gh_n),
+                 "site": _check_count(site_gh, gh_n),
+                 "status": "ok" if gh_n > 0 else "warn", "note": ""})
+
+    return rows
+
+
+def _collect_freshness() -> list[dict]:
+    """Stale-data sentinels — catches "X data is from 3 days ago" class of issues
+    that look fine in the agent-delivery panel but represent rotting content."""
+    today = datetime.now()
+    today_str = today.strftime("%Y-%m-%d")
+    rows = []
+
+    tw_files = sorted(glob.glob(f"twitter-agent/output/{today_str}/twitter_*.json"))
+    if tw_files:
+        try:
+            d = json.load(open(tw_files[-1]))
+            ph = (d.get("briefing", {}) or {}).get("people_highlights", []) or []
+            tp = (d.get("briefing", {}) or {}).get("trending_posts", []) or []
+            latest = None
+            for p in ph:
+                s = (p.get("date") or "").strip()
+                try:
+                    dt = datetime.strptime(s, "%B %d, %Y")
+                except (ValueError, TypeError):
+                    continue
+                if latest is None or dt > latest:
+                    latest = dt
+            if latest:
+                age = (today.date() - latest.date()).days
+                if age == 0:
+                    status, note = "ok", "today"
+                elif age <= 2:
+                    status, note = "warn", f"{age} day{'s' if age != 1 else ''} ago"
+                else:
+                    status, note = "error", f"{age} days ago — content is stale"
+                rows.append({"label": "X · latest post date", "value": latest.strftime("%b %d"),
+                             "status": status, "note": note})
+
+            if not tp:
+                streak = 0
+                for offset in range(8):
+                    d_check = (today - timedelta(days=offset)).strftime("%Y-%m-%d")
+                    f_check = sorted(glob.glob(f"twitter-agent/output/{d_check}/twitter_*.json"))
+                    if not f_check:
+                        continue
+                    try:
+                        dd = json.load(open(f_check[-1]))
+                        if (dd.get("briefing", {}) or {}).get("trending_posts"):
+                            break
+                        streak += 1
+                    except Exception:
+                        pass
+                rows.append({"label": "X · trending posts", "value": "0",
+                             "status": "error" if streak >= 2 else "warn",
+                             "note": f"{streak}-day streak — scrape broken" if streak >= 2 else "(today only)"})
+            else:
+                rows.append({"label": "X · trending posts", "value": str(len(tp)),
+                             "status": "ok", "note": ""})
+        except Exception as e:
+            rows.append({"label": "X data", "value": "—", "status": "error", "note": str(e)[:60]})
+
+    rss_files = sorted(glob.glob(f"rss-news-agent/output/{today_str}/rss_*.json"))
+    if rss_files:
+        try:
+            d = json.load(open(rss_files[-1]))
+            posts = d.get("reddit_posts") or (d.get("briefing", {}) or {}).get("reddit_posts", []) or []
+            if posts:
+                rows.append({"label": "Reddit · today's posts", "value": str(len(posts)),
+                             "status": "ok", "note": ""})
+            else:
+                rows.append({"label": "Reddit · today's posts", "value": "0",
+                             "status": "warn", "note": "ArcticShift returned empty"})
+        except Exception:
+            pass
+
+    return rows
+
+
 usage_data = _collect_usage()
 if usage_data:
     print("Usage from this run (collected before API checks so they can reference it):")
@@ -593,6 +799,14 @@ if fallback_events:
     print("Fallback events this run:")
     for f in fallback_events:
         print(f"  {f['agent']}: {f['from']} → {f['to']}  ×{f['count']}")
+
+print("Collecting agent delivery & freshness signals...")
+agent_delivery = _collect_agent_delivery()
+freshness_signals = _collect_freshness()
+for r in agent_delivery:
+    print(f"  [{r['status']:5}] {r['agent']:18} raw={r['raw']:14} json={r['json']:12} site={r['site']:10} {r['note']}")
+for r in freshness_signals:
+    print(f"  [{r['status']:5}] {r['label']:24} {r['value']:12} {r['note']}")
 
 
 def _active_sources_today() -> list[str]:
@@ -802,11 +1016,51 @@ fallback_rows = ""
 for f in fallback_events:
     fallback_rows += f'<tr><td style="padding:3px 8px;font-size:12px;color:#d97706">🟡 {f["agent"]}</td><td style="padding:3px 8px;font-size:12px;color:#64748b;font-family:monospace">{f["from"]} → {f["to"]}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#d97706">×{f["count"]}</td></tr>\n'
 
+delivery_rows = ""
+for r in agent_delivery:
+    icon = {"ok": "🟢", "warn": "🟡", "error": "❌", "off": "⚪"}.get(r["status"], "⚪")
+    color = {"ok": "#16a34a", "warn": "#d97706", "error": "#dc2626", "off": "#9ca3af"}.get(r["status"], "#64748b")
+    delivery_rows += (
+        f'<tr>'
+        f'<td style="padding:3px 8px;font-size:12px">{icon} {r["agent"]}</td>'
+        f'<td style="padding:3px 8px;font-size:12px;font-family:monospace">{r["raw"]}</td>'
+        f'<td style="padding:3px 8px;font-size:12px;font-family:monospace">{r["json"]}</td>'
+        f'<td style="padding:3px 8px;font-size:12px;font-family:monospace">{r["site"]}</td>'
+        f'<td style="padding:3px 8px;font-size:12px;color:{color}">{r["note"]}</td>'
+        f'</tr>\n'
+    )
+
+freshness_rows = ""
+for r in freshness_signals:
+    icon = {"ok": "🟢", "warn": "🟡", "error": "🔴"}.get(r["status"], "⚪")
+    color = {"ok": "#16a34a", "warn": "#d97706", "error": "#dc2626"}.get(r["status"], "#64748b")
+    note_part = f' · {r["note"]}' if r["note"] else ""
+    freshness_rows += (
+        f'<tr>'
+        f'<td style="padding:3px 8px;font-size:12px">{icon} {r["label"]}</td>'
+        f'<td style="padding:3px 8px;font-size:12px;font-family:monospace;color:{color}">{r["value"]}{note_part}</td>'
+        f'</tr>\n'
+    )
+
 status_section = ""
-if paid_rows or free_rows or usage_rows or fallback_rows:
+if paid_rows or free_rows or usage_rows or fallback_rows or delivery_rows or freshness_rows:
     status_section = '<hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0">\n'
+    if delivery_rows:
+        status_section += (
+            f'<p style="font-size:11px;font-weight:700;color:#374151;margin-bottom:4px">AGENT DELIVERY (raw → JSON → site)</p>\n'
+            f'<table style="border-collapse:collapse">\n'
+            f'<tr style="border-bottom:1px solid #e2e8f0">'
+            f'<th style="padding:3px 8px;font-size:10px;color:#9ca3af;text-align:left;font-weight:600">agent</th>'
+            f'<th style="padding:3px 8px;font-size:10px;color:#9ca3af;text-align:left;font-weight:600">raw</th>'
+            f'<th style="padding:3px 8px;font-size:10px;color:#9ca3af;text-align:left;font-weight:600">JSON</th>'
+            f'<th style="padding:3px 8px;font-size:10px;color:#9ca3af;text-align:left;font-weight:600">site</th>'
+            f'<th style="padding:3px 8px;font-size:10px;color:#9ca3af;text-align:left;font-weight:600">notes</th>'
+            f'</tr>\n{delivery_rows}</table>\n'
+        )
+    if freshness_rows:
+        status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-top:12px;margin-bottom:4px">FRESHNESS WATCH</p>\n<table style="border-collapse:collapse">\n{freshness_rows}</table>\n'
     if paid_rows:
-        status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-bottom:4px">API STATUS · PAID</p>\n<table style="border-collapse:collapse">\n{paid_rows}</table>\n'
+        status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-top:12px;margin-bottom:4px">API STATUS · PAID</p>\n<table style="border-collapse:collapse">\n{paid_rows}</table>\n'
     if free_rows:
         status_section += f'<p style="font-size:11px;font-weight:700;color:#374151;margin-top:12px;margin-bottom:4px">API STATUS · FREE TIER</p>\n<table style="border-collapse:collapse">\n{free_rows}</table>\n'
     if fallback_rows:

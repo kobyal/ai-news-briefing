@@ -458,7 +458,10 @@ def _check_apis() -> list[dict]:
             try:
                 body = json.dumps({"query": "test", "num_results": 1, "type": "auto"}).encode()
                 req = urllib.request.Request("https://api.exa.ai/search", data=body,
-                                              headers={"x-api-key": key, "Content-Type": "application/json"})
+                                              headers={"x-api-key": key, "Content-Type": "application/json",
+                                                       # Cloudflare WAF on api.exa.ai 403s urllib's default UA (error 1010).
+                                                       # Browser-shaped UA gets through without changing what we test.
+                                                       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"})
                 with urllib.request.urlopen(req, timeout=8):
                     checks.append({"name": f"Exa #{i}", "status": "ok", "detail": "PAYG · check spend",
                                    "console_url": "https://dashboard.exa.ai/usage?tab=spend", "tier": "free"})

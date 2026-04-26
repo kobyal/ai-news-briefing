@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Briefing · Tavily + Perplexity — April 26, 2026</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;min-height:100vh;color:#0f172a}
+.header{background:linear-gradient(135deg,#0f172a,#1e3a5f,#334155);color:#fff;padding:32px 28px;text-align:center}
+.header h1{font-size:24px;font-weight:700;margin-bottom:4px}
+.header .date{font-size:14px;opacity:.75;margin-top:6px}
+.sources-badge{display:inline-flex;align-items:center;gap:6px;margin-top:10px;background:rgba(255,255,255,.12);border-radius:20px;padding:4px 14px;font-size:12px;color:rgba(255,255,255,.85)}
+.sources-badge b{color:#93c5fd}
+.toggle{display:inline-flex;background:rgba(255,255,255,.18);border-radius:24px;padding:3px;gap:3px;margin-top:12px}
+.tbtn{padding:6px 20px;border:none;border-radius:20px;cursor:pointer;font-size:13px;font-weight:600;background:transparent;color:#fff;transition:all .2s}
+.tbtn.active{background:#fff;color:#1e3a5f}
+.wrap{max-width:680px;margin:0 auto;padding:24px 16px}
+.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:10px}
+.tldr-card{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:24px;border-left:4px solid #3b82f6;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tldr-card h2{font-size:16px;font-weight:700;color:#1e3a5f;margin-bottom:12px}
+.tldr-card ul{padding-left:18px;font-size:14px;line-height:1.8;color:#374151}
+.tldr-card ul[dir=rtl]{padding-left:0;padding-right:18px;text-align:right}
+.tldr-card li{margin-bottom:6px}
+.news-card{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:box-shadow .2s}
+.news-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.card-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.card-header h3{font-size:15px;font-weight:600;color:#0f172a;flex:1}
+.summary{font-size:14px;line-height:1.7;color:#4b5563;margin-bottom:8px}
+.pub-date{display:block;font-size:12px;color:#94a3b8;margin-bottom:8px}
+.sources{display:flex;flex-direction:column;gap:3px;margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9}
+.source-link{font-size:12px;color:#3b82f6;text-decoration:none;word-break:break-all}
+.source-link:hover{text-decoration:underline}
+.community-card{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:24px;border-left:4px solid #1e40af;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.community-card h2{font-size:16px;font-weight:700;color:#1e40af;margin-bottom:10px}
+.community-bullets{padding-left:18px;font-size:14px;line-height:1.8;color:#374151;list-style:disc}
+.community-bullets[dir=rtl]{padding-left:0;padding-right:18px;text-align:right}
+.community-bullets li{margin-bottom:8px}
+.community-card p{font-size:14px;line-height:1.7;color:#374151}
+.footer{text-align:center;padding:20px;font-size:12px;color:#94a3b8}
+</style></head><body>
+<div class="header">
+<h1>🎯 AI Briefing</h1>
+<div class="date">April 26, 2026</div>
+<div class="sources-badge">Powered by <b>Tavily Search</b> + <b>Perplexity API</b></div>
+<div class="toggle">
+<button class="tbtn active" onclick="setLang('en',this)">EN</button>
+<button class="tbtn" onclick="setLang('he',this)">עברית</button>
+</div>
+</div>
+<div class="wrap">
+<div class="tldr-card">
+<h2 id="tldr-label">TL;DR</h2>
+<ul id="tldr-en"><li>DeepSeek previewed V4 Pro (1.6T params) and V4 Flash (284B), open-source MoE models with 1M context that rival GPT-5.5 at 1/6th the cost, reshaping the efficiency race.</li><li>OpenAI launched GPT-5.5 with 82.7% on Terminal-Bench 2.0 and 73.1% on Expert-SWE, advancing agentic coding and computer-use toward an AI 'superapp' vision.</li><li>Meta signed a multi-year supply deal with AWS for Graviton5 chips to power its agentic AI workloads, deepening Amazon's silicon push against NVIDIA.</li><li>AWS slashed Bedrock AgentCore agent setup to just 3 API calls via a managed agent harness, dramatically lowering the barrier to deploying autonomous agents.</li><li>Anthropic rolled out Claude personal connectors for Spotify, Uber, TurboTax, Audible, Instacart, and AllTrails, while admitting harness changes caused recent Claude quality degradation.</li><li>NVIDIA delivered Day-0 Blackwell support for DeepSeek V4 hitting 3,500 tokens/sec on the 1.6T model, and rolled GPT-5.5-powered Codex to 10,000 internal employees.</li></ul>
+<ul id="tldr-he" dir="rtl" style="display:none"><li>DeepSeek חשפה תצוגה מקדימה של V4 Pro (1.6T פרמטרים) ושל V4 Flash (284B) — מודלי MoE בקוד פתוח עם חלון הקשר של 1M טוקנים, המתחרים ב-GPT-5.5 בשישית מהעלות ומשנים את מירוץ היעילות.</li><li>OpenAI השיקה את GPT-5.5 עם ציוני 82.7% ב-Terminal-Bench 2.0 ו-73.1% ב-Expert-SWE, בצעד משמעותי לעבר agentic coding ושימוש במחשב במסגרת חזון ה-superapp של החברה.</li><li>Meta חתמה על הסכם אספקה רב-שנתי עם AWS לרכש שבבי Graviton5 שיפעילו עומסי AI agentic, והעמיקה את מהלך הסיליקון של Amazon מול NVIDIA.</li><li>AWS צמצמה את תהליך ההקמה של agent ב-Bedrock AgentCore ל-3 קריאות API בלבד באמצעות agent harness מנוהל, והורידה דרמטית את רף הכניסה לפריסת agents אוטונומיים.</li><li>Anthropic השיקה connectors אישיים של Claude עבור Spotify, Uber, TurboTax, Audible, Instacart ו-AllTrails, והודתה כי שינויים ב-harness הם שגרמו לירידה האחרונה באיכות Claude.</li><li>NVIDIA סיפקה תמיכת Day-0 ב-Blackwell עבור DeepSeek V4 והגיעה ל-3,500 טוקנים בשנייה במודל ה-1.6T, וגם הטמיעה את Codex מבוסס GPT-5.5 בקרב 10,000 עובדים פנימיים.</li></ul>
+</div>
+<div class="section-label" id="news-label">Latest News</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#ea580c;color:#fff">AWS</span>
+<h3 class="en-content">AWS Cuts Bedrock AgentCore Agent Setup to 3 API Calls; Meta Signs Graviton5 Supply Deal</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">AWS מצמצמת את הקמת ה-agent ב-Bedrock AgentCore ל-3 קריאות API; Meta חותמת על עסקת אספקה ל-Graviton5</h3>
+</div>
+<span class="pub-date">📅 April 26, 2026</span>
+<p class="summary en-content">AWS introduced a managed agent harness in Amazon Bedrock AgentCore that reduces autonomous agent deployment to just 3 API calls. Separately, Meta signed a supply agreement with AWS to run agentic AI workloads on Graviton5 CPUs, AWS's most powerful and efficient processor to date.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">AWS הציגה agent harness מנוהל ב-Amazon Bedrock AgentCore המצמצם את פריסת ה-agents האוטונומיים ל-3 קריאות API בלבד. במקביל, Meta חתמה עם AWS על הסכם אספקה להפעלת עומסי AI agentic על מעבדי Graviton5 — המעבד החזק והיעיל ביותר של AWS עד כה.</p>
+<div class="sources"><a href="https://ca.news.yahoo.com/aws-cuts-ai-agent-setup-160824660.html" target="_blank" class="source-link">https://ca.news.yahoo.com/aws-cuts-ai-agent-setup-160824660.html</a><a href="https://www.aboutamazon.com/news/aws/meta-aws-graviton-ai-partnership" target="_blank" class="source-link">https://www.aboutamazon.com/news/aws/meta-aws-graviton-ai-partner...</a><a href="https://about.fb.com/news/2026/04/meta-partners-with-aws-on-graviton-chips-to-power-agentic-ai/" target="_blank" class="source-link">https://about.fb.com/news/2026/04/meta-partners-with-aws-on-gravi...</a></div>
+</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#16a34a;color:#fff">OpenAI</span>
+<h3 class="en-content">OpenAI Releases GPT-5.5 With Major Agentic and Coding Gains</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">OpenAI משחררת את GPT-5.5 עם זינוק משמעותי ביכולות agentic וקוד</h3>
+</div>
+<span class="pub-date">📅 April 23, 2026</span>
+<p class="summary en-content">OpenAI unveiled GPT-5.5, scoring 82.7% on Terminal-Bench 2.0 and 73.1% on Expert-SWE with reduced hallucinations and lower token usage at matching latency. The model targets agentic coding, knowledge work, and computer-use tasks across email, spreadsheets, and calendars, rolling out to Plus, Pro, and Enterprise subscribers.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">OpenAI חשפה את GPT-5.5 עם ציון 82.7% ב-Terminal-Bench 2.0 ו-73.1% ב-Expert-SWE, לצד הפחתה בהזיות וצריכת טוקנים נמוכה יותר באותה latency. המודל מכוון ל-agentic coding, עבודת ידע ומשימות שימוש במחשב — אימייל, גיליונות אלקטרוניים ויומנים — ומגיע למנויי Plus, Pro ו-Enterprise.</p>
+<div class="sources"><a href="https://techcrunch.com/2026/04/23/openai-chatgpt-gpt-5-5-ai-model-superapp/" target="_blank" class="source-link">https://techcrunch.com/2026/04/23/openai-chatgpt-gpt-5-5-ai-model...</a><a href="https://mlq.ai/news/openai-launches-gpt-55-as-its-most-advanced-ai-model-yet/" target="_blank" class="source-link">https://mlq.ai/news/openai-launches-gpt-55-as-its-most-advanced-a...</a><a href="https://www.bloomberg.com/news/articles/2026-04-23/openai-unveils-gpt-5-5-to-field-tasks-with-limited-instructions" target="_blank" class="source-link">https://www.bloomberg.com/news/articles/2026-04-23/openai-unveils...</a></div>
+</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#7c3aed;color:#fff">Anthropic</span>
+<h3 class="en-content">Claude Adds Personal App Connectors; Anthropic Explains Recent Quality Degradation</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">Claude מקבל connectors אישיים לאפליקציות; Anthropic מסבירה את הירידה האחרונה באיכות</h3>
+</div>
+<span class="pub-date">📅 April 24, 2026</span>
+<p class="summary en-content">Anthropic launched Claude connectors for Spotify, Uber, Uber Eats, Audible, AllTrails, TripAdvisor, Instacart, and TurboTax, extending beyond enterprise integrations to everyday personal tasks. Separately, Anthropic admitted that recent harness and operating instruction changes likely caused Claude Code degradation, promising more internal dogfooding and a new @ClaudeDevs transparency channel.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">Anthropic השיקה connectors של Claude עבור Spotify, Uber, Uber Eats, Audible, AllTrails, TripAdvisor, Instacart ו-TurboTax — והרחיבה את האינטגרציות מעבר לעולם ה-enterprise אל משימות אישיות יומיומיות. בנפרד, Anthropic הודתה כי שינויים ב-harness ובהוראות ההפעלה הם שגרמו ככל הנראה לירידה באיכות Claude Code, והבטיחה הגברה של dogfooding פנימי וערוץ שקיפות חדש בשם @ClaudeDevs.</p>
+<div class="sources"><a href="https://www.theverge.com/ai-artificial-intelligence/917871/anthropic-claude-personal-app-connectors" target="_blank" class="source-link">https://www.theverge.com/ai-artificial-intelligence/917871/anthro...</a><a href="https://9to5google.com/2026/04/24/claude-connectors-spotify-uber-turbotax-more/" target="_blank" class="source-link">https://9to5google.com/2026/04/24/claude-connectors-spotify-uber-...</a><a href="https://venturebeat.com/technology/mystery-solved-anthropic-reveals-changes-to-claudes-harnesses-and-operating-instructions-likely-caused-degradation" target="_blank" class="source-link">https://venturebeat.com/technology/mystery-solved-anthropic-revea...</a></div>
+</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#76b900;color:#fff">NVIDIA</span>
+<h3 class="en-content">NVIDIA Delivers Day-0 Blackwell Support for DeepSeek V4 and Deploys GPT-5.5 Codex Internally</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">NVIDIA מספקת תמיכת Day-0 ב-Blackwell עבור DeepSeek V4 ופורסת את GPT-5.5 Codex פנימית</h3>
+</div>
+<span class="pub-date">📅 April 26, 2026</span>
+<p class="summary en-content">NVIDIA shipped Day-0 Blackwell optimization for DeepSeek V4, hitting 3,500 tokens/second on the 1.6T-parameter Pro model with just 27% of single-token inference FLOPs. The company also rolled out OpenAI's GPT-5.5-powered Codex to 10,000 employees, reporting that multi-day debugging cycles now close in hours.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">NVIDIA שחררה אופטימיזציית Day-0 ל-Blackwell עבור DeepSeek V4 והגיעה ל-3,500 טוקנים בשנייה במודל ה-Pro בן 1.6T פרמטרים — תוך שימוש בכ-27% בלבד מ-FLOPs ההסקה לטוקן בודד. בנוסף, החברה הטמיעה את Codex מבוסס GPT-5.5 של OpenAI בקרב 10,000 עובדים, ומדווחת כי מחזורי debug שנמשכו ימים נסגרים כעת בשעות.</p>
+<div class="sources"><a href="https://wccftech.com/nvidia-beats-everyone-to-deepseek-v4-day-0-blackwell-support-pushing-3500-tokens-on-1-6t-models/" target="_blank" class="source-link">https://wccftech.com/nvidia-beats-everyone-to-deepseek-v4-day-0-b...</a><a href="https://www.pcgamer.com/software/ai/nvidia-rolls-out-gpt-5-5-based-codex-to-10-000-of-its-employees-who-apparently-all-think-its-mind-blowing-and-life-changing/" target="_blank" class="source-link">https://www.pcgamer.com/software/ai/nvidia-rolls-out-gpt-5-5-base...</a></div>
+</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#f59e0b;color:#fff">Hugging Face</span>
+<h3 class="en-content">DeepSeek Releases V4 Pro (1.6T) and V4 Flash (284B) Open-Weight Models</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">DeepSeek משחררת את V4 Pro (1.6T) ו-V4 Flash (284B) כמודלים open-weight</h3>
+</div>
+<span class="pub-date">📅 April 24, 2026</span>
+<p class="summary en-content">DeepSeek published V4 Pro (1.6T total / 49B active params) and V4 Flash (284B / 13B active) on Hugging Face, both MoE models with 1M-token context windows. The release introduced a Hybrid Attention Architecture and three reasoning modes (Non-think, Think High, Think Max), claiming parity with GPT-5.2 and Gemini 3.0 Pro at a fraction of the cost.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">DeepSeek פרסמה ב-Hugging Face את V4 Pro (1.6T פרמטרים סך-הכול / 49B פעילים) ואת V4 Flash (284B / 13B פעילים) — שני מודלי MoE עם חלון הקשר של 1M טוקנים. השחרור הציג Hybrid Attention Architecture ושלושה מצבי reasoning (Non-think, Think High, Think Max), בטענה לשוויון ביצועים מול GPT-5.2 ו-Gemini 3.0 Pro בשבריר מהעלות.</p>
+<div class="sources"><a href="https://www.bloomberg.com/news/articles/2026-04-24/deepseek-unveils-newest-flagship-a-year-after-ai-breakthrough" target="_blank" class="source-link">https://www.bloomberg.com/news/articles/2026-04-24/deepseek-unvei...</a><a href="https://techcrunch.com/2026/04/24/deepseek-previews-new-ai-model-that-closes-the-gap-with-frontier-models/" target="_blank" class="source-link">https://techcrunch.com/2026/04/24/deepseek-previews-new-ai-model-...</a><a href="https://www.scmp.com/tech/big-tech/article/3351239/deepseek-releases-next-gen-ai-model-world-leading-efficiency" target="_blank" class="source-link">https://www.scmp.com/tech/big-tech/article/3351239/deepseek-relea...</a></div>
+</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#2563eb;color:#fff">Google</span>
+<h3 class="en-content">Google Cloud Launches Gemini Enterprise Agent Platform With Travel Showcase</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">Google Cloud משיקה את Gemini Enterprise Agent Platform עם הדגמה בתחום התיירות</h3>
+</div>
+<span class="pub-date">📅 April 25, 2026</span>
+<p class="summary en-content">At Google Cloud Next, Google unveiled the Gemini Enterprise Agent Platform for orchestrating multi-step agentic AI workflows, with Virgin Voyages debuting Rovey, a context-retaining cruise booking assistant. Google also detailed AI-driven Maps updates that automatically refresh the world model from Street View and aerial imagery.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">בכנס Google Cloud Next חשפה Google את Gemini Enterprise Agent Platform לתזמור תהליכי AI agentic מרובי-שלבים, כאשר Virgin Voyages הציגה את Rovey — assistant להזמנת שייטים ששומר על הקשר. Google גם פירטה עדכוני Maps מבוססי AI שמרעננים אוטומטית את מודל העולם מ-Street View ומצילומי אוויר.</p>
+<div class="sources"><a href="https://skift.com/2026/04/25/google-cloud-ai-agents-enterprise-platform-virgin-voyages/" target="_blank" class="source-link">https://skift.com/2026/04/25/google-cloud-ai-agents-enterprise-pl...</a><a href="https://www.forbes.com/sites/bernardmarr/2026/04/24/google-and-the-future-of-search-maps-and-ai-agents/" target="_blank" class="source-link">https://www.forbes.com/sites/bernardmarr/2026/04/24/google-and-th...</a></div>
+</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#0078d4;color:#fff">Azure</span>
+<h3 class="en-content">Microsoft Drops 'Copilot' Branding in Notepad, Renames AI Features to 'Writing Tools'</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">Microsoft מסירה את מותג ה-Copilot מ-Notepad ומשנה את שם הפיצ'רים ל-Writing Tools</h3>
+</div>
+<span class="pub-date">📅 April 26, 2026</span>
+<p class="summary en-content">Microsoft is rolling out a Notepad rebrand on Windows 11 outside the Insider Program, replacing 'Copilot' with 'Writing Tools' while keeping the underlying AI functionality intact. The move signals Microsoft quietly de-emphasizing the Copilot brand in some surfaces even as it leans into broader GPT-5.5 integration.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">Microsoft משחררת מיתוג מחדש של Notepad ב-Windows 11 גם מחוץ ל-Insider Program, ומחליפה את 'Copilot' ב-'Writing Tools' תוך שימור פונקציונליות ה-AI. המהלך מאותת על הנמכת פרופיל מותג Copilot במספר משטחים, גם כשהחברה מעמיקה את האינטגרציה הרחבה של GPT-5.5.</p>
+<div class="sources"><a href="https://www.windowslatest.com/2026/04/26/microsoft-drops-copilot-branding-in-notepad-for-windows-11-for-everyone-but-its-really-just-a-rename/" target="_blank" class="source-link">https://www.windowslatest.com/2026/04/26/microsoft-drops-copilot-...</a><a href="https://www.cnbc.com/2026/04/23/openai-announces-latest-artificial-intelligence-model.html" target="_blank" class="source-link">https://www.cnbc.com/2026/04/23/openai-announces-latest-artificia...</a></div>
+</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#1877f2;color:#fff">Meta</span>
+<h3 class="en-content">Meta and Microsoft Announce ~20,000 Job Cuts Amid $700B AI Infrastructure Push</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">Meta ו-Microsoft מודיעות על כ-20,000 פיטורים על רקע השקעה של 700 מיליארד דולר בתשתית AI</h3>
+</div>
+<span class="pub-date">📅 April 26, 2026</span>
+<p class="summary en-content">Meta and Microsoft announced more than 20,000 combined potential job cuts on April 23, even as the industry collectively commits roughly $700B to AI infrastructure. Total tech layoffs since 2020 are nearing 900,000, intensifying worker anxiety as ChatGPT and Claude reshape knowledge work.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">Meta ו-Microsoft הודיעו ב-April 23 על יותר מ-20,000 פיטורים פוטנציאליים במשולב, בעוד התעשייה כולה מתחייבת להשקעה מצטברת של כ-700 מיליארד דולר בתשתית AI. סך הפיטורים בתעשיית הטק מאז 2020 מתקרב ל-900,000, מעצים את החרדה בקרב עובדים ככל ש-ChatGPT ו-Claude משנים את עבודת הידע.</p>
+<div class="sources"><a href="https://www.outlookbusiness.com/corporate/meta-microsoft-job-cuts-ai-700bn-workforce-shift" target="_blank" class="source-link">https://www.outlookbusiness.com/corporate/meta-microsoft-job-cuts...</a></div>
+</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#555555;color:#fff">Apple</span>
+<h3 class="en-content">Apple's Next CEO John Ternus Faces Pressure to Deliver Killer AI Product</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">ה-CEO הבא של Apple, John Ternus, נדרש לספק מוצר AI פורץ דרך</h3>
+</div>
+<span class="pub-date">📅 April 24, 2026</span>
+<p class="summary en-content">With Tim Cook set to vacate the CEO role in September, incoming CEO John Ternus inherits an AI strategy where many WWDC 2024 Siri features remain undelivered. Reports suggest Apple may turn to Google for AI support, while Perplexity's CEO argues the iPhone's role as a 'digital passport' still gives Apple a structural edge.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">עם פרישתו הצפויה של Tim Cook מתפקיד ה-CEO בספטמבר, John Ternus יורש אסטרטגיית AI שבמסגרתה רבים מפיצ'רי Siri שהוצגו ב-WWDC 2024 טרם סופקו. דיווחים מציינים כי Apple עשויה להישען על Google לתמיכה ב-AI, בעוד ה-CEO של Perplexity טוען כי תפקידו של ה-iPhone כ'דרכון דיגיטלי' עדיין מעניק ל-Apple יתרון מבני.</p>
+<div class="sources"><a href="https://www.wired.com/story/apples-next-ceo-needs-to-launch-a-killer-ai-product/" target="_blank" class="source-link">https://www.wired.com/story/apples-next-ceo-needs-to-launch-a-kil...</a><a href="https://www.forbes.com/sites/ewanspence/2026/04/24/apple-news-headlines-tim-cook-ceo-john-ternus-iphone-18-pro-macbook-neo-memory-shortage/" target="_blank" class="source-link">https://www.forbes.com/sites/ewanspence/2026/04/24/apple-news-hea...</a><a href="https://www.techradar.com/ai-platforms-assistants/the-iphone-is-actually-not-getting-disrupted-by-ai-at-all-perplexity-ceo-dismisses-talk-that-apple-losing-out-in-the-ai-race" target="_blank" class="source-link">https://www.techradar.com/ai-platforms-assistants/the-iphone-is-a...</a></div>
+</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#1a1a1a;color:#fff">xAI</span>
+<h3 class="en-content">Linux Kernel Gains Local-LLM Fuzzing Bot; NeoCognition Raises $40M for Self-Learning Agents</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">ליבת Linux מקבלת בוט fuzzing מבוסס LLM מקומי; NeoCognition מגייסת 40 מיליון דולר ל-agents לומדים</h3>
+</div>
+<span class="pub-date">📅 April 26, 2026</span>
+<p class="summary en-content">Greg Kroah-Hartman detailed 'gregkh_clanker_t1000,' a local-LLM kernel fuzzing bot running on a Framework Desktop with AMD Ryzen AI Max that has uncovered numerous Linux kernel bugs. Separately, NeoCognition raised a $40M seed round to build self-learning autonomous agents.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">Greg Kroah-Hartman חשף את 'gregkh_clanker_t1000', בוט fuzzing לליבת Linux מבוסס LLM מקומי שרץ על Framework Desktop עם AMD Ryzen AI Max, אשר חשף באגים רבים בליבת Linux. בנפרד, NeoCognition גייסה סבב seed של 40 מיליון דולר לבניית agents אוטונומיים לומדים-עצמית.</p>
+<div class="sources"><a href="https://www.phoronix.com/news/Clanker-T1000-AMD-Ryzen-AI-Max" target="_blank" class="source-link">https://www.phoronix.com/news/Clanker-T1000-AMD-Ryzen-AI-Max</a><a href="https://letsdatascience.com/news/neocognition-raises-40m-seed-to-build-self-learning-agents-252ec767" target="_blank" class="source-link">https://letsdatascience.com/news/neocognition-raises-40m-seed-to-...</a></div>
+</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#f97316;color:#fff">Mistral</span>
+<h3 class="en-content">DeepSeek V4 Preview Intensifies Open-Source Pressure on Western Labs</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">תצוגת DeepSeek V4 מעצימה את הלחץ של ה-open-source על מעבדות המערב</h3>
+</div>
+<span class="pub-date">📅 April 24, 2026</span>
+<p class="summary en-content">DeepSeek's open-source V4 preview—released more than a year after the R1 reasoning model that rocked global tech markets—lets developers download, run, and modify the code locally. The Pro variant's 1.6T parameters surpasses Moonshot's Kimi K 2.6 (1.1T) and MiniMax M1 (456B), redrawing the open-weight leaderboard.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">תצוגת ה-V4 בקוד פתוח של DeepSeek — ששוחררה יותר משנה לאחר מודל ה-reasoning R1 שטלטל את שווקי הטכנולוגיה העולמיים — מאפשרת למפתחים להוריד, להריץ ולשנות את הקוד מקומית. 1.6T הפרמטרים של גרסת ה-Pro עוקפים את Kimi K 2.6 של Moonshot (1.1T) ואת MiniMax M1 (456B), ומשרטטים מחדש את טבלת ה-open-weight.</p>
+<div class="sources"><a href="https://www.cnbc.com/2026/04/24/deepseek-v4-llm-preview-open-source-ai-competition-china.html" target="_blank" class="source-link">https://www.cnbc.com/2026/04/24/deepseek-v4-llm-preview-open-sour...</a><a href="https://www.wsj.com/tech/ai/chinas-deepseek-launches-long-awaited-ai-model-066a7d6e" target="_blank" class="source-link">https://www.wsj.com/tech/ai/chinas-deepseek-launches-long-awaited...</a></div>
+</div>
+<div class="news-card">
+<div class="card-header">
+<span class="badge" style="background:#6b7280;color:#fff">Other</span>
+<h3 class="en-content">Samsung, Alibaba, and DeepSeek Push AI Across Devices, Video, and China's Tech Stack</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">Samsung, Alibaba ו-DeepSeek מקדמות AI במכשירים, וידאו וב-tech stack של סין</h3>
+</div>
+<span class="pub-date">📅 April 25, 2026</span>
+<p class="summary en-content">Samsung extended Galaxy AI upgrades to S25 owners and showcased AI-powered foldables and wearables at Milan Design Week, while leaks teased the Galaxy Book 6 Edge and Z Fold 8 Wide. Alibaba and other Chinese labs are flooding consumer phones with made-in-China generative video, and Huawei pledged 'full support' with new chips for DeepSeek V4.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">Samsung הרחיבה את שדרוגי Galaxy AI לבעלי S25 והציגה foldables ו-wearables מבוססי AI ב-Milan Design Week, בעוד שדלפים חשפו את Galaxy Book 6 Edge ו-Z Fold 8 Wide. Alibaba ומעבדות סיניות נוספות מציפות סמארטפונים בווידאו generative תוצרת סין, ו-Huawei התחייבה ל'תמיכה מלאה' עם שבבים חדשים עבור DeepSeek V4.</p>
+<div class="sources"><a href="https://www.forbes.com/sites/ewanspence/2026/04/24/android-news-headlines-galaxy-ai-s24-s25-pixel-11-asus-pad-huaweihonor-600-anker-thus/" target="_blank" class="source-link">https://www.forbes.com/sites/ewanspence/2026/04/24/android-news-h...</a><a href="https://www.wsj.com/tech/ai/china-ai-video-generation-f882dccf" target="_blank" class="source-link">https://www.wsj.com/tech/ai/china-ai-video-generation-f882dccf</a><a href="https://www.sammobile.com/news/galaxy-book-6-edge-design-features-price-leak/" target="_blank" class="source-link">https://www.sammobile.com/news/galaxy-book-6-edge-design-features...</a></div>
+</div>
+
+<div class="community-card">
+<h2 id="community-label">Community Pulse</h2>
+<div id="community-en" class="en-content"><ul class='community-bullets'><li>Developers are dissecting DeepSeek V4's Hybrid Attention Architecture and three-mode reasoning (Non-think / Think High / Think Max), with VentureBeat pegging quality near Opus 4.7 and GPT-5.5 at roughly 1/6th the cost—reigniting the 'efficiency over scale' debate.</li><li>Anthropic's public post-mortem on Claude Code degradation (blamed on harness and system-prompt changes) was well received by devs, who welcomed the new @ClaudeDevs account, mandatory internal dogfooding of public builds, and promised eval transparency.</li><li>NVIDIA employees rolling out GPT-5.5-powered Codex internally are reporting 'mind-blowing' productivity wins, with multi-day debug cycles compressing into hours—fueling fresh anxiety in threads about coding-job displacement alongside Meta/Microsoft's 20,000 layoffs.</li><li>Meta's choice of AWS Graviton5 over more NVIDIA GPUs for agentic AI inference is being read as a serious validation of Arm-based CPU inference economics, and a strategic hedge against NVIDIA pricing power.</li><li>Microsoft quietly renaming Notepad's 'Copilot' to 'Writing Tools' drew skepticism on Windows forums—users see it as brand fatigue management rather than a real change, since the AI itself remains.</li><li>Apple-watchers are split: WIRED argues incoming CEO John Ternus must ship a killer AI product fast, while Perplexity's CEO counters that the iPhone-as-digital-passport thesis still gives Apple a durable edge despite Siri's delays.</li></ul></div>
+<div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right"><ul class='community-bullets'><li>מפתחים מנתחים את ה-Hybrid Attention Architecture של DeepSeek V4 ואת שלושת מצבי ה-reasoning (Non-think / Think High / Think Max), כש-VentureBeat ממקם את האיכות סביב Opus 4.7 ו-GPT-5.5 בכשישית מהעלות — מה שמחדש את הוויכוח על 'יעילות מול קנה מידה'.</li><li>ה-post-mortem הפומבי של Anthropic על הירידה באיכות Claude Code (שיוחסה לשינויים ב-harness וב-system prompt) התקבל היטב בקרב מפתחים, שבירכו על חשבון @ClaudeDevs החדש, על dogfooding פנימי חובה של בילדים ציבוריים ועל הבטחת שקיפות ב-evals.</li><li>עובדי NVIDIA שמטמיעים את Codex מבוסס GPT-5.5 פנימית מדווחים על שיפורי פרודוקטיביות 'מטלטלים', עם מחזורי debug שהתכווצו מימים לשעות — מה שמלבה חרדה בשיחות על החלפת מתכנתים, במקביל ל-20,000 הפיטורים של Meta ו-Microsoft.</li><li>בחירתה של Meta ב-AWS Graviton5 על פני עוד GPUs של NVIDIA לצורכי הסקת AI agentic מתפרשת כאישוש משמעותי לכלכלת ההסקה על CPU מבוסס Arm, וכגידור אסטרטגי מול כוח התמחור של NVIDIA.</li><li>המהלך השקט של Microsoft, ששינתה את 'Copilot' ב-Notepad ל-'Writing Tools', התקבל בספקנות בפורומי Windows — משתמשים רואים בכך ניהול עייפות מותג ולא שינוי אמיתי, שכן ה-AI עצמו נשאר במקום.</li><li>הצופים ב-Apple חלוקים: WIRED טוענת כי ה-CEO הנכנס John Ternus חייב להשיק מוצר AI פורץ דרך במהירות, בעוד ה-CEO של Perplexity משיב כי תזת ה-iPhone כ'דרכון דיגיטלי' עדיין מעניקה ל-Apple יתרון יציב למרות העיכובים ב-Siri.</li></ul></div>
+
+</div>
+</div>
+<div class="footer">
+  Generated April 26, 2026 at 20:56 ·
+  Tavily News Search + Perplexity API
+</div>
+<script>
+function setLang(l,btn){
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  var en=l==='en';
+  document.getElementById('tldr-en').style.display=en?'':'none';
+  document.getElementById('tldr-he').style.display=en?'none':'';
+  document.getElementById('tldr-label').textContent=en?'TL;DR':'תקציר';
+  document.getElementById('news-label').textContent=en?'Latest News':'חדשות אחרונות';
+  document.getElementById('community-label').textContent=en?'Community Pulse':'דופק הקהילה';
+  document.querySelectorAll('.en-content').forEach(function(el){el.style.display=en?'':'none';});
+  document.querySelectorAll('.he-content').forEach(function(el){el.style.display=en?'none':'';});
+}
+</script>
+</body></html>

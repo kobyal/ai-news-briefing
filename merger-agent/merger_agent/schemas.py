@@ -5,6 +5,10 @@ from pydantic import BaseModel, Field
 
 class NewsItem(BaseModel):
     vendor: str
+    secondary_vendor: str = Field(
+        default="",
+        description="Second vendor when the story prominently involves two known companies (e.g. Apple+Google for Gemini-Siri, Meta+AWS for Graviton5 deal). Empty string when only one vendor is involved.",
+    )
     headline: str
     published_date: str
     summary: str

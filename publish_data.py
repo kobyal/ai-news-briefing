@@ -154,16 +154,32 @@ _VENDOR_KEYWORDS = {
 _briefing = merger.get("briefing", {})
 _news_items = _briefing.get("news_items", [])
 _fixed = 0
+_secondary_added = 0
 for item in _news_items:
-    if item.get("vendor", "") == "Other":
+    primary = item.get("vendor", "")
+    if primary == "Other":
         text = (item.get("headline", "") + " " + item.get("summary", "")).lower()
         for kw, vendor in _VENDOR_KEYWORDS.items():
             if kw in text:
                 item["vendor"] = vendor
+                primary = vendor
                 _fixed += 1
+                break
+
+    # Multi-vendor: if merger didn't set secondary_vendor, scan the headline (only)
+    # for a SECOND distinct vendor mention. Headline-only avoids false positives
+    # from passing references in the summary.
+    if not item.get("secondary_vendor"):
+        headline_lc = item.get("headline", "").lower()
+        for kw, vendor in _VENDOR_KEYWORDS.items():
+            if vendor != primary and kw in headline_lc:
+                item["secondary_vendor"] = vendor
+                _secondary_added += 1
                 break
 if _fixed:
     print(f"Auto-corrected {_fixed} 'Other' vendor tags based on headline/summary keywords")
+if _secondary_added:
+    print(f"Inferred secondary_vendor for {_secondary_added} stories from headline keywords")
 
 # Fetch real OG images for articles missing them or with broken relative paths
 _TITLE_PATTERNS = [

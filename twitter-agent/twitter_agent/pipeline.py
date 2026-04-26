@@ -58,10 +58,52 @@ FEATURES_USER = {
     "responsive_web_graphql_timeline_navigation_enabled": True,
 }
 
+# SearchTimeline accepts a different feature-flag set than User* endpoints —
+# captured from a live browser request 2026-04-26. Mismatch yields HTTP 400.
+FEATURES_SEARCH = {
+    "rweb_video_screen_enabled": False,
+    "rweb_cashtags_enabled": True,
+    "profile_label_improvements_pcf_label_in_post_enabled": True,
+    "responsive_web_profile_redirect_enabled": False,
+    "rweb_tipjar_consumption_enabled": False,
+    "verified_phone_label_enabled": False,
+    "creator_subscriptions_tweet_preview_api_enabled": True,
+    "responsive_web_graphql_timeline_navigation_enabled": True,
+    "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+    "premium_content_api_read_enabled": False,
+    "communities_web_enable_tweet_community_results_fetch": True,
+    "c9s_tweet_anatomy_moderator_badge_enabled": True,
+    "responsive_web_grok_analyze_button_fetch_trends_enabled": False,
+    "responsive_web_grok_analyze_post_followups_enabled": True,
+    "responsive_web_jetfuel_frame": True,
+    "responsive_web_grok_share_attachment_enabled": True,
+    "responsive_web_grok_annotations_enabled": True,
+    "articles_preview_enabled": True,
+    "responsive_web_edit_tweet_api_enabled": True,
+    "graphql_is_translatable_rweb_tweet_is_translatable_enabled": True,
+    "view_counts_everywhere_api_enabled": True,
+    "longform_notetweets_consumption_enabled": True,
+    "responsive_web_twitter_article_tweet_consumption_enabled": True,
+    "content_disclosure_indicator_enabled": True,
+    "content_disclosure_ai_generated_indicator_enabled": True,
+    "responsive_web_grok_show_grok_translated_post": True,
+    "responsive_web_grok_analysis_button_from_backend": True,
+    "post_ctas_fetch_enabled": True,
+    "freedom_of_speech_not_reach_fetch_enabled": True,
+    "standardized_nudges_misinfo": True,
+    "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": True,
+    "longform_notetweets_rich_text_read_enabled": True,
+    "longform_notetweets_inline_media_enabled": False,
+    "responsive_web_grok_image_annotation_enabled": True,
+    "responsive_web_grok_imagine_annotation_enabled": True,
+    "responsive_web_grok_community_note_auto_translation_is_enabled": True,
+    "responsive_web_enhance_cards_enabled": False,
+}
+
 # GraphQL endpoint IDs (stable, but may need updating if X rotates them)
 EP_USER_BY_SCREEN_NAME = "https://x.com/i/api/graphql/NimuplG1OB7Fd2btCLdBOw/UserByScreenName"
 EP_USER_TWEETS         = "https://x.com/i/api/graphql/QWF3SzpHmykQHsQMixG0cg/UserTweets"
-EP_SEARCH              = "https://x.com/i/api/graphql/R0u1RWRf748KzyGBXvOYRA/SearchTimeline"
+EP_SEARCH              = "https://x.com/i/api/graphql/XN_HccZ9SU-miQVvwTAlFQ/SearchTimeline"
 
 TRACKED_HANDLES = [
     # ── OpenAI ────────────────────────────────────────────────────────────────
@@ -102,7 +144,8 @@ AI_SEARCH_QUERIES = [
 # Core HTTP helper
 # ---------------------------------------------------------------------------
 
-def _gql(url: str, variables: dict, features: dict, ct0: str, auth_token: str) -> dict:
+def _gql(url: str, variables: dict, features: dict, ct0: str, auth_token: str,
+         tx_id: str | None = None) -> dict:
     headers = {
         "Authorization": f"Bearer {BEARER}",
         "x-csrf-token": ct0,
@@ -111,6 +154,11 @@ def _gql(url: str, variables: dict, features: dict, ct0: str, auth_token: str) -
         "x-twitter-auth-type": "OAuth2Session",
         "x-twitter-client-language": "en",
     }
+    if tx_id:
+        # Required by SearchTimeline (and increasingly more endpoints). Signed by JS in the
+        # browser; we use x-client-transaction lib to mirror the algorithm. Other endpoints
+        # still accept un-signed requests as of 2026-04, hence the optional kwarg.
+        headers["x-client-transaction-id"] = tx_id
     cookies = {"auth_token": auth_token, "ct0": ct0}
     resp = requests.get(
         url,
@@ -119,6 +167,44 @@ def _gql(url: str, variables: dict, features: dict, ct0: str, auth_token: str) -
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def _bootstrap_signer(auth_token: str, ct0: str):
+    """Builds an x-client-transaction-id signer. Imported lazily so the agent
+    still runs (UserByScreenName / UserTweets) if the lib isn't installed.
+    Returns None on any failure — callers should handle the None case."""
+    try:
+        import bs4
+        from x_client_transaction import ClientTransaction
+        from x_client_transaction.utils import (
+            handle_x_migration, get_ondemand_file_url, generate_headers,
+        )
+    except ImportError as e:
+        print(f"  ⚠ x-client-transaction lib not available ({e}); trending will fail")
+        return None
+    try:
+        s = requests.Session()
+        s.headers = generate_headers()
+        s.cookies.update({"auth_token": auth_token, "ct0": ct0})
+        home = handle_x_migration(s)
+        ondemand_url = get_ondemand_file_url(home)
+        ondemand_resp = s.get(ondemand_url, timeout=15)
+        ondemand = bs4.BeautifulSoup(ondemand_resp.content, "html.parser")
+        return ClientTransaction(home, ondemand)
+    except Exception as e:
+        print(f"  ⚠ tx-id signer bootstrap failed ({e}); trending will fail")
+        return None
+
+
+def _sign_path(signer, method: str, url: str) -> str | None:
+    if signer is None:
+        return None
+    from urllib.parse import urlparse
+    try:
+        return signer.generate_transaction_id(method=method, path=urlparse(url).path)
+    except Exception as e:
+        print(f"  ⚠ tx-id generate failed ({e})")
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -271,14 +357,15 @@ def _parse_search_tweets(data: dict, cutoff_ts: float) -> list[dict]:
     return results
 
 
-def _fetch_trending(auth_token: str, ct0: str, cutoff_ts: float) -> list[dict]:
+def _fetch_trending(auth_token: str, ct0: str, cutoff_ts: float, signer=None) -> list[dict]:
     all_tweets = []
     for q in AI_SEARCH_QUERIES:
         try:
+            tx_id = _sign_path(signer, "GET", EP_SEARCH)
             data = _gql(EP_SEARCH,
                         {"rawQuery": q, "count": 20, "querySource": "typed_query",
-                         "product": "Latest"},
-                        FEATURES, ct0, auth_token)
+                         "product": "Latest", "withGrokTranslatedBio": True},
+                        FEATURES_SEARCH, ct0, auth_token, tx_id=tx_id)
             tweets = _parse_search_tweets(data, cutoff_ts)
             all_tweets.extend(tweets)
             print(f"    ✓ search '{q[:50]}' → {len(tweets)} tweets")
@@ -330,7 +417,9 @@ def run_pipeline() -> dict:
 
     # --- Trending posts ---
     print(f"\n[2/2] Searching viral AI posts...")
-    trending = _fetch_trending(auth_token, ct0, cutoff_ts)
+    print("  Bootstrapping x-client-transaction-id signer (required for SearchTimeline)...")
+    signer = _bootstrap_signer(auth_token, ct0)
+    trending = _fetch_trending(auth_token, ct0, cutoff_ts, signer=signer)
     print(f"  → {len(trending)} trending posts")
 
     output = {

@@ -657,6 +657,7 @@ def _collect_agent_delivery() -> list[dict]:
         ("perplexity-news-agent", "perplexity"),
         ("rss-news-agent",        "rss-news"),
         ("tavily-news-agent",     "tavily"),
+        ("adk-news-agent",        "adk"),
         ("exa-news-agent",        "exa"),
         ("newsapi-agent",         "newsapi"),
     ]:
@@ -689,7 +690,7 @@ def _collect_agent_delivery() -> list[dict]:
                          "json": "(merged)", "site": "(merged)",
                          "status": "ok", "note": "ArcticShift OK"})
 
-    for dirname, label in [("article-reader-agent", "article-reader"), ("adk-news-agent", "adk")]:
+    for dirname, label in [("article-reader-agent", "article-reader")]:
         d = _latest(dirname)
         if d and ((d.get("briefing") or {}).get("news_items")):
             n = len(d["briefing"]["news_items"])

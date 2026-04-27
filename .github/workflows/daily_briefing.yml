@@ -75,14 +75,18 @@ jobs:
       - name: Install dependencies
         if: steps.skip_check.outputs.skip != 'true'
         run: |
-          pip install \
-            -r adk-news-agent/requirements.txt \
-            -r perplexity-news-agent/requirements.txt \
-            -r tavily-news-agent/requirements.txt \
-            -r merger-agent/requirements.txt \
-            -r rss-news-agent/requirements.txt \
-            -r twitter-agent/requirements.txt \
-            firecrawl-py exa-py newsapi-python duckduckgo-search || true
+          # Per-requirement loop (NOT a single batched pip call) — pip is
+          # atomic per invocation, so one failed dep (e.g. twitter-agent's
+          # git+https x-client-transaction temporarily unreachable) used to
+          # roll back the entire batch and silently skip google-adk,
+          # firecrawl-py, etc. The 2026-04-27 ADK silent failure was caused
+          # by the old batched form. Splitting per-file isolates failures.
+          for req in adk-news-agent perplexity-news-agent tavily-news-agent \
+                     merger-agent rss-news-agent twitter-agent; do
+            pip install -r "${req}/requirements.txt" || \
+              echo "::warning::${req} requirements install failed — continuing"
+          done
+          pip install firecrawl-py exa-py newsapi-python duckduckgo-search || true
 
       - name: Run all pipelines
         if: steps.skip_check.outputs.skip != 'true'

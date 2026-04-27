@@ -10,15 +10,17 @@ import os
 import time
 from pathlib import Path
 
-# Load local .env so GOOGLE_API_KEY is available when run standalone
-env_path = Path(__file__).parent / "private" / ".env"
+# Load local .env so GOOGLE_API_KEY is available when run standalone.
+# Script lives in scripts/, so go one level up for the repo's private/.env.
+env_path = Path(__file__).resolve().parent.parent / "private" / ".env"
 if env_path.exists():
     for line in env_path.read_text().splitlines():
         if "=" in line and not line.startswith("#"):
             k, v = line.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip())
 
-# Reconstruct the merger input the same way merger-agent/pipeline.py does
+# Glob patterns below are relative to repo root — run from there:
+#   python3 scripts/test_gemini_vs_sonnet.py
 import glob
 DATE = "2026-04-22"
 sources = {}

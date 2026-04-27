@@ -8,7 +8,7 @@ import os
 import re
 import urllib.request
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -414,6 +414,189 @@ def _story_id_hash(item: dict) -> str:
     return hashlib.sha256(primary.encode()).hexdigest()[:12]
 
 
+_YT_STOP = {
+    "the","a","an","and","or","but","for","with","on","in","at","to","of","is","are","was","were","be",
+    "from","into","over","under","this","that","these","those","it","its","by","has","have","had",
+    "new","launches","launched","announces","announced","releases","released","unveils","adds","brings",
+    "ships","arrives","commits","cuts","tops","reaches","beats","raises",
+}
+
+
+def _video_url(v: dict) -> str:
+    if not isinstance(v, dict):
+        return ""
+    if v.get("url"):
+        return str(v["url"])
+    urls = v.get("urls") or []
+    return str(urls[0]) if urls else ""
+
+
+def _yt_search(api_key: str, query: str, max_results: int = 3, lookback_days: int = 14) -> list[dict]:
+    """One YouTube Data API v3 search.list call. Returns news_item-shaped videos.
+
+    100 quota units per call. Filters to videos uploaded in the last N days,
+    medium duration (~4-20 min) to skip Shorts and very long uploads.
+    """
+    if not query.strip():
+        return []
+    published_after = (datetime.utcnow() - timedelta(days=lookback_days)).strftime("%Y-%m-%dT00:00:00Z")
+    params = {
+        "key": api_key,
+        "part": "snippet",
+        "q": query.strip()[:80],
+        "type": "video",
+        "maxResults": str(max_results),
+        "order": "relevance",
+        "publishedAfter": published_after,
+        "videoDuration": "medium",
+    }
+    url = "https://www.googleapis.com/youtube/v3/search?" + urllib.parse.urlencode(params)
+    try:
+        with urllib.request.urlopen(url, timeout=30) as r:
+            data = json.loads(r.read())
+    except Exception as e:
+        print(f"  YT search '{query[:40]}' failed: {e}")
+        return []
+    out = []
+    for item in data.get("items", []):
+        snippet = item.get("snippet", {})
+        vid = (item.get("id") or {}).get("videoId", "")
+        if not vid:
+            continue
+        out.append({
+            "headline": snippet.get("title", ""),
+            "summary": f"[{snippet.get('channelTitle','?')}] {snippet.get('description','')}"[:280],
+            "vendor":   "Other",  # we don't classify vendor here; LLM pairing uses headlines
+            "urls":     [f"https://www.youtube.com/watch?v={vid}"],
+            "published_date": (snippet.get("publishedAt") or "")[:10],
+        })
+    return out
+
+
+def _enrich_youtube_per_story(news_items: list, videos: list, api_key: str) -> int:
+    """Phase 1: search YouTube once per story using the headline.
+
+    Adds new videos to the pool BEFORE LLM pairing — gives Claude more
+    candidates than the 17 generic ones from the YouTube agent's broad sweep.
+    Spends ~100 quota × len(news_items). Returns count of videos added.
+    """
+    seen = {_video_url(v) for v in videos if _video_url(v)}
+    added = 0
+    for story in news_items:
+        candidates = _yt_search(api_key, story.get("headline") or "", max_results=2, lookback_days=14)
+        for c in candidates:
+            u = _video_url(c)
+            if not u or u in seen:
+                continue
+            seen.add(u)
+            videos.append(c)
+            added += 1
+    return added
+
+
+def _alt_query(story: dict) -> str:
+    """Build an alternate-angle query for gap-fill: vendor + first 3-4 distinctive words.
+
+    Phase 1 used the full headline; if that didn't surface a match, the headline
+    was probably too noisy. Strip stopwords + light verbs, keep nouns/proper-nouns.
+    """
+    vendor = (story.get("vendor") or "").strip()
+    headline = (story.get("headline") or "")
+    words = re.findall(r"[A-Za-z][A-Za-z0-9.+-]{2,}", headline)
+    significant = [w for w in words if w.lower() not in _YT_STOP][:4]
+    parts = []
+    if vendor and vendor.lower() not in (w.lower() for w in significant):
+        parts.append(vendor)
+    parts.extend(significant)
+    return " ".join(parts)
+
+
+def _llm_pick_best(story: dict, candidates: list[dict]) -> dict | None:
+    """Phase 2 mini-judge: ask Claude if any of these N videos pairs with this one story.
+
+    Returns the picked candidate dict (with paired_with_story_id set) or None.
+    Smaller and cheaper than the bulk pair call — used only for gap-fill.
+    """
+    if not candidates:
+        return None
+    video_lines = [
+        f"V{i}: [{(c.get('vendor') or '?')}] {(c.get('headline') or '')[:140]}"
+        for i, c in enumerate(candidates)
+    ]
+    instructions = (
+        "Pick which video (if any) is a real explainer for the given story. A pair is "
+        "valid ONLY if the video discusses the same specific news event or directly "
+        "explains the story's subject. Same vendor or topic alone is NOT enough. "
+        "Return null if nothing fits."
+    )
+    prompt = (
+        f"STORY: [{story.get('vendor','?')}] {story.get('headline','')}\n\n"
+        f"CANDIDATES:\n{chr(10).join(video_lines)}\n\n"
+        'Output JSON: {"v": <index_or_null>}'
+    )
+    text = ""
+    try:
+        if os.environ.get("MERGER_VIA_CLAUDE_CODE") == "1":
+            from shared.anthropic_cc import agent as cc_agent
+            text = cc_agent(prompt, instructions=instructions, json_mode=True, label="GapFillJudge")
+        elif os.environ.get("ANTHROPIC_API_KEY"):
+            import anthropic
+            client = anthropic.Anthropic()
+            resp = client.messages.create(
+                model="claude-haiku-4-5",
+                max_tokens=200,
+                system=instructions + "\nRespond with ONLY valid JSON.",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = resp.content[0].text if resp.content else ""
+        else:
+            return None
+    except Exception as e:
+        print(f"    Gap-fill judge failed: {e}")
+        return None
+    try:
+        parsed = json.loads(text.strip())
+        idx = parsed.get("v") if isinstance(parsed, dict) else None
+    except Exception:
+        return None
+    if not isinstance(idx, int) or not (0 <= idx < len(candidates)):
+        return None
+    return candidates[idx]
+
+
+def _gap_fill_unpaired(news_items: list, videos: list, api_key: str) -> int:
+    """Phase 2: for stories LLM left unpaired, do a focused alt-angle search.
+
+    Different query angle from phase 1 (vendor + 3-4 distinctive nouns instead
+    of full headline), longer lookback (30d vs 14d), then a per-story mini LLM
+    judge to confirm the match. Spends ~100 quota per unpaired story plus one
+    cheap LLM call each.
+    """
+    paired = {v.get("paired_with_story_id") for v in videos if v.get("paired_with_story_id")}
+    unpaired = [s for s in news_items if _story_id_hash(s) not in paired]
+    if not unpaired:
+        return 0
+    print(f"  Phase 2 gap-fill: {len(unpaired)} unpaired stories, alt-angle YouTube search")
+    seen = {_video_url(v) for v in videos if _video_url(v)}
+    added = 0
+    for story in unpaired:
+        q = _alt_query(story)
+        if not q:
+            continue
+        candidates = _yt_search(api_key, q, max_results=3, lookback_days=30)
+        candidates = [c for c in candidates if _video_url(c) not in seen]
+        if not candidates:
+            continue
+        picked = _llm_pick_best(story, candidates)
+        if picked:
+            picked["paired_with_story_id"] = _story_id_hash(story)
+            videos.append(picked)
+            seen.add(_video_url(picked))
+            added += 1
+            print(f"    ✓ {story.get('vendor','?')}: {(story.get('headline') or '')[:55]} ↔ {(picked.get('headline') or '')[:55]}")
+    return added
+
+
 def _pair_explainer_videos(news_items: list, videos: list) -> int:
     if not news_items or not videos:
         return 0
@@ -483,7 +666,20 @@ def _pair_explainer_videos(news_items: list, videos: list) -> int:
     return paired
 
 
+_yt_api_key = os.environ.get("YOUTUBE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+if _yt_api_key:
+    _added_p1 = _enrich_youtube_per_story(_news_items, youtube_items, _yt_api_key)
+    print(f"  Phase 1 enrichment: +{_added_p1} videos from per-story YouTube searches "
+          f"(pool now {len(youtube_items)})")
+else:
+    print("  Phase 1 enrichment skipped: no YOUTUBE_API_KEY / GOOGLE_API_KEY")
+
 _pair_explainer_videos(_news_items, youtube_items)
+
+if _yt_api_key:
+    _added_p2 = _gap_fill_unpaired(_news_items, youtube_items, _yt_api_key)
+    if _added_p2:
+        print(f"  Phase 2 gap-fill: +{_added_p2} additional pairings recovered")
 
 
 published = {

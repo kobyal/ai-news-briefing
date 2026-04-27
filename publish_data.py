@@ -1,6 +1,7 @@
 """
 publish_data.py — combine all agent outputs into docs/data/YYYY-MM-DD.json
 """
+import hashlib
 import json
 import glob
 import os
@@ -395,6 +396,95 @@ try:
         print(f"  Image fallback: {_fb_count} stories filled from vendor stock pool / Unsplash")
 except Exception as _e:
     print(f"  Image fallback skipped: {_e}")
+
+
+# ── LLM-judged story-explainer pairing ────────────────────────────────────────
+# The frontend's keyword-overlap algo (≥2 matches or digit-keyword) is too
+# strict given how broadly worded YouTube titles are: "DeepSeek Just Did It
+# Again" only shares 'deepseek' with the DeepSeek V4 story headline (1 kw,
+# no digit) and gets rejected. Result: 1/18 stories paired on 2026-04-27.
+# We ask Claude to make a judgment call per pair instead — same vendor + same
+# news event = pair, otherwise null. Output mutates each video's
+# `paired_with_story_id` field; frontend reads this as the canonical pairing
+# and falls back to keyword matching when absent (so old data still works).
+def _story_id_hash(item: dict) -> str:
+    """Mirror handler.py's story_id derivation — sha256(primary URL or headline)[:12]."""
+    urls = item.get("urls", [])
+    primary = urls[0] if urls else item.get("headline", "")
+    return hashlib.sha256(primary.encode()).hexdigest()[:12]
+
+
+def _pair_explainer_videos(news_items: list, videos: list) -> int:
+    if not news_items or not videos:
+        return 0
+    story_lines = [
+        f"S{i}: [{(item.get('vendor') or '?')}] {(item.get('headline') or '')[:140]}"
+        for i, item in enumerate(news_items)
+    ]
+    video_lines = [
+        f"V{i}: [{(v.get('vendor') or '?')}] {(v.get('headline') or v.get('title') or '')[:140]}"
+        for i, v in enumerate(videos)
+    ]
+    instructions = (
+        "You pair daily AI-news stories with the most relevant explainer video. "
+        "A pair is valid ONLY if the video discusses the same specific news event "
+        "or directly explains the story's subject. Same vendor alone is NOT enough — "
+        "an Anthropic product-engineering tutorial does NOT pair with an Anthropic "
+        "research-bias story. When in doubt, return null. Each video can pair with "
+        "at most one story. Cover every story in the output (use null for no match)."
+    )
+    prompt = (
+        "Match each story to its best explainer video, or null if no good match.\n\n"
+        f"STORIES:\n{chr(10).join(story_lines)}\n\n"
+        f"VIDEOS:\n{chr(10).join(video_lines)}\n\n"
+        'Output JSON: {"pairs": [{"s": <story_idx>, "v": <video_idx_or_null>}, ...]}'
+    )
+
+    text = ""
+    try:
+        if os.environ.get("MERGER_VIA_CLAUDE_CODE") == "1":
+            from shared.anthropic_cc import agent as cc_agent
+            text = cc_agent(prompt, instructions=instructions, json_mode=True, label="VideoPairer")
+        elif os.environ.get("ANTHROPIC_API_KEY"):
+            import anthropic
+            client = anthropic.Anthropic()
+            resp = client.messages.create(
+                model="claude-haiku-4-5",
+                max_tokens=2000,
+                system=instructions + "\nRespond with ONLY valid JSON.",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = resp.content[0].text if resp.content else ""
+        else:
+            print("  Explainer pairing skipped: no subscription or ANTHROPIC_API_KEY")
+            return 0
+    except Exception as e:
+        print(f"  Explainer pairing call failed: {e}")
+        return 0
+
+    try:
+        parsed = json.loads(text.strip())
+        entries = parsed.get("pairs", []) if isinstance(parsed, dict) else parsed
+    except Exception as e:
+        print(f"  Explainer pairing JSON parse failed: {e}; got: {text[:200]!r}")
+        return 0
+
+    paired = 0
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        s_idx, v_idx = entry.get("s"), entry.get("v")
+        if v_idx is None or not isinstance(s_idx, int) or not isinstance(v_idx, int):
+            continue
+        if 0 <= s_idx < len(news_items) and 0 <= v_idx < len(videos):
+            videos[v_idx]["paired_with_story_id"] = _story_id_hash(news_items[s_idx])
+            paired += 1
+    print(f"  Explainer pairing: {paired}/{len(news_items)} stories matched with a video (LLM-judged)")
+    return paired
+
+
+_pair_explainer_videos(_news_items, youtube_items)
+
 
 published = {
     "date":        date_str,

@@ -307,6 +307,49 @@ def _fetch_person(person: dict, auth_token: str, ct0: str, cutoff_ts: float) -> 
 # Search for viral AI posts
 # ---------------------------------------------------------------------------
 
+# Quality gates for trending posts. Search-side `min_faves:N` operator is
+# ignored by X's GraphQL endpoint (verified 2026-04-27 — search returned 1-4
+# like posts despite min_faves:500 in the query), so engagement is enforced
+# post-fetch. AI-relevance filter weeds out false-positive matches like
+# 3D-modeling posts that say "MODEL RELEASE".
+_TRENDING_MIN_LIKES = 50
+_AI_RELEVANCE_RE = re.compile(
+    r"\b("
+    r"openai|anthropic|claude|chatgpt|gpt-?\d|sora|codex|"
+    r"gemini|deepmind|llama|bedrock|copilot|"
+    r"nvidia|grok|xai|mistral|cohere|deepseek|qwen|huggingface|perplexity|"
+    r"llm|llms|agi|transformer|multimodal|fine[- ]?tun|embedding|"
+    r"ai (?:model|agent|tool|coding|safety|alignment|race|race|chip)|"
+    r"ml model|neural net|frontier model|foundation model"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Map post text → most-relevant vendor for the topic badge. First match wins.
+# Order matters: more specific vendor names before generic ones (e.g.
+# "Claude Code" should resolve to Anthropic before bare "code" matches).
+_VENDOR_PATTERNS = [
+    ("Anthropic", re.compile(r"\b(anthropic|claude)\b", re.IGNORECASE)),
+    ("OpenAI",    re.compile(r"\b(openai|chatgpt|gpt-?\d|codex|sora)\b", re.IGNORECASE)),
+    ("Google",    re.compile(r"\b(gemini|deepmind|google ai)\b", re.IGNORECASE)),
+    ("Meta",      re.compile(r"\b(llama|meta ai)\b", re.IGNORECASE)),
+    ("xAI",       re.compile(r"\b(grok|xai)\b", re.IGNORECASE)),
+    ("DeepSeek",  re.compile(r"\bdeepseek\b", re.IGNORECASE)),
+    ("Mistral",   re.compile(r"\bmistral\b", re.IGNORECASE)),
+    ("Cohere",    re.compile(r"\bcohere\b", re.IGNORECASE)),
+    ("Alibaba",   re.compile(r"\b(qwen|alibaba)\b", re.IGNORECASE)),
+    ("NVIDIA",    re.compile(r"\bnvidia\b", re.IGNORECASE)),
+    ("HuggingFace", re.compile(r"\bhugging.?face\b", re.IGNORECASE)),
+]
+
+
+def _derive_vendor(text: str) -> str:
+    for vendor, pattern in _VENDOR_PATTERNS:
+        if pattern.search(text):
+            return vendor
+    return ""
+
+
 def _parse_search_tweets(data: dict, cutoff_ts: float) -> list[dict]:
     results = []
     instructions = (
@@ -327,16 +370,34 @@ def _parse_search_tweets(data: dict, cutoff_ts: float) -> list[dict]:
             if not tweet or tweet.get("__typename") != "Tweet":
                 continue
             legacy = tweet.get("legacy", {})
-            user_legacy = tweet.get("core", {}).get("user_results", {}).get("result", {}).get("legacy", {})
+            # X moved screen_name + name from result.legacy to result.core
+            # (verified 2026-04-27 — legacy.screen_name returns None now).
+            # Try the new path first, fall through to legacy for older responses.
+            user_result = tweet.get("core", {}).get("user_results", {}).get("result", {})
+            user_core = user_result.get("core", {}) if isinstance(user_result, dict) else {}
+            user_legacy = user_result.get("legacy", {}) if isinstance(user_result, dict) else {}
+            screen_name = user_core.get("screen_name") or user_legacy.get("screen_name", "")
+            name = user_core.get("name") or user_legacy.get("name", "")
             text = legacy.get("full_text", "")
             if text.startswith("RT @"):
                 continue
+            # Skip orphan replies (text starts with @mention) — out of context
+            # in a trending list. Bare @ at index 0 indicates a reply tweet.
+            if text.lstrip().startswith("@"):
+                continue
             likes = legacy.get("favorite_count", 0)
+            if likes < _TRENDING_MIN_LIKES:
+                continue
+            # AI relevance: post must mention at least one vendor/AI term.
+            # The search query alone matches "MODEL RELEASE" too liberally
+            # (Blender 3D models, model trains, etc).
+            if not _AI_RELEVANCE_RE.search(text):
+                continue
             created = legacy.get("created_at", "")
             tid = legacy.get("id_str", "")
-            screen_name = user_legacy.get("screen_name", "")
-            name = user_legacy.get("name", "")
-            if not created or not tid:
+            if not created or not tid or not screen_name:
+                # No screen_name → URL would be broken (https://x.com//status/...)
+                # and the UI would show a bare "@". Drop it.
                 continue
             try:
                 ts = datetime.strptime(created, "%a %b %d %H:%M:%S +0000 %Y").replace(tzinfo=timezone.utc)
@@ -347,11 +408,12 @@ def _parse_search_tweets(data: dict, cutoff_ts: float) -> list[dict]:
             results.append({
                 "author": f"@{screen_name}",
                 "name":   name,
+                "handle": screen_name,
                 "post":   text[:280],
                 "date":   ts.strftime("%B %d, %Y"),
                 "url":    f"https://x.com/{screen_name}/status/{tid}",
                 "engagement": f"{likes} likes",
-                "topic":  "AI",
+                "vendor": _derive_vendor(text),  # better topic badge than hardcoded "AI"
                 "_likes": likes,
             })
     return results

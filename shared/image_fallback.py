@@ -257,20 +257,23 @@ def find_fallback(story: dict) -> str | None:
     1. Pre-warmed S3 cache — first-party, zero-latency subject photos
     2. Wikipedia subject photo — for named people/products/companies on Wikipedia
        (Bezos, Altman, Kimi, GPT-5, Sam Altman, etc.)
-    3. GitHub org opengraph — for open-source projects by orgs that exist on GitHub
-       (Fathym → opengraph.githubassets.com/1/fathym-deno with branded image)
-    4. Vendor stock pool — Google favicon at 256px for known vendors (OpenAI,
+    3. Vendor stock pool — Google favicon at 256px for known vendors (OpenAI,
        Anthropic, Google, Meta, etc.)
-    5. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
-    6. None — frontend renders colored gradient + vendor icon
+    4. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
+    5. None — frontend renders colored gradient + vendor icon
+
+    NOTE: github_org_image (formerly step 3) was removed 2026-04-27 — for any
+    AI vendor with a GitHub org (Mistral, Alibaba, DeepSeek, NVIDIA, etc.) it
+    returned a generic GitHub-branded card (logo + org name on a gradient)
+    that read as "this story is about GitHub" to users. The vendor pool
+    fallback (Wikimedia logos for the same vendors) is consistently better.
+    The original Fathym-style legitimate use case is rare enough that the
+    cosmetic regression isn't worth the recurring confusion.
     """
     url = prewarmed_image(story)
     if url:
         return url
     url = wikipedia_subject_image(story)
-    if url:
-        return url
-    url = github_org_image(story)
     if url:
         return url
     url = vendor_pool_image(story)

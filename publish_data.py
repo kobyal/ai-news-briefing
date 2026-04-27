@@ -326,11 +326,17 @@ def _fetch_og_for_story(item: dict) -> tuple[str, list]:
     Vendor first-party URLs (anthropic.com for Anthropic stories, openai.com for
     OpenAI stories, etc.) bypass the title-match check — they're inherently
     relevant even when the page title is just "Newsroom" or "Press".
+
+    Last-resort recovery: if validation would strip ALL URLs (story ends up
+    sourceless on the website), preserve the least-bad rejected URL —
+    title-mismatch beats wrong-vendor beats nothing. Fixes the 2026-04-27
+    Alibaba/Mistral/Verifier "0 URLs shipped" silent regression.
     """
     kws = _story_keywords(item)
     vendor = item.get("vendor", "")
     kept_urls = []
     og_image = ""
+    rejected: list[tuple[str, str, str]] = []  # (url, reason, html_snippet) for fallback
     for url in item.get("urls", []):
         html, title = _fetch_page(url)
         if not html:
@@ -360,13 +366,28 @@ def _fetch_og_for_story(item: dict) -> tuple[str, list]:
                         og_image = _extract_og_image(html) or og_image
                     continue
                 print(f"  ✂ Wrong-vendor URL for '{item.get('headline','?')[:40]}' (vendor={vendor}): title's primary subject is {title_subject} url={url[:60]}")
+                rejected.append((url, "wrong-vendor", html))
                 continue
             if not _title_matches_story(title, kws):
                 print(f"  ✂ URL mismatch for '{item.get('headline','?')[:40]}': title='{title[:60]}' url={url[:60]}")
+                rejected.append((url, "title-mismatch", html))
                 continue  # drop URL — wrong topic
             kept_urls.append(url)
         if not og_image:
             og_image = _extract_og_image(html) or og_image
+
+    # Last-resort: if everything got stripped, restore the least-bad rejected URL.
+    # Prefer title-mismatch over wrong-vendor (wrong-vendor URLs are about a
+    # different company entirely; title-mismatch is just a weak topical match).
+    if not kept_urls and rejected:
+        rejected.sort(key=lambda r: 0 if r[1] == "title-mismatch" else 1)
+        recovered_url, reason, html = rejected[0]
+        kept_urls.append(recovered_url)
+        if not og_image:
+            og_image = _extract_og_image(html) or og_image
+        print(f"  ↻ Recovered URL for '{item.get('headline','?')[:40]}' (would have been 0 URLs): "
+              f"reason={reason} url={recovered_url[:60]}")
+
     return og_image, kept_urls
 
 # Validate ALL stories' URLs against their content, and fetch OG image in the same pass.
@@ -388,6 +409,80 @@ with ThreadPoolExecutor(max_workers=8) as pool:
             item["og_image"] = og
             _og_fetched += 1
 print(f"  URL sanity: dropped {_mismatches} mismatched URLs | OG images fetched: {_og_fetched}")
+
+
+# ── Zero-URL recovery via Tavily ──────────────────────────────────────────────
+# Some stories arrive with 0 URLs (Mistral Large 3 on 2026-04-27: the only
+# source was mistral.ai/news/mistral-large-3 which legitimately 404s now).
+# When that happens we have a real news event with no clickable source —
+# users see "no sources" on the story card. Recover by running a Tavily
+# search for headline+vendor and attaching the top working result.
+def _tavily_search_first_alive(query: str, api_key: str, max_results: int = 5) -> str | None:
+    """Single Tavily call, return the first URL that responds 2xx/3xx/403/405."""
+    if not query.strip() or not api_key:
+        return None
+    try:
+        body = json.dumps({
+            "api_key": api_key,
+            "query": query.strip()[:200],
+            "max_results": max_results,
+            "search_depth": "basic",
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.tavily.com/search",
+            data=body,
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read())
+    except Exception as e:
+        print(f"  Tavily recovery failed: {e}")
+        return None
+    import requests as _rq
+    # Skip social/video/forum URLs — fallback should be a news article, not
+    # a YouTube reaction video or a tweet (Tavily picked a YouTube URL for
+    # the 2026-04-27 Mistral Large 3 zero-URL recovery, which read like a
+    # primary source on the story card but wasn't).
+    _SKIP_DOMAINS = (
+        "youtube.com", "youtu.be", "twitter.com", "x.com",
+        "instagram.com", "tiktok.com", "facebook.com", "linkedin.com",
+        "pinterest.com", "reddit.com",  # reddit handled separately, not a primary source
+    )
+    for hit in data.get("results", []):
+        url = hit.get("url", "")
+        if not url or not url.startswith("http"):
+            continue
+        if any(d in url.lower() for d in _SKIP_DOMAINS):
+            continue
+        try:
+            resp = _rq.head(url, timeout=8, allow_redirects=True,
+                            headers={"User-Agent": "Mozilla/5.0 (compatible; ai-news-briefing/1.0)"})
+            if resp.status_code < 400 or resp.status_code in (403, 405):
+                return url
+        except Exception:
+            continue
+    return None
+
+
+# Prefer healthy Tavily key (#3 has the most headroom on the 3-key rotation).
+_tavily_key = (os.environ.get("TAVILY_API_KEY3") or os.environ.get("TAVILY_API_KEY2")
+               or os.environ.get("TAVILY_API_KEY"))
+_recovered = 0
+if _tavily_key:
+    for item in _news_items:
+        if item.get("urls"):
+            continue
+        query = f"{item.get('vendor', '')} {item.get('headline', '')}".strip()
+        url = _tavily_search_first_alive(query, _tavily_key)
+        if url:
+            item["urls"] = [url]
+            item["source_count"] = 1
+            _recovered += 1
+            print(f"  ↻ Tavily recovered URL for '{(item.get('headline') or '')[:50]}': {url[:60]}")
+if _recovered:
+    print(f"  Zero-URL recovery: {_recovered} stories rescued via Tavily search")
+
 
 # Fallback chain for stories still without an og:image — vendor stock pool then Unsplash.
 # Better than a blank gradient. Frontend still shows the gradient if this returns None.

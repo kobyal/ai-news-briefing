@@ -1,47 +1,52 @@
-# AI News Briefing - 9 Collection Agents + Final Merger
+# AI News Briefing
 
-This repo runs **9 collection/enrichment agents in parallel**, then a final **Merger Agent** turns the latest outputs into one bilingual AI briefing in English and Hebrew.
+A daily AI news pipeline. Eleven independent agents collect stories from search APIs, RSS feeds, social channels, and developer sources in parallel; a final Merger Agent deduplicates, ranks, summarizes, and translates them into one bilingual (English + Hebrew) briefing. The output is a static HTML page and a structured JSON file that any frontend can consume.
 
-The current architecture is:
-- **4 core source pipelines**: ADK, Perplexity, RSS, Tavily
-- **5 supplemental agents**: Article Reader, Exa, NewsAPI, YouTube, GitHub Trending
-- **1 final merger**: loads the latest outputs, deduplicates stories, translates to Hebrew, and publishes the combined HTML
+The pipeline is designed to be **forkable**: every external dependency has a fallback, every paid call has a free alternative, and the merger can run on either the Anthropic API or a Claude Max subscription (zero per-call cost). If you fork this repo and supply your own keys, it should run end-to-end on your own GitHub Actions + GitHub Pages without any other infrastructure.
 
-**Live site:** [duus0s1bicxag.cloudfront.net](https://duus0s1bicxag.cloudfront.net/) (CloudFront — full Next.js app) · [kobyal.github.io/ai-news-briefing](https://kobyal.github.io/ai-news-briefing) redirects there · raw per-day merged HTML at `kobyal.github.io/ai-news-briefing/report/latest.html`
+**Live site:** [duus0s1bicxag.cloudfront.net](https://duus0s1bicxag.cloudfront.net/) (Next.js app on CloudFront — maintainer's deployment)
+**Raw merged briefing:** `kobyal.github.io/ai-news-briefing/report/latest.html` (GitHub Pages — what this repo publishes directly)
+**Structured data:** `kobyal.github.io/ai-news-briefing/data/<YYYY-MM-DD>.json` (machine-readable daily snapshot)
 
 **Operational docs:**
-- [COSTS.md](./COSTS.md) — per-run + MTD cost breakdown, how to refresh dashboard snapshots
-- [FALLBACKS.md](./FALLBACKS.md) — every rotation path per service + tracker contract
-
-**Suggested GitHub About text:** `9-agent AI news collection + merger pipeline: ADK, Perplexity, RSS, Tavily, Article Reader, Exa, NewsAPI, YouTube, GitHub Trending -> bilingual EN/Hebrew briefing + docs/data JSON.`
+- [COSTS.md](./COSTS.md) — per-run + month-to-date cost breakdown, dashboard refresh recipe
+- [FALLBACKS.md](./FALLBACKS.md) — every rotation path per service, tracker contract
 
 ---
 
 ## Quick Start
 
 ```bash
+# 1. Clone and create a virtualenv
+git clone https://github.com/kobyal/ai-news-briefing
+cd ai-news-briefing
 python3 -m venv .venv
 source .venv/bin/activate
 
-pip install \
-  -r adk-news-agent/requirements.txt \
-  -r perplexity-news-agent/requirements.txt \
-  -r tavily-news-agent/requirements.txt \
-  -r merger-agent/requirements.txt \
-  -r rss-news-agent/requirements.txt \
-  firecrawl-py exa-py newsapi-python
+# 2. Install per-agent requirements (one file at a time — see "Why per-file?" below)
+for req in adk-news-agent perplexity-news-agent tavily-news-agent \
+           rss-news-agent merger-agent twitter-agent; do
+  pip install -r "${req}/requirements.txt"
+done
+pip install firecrawl-py exa-py newsapi-python duckduckgo-search
 
-# Run all 10 collection/enrichment agents, then the merger.
+# 3. Provide API keys (.env at repo root, or export in shell)
+cp .env.example .env  # fill in the keys you have; missing keys make agents no-op cleanly
+
+# 4. Run everything: 10 collectors in parallel, then the merger.
 python3 run_all.py
 
-# Run only the merger against the latest saved outputs.
-python3 run_all.py --merge-only
-
-# Skip selected core pipelines.
-python3 run_all.py --skip adk rss
+# Useful flags:
+python3 run_all.py --list                    # show all agents + cost tier
+python3 run_all.py --merge-only              # re-run only merger against latest outputs
+python3 run_all.py --skip xai twitter        # skip selected agents
+python3 run_all.py --only adk perplexity     # run ONLY these (+ merger)
+python3 run_all.py --free-only               # skip all paid APIs
 ```
 
-`run_all.py` launches all agents in parallel (except the merger which runs last). If an API key is missing, agents usually no-op and continue cleanly.
+**Why per-file pip install?** `pip install -r a -r b -r c` is atomic — one missing dep (e.g. a `git+https` URL momentarily 404s) rolls back the entire batch and silently skips packages from earlier files. Splitting per-file means a flaky dep takes down only its own agent. CI does the same.
+
+If a required key is missing, the agent prints a warning and writes an empty/partial output. The merger handles missing inputs gracefully.
 
 ---
 
@@ -49,51 +54,51 @@ python3 run_all.py --skip adk rss
 
 ```mermaid
 flowchart TD
-    subgraph core["4 core source pipelines"]
-        A["ADK"]
-        B["Perplexity"]
-        C["RSS"]
-        D["Tavily"]
+    subgraph core["Core LLM pipelines (4)"]
+        ADK["ADK<br/>Gemini + google_search"]
+        PX["Perplexity<br/>Sonar search + Claude write"]
+        RSS["RSS<br/>75+ feeds + HN + Reddit"]
+        TAV["Tavily<br/>Vendor search + Claude write"]
     end
 
-    subgraph extra["5 supplemental agents"]
-        F["Article Reader"]
-        G["Exa"]
-        H["NewsAPI"]
-        I["YouTube"]
-        J["GitHub Trending"]
+    subgraph supp["Supplemental collectors (5)"]
+        AR["Article Reader<br/>Jina + Firecrawl"]
+        EXA["Exa<br/>Semantic search"]
+        NEWS["NewsAPI<br/>Wire-service news"]
+        YT["YouTube<br/>Channel + search"]
+        GH["GitHub Trending<br/>Repos + releases"]
     end
 
-    A --> M
-    B --> M
-    C --> M
-    D --> M
-    G --> M
-    H --> M
-    F --> M
+    subgraph social["Social channels (2)"]
+        TW["Twitter scrape<br/>auth_token+ct0 (free, active)"]
+        XAI["xAI Grok<br/>(disabled by default — paid)"]
+    end
 
-    I --> P
-    J --> P
+    M["Merger Agent<br/>Anthropic Claude<br/>or Claude Max subscription"]
 
-    M["Final Merger Agent"] --> P["docs/index.html"]
-    M --> D2
-    I --> D2
-    J --> D2["docs/data/*.json"]
+    ADK --> M
+    PX --> M
+    RSS --> M
+    TAV --> M
+    AR --> M
+    EXA --> M
+    NEWS --> M
+    YT --> M
+    GH --> M
+    TW --> M
+    XAI -.-> M
+
+    M --> H["docs/index.html<br/>(GH Pages — raw merged HTML)"]
+    M --> J["docs/data/&lt;date&gt;.json<br/>(structured snapshot)"]
 ```
 
-### What feeds the merger vs. what renders separately
+**Three layers, intentionally split:**
 
-| Agent | Used in merger prompt | Rendered directly in merged HTML | Included in `docs/data` |
-|------|------------------------|----------------------------------|--------------------------|
-| ADK | Yes | No | Through merged briefing |
-| Perplexity | Yes | No | Through merged briefing |
-| RSS | Yes | No | Through merged briefing |
-| Tavily | Yes | No | Through merged briefing |
-| Article Reader | Yes (full-text context) | No | No |
-| Exa | Yes | No | Through merged briefing |
-| NewsAPI | Yes | No | Through merged briefing |
-| YouTube | No | Yes | Yes |
-| GitHub Trending | No | Yes | Yes |
+| Layer | Why it exists |
+|-------|---------------|
+| Core LLM pipelines | Each retrieves news from a *different* surface (live web search, vendor blog feeds, semantic search). Running them in parallel means no single provider outage breaks the briefing. |
+| Supplemental collectors | Widen recall (Exa for niche AI research; NewsAPI for mainstream coverage), enrich content (Article Reader pulls full body text into merger context), or feed dedicated UI sections (YouTube videos, GitHub repos). |
+| Social channels | People-quote and trending-post sections. Twitter scraper covers this for free; xAI Grok is wired in but disabled (cost ≈ $0.35/run, no quality lift over the scraper). |
 
 ---
 
@@ -101,590 +106,533 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    subgraph collect["Collection"]
-        A1["ADK google_search"]
-        A2["Perplexity web_search"]
-        A3["RSS + HN + Reddit (Arctic Shift)"]
-        A4["Tavily news search"]
-        A6["Exa semantic search"]
-        A7["NewsAPI"]
-        A8["YouTube Data API"]
-        A9["GitHub Search + Releases API"]
-        A10["Reddit via Arctic Shift (no-auth)"]
-        A11["Article Reader: Jina + Firecrawl"]
+    subgraph collect["Collection layer"]
+        C1["ADK"]
+        C2["Perplexity"]
+        C3["RSS + HN + Reddit (Arctic Shift)"]
+        C4["Tavily"]
+        C5["Article Reader<br/>(Jina + Firecrawl)"]
+        C6["Exa"]
+        C7["NewsAPI"]
+        C8["YouTube"]
+        C9["GitHub"]
+        C10["Twitter scrape"]
     end
 
-    subgraph save["Saved outputs"]
-        J1["core briefing JSON/HTML"]
-        J2["exa/newsapi JSON"]
-        J3["youtube/github/xai JSON"]
-        J4["article full-text JSON"]
+    subgraph save["Per-agent JSON outputs"]
+        S1["briefing_*.json<br/>(core 4)"]
+        S2["articles_*.json"]
+        S3["exa_*.json / newsapi_*.json"]
+        S4["youtube_*.json / github_*.json"]
+        S5["twitter_*.json"]
     end
 
-    subgraph merge["Final merge"]
-        M1["Anthropic merge"]
-        M2["Hebrew translation"]
-        M3["HTML builder"]
-        M4["publish_data.py"]
+    subgraph merge["Merger (final synthesis)"]
+        MA["Anthropic write<br/>(merge + dedup + score)"]
+        MB["3× parallel<br/>Hebrew translation"]
+        MC["HTML render"]
     end
 
-    A1 --> J1
-    A2 --> J1
-    A3 --> J1
-    A4 --> J1
-    A6 --> J2
-    A7 --> J2
-    A8 --> J3
-    A9 --> J3
-    A10 --> J3
-    A11 --> J4
+    subgraph publish["Publishing"]
+        P1["docs/index.html<br/>+ docs/report/&lt;date&gt;.html"]
+        P2["publish_data.py<br/>(combine + DeepL Reddit/X)"]
+        P3["docs/data/&lt;date&gt;.json"]
+        P4["send_email.py<br/>(status panel + cost)"]
+    end
 
-    J1 --> M1
-    J2 --> M1
-    J4 --> M1
-    M1 --> M2
-    M2 --> M3
-    J3 --> M3
-    M3 --> O1["docs/index.html"]
+    C1 --> S1
+    C2 --> S1
+    C3 --> S1
+    C4 --> S1
+    C5 --> S2
+    C6 --> S3
+    C7 --> S3
+    C8 --> S4
+    C9 --> S4
+    C10 --> S5
 
-    M3 --> M4
-    J3 --> M4
-    M4 --> O3["docs/data/latest.json"]
+    S1 --> MA
+    S2 --> MA
+    S3 --> MA
+    MA --> MB
+    MB --> MC
+    S4 --> MC
+    S5 --> MC
+    MC --> P1
+    P1 --> P2
+    S4 --> P2
+    S5 --> P2
+    P2 --> P3
+    P3 --> P4
 ```
+
+**What feeds the merger prompt vs. what renders directly:**
+
+| Agent | In merger prompt | Rendered directly | In `docs/data` |
+|-------|:----------------:|:-----------------:|:--------------:|
+| ADK | ✓ | — | via merged briefing |
+| Perplexity | ✓ | — | via merged briefing |
+| RSS (incl. Reddit + HN) | ✓ | Reddit posts rendered separately | ✓ |
+| Tavily | ✓ | — | via merged briefing |
+| Article Reader | ✓ (full-text context) | — | — |
+| Exa | ✓ | — | via merged briefing |
+| NewsAPI | ✓ | — | via merged briefing |
+| YouTube | — | ✓ (video grid) | ✓ |
+| GitHub Trending | — | ✓ (repo cards) | ✓ |
+| Twitter scrape | — | ✓ (people + trending) | ✓ |
+| xAI Grok | — | ✓ (when enabled — fallback for Twitter) | ✓ |
+
+---
+
+## Two ways to run the merger
+
+The merger can talk to Claude in two ways. Pick whichever matches your account.
+
+### A. Anthropic API (default)
+
+Set `ANTHROPIC_API_KEY` in your environment and run normally. Cost ≈ **$0.76/run** for the merger (Sonnet 4.6 input + 3 parallel translations) plus collector LLMs ≈ $0.25 → **~$1.01/run total**. See [COSTS.md](./COSTS.md) for the measured breakdown.
+
+### B. Claude Max subscription (zero per-call cost)
+
+If you have a Claude Max account, the merger can route Anthropic calls through `claude -p` (the Claude Code CLI), which uses your OAuth keychain credentials instead of a metered API key. **Sonnet 4.6 → Opus 4.7 included, $0 marginal cost per run.**
+
+**Switch:**
+```bash
+unset ANTHROPIC_API_KEY        # hard-block the API path
+export MERGER_VIA_CLAUDE_CODE=1 # route via `claude -p`
+python3 run_all.py --skip xai
+```
+
+The flag is honored by the four LLM-using agents (`merger-agent`, `perplexity-news-agent`, `rss-news-agent`, `tavily-news-agent`) via `shared/anthropic_cc.py`. On success, the merger writes a marker file `merger-agent/output/<date>/.via_subscription.done`; if CI sees that marker dated within 5 hours, it skips the daily run so you don't double-bill.
+
+The maintainer wraps this whole flow (subscription run → publish → email → AWS Lambda ingest) in `private/LOCAL_RUN.md` (gitignored). For a fork, the three lines above are enough — wire the rest to your own publish target.
+
+### C. Re-running just the merger
+
+If you've already collected today's data and only want to re-render with a different model or prompt:
+```bash
+python3 run_all.py --merge-only
+```
+Loads the latest per-agent outputs from disk. Free for collectors, only the merger LLM cost.
+
+---
+
+## Per-agent reference
+
+Each agent is independent: separate folder, requirements, run.py, output dir. Agents follow the convention `<name>-news-agent/<name>_news_agent/`. Skip any with `--skip <name>`.
+
+### 1. ADK News Agent — `adk-news-agent/`
+
+Google Agent Development Kit pipeline. Vendor + community researchers use Gemini with `google_search`, then a URL resolver expands Google grounding redirects, then writer + translator + publisher.
+
+```mermaid
+flowchart LR
+    A[VendorResearcher] --> B[URLResolver]
+    C[CommunityResearcher] --> D[BriefingWriter]
+    B --> D
+    D --> E[Translator]
+    E --> F[Publisher]
+```
+
+**Run:** `cd adk-news-agent && python3 run.py`
+**Env:** `GOOGLE_API_KEY`, `GOOGLE_GENAI_MODEL` (default `gemini-2.5-flash`), `LOOKBACK_DAYS`
+
+### 2. Perplexity News Agent — `perplexity-news-agent/`
+
+Perplexity Sonar for search; writer + translator now call **Anthropic SDK directly** (cost-saving routing change, 2026-04-23). Sonar still does the actual web research.
+
+```mermaid
+flowchart LR
+    A[VendorResearcher<br/>Sonar search] --> C[BriefingWriter<br/>Anthropic direct]
+    B[CommunityResearcher<br/>Sonar search] --> C
+    C --> D[Translator<br/>Anthropic direct]
+    D --> E[Publisher]
+```
+
+**Run:** `cd perplexity-news-agent && python3 run.py`
+**Env:** `PERPLEXITY_API_KEY`, `ANTHROPIC_API_KEY`, `PERPLEXITY_SEARCH_MODEL`, `PERPLEXITY_WRITER_MODEL`, `PERPLEXITY_TRANSLATOR_MODEL`, `LOOKBACK_DAYS`
+
+### 3. RSS News Agent — `rss-news-agent/`
+
+Deterministic fetch — no search LLM. Pulls from 75+ vendor blogs, tech feeds, Hacker News, and Reddit (via [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift), no auth required). LLM only enters at synthesis.
+
+```mermaid
+flowchart LR
+    A[Vendor RSS feeds] --> X[Filter + rank]
+    B[Hacker News] --> X
+    C[Reddit via Arctic Shift] --> X
+    X --> D[BriefingWriter]
+    D --> E[Translator]
+    E --> F[Publisher]
+```
+
+**Run:** `cd rss-news-agent && python3 run.py`
+**Env:** `ANTHROPIC_API_KEY`, `RSS_WRITER_MODEL`, `RSS_TRANSLATOR_MODEL`, `LOOKBACK_DAYS`
+**Note:** Reddit posts (filtered to score ≥ 20) are also surfaced separately on the live site via `publish_data.py` + DeepL translation.
+
+### 4. Tavily News Agent — `tavily-news-agent/`
+
+Hits 11 vendor topics through Tavily Search, then Anthropic Haiku writes + translates. Tavily key chain: `TAVILY_API_KEY → KEY2 → KEY3 → DuckDuckGo`.
+
+```mermaid
+flowchart LR
+    A[Tavily vendor search<br/>3-key cascade + DDG fallback] --> B[BriefingWriter]
+    B --> C[Translator]
+    C --> D[Publisher]
+```
+
+**Run:** `cd tavily-news-agent && python3 run.py`
+**Env:** `TAVILY_API_KEY` (+ `TAVILY_API_KEY2`, `TAVILY_API_KEY3`), `ANTHROPIC_API_KEY`, `TAVILY_WRITER_MODEL`, `TAVILY_TRANSLATOR_MODEL`, `LOOKBACK_DAYS`
+
+### 5. Article Reader Agent — `article-reader-agent/`
+
+Enrichment-only — no newsletter HTML. Collects URLs from the four core agents' outputs, optionally widens with Tavily/DDG search, fetches full body text via Jina Reader (then Firecrawl, then local cache).
+
+```mermaid
+flowchart LR
+    A[URLs from core outputs] --> C[Deduplicate]
+    B[Tavily / DDG search] --> C
+    C --> D[Jina Reader<br/>→ Firecrawl<br/>→ local cache]
+    D --> E[articles_*.json]
+```
+
+**Run:** `cd article-reader-agent && python3 run.py`
+**Env:** `JINA_API_KEY` (+ `JINA_API_KEY2`), `FIRECRAWL_API_KEY`, `TAVILY_API_KEY`, `SKIP_ARTICLE_READING=true` to disable, `ARTICLE_READ_TIMEOUT`
+
+### 6. Exa News Agent — `exa-news-agent/`
+
+Semantic search for niche/technical AI stories that broad search misses. 10 hand-tuned queries.
+
+```mermaid
+flowchart LR
+    A[10 Exa semantic queries] --> B[Collect]
+    B --> C[Deduplicate]
+    C --> D[exa_*.json]
+```
+
+**Run:** `cd exa-news-agent && python3 run.py`
+**Env:** `EXA_API_KEY` (+ `EXA_API_KEY2`), `LOOKBACK_DAYS`
+
+### 7. NewsAPI Agent — `newsapi-agent/`
+
+Structured wire-service feed for mainstream coverage. 8 queries, vendor classification, dedup.
+
+```mermaid
+flowchart LR
+    A[8 NewsAPI queries] --> B[Collect]
+    B --> C[Deduplicate]
+    C --> D[Classify by vendor]
+    D --> E[newsapi_*.json]
+```
+
+**Run:** `cd newsapi-agent && python3 run.py`
+**Env:** `NEWSAPI_KEY` (+ `NEWSAPI_KEY2`), `LOOKBACK_DAYS`
+
+### 8. YouTube News Agent — `youtube-news-agent/`
+
+Video discovery: ~25 curated channels (Hebrew + vendor) + 4 targeted searches, stats, quality filter, vendor classify. Renders directly in the merged HTML's video section. 7-day lookback (independent of core 3-day default).
+
+```mermaid
+flowchart LR
+    A[Curated channels<br/>~25] --> C[Merge]
+    B[Targeted searches] --> C
+    C --> D[Stats + quality filter]
+    D --> E[Classify vendors]
+    E --> F[youtube_*.json]
+```
+
+**Run:** `cd youtube-news-agent && python3 run.py`
+**Env:** `YOUTUBE_API_KEY` (or `GOOGLE_API_KEY` as fallback), `LOOKBACK_DAYS`
+
+### 9. GitHub Trending Agent — `github-trending-agent/`
+
+Open-source AI momentum: 6 trending search queries + 15 tracked repos for release polling. No LLM.
+
+```mermaid
+flowchart LR
+    A[6 trending searches] --> C[Merge]
+    B[15 tracked repos<br/>release polling] --> C
+    C --> D[github_*.json]
+```
+
+**Run:** `cd github-trending-agent && python3 run.py`
+**Env:** `GITHUB_TOKEN` (optional — for higher rate limits), `LOOKBACK_DAYS`
+
+### 10. Twitter Agent — `twitter-agent/` (active, free)
+
+Direct X/Twitter GraphQL scrape using a logged-in session's `auth_token` + `ct0` cookies — no paid API. Pulls recent posts from a curated list of AI leaders (Sam Altman, Yann LeCun, Greg Brockman, François Chollet, Simon Willison, etc.) plus a trending AI search. Output schema matches the xAI agent so the merger and frontend treat them interchangeably.
+
+**Reliability:** People-timeline path is stable. Search/trending path occasionally 404s when X rotates GraphQL query IDs (last fixed 2026-04-27). When this breaks, the merger shows trending=empty rather than failing.
+
+**Run:** `cd twitter-agent && python3 run.py`
+**Env:** `TWITTER_AUTH_TOKEN`, `TWITTER_CT0` (cookies — see [How to get them](#how-to-get-twitter-cookies)), `LOOKBACK_DAYS`
+
+### 11. xAI Twitter Agent — `xai-twitter-agent/` (disabled by default)
+
+Same role as `twitter-agent` but uses Grok-4 + xAI's `x_search` tool instead of scraping. Disabled in CI (`--skip xai`) because it costs ≈ $0.35/run with no quality advantage over the free scraper. Re-enable by removing `--skip xai` if X cookies become unobtainable.
+
+**Run:** `cd xai-twitter-agent && python3 run.py`
+**Env:** `XAI_API_KEY`, `LOOKBACK_DAYS`
+
+### 12. Merger Agent — `merger-agent/`
+
+Final synthesis. Loads the latest of every per-agent JSON output, runs them through Claude (one merge call + three parallel translation calls), and renders the bilingual HTML.
+
+```mermaid
+flowchart LR
+    A[Load core 4 briefings] --> M[Merge call<br/>(Claude Sonnet 4.6<br/>or Opus 4.7 sub)]
+    B[Load Article Reader<br/>full text] --> M
+    C[Load Exa + NewsAPI] --> M
+    M --> T[3× parallel<br/>Hebrew translation]
+
+    T --> H[HTML builder]
+    D[Twitter / xAI<br/>people + trending] --> H
+    E[YouTube + GitHub] --> H
+
+    H --> O[merged_*.html<br/>+ merged_*.json]
+```
+
+**Run:** `cd merger-agent && python3 run.py`
+**Env:**
+- `ANTHROPIC_API_KEY` *or* `MERGER_VIA_CLAUDE_CODE=1` (subscription path — see above)
+- `MERGER_WRITER_MODEL` (default `claude-sonnet-4-6` on API path)
+- `MERGER_TRANSLATOR_MODEL` (default `claude-sonnet-4-6`)
+- `MERGER_CC_MODEL` (default `claude-opus-4-7`, subscription only)
+- `MERGER_CC_EFFORT` (default `low`, subscription only — keeps output under the 32K single-turn ceiling so Claude Code doesn't auto-continue and break JSON parsing)
 
 ---
 
 ## Model Stack
 
-| Agent | Current default models / APIs | Provider |
-|------|-------------------------------|----------|
-| ADK | `gemini-2.5-flash` + `google_search` | Google AI / ADK |
-| Perplexity | `PERPLEXITY_SEARCH_MODEL` default `anthropic/claude-haiku-4-5`, writer `anthropic/claude-sonnet-4-6`, translator `anthropic/claude-haiku-4-5` | Perplexity Responses API |
-| RSS | writer `anthropic/claude-haiku-4-5`, translator `anthropic/claude-haiku-4-5` | Perplexity Responses API |
-| Tavily | writer `anthropic/claude-sonnet-4-6`, translator `anthropic/claude-haiku-4-5` | Tavily + Perplexity Responses API |
-| Article Reader | no LLM | Jina Reader + Firecrawl |
-| Exa | no LLM | Exa API |
-| NewsAPI | no LLM | NewsAPI |
-| YouTube | no LLM | YouTube Data API v3 |
-| GitHub Trending | no LLM | GitHub REST APIs |
-| xAI Twitter | `grok-4` via Responses API with `x_search` tool | xAI API |
-| Merger | `MERGER_WRITER_MODEL` default `claude-sonnet-4-6`, `MERGER_TRANSLATOR_MODEL` default `claude-sonnet-4-6` | Anthropic API |
-
-The CI workflow sets both merger steps to `claude-sonnet-4-6`. See [COSTS.md](./COSTS.md) for measured per-run costs.
-
----
-
-## Agents
-
-### 1. ADK News Agent (`adk-news-agent/`)
-
-Google ADK pipeline that uses Gemini and `google_search`, then resolves Google grounding URLs before writing the final briefing.
-
-```mermaid
-flowchart LR
-    A["VendorResearcher"] --> B["URLResolver"]
-    C["CommunityResearcher"] --> D["BriefingWriter"]
-    B --> D
-    D --> E["Translator"]
-    E --> F["Publisher"]
-```
-
-**Run**
-```bash
-cd adk-news-agent
-python3 run.py
-```
-
-**Key env**
-- `GOOGLE_API_KEY`
-- `GOOGLE_GENAI_MODEL` (default `gemini-2.5-flash`)
-- `LOOKBACK_DAYS`
-
-### 2. Perplexity News Agent (`perplexity-news-agent/`)
-
-Agentic search pipeline on the Perplexity Responses API. It does vendor research, community research, structured JSON writing, translation, then HTML publishing.
-
-```mermaid
-flowchart LR
-    A["VendorResearcher"] --> C["BriefingWriter"]
-    B["CommunityResearcher"] --> C
-    C --> D["Translator"]
-    D --> E["Publisher"]
-```
-
-**Run**
-```bash
-cd perplexity-news-agent
-python3 run.py
-```
-
-**Key env**
-- `PERPLEXITY_API_KEY`
-- `PERPLEXITY_SEARCH_MODEL`
-- `PERPLEXITY_WRITER_MODEL`
-- `PERPLEXITY_TRANSLATOR_MODEL`
-- `LOOKBACK_DAYS`
-
-### 3. RSS News Agent (`rss-news-agent/`)
-
-Deterministic fetch pipeline for vendor blogs, tech feeds, Hacker News, and Reddit (via Arctic Shift — no auth required). Covers 75+ feeds. No search LLM is used; LLM work only starts at synthesis.
-
-```mermaid
-flowchart LR
-    A["RSS + HN + Reddit (Arctic Shift) fetch"] --> B["Filter and rank"]
-    B --> C["BriefingWriter"]
-    C --> D["Translator"]
-    D --> E["Publisher"]
-```
-
-**Run**
-```bash
-cd rss-news-agent
-python3 run.py
-```
-
-**Key env**
-- `PERPLEXITY_API_KEY`
-- `RSS_WRITER_MODEL`
-- `RSS_TRANSLATOR_MODEL`
-- `LOOKBACK_DAYS`
-
-### 4. Tavily News Agent (`tavily-news-agent/`)
-
-Searches 11 vendors through Tavily, then uses Perplexity-hosted models to turn the fetched articles into briefing JSON and Hebrew output.
-
-```mermaid
-flowchart LR
-    A["Tavily vendor search"] --> B["BriefingWriter"]
-    B --> C["Translator"]
-    C --> D["Publisher"]
-```
-
-**Run**
-```bash
-cd tavily-news-agent
-python3 run.py
-```
-
-**Key env**
-- `TAVILY_API_KEY`
-- `PERPLEXITY_API_KEY`
-- `TAVILY_WRITER_MODEL`
-- `TAVILY_TRANSLATOR_MODEL`
-- `LOOKBACK_DAYS`
-
-### 5. Article Reader Agent (`article-reader-agent/`)
-
-Collects article URLs from recent core outputs, supplements them with Tavily or DuckDuckGo search, reads full text with Jina Reader, and falls back to Firecrawl when needed.
-
-This agent exists only to improve merger quality; it does not produce newsletter HTML.
-
-```mermaid
-flowchart LR
-    A["Collect URLs from latest outputs"] --> C["Deduplicate"]
-    B["Tavily or DDG search"] --> C
-    C --> D["Read full text"]
-    D --> E["Save articles_*.json"]
-```
-
-**Run**
-```bash
-cd article-reader-agent
-python3 run.py
-```
-
-**Key env**
-- `TAVILY_API_KEY` or `TAVILY_API_KEY2`
-- `FIRECRAWL_API_KEY` for fallback reader
-- `SKIP_ARTICLE_READING=true` to disable
-- `ARTICLE_READ_TIMEOUT`
-
-### 6. Exa News Agent (`exa-news-agent/`)
-
-Semantic search layer for niche or technical AI stories that broader web/news search can miss.
-
-```mermaid
-flowchart LR
-    A["10 Exa semantic queries"] --> B["Collect results"]
-    B --> C["Deduplicate URLs"]
-    C --> D["Format news_items"]
-    D --> E["Save exa_*.json"]
-```
-
-**Run**
-```bash
-cd exa-news-agent
-python3 run.py
-```
-
-**Key env**
-- `EXA_API_KEY`
-- `LOOKBACK_DAYS`
-
-### 7. NewsAPI Agent (`newsapi-agent/`)
-
-Structured news wire layer that prioritizes normalized dates, source metadata, and broad mainstream coverage.
-
-```mermaid
-flowchart LR
-    A["8 NewsAPI queries"] --> B["Collect articles"]
-    B --> C["Deduplicate"]
-    C --> D["Classify + format"]
-    D --> E["Save newsapi_*.json"]
-```
-
-**Run**
-```bash
-cd newsapi-agent
-python3 run.py
-```
-
-**Key env**
-- `NEWSAPI_KEY`
-- `LOOKBACK_DAYS`
-
-### 8. YouTube News Agent (`youtube-news-agent/`)
-
-Video discovery layer that pulls from `35` curated channels (including Hebrew channels and official vendor channels), adds `4` targeted searches, fetches stats, filters aggressively, and emits a JSON section for direct rendering in the merged HTML. Uses a 7-day lookback (independent of other agents' 3-day default).
-
-```mermaid
-flowchart LR
-    A["Curated channel fetch"] --> C["Merge videos"]
-    B["Targeted YouTube search"] --> C
-    C --> D["Stats + quality filter"]
-    D --> E["Classify vendors"]
-    E --> F["Save youtube_*.json"]
-```
-
-**Run**
-```bash
-cd youtube-news-agent
-python3 run.py
-```
-
-**Key env**
-- `YOUTUBE_API_KEY` or `GOOGLE_API_KEY`
-- `LOOKBACK_DAYS`
-
-### 9. GitHub Trending Agent (`github-trending-agent/`)
-
-Tracks open-source AI momentum through repository search and release polling:
-- `6` trending search queries
-- `15` tracked repositories for release checks
-
-```mermaid
-flowchart LR
-    A["GitHub repo search"] --> C["Format output"]
-    B["Tracked release polling"] --> C
-    C --> D["Save github_*.json"]
-```
-
-**Run**
-```bash
-cd github-trending-agent
-python3 run.py
-```
-
-**Key env**
-- `GITHUB_TOKEN` optional for higher rate limits
-- `LOOKBACK_DAYS`
-
-### 10. Twitter Agent (`twitter-agent/`) — active, free
-
-Scrapes X/Twitter GraphQL directly using logged-in cookies (`auth_token` + `ct0`) — no paid API required. Pulls recent posts from a curated list of AI leaders (Yann LeCun, Sam Altman, Greg Brockman, Francois Chollet, Simon Willison, etc.) plus trending AI search. People timeline path is stable; the search/trending path occasionally 404s when X rotates its GraphQL query IDs.
-
-**Key env**
-- `TWITTER_AUTH_TOKEN`, `TWITTER_CT0` (cookies from a logged-in x.com session)
-- `LOOKBACK_DAYS`
-
-### 11. xAI Twitter Agent (`xai-twitter-agent/`) — currently disabled
-
-Uses Grok to search recent posts from tracked AI leaders. Disabled by default (`--skip xai`) due to cost (~$0.35/run) because `twitter-agent/` already covers the same use case for free. Re-enable by removing `--skip xai` from the workflow if we need the xAI search path specifically.
-
-**Key env**
-- `XAI_API_KEY`
-- `LOOKBACK_DAYS`
-
-### 11. Merger Agent (`merger-agent/`)
-
-Runs **after** the other agents. It loads the latest saved outputs, merges core news, uses Article Reader full-text context, includes Exa and NewsAPI as extra sources, translates to Hebrew with three parallel calls, and renders the final HTML.
-
-Directly rendered sections in the merged page come from:
-- xAI Twitter `people_highlights` and `trending_posts`
-- YouTube `news_items`
-- GitHub Trending `news_items`
-
-```mermaid
-flowchart LR
-    A["Load latest core briefings"] --> F["Anthropic merge"]
-    B["Load Exa + NewsAPI"] --> F
-    C["Load Article Reader full text"] --> F
-    F --> G["Parallel Hebrew translation"]
-    D["Load xAI social data"] --> H["HTML builder"]
-    E["Load YouTube + GitHub JSON"] --> H
-    G --> H
-    H --> I["Save merged_*.html and merged_*.json"]
-```
-
-**Run**
-```bash
-cd merger-agent
-python3 run.py
-```
-
-**Key env**
-- `ANTHROPIC_API_KEY`
-- `MERGER_WRITER_MODEL`
-- `MERGER_TRANSLATOR_MODEL`
-
----
-
-## Run Everything
-
-`run_all.py` starts all collection/enrichment agents in parallel and only then runs the merger.
-
-```mermaid
-flowchart LR
-    A["Launch 10 collection/enrichment agents"] --> B["Wait for completion / timeouts"]
-    B --> C["Warn on failures but continue"]
-    C --> D["Run merger once"]
-```
-
-**Commands**
-```bash
-python3 run_all.py
-python3 run_all.py --skip adk
-python3 run_all.py --skip perplexity xai
-python3 run_all.py --merge-only
-```
-
-**Useful env**
-- `AGENT_TIMEOUT` default `480` seconds for each launched process
-- `LOOKBACK_DAYS` default `3`
-
----
-
-## Why This Architecture
-
-The system is a layered collection pipeline:
-
-| Layer | Agents | Purpose |
-|------|--------|---------|
-| Core news collection | ADK, Perplexity, RSS, Tavily | High-signal vendor and industry news from different retrieval styles |
-| Enrichment | Article Reader | Full article text for better merged summaries |
-| Supplemental discovery | Exa, NewsAPI | Niche semantic search plus structured mainstream news coverage |
-| Direct-render side channels | YouTube, GitHub Trending | Video and open-source sections that should not be collapsed into headline cards |
-| Social + X/Twitter | xAI Twitter | People highlights, trending posts, community pulse — serves as the social data source |
-| Final synthesis | Merger | Deduplication, ranking, Hebrew translation, HTML publishing |
-
-That split matters because different agents solve different problems:
-- ADK and Perplexity are best at live search.
-- RSS is deterministic and cheap.
-- Tavily is strong for fresh vendor-by-vendor article retrieval.
-- xAI Twitter catches practitioner sentiment and community reaction via X/Twitter.
-- Article Reader improves summary density by adding full article text.
-- Exa and NewsAPI widen recall without changing the core story format.
-- YouTube and GitHub are more useful as dedicated sections than as generic news cards.
+| Agent | API path default | Subscription path | Provider |
+|-------|------------------|-------------------|----------|
+| ADK | `gemini-2.5-flash` + `google_search` | (n/a — not Anthropic) | Google AI |
+| Perplexity | search: Sonar; writer + translator: `claude-haiku-4-5` (direct) | writer + translator → Opus 4.7 via `claude -p` | Perplexity + Anthropic |
+| RSS | writer + translator: `claude-haiku-4-5` | → Opus 4.7 via `claude -p` | Anthropic |
+| Tavily | writer + translator: `claude-haiku-4-5` | → Opus 4.7 via `claude -p` | Tavily + Anthropic |
+| Article Reader | (no LLM) | (n/a) | Jina + Firecrawl |
+| Exa | (no LLM) | (n/a) | Exa |
+| NewsAPI | (no LLM) | (n/a) | NewsAPI |
+| YouTube | (no LLM) | (n/a) | YouTube Data API v3 |
+| GitHub Trending | (no LLM) | (n/a) | GitHub REST |
+| Twitter | (no LLM) | (n/a) | X GraphQL (scrape) |
+| xAI | `grok-4` + `x_search` | (not routed) | xAI |
+| **Merger** | writer + translator: `claude-sonnet-4-6` | `claude-opus-4-7` via `claude -p` | Anthropic |
 
 ---
 
 ## Outputs
 
-### Per-agent outputs
+### Per-agent (committed daily)
 
-| Path | Output |
-|------|--------|
-| `adk-news-agent/output/YYYY-MM-DD/briefing_*.html` | ADK standalone newsletter |
-| `adk-news-agent/output/YYYY-MM-DD/briefing_*.json` | ADK structured briefing |
-| `perplexity-news-agent/output/YYYY-MM-DD/briefing_*.html` | Perplexity standalone newsletter |
-| `perplexity-news-agent/output/YYYY-MM-DD/briefing_*.json` | Perplexity structured briefing |
-| `rss-news-agent/output/YYYY-MM-DD/briefing_*.html` | RSS standalone newsletter |
-| `rss-news-agent/output/YYYY-MM-DD/briefing_*.json` | RSS structured briefing |
-| `tavily-news-agent/output/YYYY-MM-DD/briefing_*.html` | Tavily standalone newsletter |
-| `tavily-news-agent/output/YYYY-MM-DD/briefing_*.json` | Tavily structured briefing |
-| `article-reader-agent/output/YYYY-MM-DD/articles_*.json` | Full article text cache for merger context |
-| `exa-news-agent/output/YYYY-MM-DD/exa_*.json` | Supplemental news source |
-| `newsapi-agent/output/YYYY-MM-DD/newsapi_*.json` | Supplemental news source |
-| `youtube-news-agent/output/YYYY-MM-DD/youtube_*.json` | Video section source |
-| `github-trending-agent/output/YYYY-MM-DD/github_*.json` | Open-source section source |
-| `xai-twitter-agent/output/YYYY-MM-DD/xai_twitter_*.json` | X/Twitter side-channel data |
-| `merger-agent/output/YYYY-MM-DD/merged_*.html` | Final merged newsletter |
-| `merger-agent/output/YYYY-MM-DD/merged_*.json` | Final merged structured output |
+| Path | Description |
+|------|-------------|
+| `<agent>/output/<YYYY-MM-DD>/briefing_<HHMMSS>.{html,json}` | Standalone briefing per core agent |
+| `<agent>/output/<YYYY-MM-DD>/usage_<HHMMSS>.json` | Per-call token + cost log (LLM agents only) |
+| `article-reader-agent/output/.../articles_*.json` | Full article body text for merger context |
+| `exa-news-agent/output/.../exa_*.json` | Supplemental sources |
+| `newsapi-agent/output/.../newsapi_*.json` | Supplemental sources |
+| `youtube-news-agent/output/.../youtube_*.json` | Direct-render video items |
+| `github-trending-agent/output/.../github_*.json` | Direct-render repo items |
+| `twitter-agent/output/.../briefing_*.json` | People highlights + trending posts |
+| `merger-agent/output/.../merged_*.{html,json}` | Final merged briefing |
+| `merger-agent/output/.../.via_subscription.done` | Marker — written when subscription path was used; signals CI to skip |
 
-### Published outputs
+### Published (the public contract)
 
 | Path | Producer | Notes |
 |------|----------|-------|
-| `docs/index.html` | GitHub Actions | Latest merged newsletter for GitHub Pages |
-| `docs/data/YYYY-MM-DD.json` | `publish_data.py` | Combined machine-readable daily snapshot |
-| `docs/data/latest.json` | `publish_data.py` | Latest combined snapshot |
+| `docs/index.html` | CI / `local-cycle.sh` | Latest merged briefing — standalone, no JS dependency |
+| `docs/report/<YYYY-MM-DD>.html` | CI / `local-cycle.sh` | Per-day archive |
+| `docs/report/latest.html` | CI / `local-cycle.sh` | Alias for today |
+| `docs/data/<YYYY-MM-DD>.json` | `publish_data.py` | Combined daily snapshot — see schema below |
+| `docs/data/latest.json` | `publish_data.py` | Alias for today |
+| `docs/data/_fallbacks_<date>.jsonl` | `shared/fallback_tracker` | One JSON line per key rotation that fired |
 
-`publish_data.py` bundles:
-- merged briefing (EN + Hebrew)
-- xAI social data (people, trending, community)
-- YouTube items
-- GitHub items
+### `docs/data/<date>.json` shape
 
----
+```json
+{
+  "date": "2026-04-28",
+  "briefing": { "tldr": "...", "stories": [...], "tldr_he": "...", "stories_he": [...] },
+  "twitter":  { "people_highlights": [...], "trending_posts": [...], "community_pulse": "..." },
+  "social":   { "people_highlights": [...], "community_pulse": "...", "top_reddit": [...] },
+  "youtube":  [ { "title": ..., "url": ..., "channel": ..., ... } ],
+  "github":   [ { "repo": ..., "url": ..., "stars_today": ..., ... } ]
+}
+```
 
-## Automation and Publishing
-
-The daily schedule is driven entirely by EventBridge (no GitHub Actions cron):
-
-| Israel time | UTC | Lambda | Action |
-|---|---|---|---|
-| 09:00 | 06:00 | `ai-news-trigger` | Dispatches GitHub Actions workflow |
-| 09:30 | 06:30 | `ai-news-ingest` | Ingests published data into DynamoDB |
-
-The GitHub Actions workflow (`daily_briefing.yml`) only responds to `workflow_dispatch` — no cron. Steps:
-1. install dependencies
-2. run `python3 run_all.py`
-3. copy the latest merged HTML to `docs/index.html`
-4. run `python3 publish_data.py`
-5. commit and push outputs
-6. send email
+The site at `kobyal.github.io/ai-news-briefing/data/<date>.json` is the maintainer's deployment of this contract — fork-friendly because the same file is what your fork would publish.
 
 ---
 
-## Environment
+## Scheduling & CI
 
-| Env var | Used by |
-|--------|---------|
-| `GOOGLE_API_KEY` | ADK, optionally YouTube |
-| `GOOGLE_GENAI_MODEL` | ADK |
-| `PERPLEXITY_API_KEY` | Perplexity, RSS, Tavily |
-| `PERPLEXITY_SEARCH_MODEL` | Perplexity |
-| `PERPLEXITY_WRITER_MODEL` | Perplexity |
-| `PERPLEXITY_TRANSLATOR_MODEL` | Perplexity |
-| `RSS_WRITER_MODEL` / `RSS_TRANSLATOR_MODEL` | RSS |
-| `TAVILY_API_KEY` / `TAVILY_API_KEY2` | Tavily, Article Reader |
-| `TAVILY_WRITER_MODEL` / `TAVILY_TRANSLATOR_MODEL` | Tavily |
-| `EXA_API_KEY` | Exa |
-| `NEWSAPI_KEY` | NewsAPI |
-| `YOUTUBE_API_KEY` | YouTube |
-| `GITHUB_TOKEN` | GitHub Trending optional auth |
-| `XAI_API_KEY` | xAI Twitter |
-| `FIRECRAWL_API_KEY` | Article Reader fallback |
-| `ANTHROPIC_API_KEY` | Merger |
-| `MERGER_WRITER_MODEL` / `MERGER_TRANSLATOR_MODEL` | Merger |
-| `LOOKBACK_DAYS` | Most agents |
-| `AGENT_TIMEOUT` | `run_all.py` |
-| `SKIP_ARTICLE_READING` | Article Reader |
+### GitHub Actions (`.github/workflows/daily_briefing.yml`)
+
+Triggered by **`workflow_dispatch` only** — no cron is currently active in the workflow file. The pipeline runs end-to-end (~18 minutes) and commits outputs back to `main` (which deploys GitHub Pages).
+
+**Skip-window** (added 2026-04-24): step 1 checks for `merger-agent/output/<today>/.via_subscription.done`. If the marker is < 5 hours old, every subsequent step short-circuits with `if: steps.skip_check.outputs.skip != 'true'`. This lets the maintainer run via subscription locally (zero cost) and have CI gracefully no-op the same morning.
+
+**Modes** (via workflow_dispatch input):
+| Mode | What runs |
+|------|-----------|
+| `all` (default) | Every agent except xAI, then merger |
+| `merge-only` | Only the merger against the latest committed outputs |
+
+### EventBridge (currently disabled)
+
+The maintainer's AWS account has two EventBridge rules wired to drive a daily run:
+
+| Israel Time | UTC | Lambda | Purpose |
+|-------------|-----|--------|---------|
+| 09:00 | 06:00 | `ai-news-trigger` | Dispatches the GitHub Actions workflow |
+| 09:30 | 06:30 | `ai-news-ingest` | Reads `docs/data/<date>.json` from GH Pages → DynamoDB → CloudFront |
+
+**Both rules are disabled as of 2026-04-26** to avoid double-runs while the maintainer was iterating locally. Re-enable with:
+```bash
+aws events enable-rule --name ai-news-trigger-daily --region us-east-1
+aws events enable-rule --name ai-news-ingest-daily --region us-east-1
+```
+
+For a fork, you don't need EventBridge at all — uncomment a `cron` trigger in `daily_briefing.yml` and you have a fully self-contained daily pipeline.
 
 ---
 
-## Vendor Coverage
+## Local daily wrapper (subscription-path power user)
 
-The merger classifies stories into these vendor buckets:
+The maintainer runs the daily pipeline locally on a Claude Max subscription via a wrapper script `local-cycle.sh` (gitignored — personal runner). The script chains: install deps → `python3 run_all.py --skip xai` (subscription path) → copy HTML to `docs/` → `publish_data.py` → `send_email.py` → git push → wait for GH Pages → invoke AWS ingest Lambda.
+
+If you have a Claude Max account and want to do the same, the **full operational playbook** (env layout, marker semantics, recovery commands, common gotchas) lives in **`private/LOCAL_RUN.md`** (also gitignored — copy out of the maintainer's repo if you have access, or write your own from the recipe in [Two ways to run the merger → B](#b-claude-max-subscription-zero-per-call-cost) above).
+
+Minimum viable local run, no AWS, no email:
+```bash
+cp .env.example private/.env
+vim private/.env                    # fill in keys
+set -a; source private/.env; set +a
+unset ANTHROPIC_API_KEY
+export MERGER_VIA_CLAUDE_CODE=1
+python3 run_all.py --skip xai
+DATE=$(date +%Y-%m-%d)
+cp $(ls -t merger-agent/output/${DATE}/merged_*.html | head -1) docs/index.html
+python3 publish_data.py
+git add -f docs/ && git commit -m "briefing: ${DATE}" && git push
+```
+
+---
+
+## Frontend & Infrastructure (separate repos)
+
+The maintainer's deployment has two extra components that are **not in this public repo**:
+
+- **`web/`** — Next.js static-export site, deployed to S3 + CloudFront. Reads `docs/data/<date>.json` (or its mirrored copy in DynamoDB via `/api/stories`) and renders `/`, `/community/`, `/media/`, `/archive/`, `/[date]/`, `/story?id=...`. Local dev: `cd web && npm install && npm run dev`. Build/deploy: `npm run build && aws s3 sync out s3://<bucket> --delete --exclude "data/*"` (the `data/*` exclude is critical — that folder is written by the ingest Lambda and would be wiped by `--delete`).
+- **`infra/`** — AWS CDK (Python). Five stacks: `DatabaseStack` (DynamoDB), `TriggerStack` (Lambda → GH Actions dispatch), `IngestStack` (Lambda → DynamoDB), `ApiStack` (Lambda + API Gateway → `/api/stories`, `/api/archive`, `/api/story/:id`), `FrontendStack` (S3 + CloudFront with OAC).
+
+**Both directories are gitignored from this repo by design** — they exist only in the maintainer's local checkout as separate git repos with no remote. For a fork, you have two clean choices:
+1. **Stop at `docs/`** — GitHub Pages serves the merged briefing and the daily JSON. That's a complete product.
+2. **Build your own consumer** — your own Next.js/Astro/static frontend that reads the JSON. The schema above is the contract; you don't need DynamoDB or any AWS.
+
+---
+
+## Forking & customizing
+
+Common changes a fork might want:
+
+| Goal | Where |
+|------|-------|
+| Drop an agent | `python3 run_all.py --skip <name>` or remove its block from the workflow |
+| Add an agent | Create `<name>-news-agent/` (mirror an existing one), register in `run_all.py::AGENTS`, add `<name>_*.json` discovery to `merger-agent/merger_agent/pipeline.py` if it should feed the merge prompt, or to `publish_data.py` if it renders directly |
+| Change the merger model | `MERGER_WRITER_MODEL=claude-haiku-4-5` (saves ~$0.50/run, some quality drop) |
+| Change vendor coverage | `shared/vendors.py` — taxonomy used by all classifiers |
+| Change YouTube channel list | `youtube-news-agent/youtube_news_agent/pipeline.py::AI_CHANNELS` |
+| Change RSS feed list | `rss-news-agent/rss_news_agent/feeds.py` |
+| Disable Hebrew | Skip the translator step or set `MERGER_TRANSLATOR_MODEL=` empty (results in EN-only output) |
+
+---
+
+## Vendor coverage
+
+The merger classifies stories into these vendor buckets. Edit `shared/vendors.py` to change.
 
 | Vendor | Focus |
 |--------|-------|
 | Anthropic | Claude, API, safety, coding tools |
-| AWS | Bedrock, Nova, SageMaker |
 | OpenAI | GPT, ChatGPT, API, reasoning models |
 | Google | Gemini, DeepMind, Gemma |
-| Azure | Azure AI, Copilot, Microsoft AI |
+| Microsoft / Azure | Azure AI, Copilot, Microsoft AI |
+| AWS | Bedrock, Nova, SageMaker |
 | Meta | Llama, Meta AI |
 | xAI | Grok, xAI releases |
 | NVIDIA | GPUs, inference stack, NIM |
-| Mistral | Open and commercial models |
+| Mistral | Open + commercial models |
 | Apple | Apple Intelligence, on-device AI |
-| Hugging Face | Models, datasets, open-source ecosystem |
+| Hugging Face | Models, datasets, OS ecosystem |
 | Alibaba | Qwen, Tongyi, cloud AI |
-| DeepSeek | DeepSeek models, open-source LLMs |
+| DeepSeek | DeepSeek models, OS LLMs |
 | Samsung | On-device AI, Gauss, hardware AI |
 
 Stories not matching a specific vendor are classified as `Other`.
 
 ---
 
-## Web App
+## Environment variables
 
-The frontend is a **Next.js** static-export app in `web/`. It fetches data from the API at runtime and renders:
-
-| Route | Description |
-|-------|-------------|
-| `/` | Homepage — TL;DR, stories grid, vendor filter, community/social sections |
-| `/community/` | X/Twitter trending + people posts (deduplicated, with Hebrew descriptions) |
-| `/media/` | Latest AI videos (2-col grid), curated YouTube channels (15) + podcasts (8) |
-| `/github/` | GitHub Trending (coming soon) |
-| `/archive/` | Calendar view of past briefings |
-| `/story?id=` | Individual story detail page |
-| `/[date]` | Individual day briefing |
-
-### Local development
-
-```bash
-cd web
-npm install
-npm run dev   # → http://localhost:3000
-```
-
-### Build & deploy
-
-```bash
-cd web
-npm run build                    # generates out/ (static export)
-# IMPORTANT: --exclude "data/*" is required because the data/ folder
-# (per-day JSON + OG-image mirrors) is written by the ingest Lambda and
-# does NOT live in web/out. Without this exclude, --delete will wipe it.
-aws s3 sync out s3://ai-news-briefing-web --delete --exclude "data/*"
-aws cloudfront create-invalidation --distribution-id E2XOWDA6B84582 --paths "/*"
-```
+| Var | Used by |
+|-----|---------|
+| `GOOGLE_API_KEY` | ADK, YouTube fallback |
+| `GOOGLE_GENAI_MODEL` | ADK |
+| `PERPLEXITY_API_KEY` | Perplexity (Sonar) |
+| `PERPLEXITY_SEARCH_MODEL` / `_WRITER_MODEL` / `_TRANSLATOR_MODEL` | Perplexity |
+| `ANTHROPIC_API_KEY` | Merger, RSS, Tavily, Perplexity (writer + translator after Apr 23 routing change) |
+| `MERGER_VIA_CLAUDE_CODE` | Switch all Anthropic calls to `claude -p` (subscription path) |
+| `MERGER_WRITER_MODEL` / `MERGER_TRANSLATOR_MODEL` | Merger (API path) |
+| `MERGER_CC_MODEL` / `MERGER_CC_EFFORT` | Merger (subscription path) |
+| `RSS_WRITER_MODEL` / `RSS_TRANSLATOR_MODEL` | RSS |
+| `TAVILY_API_KEY` (+ `TAVILY_API_KEY2`, `TAVILY_API_KEY3`) | Tavily, Article Reader search |
+| `TAVILY_WRITER_MODEL` / `TAVILY_TRANSLATOR_MODEL` | Tavily |
+| `EXA_API_KEY` (+ `EXA_API_KEY2`) | Exa |
+| `NEWSAPI_KEY` (+ `NEWSAPI_KEY2`) | NewsAPI |
+| `YOUTUBE_API_KEY` | YouTube |
+| `GITHUB_TOKEN` | GitHub Trending (optional) |
+| `XAI_API_KEY` | xAI Grok agent |
+| `JINA_API_KEY` (+ `JINA_API_KEY2`) | Article Reader |
+| `FIRECRAWL_API_KEY` | Article Reader fallback |
+| `TWITTER_AUTH_TOKEN` / `TWITTER_CT0` | Twitter scrape (cookies from logged-in x.com) |
+| `DEEPL_API_KEY` | `publish_data.py` (Hebrew for Reddit + X posts) |
+| `LOOKBACK_DAYS` | Most agents (default 3) |
+| `AGENT_TIMEOUT` | `run_all.py` (default 480 s per process) |
+| `SKIP_ARTICLE_READING` | Article Reader |
+| `GMAIL_APP_PASSWORD` | `send_email.py` |
+| `DASHBOARD_MTD_JSON` | `send_email.py` (CI only — mirrors `private/dashboard_mtd.json`) |
 
 ---
 
-## Infrastructure (AWS CDK)
+## How to get Twitter cookies
 
-All infrastructure is defined in `infra/` using AWS CDK (Python).
+1. Open `x.com` in a logged-in browser session.
+2. DevTools → Application → Cookies → `https://x.com`.
+3. Copy the values of `auth_token` and `ct0`.
+4. Paste into `TWITTER_AUTH_TOKEN` and `TWITTER_CT0` env vars.
 
-| Stack | Resources |
-|-------|-----------|
-| `DatabaseStack` | DynamoDB table `ai-news-stories` (PK/SK, GSI on date+vendor) |
-| `TriggerStack` | Lambda `ai-news-trigger` — dispatches GitHub Actions workflow via EventBridge cron |
-| `IngestStack` | Lambda `ai-news-ingest` — reads from GitHub Pages, writes to DynamoDB. Runs delete-then-write per date |
-| `ApiStack` | Lambda `ai-news-api` behind API Gateway — serves `/api/stories`, `/api/archive`, `/api/story/:id` |
-| `FrontendStack` | S3 bucket + CloudFront distribution with OAC, API proxy on `/api/*` |
+Cookies expire when X invalidates the session (re-login, password change, suspicious-activity flag). The agent will start returning empty results — re-grab the cookies.
 
-### Deploy CDK
+---
 
-```bash
-cd infra
-pip install -r requirements.txt
-cdk deploy --all
-```
+## Operational features (added April 2026)
 
-### EventBridge schedule (single daily run)
+- **Per-run cost tracking** — every LLM-using agent appends each call to a usage log and writes `usage_<HHMMSS>.json` to its output dir. Multi-run days preserve every run's data separately.
+- **Fallback tracker** — `shared/fallback_tracker.py` writes one JSON line per key rotation to `/tmp/_fallbacks.jsonl`, persisted to `docs/data/_fallbacks_<date>.jsonl` after the run. The daily email surfaces aggregated counts in a `FALLBACKS FIRED` panel.
+- **Three-layer URL defense** — (a) merger system prompt forbids inventing URLs, (b) `merger-agent/pipeline.py` drops any URL not present in source briefings, (c) `publish_data.py` drops URLs whose page title shares zero keywords with the story headline. Prevents cross-story URL mis-assignment.
+- **Data-quality audit** — `publish_data.py::_audit_data_quality()` flags EN/HE-translation mismatches, zero-URL stories, and orphan items; the email's `PROBLEMS` banner surfaces them daily so silent regressions can't hide.
+- **Image fallback** — `shared/image_fallback.py` covers vendor-logo / OG-image / GitHub-org-logo paths with a denylist for generic-looking org pages (universities, big-firm GH orgs).
+- **Dashboard MTD** — `private/dashboard_mtd.json` (gitignored, mirrored to GH secret `DASHBOARD_MTD_JSON`) carries the month-to-date numbers from each provider dashboard. Email displays alongside live today/7-day totals computed from the per-agent usage logs.
 
-| Israel Time | UTC | Lambda | Purpose |
-|-------------|-----|--------|---------|
-| 09:00 | 06:00 | `ai-news-trigger` | Kick off GitHub Actions pipeline (budget mode by default) |
-| 09:30 | 06:30 | `ai-news-ingest` | Ingest to DynamoDB after pipeline completes (~18 min + GH Pages deploy) |
+---
 
-### GitHub Actions workflow modes
+## License & forking notes
 
-| Mode | What runs | Cost per run (measured 2026-04-24) |
-|------|-----------|-------------|
-| default | All agents (xAI Grok skipped, twitter-agent active) | **~$1.01** |
-| `--skip xai` (explicit) | Same as default | ~$1.01 |
-| `merge-only` | Just the merger | ~$0.76 |
+Public-repo contents (this repo): the agents, orchestration, `publish_data.py`, `send_email.py`, GitHub Actions workflows. **Use freely.** No license file yet — treat as MIT for non-commercial use; open an issue if you need an explicit license.
 
-Per-agent breakdown:
+Not in the public repo: the maintainer's `web/` (Next.js frontend), `infra/` (AWS CDK), and `private/` (env + dashboard JSON + local playbooks). Build your own.
 
-| Agent | Cost/run | API |
-|-------|---------:|-----|
-| merger-agent | $0.7566 | Anthropic Sonnet 4.6 |
-| perplexity-news-agent | $0.1216 | Perplexity Sonar + Anthropic direct |
-| rss-news-agent | $0.0473 | Anthropic Haiku 4.5 |
-| tavily-news-agent | $0.0434 | Anthropic Haiku 4.5 |
-| adk-news-agent | $0.0420 | Google Gemini 2.5 Flash |
-| twitter / youtube / github / exa / newsapi | $0.00 | free-tier / no LLM |
-
-See [COSTS.md](./COSTS.md) for the full picture (MTD, history, refresh instructions, 3×/day math).
-
-### Operational features (added Apr 2026)
-
-- **Per-run cost tracking** — every LLM-using agent writes `usage_HHMMSS.json` to its output dir; multi-run days preserve each run's data separately.
-- **Fallback tracker** — `shared/fallback_tracker.py` records every key rotation (Tavily key1→key2, Jina→Firecrawl, Exa→Tavily). Daily email surfaces counts.
-- **Dashboard MTD** — `private/dashboard_mtd.json` (gitignored, mirrored to GH secret `DASHBOARD_MTD_JSON`) carries MTD numbers the email displays alongside live today/7d totals.
-- **Three-layer URL defense** — merger prompt forbids inventing URLs; `merger-agent/pipeline.py` drops any URL not in source briefings; `publish_data.py` drops URLs whose page title shares zero keywords with the story. Prevents cross-story URL mis-assignment.
+If you fork: the only mandatory keys for an end-to-end run are `ANTHROPIC_API_KEY` (or `MERGER_VIA_CLAUDE_CODE=1`) + at least one of `GOOGLE_API_KEY` / `PERPLEXITY_API_KEY` / `TAVILY_API_KEY`. Everything else degrades gracefully.

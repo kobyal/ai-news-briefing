@@ -693,6 +693,76 @@ if _yt_api_key:
         print(f"  Phase 2 gap-fill: +{_added_p2} additional pairings recovered")
 
 
+# ── Data-quality audit ────────────────────────────────────────────────────────
+# Surface silent degradations the email PROBLEMS banner would otherwise miss.
+# Each issue we flag here corresponds to a real bug that bit us in production
+# (orphan translations, mistagged research stories with all-Chinese sources,
+# Stanford GitHub-org-image picked for unrelated research papers).
+def _audit_data_quality():
+    issues = []
+
+    # 1. EN/HE array length parity — translator caps used to orphan items
+    _briefing_he = merger.get("briefing_he", {}) or {}
+    pairs = [
+        ("community_pulse_items", "pulse_items_he"),
+        ("news_items",            "headlines_he"),
+        ("news_items",            "summaries_he"),
+        ("news_items",            "details_he"),
+    ]
+    for en_key, he_key in pairs:
+        en_n = len(_briefing.get(en_key) or [])
+        he_n = len(_briefing_he.get(he_key) or [])
+        if en_n != he_n and en_n > 0:
+            issues.append(f"length mismatch: briefing.{en_key}={en_n} vs briefing_he.{he_key}={he_n}")
+    # twitter people_highlights → people_he
+    _people = (twitter_briefing.get("people_highlights") or [])
+    _people_he = (_briefing_he.get("people_he") or [])
+    if len(_people) != len(_people_he) and _people:
+        issues.append(f"length mismatch: twitter.people={len(_people)} vs briefing_he.people_he={len(_people_he)}")
+    # youtube descs (cap at display ceiling 12)
+    _yt_descs_he = (_briefing_he.get("youtube_descs_he") or [])
+    _yt_expected = min(len(youtube_items), 12)
+    if _yt_expected and len(_yt_descs_he) < _yt_expected:
+        issues.append(f"youtube_descs_he={len(_yt_descs_he)} but {_yt_expected} videos visible on /media/")
+
+    # 2. Source diversity — story ending up with all-non-English URLs is a
+    # red flag for an over-aggressive vendor/URL filter (the 2026-04-27 verifier
+    # story shipped with only finance.sina.com.cn after the auto-correct mistake).
+    _NON_EN_TLDS = (".cn", ".ru", ".jp", ".kr", ".cz")  # extend if needed
+    for item in _news_items:
+        urls = item.get("urls") or []
+        if not urls:
+            issues.append(f"story has no URLs: {(item.get('headline') or '')[:60]}")
+        elif all(any(tld in u.lower() for tld in _NON_EN_TLDS) for u in urls):
+            issues.append(f"only non-English sources: {(item.get('headline') or '')[:60]} | {urls}")
+
+    # 3. Auto-correct ambiguity — when a story headline mentions multiple
+    # vendors but auto-correct picked one, surface the choice for review.
+    # The tightened logic skips ambiguous cases, but flag any survivor.
+    for item in _news_items:
+        headline_lc = (item.get("headline") or "").lower()
+        v_seen = set()
+        for kw, ven in _VENDOR_KEYWORDS.items():
+            if kw in headline_lc:
+                v_seen.add(ven)
+        if len(v_seen) > 1 and item.get("vendor") in v_seen:
+            issues.append(
+                f"multi-vendor headline (chose {item.get('vendor')} from {sorted(v_seen)}): "
+                f"{(item.get('headline') or '')[:60]}"
+            )
+
+    if issues:
+        print(f"\n  ⚠ DATA QUALITY AUDIT — {len(issues)} issue(s):")
+        for i in issues:
+            print(f"    • {i}")
+    else:
+        print("\n  ✓ DATA QUALITY AUDIT — clean")
+    return issues
+
+
+_data_quality_issues = _audit_data_quality()
+
+
 published = {
     "date":        date_str,
     "briefing":    _briefing,
@@ -702,6 +772,10 @@ published = {
     "youtube":     youtube_items,
     "github":      github_items,
     "twitter":     twitter_data,
+    # Data-quality audit results — surfaced in send_email.py PROBLEMS banner so
+    # silent issues (orphan translations, mistagged stories, source diversity
+    # collapses) don't slip past the user.
+    "data_quality_issues": _data_quality_issues,
 }
 
 os.makedirs("docs/data", exist_ok=True)

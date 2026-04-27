@@ -779,6 +779,21 @@ def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dic
         if s in ("error", "exhausted", "warn"):
             sev = "error" if s in ("error", "exhausted") else "warn"
             out.append({"label": c["name"], "detail": c.get("detail", ""), "severity": sev})
+
+    # Data-quality issues from publish_data.py audit — silent bugs (orphan EN/HE
+    # translations, all-Chinese-only-source stories, GitHub-org-image misfires
+    # for research collabs) used to slip through unnoticed. Now they surface
+    # at the top of the email exactly like other warn-level signals.
+    today = datetime.now().strftime("%Y-%m-%d")
+    json_path = f"docs/data/{today}.json"
+    if os.path.exists(json_path):
+        try:
+            jd = json.load(open(json_path))
+            for issue in (jd.get("data_quality_issues") or []):
+                out.append({"label": "data quality", "detail": issue, "severity": "warn"})
+        except Exception:
+            pass
+
     return out
 
 

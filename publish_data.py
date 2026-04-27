@@ -159,13 +159,24 @@ _secondary_added = 0
 for item in _news_items:
     primary = item.get("vendor", "")
     if primary == "Other":
-        text = (item.get("headline", "") + " " + item.get("summary", "")).lower()
+        # Match on HEADLINE only — summaries often name vendors as baselines
+        # ("beats GPT-5.5 and Claude Mythos"), which used to mis-tag research
+        # stories like "Stanford/Berkeley/NVIDIA's LLM-as-a-Verifier" as
+        # Anthropic just because Claude was the comparison baseline.
+        # And: only auto-correct when EXACTLY ONE distinct vendor appears in
+        # the headline. Multiple matches signal a comparison/research piece —
+        # better to leave as "Other" than pick wrong.
+        headline_lc = item.get("headline", "").lower()
+        matched_vendors = []
+        seen_vendors = set()
         for kw, vendor in _VENDOR_KEYWORDS.items():
-            if kw in text:
-                item["vendor"] = vendor
-                primary = vendor
-                _fixed += 1
-                break
+            if kw in headline_lc and vendor not in seen_vendors:
+                matched_vendors.append(vendor)
+                seen_vendors.add(vendor)
+        if len(matched_vendors) == 1:
+            item["vendor"] = matched_vendors[0]
+            primary = matched_vendors[0]
+            _fixed += 1
 
     # Multi-vendor: if merger didn't set secondary_vendor, scan the headline (only)
     # for a SECOND distinct vendor mention. Headline-only avoids false positives

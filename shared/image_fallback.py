@@ -203,17 +203,41 @@ def wikipedia_subject_image(story: dict) -> str | None:
     return None
 
 
+# Universities, research labs, and major tech firms whose GitHub org pages exist
+# but produce a generic GitHub-branded image instead of a story-relevant one.
+# E.g. "Stanford/Berkeley/NVIDIA's LLM-as-a-Verifier" picked up Stanford's GitHub
+# org page (just a GitHub logo + "stanford" name) for a research-collab story.
+_GITHUB_ORG_DENYLIST = {
+    "stanford", "berkeley", "harvard", "mit", "oxford", "cambridge", "cmu",
+    "princeton", "yale", "cornell", "columbia", "caltech",
+    "google", "microsoft", "apple", "amazon", "meta", "facebook", "nvidia",
+    "openai", "anthropic", "deepmind",
+}
+
+
 def github_org_image(story: dict) -> str | None:
     """If headline's first proper-noun matches an existing GitHub org, use GitHub's
     auto-generated opengraph image (real branded landscape PNG). Good for open-source
-    story subjects that aren't on Wikipedia (Fathym, Cohere, small AI labs, etc.)."""
+    story subjects that aren't on Wikipedia (Fathym, Cohere, small AI labs, etc.).
+
+    Skip if:
+      - the candidate is a slash-separated research collaboration
+        (e.g. "Stanford/Berkeley/NVIDIA's …") — there's no single org image;
+      - the candidate is a denylisted university or major tech firm — their
+        GitHub org image is just generic GitHub branding, not story-related.
+    """
     import re as _re, urllib.request as _ur
     headline = story.get("headline", "") or ""
+    # Skip slash-separated research collab headlines (e.g. "Stanford/Berkeley/NVIDIA's …")
+    if _re.match(r"^[A-Z][A-Za-z]+/[A-Z]", headline):
+        return None
     # Grab the leading proper noun (single capitalized word, 4+ chars)
     m = _re.match(r"^([A-Z][A-Za-z0-9-]{3,})", headline)
     if not m:
         return None
     candidate = m.group(1).lower()
+    if candidate in _GITHUB_ORG_DENYLIST:
+        return None
     # Try a few common org-name variants
     for org in [candidate, f"{candidate}-dev", f"{candidate}-deno", f"{candidate}-ai", f"{candidate}-io"]:
         try:

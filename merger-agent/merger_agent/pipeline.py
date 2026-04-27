@@ -584,19 +584,27 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
 
         translate_input = {}
         if people:
+            # No slice cap: prior `people[:6]` left up to 6 people-highlights
+            # without Hebrew when X tracker has 12 active handles. Translator-C
+            # output stays well under the 32K ceiling even at full count.
             translate_input["people"] = [
                 {"post": p.get("post", ""), "why": p.get("why", "")}
-                for p in people[:6]
+                for p in people
             ]
         if pulse_items:
+            # No slice cap: prior `pulse_items[:7]` orphaned the 8th item on
+            # busy news days when merger exceeded its own 5-7 prompt target.
             translate_input["pulse_items"] = [
                 {"headline": pi.get("headline", ""), "body": pi.get("body", "")}
-                for pi in pulse_items[:7]
+                for pi in pulse_items
             ]
         if yt_items:
-            # Extract descriptions (strip [Channel · views] prefix)
+            # Cap at 12 — matches the YouTubeSection render limit
+            # (web/components/briefing/YouTubeSection.tsx slices to first 12).
+            # Phase 1+2 enrichment may add videos beyond display, no need to
+            # translate descriptions for ones that won't appear on /media/.
             yt_descs = []
-            for v in yt_items[:8]:
+            for v in yt_items[:12]:
                 summary = v.get("summary", "")
                 m = re.match(r'\[([^\]]+)\]\s*(.*)', summary, re.DOTALL)
                 desc = m.group(2).strip() if m else summary.strip()

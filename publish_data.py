@@ -273,6 +273,30 @@ def _is_vendor_first_party(url: str, vendor: str) -> bool:
     return any(host == d or host.endswith("." + d) for d in domains)
 
 
+# Aggregator pages list many launches at once. They commonly land in URL lists
+# because the merger sees "AWS Weekly Roundup: ... Bedrock AgentCore ... and
+# more" and treats it as a source for an AgentCore story. The first-party
+# shortcut otherwise auto-keeps these because the host (aws.amazon.com) matches.
+_AGGREGATOR_PATTERNS = [
+    r"\bweekly[- ]roundup\b",
+    r"\bweekly[- ]news\b",
+    r"\bweekly[- ]digest\b",
+    r"\bweekly[- ]update\b",
+    r"\bweekly[- ]recap\b",
+    r"\bweekly[- ]wrap\b",
+    r"\bmonthly[- ]roundup\b",
+    r"\bthis[- ]week[- ]in\b",
+    r"\bweek[- ]in[- ]review\b",
+    r"\bnews[- ]of[- ]the[- ]week\b",
+]
+_AGGREGATOR_RE = re.compile("|".join(_AGGREGATOR_PATTERNS), re.I)
+
+
+def _is_aggregator_page(url: str, title: str) -> bool:
+    """True if the page is a multi-topic roundup, not a story-specific article."""
+    return bool(_AGGREGATOR_RE.search((url or "") + " " + (title or "")))
+
+
 def _detect_title_subject_vendor(title: str) -> str | None:
     """Find the EARLIEST (most prominent) vendor name mentioned in the title.
 
@@ -342,6 +366,13 @@ def _fetch_og_for_story(item: dict) -> tuple[str, list]:
         if not html:
             kept_urls.append(url)  # keep URL — might just be a fetch failure, don't penalize
             continue
+        # Aggregator/roundup detection runs BEFORE first-party shortcut: even
+        # the vendor's own weekly-roundup post is wrong as a source for one
+        # specific story buried inside it.
+        if _is_aggregator_page(url, title):
+            print(f"  ✂ Aggregator URL for '{item.get('headline','?')[:40]}': title='{title[:60]}' url={url[:60]}")
+            rejected.append((url, "aggregator", html))
+            continue
         if _is_vendor_first_party(url, vendor):
             kept_urls.append(url)  # canonical source — always keep
         else:
@@ -379,9 +410,12 @@ def _fetch_og_for_story(item: dict) -> tuple[str, list]:
     # Last-resort: if everything got stripped, restore the least-bad rejected URL.
     # Prefer title-mismatch over wrong-vendor (wrong-vendor URLs are about a
     # different company entirely; title-mismatch is just a weak topical match).
-    if not kept_urls and rejected:
-        rejected.sort(key=lambda r: 0 if r[1] == "title-mismatch" else 1)
-        recovered_url, reason, html = rejected[0]
+    # Aggregator URLs are NEVER recovered — they really are the wrong link, even
+    # if technically about the same vendor.
+    recoverable = [r for r in rejected if r[1] != "aggregator"]
+    if not kept_urls and recoverable:
+        recoverable.sort(key=lambda r: 0 if r[1] == "title-mismatch" else 1)
+        recovered_url, reason, html = recoverable[0]
         kept_urls.append(recovered_url)
         if not og_image:
             og_image = _extract_og_image(html) or og_image
@@ -409,6 +443,52 @@ with ThreadPoolExecutor(max_workers=8) as pool:
             item["og_image"] = og
             _og_fetched += 1
 print(f"  URL sanity: dropped {_mismatches} mismatched URLs | OG images fetched: {_og_fetched}")
+
+
+# ── Drop fabricated community_pulse_items ────────────────────────────────────
+# The merger occasionally invents a "community reaction" by quoting a news
+# search hit (SOURCE D) and slapping a generic label like "Developer community"
+# on it. Two reliable signals:
+#   1. body contains "(per SOURCE A/B/C/D/E)" — direct LLM giveaway it cited a
+#      news source, not real social signal.
+#   2. source_label is generic with no platform/person attribution.
+_PULSE_GENERIC_LABELS = {
+    "developer community", "developer reactions", "developers",
+    "community", "the community", "ai community", "tech community",
+}
+_PULSE_SOURCE_TAG_RE = re.compile(r"\(per SOURCE [A-Z]\)", re.I)
+
+_pulse_items = _briefing.get("community_pulse_items") or []
+if _pulse_items:
+    _kept_pulse = []
+    _kept_indices: list[int] = []
+    _dropped_pulse = 0
+    for idx, it in enumerate(_pulse_items):
+        body = it.get("body", "") or ""
+        label = (it.get("source_label", "") or "").strip().lower()
+        if _PULSE_SOURCE_TAG_RE.search(body):
+            print(f"  ✂ pulse item dropped (cites news SOURCE): {it.get('headline','?')[:60]}")
+            _dropped_pulse += 1
+            continue
+        if label in _PULSE_GENERIC_LABELS:
+            print(f"  ✂ pulse item dropped (generic label '{label}'): {it.get('headline','?')[:60]}")
+            _dropped_pulse += 1
+            continue
+        _kept_pulse.append(it)
+        _kept_indices.append(idx)
+    if _dropped_pulse:
+        _briefing["community_pulse_items"] = _kept_pulse
+        # Rebuild flat community_urls to stay in sync
+        _briefing["community_urls"] = [
+            it.get("source_url", "") for it in _kept_pulse if it.get("source_url")
+        ]
+        # Prune the parallel Hebrew array at the same indices so EN[i]/HE[i]
+        # stay aligned and the data-quality audit doesn't flag a parity miss.
+        _briefing_he_inplace = merger.get("briefing_he") or {}
+        _pulse_he = _briefing_he_inplace.get("pulse_items_he") or []
+        if _pulse_he and len(_pulse_he) == len(_pulse_items):
+            _briefing_he_inplace["pulse_items_he"] = [_pulse_he[i] for i in _kept_indices]
+        print(f"  community_pulse_items: dropped {_dropped_pulse} fabricated, kept {len(_kept_pulse)}")
 
 
 # ── Zero-URL recovery via Tavily ──────────────────────────────────────────────

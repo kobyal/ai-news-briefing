@@ -212,6 +212,9 @@ root_agent = SequentialAgent(
         ResearchPhase,    # Parallel: VendorResearcher+URLResolver || CommunityResearcher
         BriefingWriter,   # Step 4: BriefingContent schema → briefing
         Translator,       # Step 5: HebrewBriefing schema → briefing_he
-        Publisher,        # Step 6: save HTML
+        # Publisher removed from the LLM chain — Gemini was returning parts=None
+        # (no tool call, no text) for the trivial "call build_and_save_html" prompt
+        # somewhere between Apr 25 and Apr 28. pipeline.py now calls the tool
+        # deterministically after the chain finishes; no LLM round-trip needed.
     ],
 )

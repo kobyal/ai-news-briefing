@@ -600,7 +600,8 @@ Stories not matching a specific vendor are classified as `Other`.
 | `TWITTER_AUTH_TOKEN` / `TWITTER_CT0` | Twitter scrape (cookies from logged-in x.com) |
 | `DEEPL_API_KEY` | `publish_data.py` (Hebrew for Reddit + X posts) |
 | `LOOKBACK_DAYS` | Most agents (default 3) |
-| `AGENT_TIMEOUT` | `run_all.py` (default 480 s per process) |
+| `AGENT_TIMEOUT` | `run_all.py` (default 1200 s per process — must be ≥ `ADK_TIMEOUT`) |
+| `ADK_TIMEOUT` | ADK pipeline internal cap (default 900 s; raises if Publisher didn't write today's JSON) |
 | `SKIP_ARTICLE_READING` | Article Reader |
 | `GMAIL_APP_PASSWORD` | `send_email.py` |
 | `DASHBOARD_MTD_JSON` | `send_email.py` (CI only — mirrors `private/dashboard_mtd.json`) |

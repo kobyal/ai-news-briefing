@@ -80,7 +80,7 @@ def _run_parallel(agents: list[tuple[Path, str]]) -> dict[str, bool]:
 
     print()
     t0 = time.time()
-    TIMEOUT = int(os.environ.get("AGENT_TIMEOUT", "480"))
+    TIMEOUT = int(os.environ.get("AGENT_TIMEOUT", "1200"))
 
     results = {}
     for label, proc in procs:

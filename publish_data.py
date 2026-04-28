@@ -297,6 +297,100 @@ def _is_aggregator_page(url: str, title: str) -> bool:
     return bool(_AGGREGATOR_RE.search((url or "") + " " + (title or "")))
 
 
+# Canonical vendor blog feeds. For each story whose vendor has a known feed,
+# we look up the best-matching post by headline keyword overlap and prepend
+# it. Catches launch announcements that fell outside the LOOKBACK_DAYS window
+# of the RSS agent — e.g. AgentCore launched Apr 22, but a Apr 28 publish run
+# with 3-day lookback wouldn't see it. This pass uses 14-day windowing on the
+# post date, so we only attach genuinely-recent canonical URLs.
+_VENDOR_CANONICAL_FEEDS = {
+    "Anthropic":    ["https://www.anthropic.com/rss.xml"],
+    "OpenAI":       ["https://openai.com/news/rss.xml"],
+    "Google":       ["https://blog.google/technology/ai/rss/", "https://deepmind.google/blog/rss.xml"],
+    "AWS":          ["https://aws.amazon.com/blogs/machine-learning/feed/", "https://aws.amazon.com/blogs/aws/feed/"],
+    "Azure":        ["https://blogs.microsoft.com/ai/feed/", "https://azure.microsoft.com/en-us/blog/feed/"],
+    "Meta":         ["https://ai.meta.com/blog/feed/"],
+    "NVIDIA":       ["https://blogs.nvidia.com/blog/category/deep-learning/feed/"],
+    "Mistral":      ["https://mistral.ai/feed/"],
+    "Apple":        ["https://machinelearning.apple.com/rss.xml"],
+    "Hugging Face": ["https://huggingface.co/blog/feed.xml"],
+    "Alibaba":      ["https://qwenlm.github.io/feed.xml"],
+}
+
+try:
+    import feedparser as _feedparser
+    _HAS_FEEDPARSER = True
+except ImportError:
+    _HAS_FEEDPARSER = False
+
+_canonical_feed_cache: dict = {}
+
+
+def _fetch_canonical_feed(url: str) -> list:
+    """Cached fetch — returns [{title, link, age_days}] for the feed, recent first."""
+    if url in _canonical_feed_cache:
+        return _canonical_feed_cache[url]
+    if not _HAS_FEEDPARSER:
+        _canonical_feed_cache[url] = []
+        return []
+    entries = []
+    try:
+        feed = _feedparser.parse(url)
+        from datetime import timezone as _tz
+        now = datetime.now(tz=_tz.utc)
+        for entry in feed.entries[:30]:
+            title = (getattr(entry, "title", "") or "").strip()
+            link = (getattr(entry, "link", "") or "").strip()
+            if not title or not link:
+                continue
+            # Best-effort pub date extraction
+            pub = None
+            for attr in ("published_parsed", "updated_parsed"):
+                t = getattr(entry, attr, None)
+                if t:
+                    try:
+                        pub = datetime(*t[:6], tzinfo=_tz.utc)
+                        break
+                    except Exception:
+                        pass
+            age_days = (now - pub).days if pub else 999
+            entries.append({"title": title, "link": link, "age_days": age_days})
+    except Exception as e:
+        print(f"  [canonical] feed fetch failed {url}: {e}")
+    _canonical_feed_cache[url] = entries
+    return entries
+
+
+def _find_canonical_vendor_url(item: dict) -> str | None:
+    """Find the vendor's canonical announcement URL by matching story headline
+    keywords against recent feed titles. Returns best match URL or None.
+
+    Threshold: ≥3 story-specific keywords must overlap with the feed title,
+    and the post must be ≤14 days old. Story keywords already exclude
+    stopwords + tokens <4 chars, so 3-keyword overlap is meaningful (e.g.
+    'bedrock', 'agentcore', 'agent' all in title).
+    """
+    vendor = item.get("vendor", "")
+    feeds = _VENDOR_CANONICAL_FEEDS.get(vendor) or []
+    if not feeds:
+        return None
+    kws = _story_keywords(item) - {vendor.lower()}  # vendor name is already implied
+    if len(kws) < 3:
+        return None
+
+    best_url, best_score = None, 0
+    for feed_url in feeds:
+        for entry in _fetch_canonical_feed(feed_url):
+            if entry["age_days"] > 14:
+                continue
+            title_lower = entry["title"].lower()
+            score = sum(1 for k in kws if k in title_lower)
+            if score > best_score:
+                best_score = score
+                best_url = entry["link"]
+    return best_url if best_score >= 3 else None
+
+
 def _detect_title_subject_vendor(title: str) -> str | None:
     """Find the EARLIEST (most prominent) vendor name mentioned in the title.
 
@@ -443,6 +537,22 @@ with ThreadPoolExecutor(max_workers=8) as pool:
             item["og_image"] = og
             _og_fetched += 1
 print(f"  URL sanity: dropped {_mismatches} mismatched URLs | OG images fetched: {_og_fetched}")
+
+
+# ── Canonical vendor URL prepend ──────────────────────────────────────────────
+# After URL validation, look up each story's vendor blog feed for a
+# headline-matching post and prepend it. Trusted source (vendor's own RSS),
+# so it bypasses re-validation. Catches launches that fell outside
+# LOOKBACK_DAYS in the RSS agent's first pass.
+_canonical_added = 0
+for _item in _news_items:
+    _canon = _find_canonical_vendor_url(_item)
+    if _canon and _canon not in (_item.get("urls") or []):
+        _item["urls"] = [_canon] + (_item.get("urls") or [])
+        _item["source_count"] = len(_item["urls"])
+        _canonical_added += 1
+        print(f"  ✚ Canonical URL added for '{_item.get('headline','?')[:40]}': {_canon}")
+print(f"  Canonical URLs added: {_canonical_added}")
 
 
 # ── Drop fabricated community_pulse_items ────────────────────────────────────

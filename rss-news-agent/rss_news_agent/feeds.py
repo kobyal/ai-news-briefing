@@ -385,7 +385,12 @@ def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
         (vendor_articles, community_articles)
     """
     since = datetime.now(tz=timezone.utc) - timedelta(days=lookback_days)
-    print(f"  Fetching {len(FEEDS)} feeds (since {since.strftime('%Y-%m-%d')})...")
+    # Vendor blog posts are low-density (~5/day across all blogs combined) and
+    # launch announcements stay relevant for a week — Apr 22 AgentCore launch
+    # was still being discussed Apr 28 but the 3-day cutoff dropped it. Use a
+    # 7-day floor for vendor RSS only; HN/HF/Reddit keep their own logic.
+    vendor_since = min(since, datetime.now(tz=timezone.utc) - timedelta(days=7))
+    print(f"  Fetching {len(FEEDS)} feeds (vendor RSS since {vendor_since.strftime('%Y-%m-%d')}, others since {since.strftime('%Y-%m-%d')})...")
 
     tasks = []
     for url, vendor_tag, feed_type in FEEDS:
@@ -396,7 +401,7 @@ def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
         futures = []
         for url, vendor_tag, feed_type in tasks:
             if feed_type == "rss":
-                futures.append(pool.submit(_fetch_rss, url, vendor_tag, since))
+                futures.append(pool.submit(_fetch_rss, url, vendor_tag, vendor_since))
             elif feed_type == "hn":
                 futures.append(pool.submit(_fetch_hn, url, since))
             elif feed_type == "hf_papers":

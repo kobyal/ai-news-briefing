@@ -2,6 +2,7 @@
 publish_data.py — combine all agent outputs into docs/data/YYYY-MM-DD.json
 """
 import hashlib
+import html as _html
 import json
 import glob
 import os
@@ -192,6 +193,42 @@ if _fixed:
     print(f"Auto-corrected {_fixed} 'Other' vendor tags based on headline/summary keywords")
 if _secondary_added:
     print(f"Inferred secondary_vendor for {_secondary_added} stories from headline keywords")
+
+
+def _normalize_secondary_vendor(value: str | None, vendor_names: list[str]) -> str:
+    """Post-merger sanity: clean up secondary_vendor before publishing.
+       - "Other" → ""  (renders as ugly "OTHER" badge — see QA finding bad_secondary_vendor)
+       - Non-canonical (e.g. "Microsoft" — Microsoft is bucketed under "Azure")
+         → remap if obvious synonym, else ""
+       - Anything in vendor_names → keep as-is.
+    """
+    if not value:
+        return ""
+    if value in vendor_names:
+        return value
+    if value == "Other":
+        return ""
+    SYNONYMS = {"microsoft": "Azure", "amazon": "AWS", "google deepmind": "Google",
+                "deepmind": "Google", "open ai": "OpenAI"}
+    canonical = SYNONYMS.get(value.strip().lower())
+    return canonical if canonical and canonical in vendor_names else ""
+
+
+# Normalize secondary_vendor: drop "Other", remap synonyms, drop non-canonical.
+# Prevents the "OTHER" badge bug (QA finding: data_integrity.bad_secondary_vendor).
+try:
+    from shared.vendors import VENDOR_NAMES as _SHARED_VENDOR_NAMES
+except Exception:
+    _SHARED_VENDOR_NAMES = list({v for v in _VENDOR_KEYWORDS.values()})
+_normalized = 0
+for item in _news_items:
+    raw = item.get("secondary_vendor")
+    fixed = _normalize_secondary_vendor(raw, _SHARED_VENDOR_NAMES)
+    if fixed != raw:
+        item["secondary_vendor"] = fixed
+        _normalized += 1
+if _normalized:
+    print(f"Normalized secondary_vendor on {_normalized} stories (drop 'Other', remap synonyms)")
 
 # Fetch real OG images for articles missing them or with broken relative paths
 _TITLE_PATTERNS = [
@@ -433,7 +470,10 @@ def _extract_og_image(html: str) -> str:
     for pattern in _OG_IMAGE_PATTERNS:
         m = re.search(pattern, html, re.I)
         if m:
-            img = m.group(1).strip()
+            # html.unescape: source HTML often has &amp; in URL attrs, which is
+            # invalid as a literal URL — image fails to load (caught by QA
+            # evaluator: icons_images.og_image_html_encoded).
+            img = _html.unescape(m.group(1).strip())
             if img.startswith("http") and "arxiv-logo" not in img and "placeholder" not in img:
                 return img
     return ""

@@ -142,17 +142,20 @@ Produce ONE merged briefing as a JSON object. Rules:
      Taurus, Project Prometheus, a new research lab), use "Other". Better to say Other than to
      grab-bag into a wrong vendor because of a keyword in the summary.
    - secondary_vendor: {vendor_enum}  (optional — empty string "" when not applicable)
-     SET this ONLY when a story PROMINENTLY involves TWO companies as co-actors in the same event,
-     and both names appear in the headline. Use cases:
+     SET this ONLY when a story PROMINENTLY involves TWO companies AS CO-ACTORS in the same event,
+     and BOTH names appear in the headline AND the second is one of the canonical vendors above.
+     Use cases:
        * Partnerships / deals — "Meta signs AWS Graviton5 deal" → vendor=Meta, secondary_vendor=AWS
        * Adoption / integration — "Apple confirms Gemini-powered Siri" → vendor=Apple, secondary_vendor=Google
        * Investments — "Google commits $40B to Anthropic" → vendor=Google, secondary_vendor=Anthropic
-       * Mergers — "Cohere and Aleph Alpha merge" → vendor=Cohere, secondary_vendor=Other (Aleph Alpha not in enum)
      Do NOT set secondary_vendor when:
        * The other vendor is just a passing comparison ("X chips beat NVIDIA's Blackwell")
        * The other vendor is bio context ("ex-Google researcher launches...")
        * Only one vendor name appears in the headline
-     Default to "" (empty string) — single-vendor stories should NOT have a secondary_vendor.
+       * The second entity is NOT in the canonical vendor list (e.g. Manus, Aleph Alpha,
+         Tesla, a new research lab) — leave secondary_vendor as "" rather than "Other".
+         The frontend renders "OTHER" badges literally as redundant noise.
+     Default to "" (empty string).
    - headline: specific and descriptive
    - published_date: exact date (e.g. "April 4, 2026"). "Date unknown" if not available.
    - summary: 2-4 sentences, concrete details from all sources combined

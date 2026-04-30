@@ -5,13 +5,21 @@ Chain (tried in order), see `find_fallback()`:
      (Altman, Bezos, Jensen, Claude, ChatGPT, etc.). Populated by
      scripts/prewarm_fallback_images.py. Always prefer this over external lookups.
   2. Wikipedia subject photo — for named people/products not in the prewarm cache
-  3. GitHub org opengraph — for open-source projects by GitHub orgs
-  4. Vendor favicon pool — Google's 256px favicon for known vendors
-  5. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
+  3. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
+
+Each tier's result is vision-judged via Claude Haiku (when ANTHROPIC_API_KEY is
+set) — if the candidate is just a logo/wordmark/wrong-subject, we skip it.
+
+vendor_pool_image (Google favicon at 256px) was REMOVED from the chain on
+2026-04-30 — it always produces a vendor logo on its own, and the QA evaluator
+flags those as `og_image_vendor_favicon` (P0 reader-impact issue). The frontend's
+FallbackGradient (vendor logo + colored gradient) renders consistently when
+og_image is empty, which is a better UX than shipping a bare favicon.
 
 This file is intentionally tiny — just a map + a short keyword-query helper. No complex logic,
 no external SDK. Keeps the fallback surface small and predictable.
 """
+import base64
 import hashlib
 import json
 import os
@@ -251,32 +259,103 @@ def github_org_image(story: dict) -> str | None:
     return None
 
 
+def is_logo_or_generic(image_url: str, headline: str = "", vendor: str = "") -> bool | None:
+    """Vision-judge: is this image just a logo / generic / wrong-subject?
+    Returns True (logo, skip), False (real photo, keep), or None (uncertain
+    — caller decides; usually keep). Requires ANTHROPIC_API_KEY; without
+    one, returns None and caller proceeds without filtering.
+
+    Downloads the image ourselves (real Chrome UA) and sends as base64.
+    URL-based image input on Anthropic respects robots.txt and many news
+    CDNs block their fetcher.
+    """
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key or not image_url:
+        return None
+    try:
+        import requests as _rq
+        ua = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36")
+        r = _rq.get(image_url, timeout=10,
+                    headers={"User-Agent": ua,
+                             "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8"})
+        if r.status_code >= 400 or not r.content:
+            return None
+        ct = r.headers.get("content-type", "").split(";")[0].strip().lower()
+        if ct not in ("image/jpeg", "image/png", "image/gif", "image/webp"):
+            ext = image_url.lower().rsplit(".", 1)[-1].split("?")[0]
+            ct = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                  "gif": "image/gif", "webp": "image/webp"}.get(ext, "")
+        if not ct or len(r.content) > 4 * 1024 * 1024:
+            return None
+        b64 = base64.standard_b64encode(r.content).decode("ascii")
+    except Exception:
+        return None
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model=os.environ.get("MERGER_TRANSLATOR_MODEL", "claude-haiku-4-5"),
+            max_tokens=200,
+            system=("You judge whether a news article's hero image is a real photo "
+                    "ABOUT the story, or just a logo/wordmark/generic-stock filler. "
+                    "Return JSON: {is_logo: true|false, reason: '<≤20 words>'}."),
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image",
+                     "source": {"type": "base64", "media_type": ct, "data": b64}},
+                    {"type": "text", "text": (
+                        f"STORY: {headline}\nVENDOR: {vendor or '(unknown)'}\n"
+                        "Is this just a logo/wordmark, or a real article photo?"
+                    )},
+                ],
+            }],
+        )
+        text = "".join(b.text for b in msg.content if hasattr(b, "text")).strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
+        i, j = text.find("{"), text.rfind("}")
+        if i >= 0 and j > i:
+            text = text[i:j+1]
+        d = json.loads(text)
+        return bool(d.get("is_logo"))
+    except Exception:
+        return None
+
+
+def _vision_keep(url: str | None, story: dict) -> str | None:
+    """Run is_logo_or_generic on `url`; return url if not a logo, else None.
+    None / uncertain LLM verdicts are treated as 'keep' (don't drop on doubt)."""
+    if not url:
+        return None
+    verdict = is_logo_or_generic(url, story.get("headline", ""),
+                                  story.get("vendor", ""))
+    if verdict is True:
+        return None   # confirmed logo — drop
+    return url
+
+
 def find_fallback(story: dict) -> str | None:
-    """Fallback chain, best-to-worst. Used when the article's og:image fails.
+    """Fallback chain, best-to-worst. Used when the article's og:image fails
+    or is itself a logo. Each tier is vision-judged.
 
     1. Pre-warmed S3 cache — first-party, zero-latency subject photos
     2. Wikipedia subject photo — for named people/products/companies on Wikipedia
-       (Bezos, Altman, Kimi, GPT-5, Sam Altman, etc.)
-    3. Vendor stock pool — Google favicon at 256px for known vendors (OpenAI,
-       Anthropic, Google, Meta, etc.)
-    4. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
-    5. None — frontend renders colored gradient + vendor icon
+    3. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
+    4. None — frontend renders colored gradient + vendor icon
 
-    NOTE: github_org_image (formerly step 3) was removed 2026-04-27 — for any
-    AI vendor with a GitHub org (Mistral, Alibaba, DeepSeek, NVIDIA, etc.) it
-    returned a generic GitHub-branded card (logo + org name on a gradient)
-    that read as "this story is about GitHub" to users. The vendor pool
-    fallback (Wikimedia logos for the same vendors) is consistently better.
-    The original Fathym-style legitimate use case is rare enough that the
-    cosmetic regression isn't worth the recurring confusion.
+    NOTE: vendor_pool_image (Google's s2/favicons) was REMOVED 2026-04-30 — it
+    always produces vendor logos at 256px (QA finding: og_image_vendor_favicon
+    is P0). FallbackGradient renders better consistent UX when og_image is empty.
     """
-    url = prewarmed_image(story)
+    url = _vision_keep(prewarmed_image(story), story)
     if url:
         return url
-    url = wikipedia_subject_image(story)
-    if url:
-        return url
-    url = vendor_pool_image(story)
+    url = _vision_keep(wikipedia_subject_image(story), story)
     if url:
         return url
     query_parts = [story.get("vendor", ""), "AI", "technology"]
@@ -284,4 +363,4 @@ def find_fallback(story: dict) -> str | None:
     if headline:
         query_parts.insert(1, headline.split()[0] if headline else "")
     query = " ".join(p for p in query_parts if p)[:80]
-    return unsplash_image(query)
+    return _vision_keep(unsplash_image(query), story)

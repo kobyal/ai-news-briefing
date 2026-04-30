@@ -478,6 +478,43 @@ def _extract_og_image(html: str) -> str:
                 return img
     return ""
 
+
+def _extract_body_images(html: str, base_url: str, max_n: int = 8) -> list[str]:
+    """Return list of plausible image URLs from article body (besides og:image
+    and twitter:image, which are extracted separately). Used as fallback when
+    the og:image is vision-judged a logo. Filters obvious icons / favicons /
+    tracking pixels by URL pattern."""
+    if not html:
+        return []
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return []
+    NON_PHOTO = ("/logo", "logo.png", "logo.svg", "logo.webp", "favicon",
+                 "/avatar", "/icon", "spinner", "1x1", "tracking", "/sprites/")
+    out: list[str] = []
+    seen: set[str] = set()
+    soup = BeautifulSoup(html[:200_000], "html.parser")
+    for img in soup.find_all("img"):
+        src = img.get("src") or img.get("data-src") or img.get("data-lazy-src")
+        if not src:
+            srcset = img.get("srcset") or ""
+            if srcset:
+                src = srcset.split(",")[-1].strip().split(" ")[0]
+        if not src or src.startswith("data:"):
+            continue
+        src = _html.unescape(src)
+        if not src.startswith("http"):
+            src = urllib.parse.urljoin(base_url, src)
+        lc = src.lower()
+        if any(p in lc for p in NON_PHOTO) or src in seen:
+            continue
+        seen.add(src)
+        out.append(src)
+        if len(out) >= max_n:
+            break
+    return out
+
 def _fetch_og_for_story(item: dict) -> tuple[str, list]:
     """Try all URLs. Drop any URL whose page title doesn't match the story. Return (og_image, kept_urls).
 
@@ -493,6 +530,33 @@ def _fetch_og_for_story(item: dict) -> tuple[str, list]:
     kws = _story_keywords(item)
     vendor = item.get("vendor", "")
     kept_urls = []
+    # Lazy-import vision filter; harmless if ANTHROPIC_API_KEY not set
+    # (returns None, treated as "keep").
+    try:
+        from shared.image_fallback import is_logo_or_generic as _vision_is_logo
+    except Exception:
+        _vision_is_logo = lambda *a, **kw: None
+    _story_meta = {"headline": item.get("headline", ""), "vendor": item.get("vendor", "")}
+
+    def _ok_image(url: str) -> bool:
+        """Vision-judge: drop if confirmed logo, keep otherwise."""
+        if not url:
+            return False
+        verdict = _vision_is_logo(url, _story_meta["headline"], _story_meta["vendor"])
+        return verdict is not True   # True = logo, drop. False / None = keep.
+
+    def _pick_image(html: str, url: str) -> str:
+        """Try og:image first; if vision says logo, fall through to body imgs.
+        Capped at 4 LLM calls per story to bound cost."""
+        cand = _extract_og_image(html)
+        if cand and _ok_image(cand):
+            return cand
+        # og:image was missing or judged logo — try body imgs (up to 3)
+        for bi in _extract_body_images(html, url, max_n=3):
+            if _ok_image(bi):
+                return bi
+        return ""
+
     og_image = ""
     rejected: list[tuple[str, str, str]] = []  # (url, reason, html_snippet) for fallback
     for url in item.get("urls", []):
@@ -528,7 +592,7 @@ def _fetch_og_for_story(item: dict) -> tuple[str, list]:
                 if any(k in url_slug for k in story_specific):
                     kept_urls.append(url)  # URL slug names a story-specific term — legit multi-vendor
                     if not og_image:
-                        og_image = _extract_og_image(html) or og_image
+                        og_image = _pick_image(html, url) or og_image
                     continue
                 print(f"  ✂ Wrong-vendor URL for '{item.get('headline','?')[:40]}' (vendor={vendor}): title's primary subject is {title_subject} url={url[:60]}")
                 rejected.append((url, "wrong-vendor", html))
@@ -539,7 +603,7 @@ def _fetch_og_for_story(item: dict) -> tuple[str, list]:
                 continue  # drop URL — wrong topic
             kept_urls.append(url)
         if not og_image:
-            og_image = _extract_og_image(html) or og_image
+            og_image = _pick_image(html, url) or og_image
 
     # Last-resort: if everything got stripped, restore the least-bad rejected URL.
     # Prefer title-mismatch over wrong-vendor (wrong-vendor URLs are about a
@@ -552,7 +616,7 @@ def _fetch_og_for_story(item: dict) -> tuple[str, list]:
         recovered_url, reason, html = recoverable[0]
         kept_urls.append(recovered_url)
         if not og_image:
-            og_image = _extract_og_image(html) or og_image
+            og_image = _pick_image(html, recovered_url) or og_image
         print(f"  ↻ Recovered URL for '{item.get('headline','?')[:40]}' (would have been 0 URLs): "
               f"reason={reason} url={recovered_url[:60]}")
 

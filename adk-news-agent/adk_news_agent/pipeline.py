@@ -30,6 +30,33 @@ def _price_for(model: str) -> tuple[float, float]:
     return _GEMINI_PRICES["gemini-2.5-flash"]
 
 
+class _DegenerateGeminiOutput(RuntimeError):
+    """Gemini collapsed into n-gram repetition mid-response.
+
+    Observed 2026-05-02: VendorResearcher (gemini-2.5-flash + google_search)
+    emitted a 56-char base-encoded grounding-redirect token cycled for ~100KB
+    instead of returning real search results. Downstream URLResolver and
+    BriefingWriter then returned None, crashing pydantic. The chain is dead
+    once VendorResearcher's state is corrupt — abort and let run_pipeline retry.
+    """
+
+
+def _is_degenerate_repetition(text: str) -> bool:
+    """True if a 60-char window recurs >30× in a >20KB string.
+
+    Tuned to catch the May 2026 grounding-loop failure (>100KB of a single
+    cycled 56-char token) without false-positiving long legit responses.
+    Healthy VendorResearcher output is structured JSON-ish news with varied
+    content; no 60-char window recurs 30 times in <30KB of real news prose.
+    """
+    if not text or len(text) < 20000:
+        return False
+    chunk = text[200:260] if len(text) > 260 else text[:60]
+    if len(chunk) < 30:
+        return False
+    return text.count(chunk) > 30
+
+
 async def _run_async():
     session_service = InMemorySessionService()
     session = await session_service.create_session(app_name="briefing", user_id="u1")
@@ -57,6 +84,17 @@ async def _run_async():
                     "cost_usd": round(cost, 4),
                 })
             if event.is_final_response():
+                if getattr(event, "author", "") == "VendorResearcher":
+                    text = ""
+                    content = event.content
+                    if content and getattr(content, "parts", None):
+                        for p in content.parts:
+                            text += getattr(p, "text", "") or ""
+                    if _is_degenerate_repetition(text):
+                        raise _DegenerateGeminiOutput(
+                            f"VendorResearcher emitted {len(text):,} chars of "
+                            f"repeated tokens (Gemini grounding-loop bug)."
+                        )
                 print(event.content)
 
     timed_out = False
@@ -130,4 +168,15 @@ async def _run_async():
 
 
 def run_pipeline():
-    asyncio.run(_run_async())
+    last_err: Exception | None = None
+    for attempt in (1, 2):
+        try:
+            asyncio.run(_run_async())
+            return
+        except _DegenerateGeminiOutput as e:
+            last_err = e
+            print(f"[ADK] attempt {attempt}/2 hit Gemini repetition loop: {e}")
+            if attempt < 2:
+                print("[ADK] Retrying entire chain with a fresh session...")
+    assert last_err is not None
+    raise last_err

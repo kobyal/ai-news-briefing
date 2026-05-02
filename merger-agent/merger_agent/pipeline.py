@@ -820,6 +820,41 @@ def run_pipeline() -> dict:
         merged_json = json.dumps(parsed, ensure_ascii=False)
         print(f"  URL whitelist: stripped {hallucinated} URLs not found in any source briefing")
 
+    # Cross-day dup suppression: drop any story whose entire URL set was already
+    # published in the prior 2 days. The merger prompt asks the LLM to avoid
+    # deja-vu, but it's a soft instruction — observed today (2026-05-02) that
+    # Mistral 3.5 / DeepSeek V4-Pro / Claude Security all resurfaced as
+    # near-duplicates of yesterday with no new URL. Any genuine continuation
+    # adds at least one new source URL, so "every URL is stale" is a high-
+    # confidence "this isn't actually a new development" signal.
+    prior_urls: set[str] = set()
+    for delta in (1, 2):
+        day = (datetime.now() - timedelta(days=delta)).strftime("%Y-%m-%d")
+        try:
+            with open(f"docs/data/{day}.json") as fh:
+                prior = json.load(fh)
+        except (FileNotFoundError, json.JSONDecodeError):
+            continue
+        for it in prior.get("briefing", {}).get("news_items", []):
+            for u in it.get("urls", []):
+                prior_urls.add(_norm_url(u))
+
+    if prior_urls:
+        parsed = _parse(merged_json)
+        kept_items = []
+        suppressed = 0
+        for item in parsed.get("news_items", []):
+            urls_norm = [_norm_url(u) for u in item.get("urls", [])]
+            if urls_norm and all(u in prior_urls for u in urls_norm):
+                suppressed += 1
+                print(f"  ✂ Cross-day dup dropped: {item.get('headline', '?')[:80]}")
+            else:
+                kept_items.append(item)
+        if suppressed:
+            parsed["news_items"] = kept_items
+            merged_json = json.dumps(parsed, ensure_ascii=False)
+            print(f"  Cross-day URL dedup: dropped {suppressed} story/ies with no new sources vs prior 2 days")
+
     # Validate URLs — strip broken ones (404, timeouts)
     parsed = _parse(merged_json)
     total_urls = 0

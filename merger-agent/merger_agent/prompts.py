@@ -78,19 +78,32 @@ Produce ONE merged briefing as a JSON object. Rules:
    even if the older story is "bigger" news. Within the same day, order by importance/impact.
    Aim for breadth: include stories from different vendors where possible.
 
-3a. AVOID DEJA-VU — cross-reference each candidate story against the RECENT HEADLINES section above:
-   - If a candidate covers the EXACT SAME EVENT as a headline from the last 3 days AND there's no new
-     concrete development (new benchmark numbers, new partner, new quote, new controversy): DROP it.
-     It's not news anymore. Readers already saw it.
-   - If a candidate is a genuine UPDATE to a recent story (new benchmark number, new partner, reaction,
-     lawsuit, price change, etc.): KEEP it, but phrase the headline as a CONTINUATION — not a fresh launch.
-     Good: "Claude Opus 4.7 now tops new LMSys eval after 3 days on leaderboard"
-     Good: "Mythos vulnerability: CISA issues advisory, third patch shipped"
-     Good: "Meta's Muse Spark — engineer backlash grows, open-source fork proposed"
-     Bad:  "Claude Opus 4.7 released with enhanced coding" (already covered — don't reannounce)
-     The summary MUST specifically state what's new since last time.
-   - If a candidate is a different angle on a known story (e.g. yesterday was launch, today is user
-     reception or pricing detail): KEEP with a fresh headline that names the new angle.
+3a. AVOID DEJA-VU — cross-reference each candidate story against the RECENT HEADLINES section above.
+
+   STRICT NEW-FACT TEST (apply to EVERY story that has any topical overlap with RECENT HEADLINES):
+   Before keeping the story, you must be able to point to ONE specific NEW concrete fact that
+   wasn't in the prior coverage. Concrete facts are: a number (benchmark score, dollar amount,
+   user count, latency), a named person/company added to the story, a new date/event, a specific
+   decision (lawsuit filed, regulator ruling, deal signed, feature shipped), or a direct quote.
+
+   NOT concrete enough — these are "rewording" and require dropping the story:
+   - "X is making waves" / "X continues to disrupt" / "industry reacts to X"
+   - Reordering or rephrasing the original announcement's facts
+   - Adding generic context already implicit in the prior headline
+   - "Day N of X" framing without a new event ON day N
+
+   If you cannot name the specific new fact in the FIRST sentence of the summary, DROP the story.
+   Do NOT keep it with a reworded headline as a workaround. Better to publish 12 fresh stories
+   than 20 with 8 rewordings — the reader notices.
+
+   When you DO keep a continuing story, phrase the headline as a CONTINUATION naming the new fact:
+     Good: "Claude Opus 4.7 now tops new LMSys eval after 3 days on leaderboard" (new: benchmark)
+     Good: "Mythos vulnerability: CISA issues advisory, third patch shipped" (new: CISA, patch)
+     Good: "Meta's Muse Spark — engineer backlash grows, open-source fork proposed" (new: fork)
+     Good: "Anthropic Claude Security beta: $50B raise at $900B valuation reported" (new: $ amounts)
+     Bad:  "Claude Opus 4.7 released with enhanced coding" (already covered — drop)
+     Bad:  "Mistral Medium 3.5 powers remote coding agents" (yesterday's launch, no new fact — drop)
+   The summary's first sentence MUST state the specific new development.
 
    Newspapers don't re-report yesterday's front page as today's front page. Neither do we.
 

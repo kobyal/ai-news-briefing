@@ -8,6 +8,7 @@ from datetime import datetime
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
+from pydantic import ValidationError as _PydValidationError
 
 from .agent import root_agent
 
@@ -171,9 +172,16 @@ def run_pipeline():
         try:
             asyncio.run(_run_async())
             return
-        except _DegenerateGeminiOutput as e:
+        except (_DegenerateGeminiOutput, _PydValidationError) as e:
+            # _DegenerateGeminiOutput: Gemini's grounding cycle (n-gram repetition,
+            #   first observed 2026-05-02 in VendorResearcher).
+            # _PydValidationError: Gemini truncates BriefingWriter output mid-JSON,
+            #   so the BriefingContent schema fails to parse (observed 2026-05-03 —
+            #   cut off mid-URL inside an unresolved grounding redirect). Retrying
+            #   the chain with a fresh session usually produces a complete response.
             last_err = e
-            print(f"[ADK] attempt {attempt}/2 hit Gemini repetition loop: {e}")
+            kind = "repetition loop" if isinstance(e, _DegenerateGeminiOutput) else "schema validation (likely Gemini truncation)"
+            print(f"[ADK] attempt {attempt}/2 hit Gemini {kind}: {e}")
             if attempt < 2:
                 print("[ADK] Retrying entire chain with a fresh session...")
     assert last_err is not None

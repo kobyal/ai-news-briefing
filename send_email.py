@@ -1197,7 +1197,8 @@ if paid_rows or free_rows or usage_rows or fallback_rows or delivery_rows or fre
 
 msg = MIMEMultipart("alternative")
 _subj_tag = " [LOCAL]" if RUNNER == "local" else ""
-msg["Subject"] = f"AI Daily Briefing — {date}{_subj_tag}"
+subject = f"AI Daily Briefing — {date}{_subj_tag}"
+msg["Subject"] = subject
 msg["From"]    = SENDER
 msg["To"]      = RECIPIENT
 

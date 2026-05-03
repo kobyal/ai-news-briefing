@@ -17,7 +17,7 @@ A single landing page with these sections, each populated automatically:
 | Section | Source | Cadence |
 |---------|--------|---------|
 | **TL;DR (8–10 bullets)** | Merger LLM | every run |
-| **News stories (15–25 cards)** | 4 core LLM agents + Article Reader full-text + Exa + NewsAPI, merged by Claude | every run |
+| **News stories (15–25 cards)** | 4 core LLM agents + Article Reader full-text, merged by Claude | every run |
 | **Community pulse (5–7 items)** | Merger LLM, sourced from X / Reddit / HN signals | every run |
 | **Top X people highlights** | Twitter scrape (or xAI Grok fallback) | every run |
 | **Trending X posts** | Twitter scrape | every run |
@@ -50,7 +50,7 @@ The repo's public contract ends at `docs/`. Everything from GH Pages onwards is 
 
 ## Key technical decisions
 
-- **11 agents instead of 1 big LLM call.** Each surface (live web search, vendor blog feeds, semantic search, social) has a different retrieval shape. Running them in parallel means no single provider outage breaks the briefing, and each agent specializes. The merger can be relatively dumb because the inputs are already curated.
+- **9 agents instead of 1 big LLM call.** Each surface (live web search, vendor blog feeds, semantic search, social) has a different retrieval shape. Running them in parallel means no single provider outage breaks the briefing, and each agent specializes. The merger can be relatively dumb because the inputs are already curated.
 
 - **Two ways to run the merger.** Anthropic API (~$0.76/run) or `MERGER_VIA_CLAUDE_CODE=1` (Claude Max subscription, $0/call). The two paths share the same code via `shared/anthropic_cc.py`. A marker file `.via_subscription.done` lets local subscription runs and CI cron coexist without double-billing.
 

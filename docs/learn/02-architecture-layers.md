@@ -67,13 +67,13 @@ Output of this layer: a process running with all required env vars set, ready to
 
 **Responsibility:** get raw content from independent sources, in parallel.
 
-The 11 agents (10 collectors + Article Reader as a hybrid):
+The 9 agents (8 collectors + Article Reader as a hybrid; xAI Grok dormant):
 
 | Tier | Agents |
 |------|--------|
 | Core LLM (4) | ADK, Perplexity, RSS, Tavily |
-| Supplemental (5) | Article Reader, Exa, NewsAPI, YouTube, GitHub Trending |
-| Social (2) | Twitter (active), xAI Grok (disabled) |
+| Supplemental (3) | Article Reader, YouTube, GitHub Trending |
+| Social (2) | Twitter (active), xAI Grok (dormant) |
 
 Each agent:
 
@@ -99,8 +99,6 @@ The merger:
    - SOURCE C = RSS
    - SOURCE D = Tavily News + Perplexity sub-tools
    - SOURCE E = Social (X / Reddit)
-   - SOURCE F = Exa
-   - SOURCE G = NewsAPI
    - Article Reader full-text appended for richer summaries
 3. Parses the response into the `MergerOutput` schema (15–25 news items, 5–7 community pulse items, TLDR bullets).
 4. Runs **3 parallel** Anthropic calls for translation:

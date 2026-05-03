@@ -47,7 +47,7 @@ Three reasons:
 
 ## Why separate processes?
 
-`run_all.py` uses `subprocess.Popen` to launch each agent as a separate Python process, not threads or coroutines. This trades process-spawn overhead (~50ms × 11 agents = 0.5s — negligible) for three benefits:
+`run_all.py` uses `subprocess.Popen` to launch each agent as a separate Python process, not threads or coroutines. This trades process-spawn overhead (~50ms × 9 agents ≈ 0.45s — negligible) for three benefits:
 
 1. **Clean dependency isolation.** Each agent has its own `requirements.txt`. ADK uses `google-adk` which conflicts with newer `google-generativeai` versions; Perplexity uses `requests`; Tavily uses `tavily-python`. In one Python process, this would be a dependency-resolution nightmare. Subprocesses sidestep it.
 2. **Crash isolation.** If an agent segfaults or hits an uncaught exception, the parent `run_all.py` continues. The other agents finish; the merger runs against whatever was written.
@@ -102,7 +102,7 @@ If you add a new agent, mirror the convention.
 Each agent reads its required env vars at startup. If a key is missing:
 
 - **Strict agents** (ADK, Perplexity, Tavily — paid LLM dependency) print an error and exit non-zero. `run_all.py` records the `✗ FAILED` and continues.
-- **Lenient agents** (Exa, NewsAPI, Twitter, YouTube) print a warning and emit an empty `briefing.news_items: []` so downstream readers don't NullPointerException.
+- **Lenient agents** (Twitter, YouTube) print a warning and emit an empty `briefing.news_items: []` so downstream readers don't NullPointerException.
 
 The merger handles both cases — its prompt accepts zero-source-N inputs and just produces a thinner briefing.
 

@@ -6,7 +6,7 @@ The Merger is the final agent. It reads every other agent's most recent JSON out
 
 ## Why this exists
 
-The 10 collectors produce ~80 raw stories on a typical day, with massive duplication: AWS releases AgentCore → ADK finds 3 articles, Perplexity finds 2, Tavily finds 4, RSS finds the AWS blog, NewsAPI finds the Reuters wire — that's potentially 11 separate items about the same announcement. The Merger's job is:
+The 8 collectors produce ~80 raw stories on a typical day, with massive duplication: AWS releases AgentCore → ADK finds 3 articles, Perplexity finds 2, Tavily finds 4, RSS finds the AWS blog — that's potentially 10 separate items about the same announcement. The Merger's job is:
 
 1. **Deduplicate** by topic (cluster the 11 items into one story).
 2. **Pick the best 2–4 URLs** per story.
@@ -28,11 +28,9 @@ flowchart TB
         L3[RSS briefing.json + reddit_posts]
         L4[Tavily briefing.json]
         L5[Article Reader articles.json]
-        L6[Exa exa.json]
-        L7[NewsAPI newsapi.json]
-        L8[Twitter twitter.json]
-        L9[YouTube youtube.json]
-        L10[GitHub github.json]
+        L6[Twitter twitter.json]
+        L7[YouTube youtube.json]
+        L8[GitHub github.json]
     end
 
     load --> Merge[1× Merge call<br/>Claude Sonnet 4.6 / Opus 4.7<br/>via API or via claude -p]
@@ -89,7 +87,7 @@ python3 run_all.py --merge-only
 
 `merger-agent/merger_agent/prompts.py` defines `MERGER_SYSTEM_PROMPT`. Highlights:
 
-- **SOURCE A–G mapping.** SOURCE A = ADK, B = Perplexity, C = RSS, D = Tavily News + Perplexity, E = Social (X / Reddit), F = Exa, G = NewsAPI. The prompt explicitly forbids quoting "(per SOURCE X)" in the output — we filter for this in `publish_data.py` to catch fabricated pulse items.
+- **SOURCE A–E mapping.** SOURCE A = ADK, B = Perplexity, C = RSS, D = Tavily News + Perplexity, E = Social (X / Reddit). The prompt explicitly forbids quoting "(per SOURCE X)" in the output — we filter for this in `publish_data.py` to catch fabricated pulse items. (SOURCE F = Exa and SOURCE G = NewsAPI were dropped on 2026-05-03; older merger prompts in git history still reference them.)
 - **No URL invention.** The prompt forbids the model from generating URLs not in the source briefings. Layer (b) of the three-layer URL defense.
 - **15–25 news_items required.** "Don't compress 50 source stories into 12. A vendor WILL have 2–4 stories if they made multiple announcements."
 - **Vendor classification rules.** "Vendor = the COMPANY THE STORY IS ABOUT (the subject/actor), NOT companies mentioned in passing. Specifically: benchmark comparisons name the contender, not the baseline."

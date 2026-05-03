@@ -14,18 +14,16 @@ flowchart TB
         T3[python3 run_all.py<br/>direct]
     end
 
-    subgraph collect["2. Collection — 10 agents in parallel"]
+    subgraph collect["2. Collection — 8 agents in parallel"]
         direction LR
         C1[ADK]
         C2[Perplexity]
         C3[RSS]
         C4[Tavily]
         C5[Article Reader]
-        C6[Exa]
-        C7[NewsAPI]
-        C8[YouTube]
-        C9[GitHub]
-        C10[Twitter]
+        C6[YouTube]
+        C7[GitHub]
+        C8[Twitter]
     end
 
     subgraph merge["3. Synthesis — Merger Agent"]
@@ -81,7 +79,7 @@ Solid arrows mean the merger reads the agent's content into its prompt. Dashed a
 
 **Trigger → Collection.** A trigger calls `python3 run_all.py [--skip xai]`. `run_all.py` is the orchestrator. It launches each agent's `run.py` as a subprocess in a `ThreadPoolExecutor`-style fan-out. Default per-process timeout is 1200 seconds. Agents communicate only by writing JSON to disk under `<agent>/output/<YYYY-MM-DD>/`.
 
-**Collection → Synthesis.** When all 10 collectors are done (or timed out), `run_all.py` invokes the merger as a final, blocking step. The merger uses `glob` to find the most recent JSON output for each agent in today's date directory. Missing agents are tolerated — the merger's prompt accepts thin inputs.
+**Collection → Synthesis.** When all 8 collectors are done (or timed out), `run_all.py` invokes the merger as a final, blocking step. The merger uses `glob` to find the most recent JSON output for each agent in today's date directory. Missing agents are tolerated — the merger's prompt accepts thin inputs.
 
 **Synthesis → Post-process.** The merger writes `merged_<HHMMSS>.{html,json}` and the marker file. `publish_data.py` reads the merger's output, plus the latest from `youtube`, `github`, and `twitter` (these bypass merger). It runs URL validation, the canonical-URL prepend pass, the pulse-item fabrication filter, DeepL translation for Reddit/X, the OG image fetch, and finally `_audit_data_quality()`. Output: `docs/data/<date>.json`.
 
@@ -101,8 +99,6 @@ flowchart LR
         RSS[RSS briefing.json]
         TAV[Tavily briefing.json]
         AR[Article Reader articles.json]
-        EXA[Exa exa.json]
-        NEW[NewsAPI newsapi.json]
     end
 
     subgraph render["Bypasses merger, renders directly"]

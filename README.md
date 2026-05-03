@@ -45,7 +45,7 @@ pip install firecrawl-py exa-py newsapi-python duckduckgo-search
 # 3. Provide API keys (.env at repo root, or export in shell)
 cp .env.example .env  # fill in the keys you have; missing keys make agents no-op cleanly
 
-# 4. Run everything: 10 collectors in parallel, then the merger.
+# 4. Run everything: 8 collectors in parallel, then the merger.
 python3 run_all.py
 
 # Useful flags:

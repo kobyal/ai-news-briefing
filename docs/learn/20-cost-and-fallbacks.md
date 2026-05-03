@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-A daily run costs **~$1.01 on the Anthropic API path** and **~$0.16 on the Claude Max subscription path** — the difference is 0× / $0.85 saved per run. Every external dependency has a fallback (Tavily 3-key cascade → DDG, Jina → Firecrawl → cache, Exa 2-key, NewsAPI 2-key, YouTube → Google API key). Every paid call has a free alternative (Twitter scrape replaces Grok, Reddit Arctic Shift replaces Reddit OAuth). The daily email's `FALLBACKS FIRED` panel surfaces which chains actually fired today.
+A daily run costs **~$1.01 on the Anthropic API path** and **~$0.16 on the Claude Max subscription path** — the difference is 0× / $0.85 saved per run. Every external dependency has a fallback (Tavily 3-key cascade → DDG, Jina → Firecrawl → cache, YouTube → Google API key). Every paid call has a free alternative (Twitter scrape replaces Grok, Reddit Arctic Shift replaces Reddit OAuth). The daily email's `FALLBACKS FIRED` panel surfaces which chains actually fired today.
 
 ## The cost ladder
 
@@ -72,8 +72,6 @@ The CI workflow's first step reads this. If the marker is < 5 hours old, every s
 | Anthropic via subscription | `claude -p` (OAuth) | no auto-fallback to API — fails the step | n/a |
 | Perplexity Sonar | `PERPLEXITY_API_KEY` | retry only (single key) | n/a |
 | Google Gemini (ADK) | `GOOGLE_API_KEY` | SDK retry only | n/a |
-| Exa | `EXA_API_KEY` | `EXA_API_KEY2` → empty result | not yet |
-| NewsAPI | `NEWSAPI_KEY` | `NEWSAPI_KEY2` → empty result | not yet |
 | YouTube | `YOUTUBE_API_KEY` | `GOOGLE_API_KEY` → skip | not yet |
 | Twitter scrape | cookies | xAI Grok agent (if re-enabled) → empty section | partial |
 | Reddit (Arctic Shift) | unauthenticated | retry → empty `reddit_posts` | no |
@@ -126,8 +124,7 @@ In order of size:
 
 1. **Merger → Opus 4.7 via subscription.** Already what the maintainer runs daily.
 2. **More feeds in the RSS agent.** ~75 → ~150 doubles vendor coverage at zero cost.
-3. **More Exa queries.** $0.007/query, can run 30 queries instead of 10.
-4. **Larger LOOKBACK_DAYS.** 3 → 7 catches week-old launches still being talked about.
+3. **Larger LOOKBACK_DAYS.** 3 → 7 catches week-old launches still being talked about.
 5. **More YouTube channels.** YouTube quota has 20× headroom.
 
 ## Code tour

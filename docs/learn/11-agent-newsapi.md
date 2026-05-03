@@ -1,5 +1,7 @@
 # 11 — Agent: NewsAPI
 
+> **⚠️ RETIRED 2026-05-03.** The NewsAPI agent was dropped from `run_all.py` after an audit found its hits were 100% redundant with Tavily / Perplexity / RSS. The directory `newsapi-agent/` and the linked NotebookLM video remain in the repo for historical reference, but NewsAPI is no longer part of the daily pipeline. See [04 — Collection pattern](./04-collection-pattern.md) for the current 8-agent lineup.
+
 ## TL;DR
 
 The NewsAPI agent fires 8 queries through NewsAPI.org's free tier, classifies each article by vendor (using `shared/vendors.py`), deduplicates URLs, and saves the results as supplemental sources for the merger. Like Exa, it's a no-LLM agent — NewsAPI returns clean JSON with structured metadata. Its niche is mainstream wire-service coverage that other agents under-index.

@@ -1,5 +1,7 @@
 # 10 — Agent: Exa
 
+> **⚠️ RETIRED 2026-05-03.** The Exa agent was dropped from `run_all.py` after an audit found Exa's stories had a ~5% pass-rate through the merger — its niche semantic-search results were almost always already covered by Tavily / Perplexity / RSS. The directory `exa-news-agent/` and the linked NotebookLM video remain in the repo for historical reference, but Exa is no longer part of the daily pipeline. See [04 — Collection pattern](./04-collection-pattern.md) for the current 8-agent lineup.
+
 ## TL;DR
 
 Exa is the semantic search layer for niche or technical AI stories that broader web/news search misses. The agent fires 10 hand-tuned queries through Exa's API, deduplicates URLs, and saves the results as supplemental sources for the merger. It's a no-LLM agent — Exa returns clean structured results, no synthesis needed at this stage.

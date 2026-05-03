@@ -107,7 +107,7 @@ Result: the daily output is typically 15–25 videos. The frontend renders top ~
 
 ## Vendor classification
 
-Same pattern as RSS/NewsAPI: video title + channel name → `shared/vendors.py::VENDOR_KEYWORDS`. A video on `Anthropic`'s official channel gets `vendor: "Anthropic"`. A Two Minute Papers video about Claude also gets `vendor: "Anthropic"` because Claude appears in the title.
+Same pattern as RSS: video title + channel name → `shared/vendors.py::VENDOR_KEYWORDS`. A video on `Anthropic`'s official channel gets `vendor: "Anthropic"`. A Two Minute Papers video about Claude also gets `vendor: "Anthropic"` because Claude appears in the title.
 
 ## Failure modes
 

@@ -40,7 +40,7 @@ The orchestrator. CI calls it; `local-cycle.sh` calls it; you can call it intera
 Useful flags:
 
 ```bash
-python3 run_all.py                      # all 11 agents (xAI included if XAI_API_KEY set)
+python3 run_all.py                      # all 9 agents (xAI included if XAI_API_KEY set)
 python3 run_all.py --skip xai           # default for daily runs
 python3 run_all.py --skip xai twitter   # skip both social agents
 python3 run_all.py --only adk perplexity   # run ONLY these (+ merger)

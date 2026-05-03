@@ -123,6 +123,8 @@ API routes (proxied by API Gateway):
 
 Returns JSON. CloudFront caches responses with a TTL (default 1 hour, but can be invalidated on demand).
 
+**Search**: there's no `/api/search` Lambda. Cross-date keyword search is served from a static **`/data/search-index.json`** that the ingest Lambda rebuilds on every run — slimmed projection of every story (story_id, date, vendor, headline + Hebrew, summary + Hebrew, og_image). The frontend fetches it once per session and filters client-side. ~1.1MB raw / ~280KB gzipped, CDN-cached. This avoids a per-keystroke DynamoDB scan; given the table caps at ~2K items via 90-day TTL, the static-index approach scales fine for the lifetime of the project.
+
 Cache invalidation when re-publishing:
 
 ```bash

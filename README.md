@@ -15,7 +15,7 @@ It's intentionally fork-friendly:
 - **The merger can run on a Claude Max subscription** instead of the Anthropic API — bringing per-run cost from ~$1.01 to ~$0.16.
 - **Fork it as-is** and it'll run end-to-end on GitHub Actions + GitHub Pages — no AWS, no other infrastructure required.
 
-**Live site:** [duus0s1bicxag.cloudfront.net](https://duus0s1bicxag.cloudfront.net/) (Next.js app on CloudFront — maintainer's deployment)
+**Live site:** [d2p40aowelo4td.cloudfront.net](https://d2p40aowelo4td.cloudfront.net/) (Next.js app on CloudFront — maintainer's deployment)
 **Raw merged briefing:** `kobyal.github.io/ai-news-briefing/report/latest.html` (GitHub Pages — what this repo publishes directly)
 **Structured data:** `kobyal.github.io/ai-news-briefing/data/<YYYY-MM-DD>.json` (machine-readable daily snapshot)
 

@@ -60,7 +60,7 @@ VENDOR_STOCK_POOL: dict[str, list[str]] = {
 }
 
 
-_PREWARMED_MANIFEST_URL = "https://duus0s1bicxag.cloudfront.net/data/img/fallback/prewarmed/index.json"
+_PREWARMED_MANIFEST_URL = "https://aibriefing.dev/data/img/fallback/prewarmed/index.json"
 _prewarmed_cache: dict[str, str] | None = None
 
 

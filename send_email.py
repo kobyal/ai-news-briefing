@@ -23,7 +23,7 @@ except KeyError:
 # Where this run is happening — surfaces in the email so a re-run from
 # your laptop doesn't get mistaken for the morning CI email.
 RUNNER = "CI" if os.environ.get("GITHUB_ACTIONS") == "true" else "local"
-WEBSITE_URL  = "https://duus0s1bicxag.cloudfront.net"
+WEBSITE_URL  = "https://d2p40aowelo4td.cloudfront.net"
 PAGES_BASE   = "https://kobyal.github.io/ai-news-briefing"
 
 # Find latest merged HTML

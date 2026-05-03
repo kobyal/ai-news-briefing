@@ -128,7 +128,7 @@ The dev server proxies `/api/*` to the production CloudFront, so `npm run dev` s
 cd web
 npm run build                          # → web/out/ (static export)
 aws s3 sync out s3://ai-news-briefing-web --delete --exclude "data/*"
-aws cloudfront create-invalidation --distribution-id E2XOWDA6B84582 --paths "/*"
+aws cloudfront create-invalidation --distribution-id E1TSW76SSEILK4 --paths "/*"
 ```
 
 The `--exclude "data/*"` is mandatory. The S3 `data/` folder is written by the ingest Lambda (a mirror of DynamoDB for direct CloudFront access). Without the exclude, `--delete` would wipe the live data.

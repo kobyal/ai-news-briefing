@@ -29,10 +29,10 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-BUCKET = "ai-news-briefing-web"
+BUCKET = "ai-news-briefing-web2"
 PREFIX = "data/img/fallback/prewarmed"
-CF = "https://duus0s1bicxag.cloudfront.net"
-AWS_PROFILE = "aws-sandbox-personal-36"
+CF = "https://d2p40aowelo4td.cloudfront.net"
+AWS_PROFILE = "koby-personal"
 
 # Subjects to pre-warm. key = slug (used as lookup key + filename), value = Wikipedia title.
 # Keep slugs lowercase, space-separated so matching against headlines is easy.

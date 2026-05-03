@@ -90,7 +90,7 @@ Trigger: EventBridge rule `ai-news-ingest-daily` (cron `30 6 * * *` UTC = 09:30 
 Also invokable manually:
 
 ```bash
-aws --profile aws-sandbox-personal-36 lambda invoke \
+aws --profile koby-personal lambda invoke \
   --function-name ai-news-ingest --region us-east-1 \
   --cli-binary-format raw-in-base64-out --payload '{}' \
   /tmp/ingest_response.json
@@ -127,7 +127,7 @@ Cache invalidation when re-publishing:
 
 ```bash
 aws cloudfront create-invalidation \
-  --distribution-id E2XOWDA6B84582 \
+  --distribution-id E1TSW76SSEILK4 \
   --paths "/api/*"
 ```
 
@@ -138,7 +138,7 @@ Lives in `infra/stacks/api_stack.py` (separate repo).
 Purpose: serve the Next.js static export.
 
 - **S3 bucket** `ai-news-briefing-web` — stores the built `web/out/` directory.
-- **CloudFront distribution** `E2XOWDA6B84582` — global CDN.
+- **CloudFront distribution** `E1TSW76SSEILK4` — global CDN.
 - **Origin Access Control (OAC)** — only CloudFront can read S3 (no public bucket).
 - **API Gateway integration** — `/api/*` paths route to the API Gateway.
 
@@ -148,7 +148,7 @@ Deploy from `web/`:
 cd web
 npm run build
 aws s3 sync out s3://ai-news-briefing-web --delete --exclude "data/*"
-aws cloudfront create-invalidation --distribution-id E2XOWDA6B84582 --paths "/*"
+aws cloudfront create-invalidation --distribution-id E1TSW76SSEILK4 --paths "/*"
 ```
 
 The `--exclude "data/*"` is critical. The `data/` folder in S3 is written by the ingest Lambda (mirror of DynamoDB JSON for direct CloudFront access). Without the exclude, `--delete` would wipe it.
@@ -160,8 +160,8 @@ Lives in `infra/stacks/frontend_stack.py` (separate repo).
 Both rules (`ai-news-trigger-daily` and `ai-news-ingest-daily`) have been disabled since 2026-04-26 to avoid double-runs while the maintainer was iterating locally. Re-enable:
 
 ```bash
-aws --profile aws-sandbox-personal-36 events enable-rule --name ai-news-trigger-daily --region us-east-1
-aws --profile aws-sandbox-personal-36 events enable-rule --name ai-news-ingest-daily --region us-east-1
+aws --profile koby-personal events enable-rule --name ai-news-trigger-daily --region us-east-1
+aws --profile koby-personal events enable-rule --name ai-news-ingest-daily --region us-east-1
 ```
 
 The marker file mechanism (see [03-trigger-and-runtime](./03-trigger-and-runtime.md)) means re-enabling won't double-run on days the maintainer ran locally.

@@ -2,12 +2,12 @@
 
 Downloads the canonical photo for a curated list of AI-news subjects (people,
 companies, products) from Wikipedia and uploads each to:
-    s3://ai-news-briefing-web/data/img/fallback/prewarmed/{slug}.{ext}
+    s3://ai-news-briefing-web2/data/img/fallback/prewarmed/{slug}.{ext}
 
 Also writes a manifest:
-    s3://ai-news-briefing-web/data/img/fallback/prewarmed/index.json
+    s3://ai-news-briefing-web2/data/img/fallback/prewarmed/index.json
 
-Format: { "sam altman": "https://duus0s1bicxag.cloudfront.net/.../sam-altman.jpg", ... }
+Format: { "sam altman": "https://aibriefing.dev/.../sam-altman.jpg", ... }
 
 Why:
 - GitHub opengraph service rate-limits under light load (429) — unreliable
@@ -154,7 +154,7 @@ def main():
     # Invalidate the index.json + prewarmed dir so CloudFront picks up changes
     subprocess.run(
         ["aws", "cloudfront", "create-invalidation",
-         "--distribution-id", "E2XOWDA6B84582",
+         "--distribution-id", "E1TSW76SSEILK4",
          "--paths", f"/{PREFIX}/*",
          "--profile", AWS_PROFILE, "--query", "Invalidation.Id", "--output", "text"],
         capture_output=True, text=True,

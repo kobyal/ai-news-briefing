@@ -133,14 +133,12 @@ async def _run_async():
     else:
         print(f"  ✗  Publisher (direct) skipped: no 'briefing' in session state")
 
-    # Write usage.json next to today's output HTML (best-effort locate)
+    # Write usage.json next to today's briefing JSON
     today = datetime.now().strftime("%Y-%m-%d")
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     today_dir = os.path.join(base_dir, "output", today)
     if calls:
-        # adk_news_agent.tools writes HTML to output/{YYYY-MM-DD}/*.html
-        candidates = glob.glob(os.path.join(today_dir, "*.html"))
-        out_dir = os.path.dirname(candidates[0]) if candidates else today_dir
+        out_dir = today_dir
         os.makedirs(out_dir, exist_ok=True)
         total_in = sum(c["input_tokens"] for c in calls)
         total_out = sum(c["output_tokens"] for c in calls)

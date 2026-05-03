@@ -17,7 +17,7 @@ from pathlib import Path
 import anthropic
 
 from .feeds import fetch_all, VENDOR_KEYWORDS
-from .tools import build_and_save_html, _parse
+from .tools import _parse
 
 # Shared subscription path — shells to `claude -p` when MERGER_VIA_CLAUDE_CODE=1
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -202,13 +202,13 @@ def _step3_translate(briefing_json: str) -> str:
 
 
 def _step4_publish(briefing_json: str, hebrew_json: str, community_articles: list = None) -> dict:
-    print("\n[4/4] Publisher — building HTML newsletter...")
-    result = build_and_save_html(briefing_json, hebrew_json, topic="AI")
-
-    html_path = result["saved_to"]
-    json_path = html_path.replace(".html", ".json")
+    print("\n[4/4] Publisher — saving briefing JSON for merger...")
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out_dir  = os.path.join(base_dir, "output", datetime.now().strftime("%Y-%m-%d"))
+    os.makedirs(out_dir, exist_ok=True)
+    json_path = os.path.join(out_dir, f"rss_{datetime.now().strftime('%H%M%S')}.json")
     data = _parse(briefing_json)
-    he   = _parse(hebrew_json)
+    he   = _parse(hebrew_json) if hebrew_json else {}
 
     # Save top Reddit posts sorted by comment count (community_articles already sorted by _score)
     import re as _re
@@ -248,8 +248,8 @@ def _step4_publish(briefing_json: str, hebrew_json: str, community_articles: lis
             "briefing_he": he,
             "reddit_posts": reddit_posts,
         }, f, ensure_ascii=False)
-    result["json_saved_to"] = json_path
-    return result
+    print(f"  Saved → {json_path}")
+    return {"saved_to": json_path, "json_saved_to": json_path, "success": True}
 
 
 # ---------------------------------------------------------------------------

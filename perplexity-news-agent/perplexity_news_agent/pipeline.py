@@ -30,7 +30,7 @@ from .prompts import (
     TRANSLATOR_PROMPT,
 )
 from .schemas import BriefingContent, HebrewBriefing
-from .tools import build_and_save_html, _parse
+from .tools import _parse
 
 # ---------------------------------------------------------------------------
 # Config
@@ -390,17 +390,17 @@ def _step4_translate(briefing_json: str) -> str:
 
 
 def _step5_publish(briefing_json: str, hebrew_json: str) -> dict:
-    print("\n[5/5] Publisher — building HTML newsletter...")
-    result = build_and_save_html(briefing_json, hebrew_json)
-    # Save raw JSON alongside HTML for merger pipeline
-    html_path = result["saved_to"]
-    json_path = html_path.replace(".html", ".json")
+    print("\n[5/5] Publisher — saving briefing JSON for merger...")
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out_dir  = os.path.join(base_dir, "output", datetime.now().strftime("%Y-%m-%d"))
+    os.makedirs(out_dir, exist_ok=True)
+    json_path = os.path.join(out_dir, f"briefing_{datetime.now().strftime('%H%M%S')}.json")
     data = _parse(briefing_json)
-    he   = _parse(hebrew_json)
+    he   = _parse(hebrew_json) if hebrew_json else {}
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump({"source": "perplexity", "briefing": data, "briefing_he": he}, f, ensure_ascii=False)
-    result["json_saved_to"] = json_path
-    return result
+    print(f"  Saved → {json_path}")
+    return {"saved_to": json_path, "json_saved_to": json_path, "success": True}
 
 
 # ---------------------------------------------------------------------------

@@ -574,10 +574,21 @@ def _collect_fallbacks() -> list[dict]:
     return [{"agent": a, "from": f, "to": t, "count": n} for (a, f, t), n in counts.items()]
 
 
-def _check_count(have: int, expect: int) -> str:
-    """Render ✓N or ⚠N depending on whether N matches what we expected to flow through."""
+def _check_count(have: int, expect: int, at_least: bool = False) -> str:
+    """Render ✓N or ⚠N depending on whether N matches what we expected to flow through.
+
+    at_least=True treats have >= expect as ✓. Used for stages where the count
+    can legitimately grow:
+    - merger row's `site`: ingest Lambda merges same-day re-runs, so DDB/site
+      count >= this run's json count (preserved earlier-run stories).
+    - youtube row's `json`: publish_data.py enriches the agent's raw video
+      list via _enrich_youtube_per_story + _gap_fill_unpaired, so the final
+      json count >= the agent's raw count.
+    """
     if expect == 0:
         return f"{have}"
+    if at_least:
+        return f"✓{have}" if have >= expect else f"⚠{have}"
     return f"✓{have}" if have == expect else f"⚠{have}"
 
 
@@ -707,9 +718,11 @@ def _collect_agent_delivery() -> list[dict]:
     rows.append({
         "agent": "merger", "raw": f"{m_news} stories",
         "json": _check_count(json_news, m_news),
-        "site": _check_count(site_news, m_news),
-        "status": "ok" if m_news > 0 and json_news == m_news and site_news == m_news else "warn",
-        "note": "",
+        # site can legitimately exceed json on same-day re-runs — the ingest
+        # Lambda merges with earlier runs' preserved stories.
+        "site": _check_count(site_news, m_news, at_least=True),
+        "status": "ok" if m_news > 0 and json_news == m_news and site_news >= m_news else "warn",
+        "note": "" if site_news == m_news else (f"+{site_news - m_news} preserved from earlier runs" if site_news > m_news else ""),
     })
 
     tw = _latest("twitter-agent")
@@ -754,9 +767,14 @@ def _collect_agent_delivery() -> list[dict]:
             status = "error" if streak >= 2 else "warn"
         else:
             note, status = "", "ok"
+        # YouTube's json count can legitimately exceed raw because publish_data
+        # enriches the pool with story-paired + gap-fill videos. site count
+        # mirrors json (whatever was written ends up on the site).
+        json_at_least = (label == "youtube")
         rows.append({"agent": label, "raw": str(n),
-                     "json": _check_count(json_n, n),
-                     "site": _check_count(site_n, n),
+                     "json": _check_count(json_n, n, at_least=json_at_least),
+                     "site": _check_count(site_n, json_n if json_at_least else n,
+                                          at_least=json_at_least),
                      "status": status, "note": note})
 
     return rows

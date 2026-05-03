@@ -2,11 +2,11 @@
 
 ## TL;DR
 
-Eleven independent agents run in parallel as separate Python processes, each writing JSON to `<agent>/output/<date>/`. They never talk to each other directly — every interaction is mediated by disk. This is the single most important architectural choice in the project; it makes failure isolation trivial and re-running any single agent free.
+Nine independent agents run in parallel as separate Python processes, each writing JSON to `<agent>/output/<date>/`. They never talk to each other directly — every interaction is mediated by disk. This is the single most important architectural choice in the project; it makes failure isolation trivial and re-running any single agent free.
 
 ## What "collection" means
 
-A collector is anything that takes some external surface (an API, a feed, a webpage, a search index) and turns it into a JSON file. The 11 collectors cover:
+A collector is anything that takes some external surface (an API, a feed, a webpage, a search index) and turns it into a JSON file. The 9 active collectors cover:
 
 | Surface | Agents |
 |---------|--------|
@@ -14,12 +14,12 @@ A collector is anything that takes some external surface (an API, a feed, a webp
 | Vendor blog RSS + HN + Reddit | RSS agent (75+ feeds) |
 | Tavily news search | Tavily agent |
 | Full article body text | Article Reader (Jina + Firecrawl) |
-| Semantic search | Exa |
-| Wire-service news | NewsAPI |
 | Video discovery | YouTube (channels + search) |
 | Open-source momentum | GitHub Trending |
 | X/Twitter people + trending | Twitter (cookie scrape) |
 | X/Twitter via Grok (disabled) | xAI |
+
+Two other agents (`exa-news-agent`, `newsapi-agent`) live in the repo but were retired from `run_all.py` on 2026-05-03 after an audit found their stories were always already covered by Tavily/Perplexity/RSS — Exa's stories had a 5% pass rate through the merger, NewsAPI's hits were 100% redundant.
 
 ## The shared shape
 
@@ -31,8 +31,7 @@ Every collector writes to the same path pattern:
 
 The internal JSON shape varies:
 
-- **Core LLM agents** (ADK / Perplexity / RSS / Tavily) write `briefing.{json,html}` containing a structured `briefing` object with `tldr`, `news_items`, `community_pulse`, plus a `briefing_he` translation.
-- **Supplemental** (Exa / NewsAPI) write `<agent>_<HHMMSS>.json` with a `briefing.news_items` array.
+- **Core LLM agents** (ADK / Perplexity / RSS / Tavily) write `briefing_<HHMMSS>.json` containing a structured `briefing` object with `tldr`, `news_items`, `community_pulse`, plus a `briefing_he` translation. *(Until 2026-05-03 they also wrote a per-agent HTML newsletter — that was deleted as dead code; nothing read it downstream.)*
 - **Side-channel** (YouTube / GitHub / Twitter) write a JSON with a `briefing.news_items` array of items the merger renders directly without LLM processing.
 - **Article Reader** writes `articles_<HHMMSS>.json` with a list of `{url, title, body, source}` objects — pure full-text, no synthesis.
 
@@ -110,28 +109,23 @@ The merger handles both cases — its prompt accepts zero-source-N inputs and ju
 ## Where the data ends up
 
 ```
-adk-news-agent/output/2026-04-28/briefing_133708.html
-adk-news-agent/output/2026-04-28/briefing_133708.json
-adk-news-agent/output/2026-04-28/usage_133053.json
-adk-news-agent/output/2026-04-28/usage_133708.json
-perplexity-news-agent/output/2026-04-28/briefing_125211.html
-perplexity-news-agent/output/2026-04-28/briefing_125211.json
-perplexity-news-agent/output/2026-04-28/usage_125211.json
-rss-news-agent/output/2026-04-28/rss_125351.html
-rss-news-agent/output/2026-04-28/rss_125351.json
-rss-news-agent/output/2026-04-28/usage_125351.json
-tavily-news-agent/output/2026-04-28/tavily_125211.html
-tavily-news-agent/output/2026-04-28/tavily_125211.json
-tavily-news-agent/output/2026-04-28/usage_125211.json
-exa-news-agent/output/2026-04-28/exa_124929.json
-newsapi-agent/output/2026-04-28/newsapi_124918.json
-youtube-news-agent/output/2026-04-28/youtube_124930.json
-github-trending-agent/output/2026-04-28/github_124950.json
-twitter-agent/output/2026-04-28/twitter_124922.json
-article-reader-agent/output/2026-04-28/articles_124959.json
+adk-news-agent/output/2026-05-03/briefing_133708.json
+adk-news-agent/output/2026-05-03/usage_133708.json
+perplexity-news-agent/output/2026-05-03/briefing_125211.json
+perplexity-news-agent/output/2026-05-03/usage_125211.json
+rss-news-agent/output/2026-05-03/rss_125351.json
+rss-news-agent/output/2026-05-03/usage_125351.json
+tavily-news-agent/output/2026-05-03/tavily_125211.json
+tavily-news-agent/output/2026-05-03/usage_125211.json
+youtube-news-agent/output/2026-05-03/youtube_124930.json
+github-trending-agent/output/2026-05-03/github_124950.json
+twitter-agent/output/2026-05-03/twitter_124922.json
+article-reader-agent/output/2026-05-03/articles_124959.json
 ```
 
 The merger globs each of these paths to find the most recent file for today's date. Missing dates / missing files / empty files are tolerated.
+
+(Per-agent HTML newsletters used to live alongside each `briefing_*.json`. They were dropped on 2026-05-03 — nothing read them downstream. NewsAPI and Exa were also retired the same day after audit found their stories were always already covered by Tavily/Perplexity/RSS.)
 
 ## Daily commit hygiene
 

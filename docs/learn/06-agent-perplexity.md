@@ -96,7 +96,7 @@ Older Sonar variants don't return the cost field. The fallback is to compute cos
 | `run.py` | Entry point. |
 | `perplexity_news_agent/pipeline.py` | `_step1_research`, `_step2_writer`, `_step3_translate`, `_step4_publish`. The `_anthropic_direct` helper handles both API and subscription paths. |
 | `perplexity_news_agent/prompts.py` | Vendor research, community research, writer, translator prompts. |
-| `perplexity_news_agent/tools.py` | HTML rendering. |
+| `perplexity_news_agent/tools.py` | `_parse()` — JSON repair (markdown fences, Hebrew gershayim). *(Used to also do HTML rendering — removed 2026-05-03 as nothing read it.)* |
 
 ## Cool tricks
 

@@ -120,7 +120,7 @@ When a key drops from Researcher to Free tier (after a billing cycle), max searc
 | `tavily_news_agent/searcher.py` | `search()`, key rotation, DDG fallback, `fallback_tracker` integration. |
 | `tavily_news_agent/pipeline.py` | `_step1_search`, `_step2_writer`, `_step3_translate`, `_step4_publish`. |
 | `tavily_news_agent/prompts.py` | Per-topic prompt templates. |
-| `tavily_news_agent/tools.py` | HTML rendering. |
+| `tavily_news_agent/tools.py` | `_parse()` — JSON repair (markdown fences, Hebrew gershayim). *(Used to also do HTML rendering — removed 2026-05-03 as nothing read it.)* |
 
 ## Cool tricks
 

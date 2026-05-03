@@ -128,7 +128,7 @@ Same retry pattern as the Perplexity agent — 3 attempts with 5/15/30s backoff.
 | `run.py` | Entry point. |
 | `rss_news_agent/feeds.py` | `FEEDS` registry; per-type fetchers (`_fetch_rss`, `_fetch_hn`, `_fetch_arctic_shift`, `_fetch_hf_papers`); `fetch_all` orchestration. |
 | `rss_news_agent/pipeline.py` | `_step1_collect_rss` → `_step2_writer` → `_step3_translate` → `_step4_publish`. |
-| `rss_news_agent/tools.py` | HTML rendering. |
+| `rss_news_agent/tools.py` | `_parse()` — JSON repair (markdown fences, Hebrew gershayim). *(Used to also do HTML rendering — removed 2026-05-03 as nothing read it.)* |
 
 ## Cool tricks
 

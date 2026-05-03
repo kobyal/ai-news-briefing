@@ -60,8 +60,9 @@ python3 run_all.py --only adk
 ## Output
 
 - `adk-news-agent/output/<date>/briefing_<HHMMSS>.json` — structured briefing for the merger
-- `adk-news-agent/output/<date>/briefing_<HHMMSS>.html` — standalone newsletter
 - `adk-news-agent/output/<date>/usage_<HHMMSS>.json` — per-call Gemini token + cost log
+
+(There used to be a per-agent `briefing_<HHMMSS>.html` newsletter as well. It was dropped on 2026-05-03 — nothing read it. The merger writes the only user-facing HTML.)
 
 JSON shape:
 
@@ -132,7 +133,7 @@ Each URL in `resolve_source_urls` is fetched with an 8-second timeout. Slow doma
 | `adk_news_agent/agent.py` | `LlmAgent` definitions, `SequentialAgent` + `ParallelAgent` orchestration. Pydantic schemas (`BriefingContent`, `HebrewBriefing`). |
 | `adk_news_agent/pipeline.py` | `_run_async()` — drives the ADK runner; deterministic Publisher; post-run validation; usage logging. |
 | `adk_news_agent/prompts.py` | All prompt templates (VendorResearcher, URLResolver, CommunityResearcher, BriefingWriter, Translator, Publisher). |
-| `adk_news_agent/tools.py` | `resolve_source_urls()`, `build_and_save_html()`, HTML rendering, vendor color palette. |
+| `adk_news_agent/tools.py` | `resolve_source_urls()`, `_parse()` (JSON repair), `build_and_save_html()` (now JSON-only despite the name — kept for ADK tool registration). |
 
 ## Cool tricks
 

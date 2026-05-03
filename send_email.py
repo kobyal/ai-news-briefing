@@ -1243,3 +1243,18 @@ with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
     server.sendmail(SENDER, RECIPIENT, msg.as_string())
 
 print(f"Email sent → {RECIPIENT}")
+
+# Status marker for QA evaluator (data_integrity.email_not_sent check).
+# Only written on successful send — if sendmail throws above, this stays
+# stale and QA flags. Path is in private/ (gitignored).
+import datetime as _dt, pathlib as _pl
+_status_dir = _pl.Path(__file__).resolve().parent / "private"
+_status_dir.mkdir(exist_ok=True)
+_status_path = _status_dir / "email_status.json"
+_status_path.write_text(json.dumps({
+    "sent_at":   _dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    "date":      date,
+    "recipient": RECIPIENT,
+    "subject":   subject,
+    "runner":    RUNNER,
+}, indent=2), encoding="utf-8")

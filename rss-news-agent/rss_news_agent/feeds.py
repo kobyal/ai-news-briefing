@@ -11,17 +11,14 @@ from email.utils import parsedate_to_datetime
 from typing import List, Optional
 import urllib.request
 
-try:
-    import feedparser  # pip install feedparser
-    _HAS_FEEDPARSER = True
-except ImportError:
-    _HAS_FEEDPARSER = False
-
-try:
-    import requests as _requests
-    _HAS_REQUESTS = True
-except ImportError:
-    _HAS_REQUESTS = False
+# Hard-import: missing deps must crash this module loudly. The previous
+# `_HAS_FEEDPARSER` soft-flag pattern silently returned [] from every fetch
+# for ALL 70+ vendor RSS feeds when feedparser wasn't installed — caught
+# 2026-05-02 after Amazon Q Developer EOS announcement (and presumably many
+# other vendor blog posts before it) was missed for an unknown duration.
+# A pipeline that ships empty output is worse than a pipeline that fails.
+import feedparser  # pip install feedparser  (REQUIRED — no soft-fallback)
+import requests as _requests  # REQUIRED
 
 
 # ---------------------------------------------------------------------------
@@ -179,8 +176,6 @@ def _clean_html(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _fetch_rss(url: str, vendor_tag: str, since: datetime) -> List[dict]:
-    if not _HAS_FEEDPARSER:
-        return []
     try:
         feed = feedparser.parse(url)
         articles = []
@@ -211,8 +206,6 @@ def _fetch_rss(url: str, vendor_tag: str, since: datetime) -> List[dict]:
 
 def _fetch_hn(url: str, since: datetime, max_items: int = 30) -> List[dict]:
     """Fetch Hacker News top stories, filter AI-related, return articles."""
-    if not _HAS_REQUESTS:
-        return []
     AI_KEYWORDS = ["ai", "llm", "gpt", "claude", "gemini", "openai", "anthropic",
                    "mistral", "llama", "nvidia", "ml ", "machine learning",
                    "deep learning", "neural", "transformer", "diffusion",
@@ -267,8 +260,6 @@ def _fetch_hn(url: str, since: datetime, max_items: int = 30) -> List[dict]:
 
 def _fetch_hf_papers(url: str, since: datetime) -> List[dict]:
     """Fetch HuggingFace daily papers JSON API."""
-    if not _HAS_REQUESTS:
-        return []
     try:
         data = _requests.get(url, timeout=10).json()
         articles = []
@@ -311,8 +302,6 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
     Uses a 7-day lookback (regardless of pipeline lookback_days) so posts have had
     time to accumulate upvotes — gives the "Hot on Reddit" section meaningful scores.
     """
-    if not _HAS_REQUESTS:
-        return []
 
     # Use at least 7-day window for Reddit so posts have time to accumulate comments
     min_since = datetime.now(tz=timezone.utc) - timedelta(days=7)
@@ -437,4 +426,14 @@ def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
     community_articles.sort(key=lambda a: a.get("_score", 0), reverse=True)
 
     print(f"  → {len(vendor_articles)} vendor articles, {len(community_articles)} community posts")
+    # Loud sanity check: 70+ vendor RSS feeds running over a 7-day window
+    # should yield 30+ articles on a normal week. Anything below 5 means
+    # something silently broke (feedparser gone, network error, mass-403, etc.).
+    if len(vendor_articles) < 5:
+        import sys as _sys
+        print(
+            f"  ⚠️ THIN VENDOR FETCH: only {len(vendor_articles)} articles from "
+            f"{len(FEEDS)} feeds. Expected 30+. Investigate feedparser/network/keys.",
+            file=_sys.stderr,
+        )
     return vendor_articles, community_articles

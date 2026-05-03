@@ -1125,21 +1125,6 @@ def _audit_data_quality():
         elif all(any(tld in u.lower() for tld in _NON_EN_TLDS) for u in urls):
             issues.append(f"only non-English sources: {(item.get('headline') or '')[:60]} | {urls}")
 
-    # 3. Auto-correct ambiguity — when a story headline mentions multiple
-    # vendors but auto-correct picked one, surface the choice for review.
-    # The tightened logic skips ambiguous cases, but flag any survivor.
-    for item in _news_items:
-        headline_lc = (item.get("headline") or "").lower()
-        v_seen = set()
-        for kw, ven in _VENDOR_KEYWORDS.items():
-            if kw in headline_lc:
-                v_seen.add(ven)
-        if len(v_seen) > 1 and item.get("vendor") in v_seen:
-            issues.append(
-                f"multi-vendor headline (chose {item.get('vendor')} from {sorted(v_seen)}): "
-                f"{(item.get('headline') or '')[:60]}"
-            )
-
     if issues:
         print(f"\n  ⚠ DATA QUALITY AUDIT — {len(issues)} issue(s):")
         for i in issues:

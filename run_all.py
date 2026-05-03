@@ -23,8 +23,6 @@ AGENTS = {
     "tavily":     ("tavily-news-agent/run.py",        "paid",  "Tavily + Anthropic (haiku)"),
     # Supplemental agents
     "article":    ("article-reader-agent/run.py",     "cheap", "Jina (free tier)"),
-    "exa":        ("exa-news-agent/run.py",           "cheap", "Exa (free tier)"),
-    "newsapi":    ("newsapi-agent/run.py",            "free",  "NewsAPI (free tier)"),
     "youtube":    ("youtube-news-agent/run.py",       "free",  "YouTube Data API (free quota)"),
     "github":     ("github-trending-agent/run.py",    "free",  "GitHub API (free)"),
     "xai":        ("xai-twitter-agent/run.py",        "paid",  "xAI Grok-4 (~$0.35/run) — disabled"),
@@ -37,7 +35,6 @@ AGENT_DISPLAY = {
     "adk": "ADK News Agent", "perplexity": "Perplexity News Agent",
     "rss": "RSS News Agent", "tavily": "Tavily News Agent",
     "article": "Article Reader Agent",
-    "exa": "Exa News Agent", "newsapi": "NewsAPI Agent",
     "youtube": "YouTube News Agent", "github": "GitHub Trending Agent",
     "xai": "xAI Twitter Agent", "twitter": "Twitter Agent", "merger": "Merger Agent",
 }

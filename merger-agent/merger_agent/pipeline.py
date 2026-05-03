@@ -332,10 +332,7 @@ def _step1_load_sources() -> tuple:
     extra_sources = []
     youtube_data = []  # Separate — rendered as its own HTML section
     github_data = []  # Separate — rendered as its own HTML section
-    extra_agents = [
-        ("exa-news-agent",        "Exa"),
-        ("newsapi-agent",         "NewsAPI"),
-    ]
+    extra_agents: list[tuple[str, str]] = []
     for agent_dir, label in extra_agents:
         data = _find_latest_json(_ROOT / agent_dir / "output")
         if data:

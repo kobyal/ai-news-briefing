@@ -3,6 +3,7 @@
 Uses the GitHub Search API (no auth needed, 10 requests/min for unauthenticated).
 Covers: trending repos, new releases from major AI projects, rising stars.
 """
+import hashlib
 import json
 import os
 import re
@@ -11,6 +12,102 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
+
+# Drop CJK / Cyrillic / Thai / Arabic / Devanagari runs from descriptions —
+# repos like xming521/WeClone tail their English description with a Chinese
+# translation that's noise for an EN/HE audience.
+_NON_LATIN_HEBREW_RE = re.compile(
+    r"[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\u0E00-\u0E7F\u0400-\u04FF\u0600-\u06FF\u0900-\u097F]+"
+)
+
+
+def _strip_non_latin_hebrew(text: str) -> str:
+    if not text:
+        return text
+    cleaned = _NON_LATIN_HEBREW_RE.sub("", text)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+_EXPLAINER_CACHE_PATH = Path(__file__).parent.parent / "cache" / "explainers.json"
+_EXPLAINER_PROMPT = (
+    "You're writing a 2-3 sentence summary about an open-source AI/ML GitHub project "
+    "for a daily AI-news reader. Plain English, no marketing fluff, no emojis, no "
+    "Markdown.\n\n"
+    "Answer in this order: (1) what the project does in concrete terms, (2) who "
+    "would use it (developers? researchers? end-users?), (3) why it matters or "
+    "what makes it notable.\n\n"
+    "Assume the reader knows what an LLM is but might not know specific jargon — "
+    "if you use a term like 'RAG', 'MCP', 'fine-tune', or 'inference', explain it "
+    "briefly in passing.\n\n"
+    "Output: 2-3 short sentences. No headers, no bullets, no quotes. English only."
+)
+
+
+def _load_explainer_cache() -> dict:
+    try:
+        with open(_EXPLAINER_CACHE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_explainer_cache(cache: dict) -> None:
+    _EXPLAINER_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(_EXPLAINER_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def _explainer_input_hash(description: str, topics: list) -> str:
+    payload = (description or "") + "|" + ",".join(sorted(topics or []))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _generate_explainer(repo_name: str, description: str, topics: list, cache: dict) -> str:
+    """Plain-language 2-3 sentence summary via Haiku. Cached per-repo by
+    description+topics hash so we only re-generate when the upstream content
+    changes. ~$0.0001 per repo on Haiku 4.5."""
+    sig = _explainer_input_hash(description, topics)
+    cached = cache.get(repo_name)
+    if cached and cached.get("hash") == sig and cached.get("explainer"):
+        return cached["explainer"]
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return ""
+    try:
+        import anthropic
+    except ImportError:
+        return ""
+
+    user = (
+        f"Repo: {repo_name}\n"
+        f"GitHub description: {description}\n"
+        f"Topics: {', '.join(topics or [])}\n\n"
+        f"Write the 2-3 sentence summary."
+    )
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            system=_EXPLAINER_PROMPT,
+            messages=[{"role": "user", "content": user}],
+            timeout=30,
+        )
+        explainer = (resp.content[0].text.strip() if resp.content else "")
+    except Exception as e:
+        print(f"  Explainer error for {repo_name}: {e}")
+        return ""
+
+    if explainer:
+        cache[repo_name] = {"explainer": explainer, "hash": sig}
+    return explainer
+
+
+def _avatar_url(repo_name: str) -> str:
+    """GitHub serves owner avatars at github.com/{owner}.png — no auth, stable."""
+    owner = repo_name.split("/", 1)[0] if "/" in repo_name else ""
+    return f"https://github.com/{owner}.png" if owner else ""
 
 # Tags like b9014, ce4f8a3 — auto-build counters / commit hashes, not real releases.
 _BUILD_TAG_RE = re.compile(r"^(b\d{3,}|[a-f0-9]{7,})$", re.IGNORECASE)
@@ -287,7 +384,17 @@ def run_pipeline() -> dict:
     releases = list(by_repo.values())
     print(f"  Found {len(releases)} recent releases ({raw - len(releases)} filtered: builds + pre-releases + cross-day repeats)")
 
-    print("\n[3/3] Formatting output...")
+    print("\n[3a/3] Cleaning descriptions + generating LLM explainers...")
+    explainer_cache = _load_explainer_cache()
+    for repo in trending[:10]:
+        repo["description"] = _strip_non_latin_hebrew(repo.get("description", ""))
+        repo["explainer"] = _generate_explainer(
+            repo["name"], repo["description"], repo.get("topics", []), explainer_cache
+        )
+    _save_explainer_cache(explainer_cache)
+    print(f"  {sum(1 for r in trending[:10] if r.get('explainer'))} of {len(trending[:10])} repos have an explainer (rest fall back to GitHub description)")
+
+    print("\n[3b/3] Formatting output...")
     news_items = []
 
     # Trending repos first (higher value — hot AI projects)
@@ -305,6 +412,8 @@ def run_pipeline() -> dict:
             "published_date": _format_date(repo.get("updated_at", "")),
             "summary": summary[:600],
             "urls": [repo["url"]] if repo["url"] else [],
+            "explainer": repo.get("explainer", ""),
+            "avatar_url": _avatar_url(repo["name"]),
         })
 
     # Major releases after trending

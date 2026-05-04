@@ -30,19 +30,19 @@ _LOOKBACK_DAYS = lambda: int(os.environ.get("YOUTUBE_LOOKBACK_DAYS", os.environ.
 
 AI_CHANNELS = {
     # Deep AI news & analysis
-    "AI Explained": "UUIcjBGpLYXCOm5HFyjjMUcA",
-    "Matthew Berman": "UUBcRF18a7Qf58cCRy5xuWwQ",
-    "Wes Roth": "UU-2Lwz25RSji8RGCIbiiN5A",
-    "David Shapiro": "UUJHGBRWREJVjHJqkMpUbgbQ",
+    "AI Explained": "UUNJ1Ymd5yFuUPtn21xtRbbw",
+    "Matthew Berman": "UUawZsQWqfGSbCI5yjkdVkTA",
+    "Wes Roth": "UUqcbQf6yw5KzRoDDcZ_wBSw",
+    "David Shapiro": "UUvKRFNawVcuz4b9ihUTApCg",
     "Prompt Engineering": "UUDq7SjbgRKty5TgGafW8Clg",
-    "WorldofAI": "UUAv6JwTt0cTBIvNxhYUa8SA",
-    "The AI Advantage": "UUjGmGJluMB0mpqXbcWv4FBw",
+    "WorldofAI": "UU2WmuBuFq6gL08QYG-JjXKw",
+    "The AI Advantage": "UUHhYXsLBEVVnbvsq57n1MTQ",
 
     # Tech news with heavy AI coverage
     "Fireship": "UUsBjURrPoezykLs9EqgamOA",
     "Two Minute Papers": "UUbfYPyITQ-7l4upoX8nvctg",
     "Yannic Kilcher": "UUZHmQk67mSJgfCCTn7xBfew",
-    "Matt Wolfe": "UUJMQbHkl1pYRirq7IhB5gEQ",
+    "Matt Wolfe": "UUhpleBmo18P08aKCIgti38g",
     "Theo - t3.gg": "UUbRP3c757lWg9M-U7TyEkXA",
     "NetworkChuck": "UU9x0AN7BWHpCDHSm9NiJFJQ",
 
@@ -51,21 +51,22 @@ AI_CHANNELS = {
     "3Blue1Brown": "UUYO_jab_esuFRV4b17AJtAw",
     "Computerphile": "UU9-y-6csu5WGm29I7JiwpnA",
     "Machine Learning Street Talk": "UUMLtBahI5DMrt0NPvDSoIRQ",
-    "Cognitive Revolution Podcast": "UUdMsXq1XKcSqRpCOi2lBkuA",
+    "Cognitive Revolution Podcast": "UUjNRVMBVI30Sak_p6HRWhIA",
 
     # AI coding & developer tools
-    "All About AI": "UU2ityoGlg_0Ess_scBpMlSg",
-    "Cole Medin": "UUZ_JEwJGIqmCvNRFOj7ROCw",
+    "All About AI": "UUR9j1jqqB5Rse69wjUnbYwA",
+    "Cole Medin": "UUMwVTLZIRRUyyVrkjDpn4pA",
     "IndyDevDan": "UUivA7_KLKWo43tFcCkFvydw",
-    "Greg Isenberg": "UUPo-eazPXvRMkbCtdewCzMjQ",
-    "Sam Witteveen": "UUxgAuX3XZROKMjBuswvlIAQ",
+    "Greg Isenberg": "UUPjNBjflYl0-HQtUvOx0Ibw",
+    "Sam Witteveen": "UU55ODQSvARtgSyc8ThfiepQ",
+    "AI Jason": "UUrXSVX9a1mj8l0CMLwKgMVw",
 
     # Official vendor channels
     "Google DeepMind": "UUVHFbqXqoYvEWM1Ddxl0QDg",
     "Google Cloud Tech": "UUJS9pqu9BzkAMNTmzNMNhvg",
     "Google for Developers": "UU_x5XG1OV2P6uZZ5FSM9Ttw",
-    "OpenAI": "UUXnFR3s-a-YIcbpL8E5N9HA",
-    "NVIDIA": "UUCHX5YhceI5bTHG0GmzZRQQ",
+    "OpenAI": "UUXZCJLdBC09xxGZ6gcdrc6A",
+    "NVIDIA": "UUHuiy8bXnmK5nisYHUd1J5g",
     "Claude": "UUV03SRZXJEz-hchIAogeJOg",
     "Amazon Web Services": "UUd6MoB9NC6uYN2grvUNT-Zg",
     "AWS Events": "UUdoadna9HFHsxXWhafhNvKw",

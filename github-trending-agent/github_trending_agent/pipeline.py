@@ -31,15 +31,18 @@ def _strip_non_latin_hebrew(text: str) -> str:
 _EXPLAINER_CACHE_PATH = Path(__file__).parent.parent / "cache" / "explainers.json"
 _EXPLAINER_PROMPT = (
     "You're writing a 2-3 sentence summary about an open-source AI/ML GitHub project "
-    "for a daily AI-news reader. Plain English, no marketing fluff, no emojis, no "
-    "Markdown.\n\n"
+    "for an Israeli daily AI-news reader (English + Hebrew). Plain language, no "
+    "marketing fluff, no emojis, no Markdown.\n\n"
     "Answer in this order: (1) what the project does in concrete terms, (2) who "
     "would use it (developers? researchers? end-users?), (3) why it matters or "
     "what makes it notable.\n\n"
     "Assume the reader knows what an LLM is but might not know specific jargon — "
-    "if you use a term like 'RAG', 'MCP', 'fine-tune', or 'inference', explain it "
-    "briefly in passing.\n\n"
-    "Output: 2-3 short sentences. No headers, no bullets, no quotes. English only."
+    "if you use a term like RAG, MCP, fine-tune, or inference, explain it briefly "
+    "in passing.\n\n"
+    "Return strict JSON: {\"en\": \"<English explainer>\", \"he\": \"<Hebrew explainer>\"}\n\n"
+    "Hebrew rules: write naturally in Hebrew, but keep proper nouns and technical "
+    "tokens in Latin (repo names, framework names, LLM, RAG, GPU, API, JSON, etc.). "
+    "Do not transliterate brand names. No emojis."
 )
 
 
@@ -62,46 +65,51 @@ def _explainer_input_hash(description: str, topics: list) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
-def _generate_explainer(repo_name: str, description: str, topics: list, cache: dict) -> str:
-    """Plain-language 2-3 sentence summary via Haiku. Cached per-repo by
-    description+topics hash so we only re-generate when the upstream content
-    changes. ~$0.0001 per repo on Haiku 4.5."""
+def _generate_explainer(repo_name: str, description: str, topics: list, cache: dict) -> dict:
+    """Plain-language 2-3 sentence summary via Haiku, both EN + HE in one
+    call. Cached per-repo by description+topics hash so we only re-generate
+    when the upstream content changes. ~$0.0002 per repo on Haiku 4.5."""
     sig = _explainer_input_hash(description, topics)
     cached = cache.get(repo_name)
-    if cached and cached.get("hash") == sig and cached.get("explainer"):
-        return cached["explainer"]
+    if cached and cached.get("hash") == sig and cached.get("en") and cached.get("he"):
+        return {"en": cached["en"], "he": cached["he"]}
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        return ""
+        return {"en": "", "he": ""}
     try:
         import anthropic
     except ImportError:
-        return ""
+        return {"en": "", "he": ""}
 
     user = (
         f"Repo: {repo_name}\n"
         f"GitHub description: {description}\n"
         f"Topics: {', '.join(topics or [])}\n\n"
-        f"Write the 2-3 sentence summary."
+        "Write the 2-3 sentence summary in both English and Hebrew. Return JSON."
     )
     try:
         client = anthropic.Anthropic(api_key=api_key)
         resp = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=300,
+            max_tokens=600,
             system=_EXPLAINER_PROMPT,
             messages=[{"role": "user", "content": user}],
             timeout=30,
         )
-        explainer = (resp.content[0].text.strip() if resp.content else "")
+        raw = (resp.content[0].text.strip() if resp.content else "")
+        # Strip ```json fences if Haiku adds them despite the prompt.
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw)
+        parsed = json.loads(raw) if raw else {}
+        en = str(parsed.get("en", "")).strip()
+        he = str(parsed.get("he", "")).strip()
     except Exception as e:
         print(f"  Explainer error for {repo_name}: {e}")
-        return ""
+        return {"en": "", "he": ""}
 
-    if explainer:
-        cache[repo_name] = {"explainer": explainer, "hash": sig}
-    return explainer
+    if en or he:
+        cache[repo_name] = {"en": en, "he": he, "hash": sig}
+    return {"en": en, "he": he}
 
 
 def _avatar_url(repo_name: str) -> str:
@@ -264,11 +272,11 @@ def _search_trending() -> list[dict]:
 
 
 def _check_releases() -> list[dict]:
-    """Check tracked repos for recent releases."""
-    lookback = _LOOKBACK_DAYS()
-    since = datetime.now() - timedelta(days=lookback)
+    """For each tracked repo, return its latest stable release regardless of
+    age. Skips build counters + pre-releases (the caller filters again, but
+    fetching extra here lets us find a real stable when a repo's most recent
+    tag is an alpha)."""
     headers = {"Accept": "application/vnd.github+json"}
-
     token = os.environ.get("GITHUB_TOKEN", "")
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -278,34 +286,33 @@ def _check_releases() -> list[dict]:
         try:
             resp = requests.get(
                 f"https://api.github.com/repos/{repo_name}/releases",
-                params={"per_page": 3},
+                params={"per_page": 10},
                 headers=headers,
                 timeout=10,
             )
             if not resp.ok:
                 continue
-
             for rel in resp.json():
                 pub = rel.get("published_at", "")
-                if not pub:
+                tag = rel.get("tag_name", "")
+                if not pub or not tag:
                     continue
-                try:
-                    rel_date = datetime.fromisoformat(pub.replace("Z", "+00:00"))
-                    if rel_date.replace(tzinfo=None) >= since:
-                        releases.append({
-                            "repo": repo_name,
-                            "tag": rel.get("tag_name", ""),
-                            "name": rel.get("name", rel.get("tag_name", "")),
-                            "body": (rel.get("body") or "")[:500],
-                            "published_at": pub,
-                            "url": rel.get("html_url", ""),
-                        })
-                except Exception:
-                    pass
-            time.sleep(1)  # Rate limiting
+                if rel.get("prerelease") or rel.get("draft"):
+                    continue
+                if not _is_real_release(tag):
+                    continue
+                releases.append({
+                    "repo": repo_name,
+                    "tag": tag,
+                    "name": rel.get("name", tag),
+                    "body": (rel.get("body") or "")[:500],
+                    "published_at": pub,
+                    "url": rel.get("html_url", ""),
+                })
+                break  # latest stable found — move to next repo
+            time.sleep(1)
         except Exception:
             continue
-
     return releases
 
 
@@ -368,29 +375,21 @@ def run_pipeline() -> dict:
     trending.sort(key=lambda r: r.get("stars", 0), reverse=True)
     print(f"  Found {len(trending)} trending repos ({raw_t - after_ai} non-AI dropped, {after_ai - len(trending)} cross-day repeats dropped)")
 
-    print("\n[2/3] Checking tracked repos for releases...")
+    print("\n[2/3] Latest stable release per tracked repo...")
     releases = _check_releases()
-    raw = len(releases)
-    # Drop build-counter tags (b9014) and pre-releases (1.14.5a1, v1-beta).
-    releases = [r for r in releases if _is_real_release(r.get("tag", ""))]
-    # Drop releases whose (repo, tag) was shown yesterday — same package, same version.
-    releases = [r for r in releases if (r.get("repo", ""), r.get("tag", "")) not in yesterday_releases]
-    # Same-repo same-day dedup: keep only the highest-tag release per repo today.
-    by_repo: dict[str, dict] = {}
-    for rel in releases:
-        repo = rel.get("repo", "")
-        if repo not in by_repo or rel.get("tag", "") > by_repo[repo].get("tag", ""):
-            by_repo[repo] = rel
-    releases = list(by_repo.values())
-    print(f"  Found {len(releases)} recent releases ({raw - len(releases)} filtered: builds + pre-releases + cross-day repeats)")
+    # Sort newest-first so the page leads with the most recently shipped.
+    releases.sort(key=lambda r: r.get("published_at", ""), reverse=True)
+    print(f"  Found {len(releases)} latest stable releases")
 
-    print("\n[3a/3] Cleaning descriptions + generating LLM explainers...")
+    print("\n[3a/3] Cleaning descriptions + generating LLM explainers (EN+HE)...")
     explainer_cache = _load_explainer_cache()
     for repo in trending[:10]:
         repo["description"] = _strip_non_latin_hebrew(repo.get("description", ""))
-        repo["explainer"] = _generate_explainer(
+        ex = _generate_explainer(
             repo["name"], repo["description"], repo.get("topics", []), explainer_cache
         )
+        repo["explainer"] = ex.get("en", "")
+        repo["explainer_he"] = ex.get("he", "")
     _save_explainer_cache(explainer_cache)
     print(f"  {sum(1 for r in trending[:10] if r.get('explainer'))} of {len(trending[:10])} repos have an explainer (rest fall back to GitHub description)")
 
@@ -413,6 +412,7 @@ def run_pipeline() -> dict:
             "summary": summary[:600],
             "urls": [repo["url"]] if repo["url"] else [],
             "explainer": repo.get("explainer", ""),
+            "explainer_he": repo.get("explainer_he", ""),
             "avatar_url": _avatar_url(repo["name"]),
         })
 

@@ -192,6 +192,42 @@ def _parse_duration(duration: str) -> int:
 # Step 1: Pull latest videos from known channels (cheap: 1 unit each)
 # ---------------------------------------------------------------------------
 
+def _fetch_channel_latest_uploads(api_key: str) -> list[dict]:
+    """Per-channel latest upload, no filters. Feeds the frontend's "Recommended
+    Channels" cards so every curated channel always has something fresh to
+    show — independent of the topic-search/lookback filtering used for
+    today's-news pairing. Cost: 1 quota unit per channel (~30/day)."""
+    out = []
+    for channel_name, uploads_playlist in AI_CHANNELS.items():
+        try:
+            resp = requests.get(
+                "https://www.googleapis.com/youtube/v3/playlistItems",
+                params={"part": "snippet", "playlistId": uploads_playlist, "maxResults": 1, "key": api_key},
+                timeout=10,
+            )
+            if not resp.ok:
+                continue
+            items = resp.json().get("items", [])
+            if not items:
+                continue
+            sn = items[0].get("snippet", {})
+            vid_id = sn.get("resourceId", {}).get("videoId", "")
+            title = sn.get("title", "")
+            if not vid_id or not title:
+                continue
+            out.append({
+                "channel": channel_name,
+                "channel_id": uploads_playlist[2:] if uploads_playlist.startswith("UU") else uploads_playlist,
+                "title": title,
+                "url": f"https://www.youtube.com/watch?v={vid_id}",
+                "published_at": sn.get("publishedAt", ""),
+            })
+        except Exception:
+            continue
+    print(f"  Channel-latest: {len(out)} channels (1 video each, no lookback)")
+    return out
+
+
 def _fetch_channel_videos(api_key: str) -> list[dict]:
     """Get recent videos from curated AI channels via playlist items."""
     lookback = _LOOKBACK_DAYS()
@@ -424,6 +460,11 @@ def run_pipeline() -> dict:
     filtered = _enrich_and_filter(api_key, all_videos)
     print(f"  After quality filter: {len(filtered)} videos")
 
+    # Side-channel: per-channel latest upload for the frontend's Recommended
+    # Channels cards. Independent of the topic-search filtering above.
+    print("\n[bonus] Fetching per-channel latest upload (no filters)...")
+    channel_latest = _fetch_channel_latest_uploads(api_key)
+
     # Format output
     news_items = []
     for v in filtered[:20]:
@@ -456,7 +497,7 @@ def run_pipeline() -> dict:
     ts = datetime.now().strftime("%H%M%S")
     path = out_dir / f"youtube_{ts}.json"
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({"source": "youtube", "briefing": briefing}, f, ensure_ascii=False)
+        json.dump({"source": "youtube", "briefing": briefing, "channel_latest": channel_latest}, f, ensure_ascii=False)
 
     elapsed = time.time() - t_start
     print(f"\n{'=' * 60}")

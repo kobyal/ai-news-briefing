@@ -77,6 +77,7 @@ twitter_raw = _latest("twitter-agent/output/**/*.json") or _latest("xai-twitter-
 
 # Extract news_items from standard agent format
 youtube_items = (youtube_raw.get("briefing", {}) if isinstance(youtube_raw, dict) else {}).get("news_items", [])
+youtube_channel_latest = youtube_raw.get("channel_latest", []) if isinstance(youtube_raw, dict) else []
 github_items = (github_raw.get("briefing", {}) if isinstance(github_raw, dict) else {}).get("news_items", [])
 
 # Twitter/social source (people + trending + community)
@@ -1144,6 +1145,7 @@ published = {
     "social":      social_data,
     "social_he":   {},
     "youtube":     youtube_items,
+    "youtube_channel_latest": youtube_channel_latest,
     "github":      github_items,
     "twitter":     twitter_data,
     # Data-quality audit results — surfaced in send_email.py PROBLEMS banner so

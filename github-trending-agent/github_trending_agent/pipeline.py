@@ -5,11 +5,59 @@ Covers: trending repos, new releases from major AI projects, rising stars.
 """
 import json
 import os
+import re
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
+
+# Tags like b9014, ce4f8a3 — auto-build counters / commit hashes, not real releases.
+_BUILD_TAG_RE = re.compile(r"^(b\d{3,}|[a-f0-9]{7,})$", re.IGNORECASE)
+# Pre-release suffixes: 1.2.0a1, 0.5-beta, v1-rc2, 2.0.0-pre, nightly, snapshot, canary…
+_PRE_RELEASE_RE = re.compile(
+    r"(?i)(alpha|beta|rc|nightly|snapshot|canary|preview|dev\d|-pre\b)|[-_.]?(a|b|rc)\d+$"
+)
+
+
+def _is_real_release(tag: str) -> bool:
+    """Reject build counters + pre-releases. Patches still pass."""
+    t = (tag or "").strip()
+    if not t:
+        return False
+    if _BUILD_TAG_RE.match(t):
+        return False
+    if _PRE_RELEASE_RE.search(t):
+        return False
+    return True
+
+
+def _read_yesterdays_repos() -> tuple[set[str], set[tuple[str, str]]]:
+    """Yesterday's trending repo names + (repo, tag) pairs already shown,
+    so today's run can rotate to fresh material instead of re-shipping the
+    same megacorp repos with bumped patch numbers."""
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    out_dir = Path(__file__).parent.parent / "output" / yesterday
+    if not out_dir.exists():
+        return set(), set()
+    trending_seen: set[str] = set()
+    releases_seen: set[tuple[str, str]] = set()
+    for f in out_dir.glob("github_*.json"):
+        try:
+            with open(f, "r", encoding="utf-8") as fp:
+                data = json.load(fp)
+            for item in data.get("briefing", {}).get("news_items", []):
+                head = item.get("headline", "")
+                m = re.match(r"^Trending: ([^\s—]+)", head)
+                if m:
+                    trending_seen.add(m.group(1))
+                    continue
+                m = re.match(r"^([^\s]+) released (.+?)$", head)
+                if m:
+                    releases_seen.add((m.group(1), m.group(2).strip()))
+        except Exception:
+            continue
+    return trending_seen, releases_seen
 
 _TODAY = lambda: datetime.now().strftime("%B %d, %Y")
 _LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
@@ -176,15 +224,34 @@ def run_pipeline() -> dict:
 
     t_start = time.time()
 
+    yesterday_trending, yesterday_releases = _read_yesterdays_repos()
+    print(f"\n[0/3] Loaded yesterday's seen: {len(yesterday_trending)} trending + {len(yesterday_releases)} releases")
+
     print("\n[1/3] Searching trending AI repos...")
     trending = _search_trending()
     trending = _deduplicate(trending)
+    # Cross-day novelty: drop repos shown yesterday so the page rotates instead
+    # of repeating the same 4-6 megacorp repos every day.
+    before = len(trending)
+    trending = [r for r in trending if r.get("name", "") not in yesterday_trending]
     trending.sort(key=lambda r: r.get("stars", 0), reverse=True)
-    print(f"  Found {len(trending)} trending repos")
+    print(f"  Found {len(trending)} trending repos ({before - len(trending)} dropped as already-shown yesterday)")
 
     print("\n[2/3] Checking tracked repos for releases...")
     releases = _check_releases()
-    print(f"  Found {len(releases)} recent releases")
+    raw = len(releases)
+    # Drop build-counter tags (b9014) and pre-releases (1.14.5a1, v1-beta).
+    releases = [r for r in releases if _is_real_release(r.get("tag", ""))]
+    # Drop releases whose (repo, tag) was shown yesterday — same package, same version.
+    releases = [r for r in releases if (r.get("repo", ""), r.get("tag", "")) not in yesterday_releases]
+    # Same-repo same-day dedup: keep only the highest-tag release per repo today.
+    by_repo: dict[str, dict] = {}
+    for rel in releases:
+        repo = rel.get("repo", "")
+        if repo not in by_repo or rel.get("tag", "") > by_repo[repo].get("tag", ""):
+            by_repo[repo] = rel
+    releases = list(by_repo.values())
+    print(f"  Found {len(releases)} recent releases ({raw - len(releases)} filtered: builds + pre-releases + cross-day repeats)")
 
     print("\n[3/3] Formatting output...")
     news_items = []

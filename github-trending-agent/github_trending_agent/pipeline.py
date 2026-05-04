@@ -20,6 +20,35 @@ _PRE_RELEASE_RE = re.compile(
 )
 
 
+# Topics that unambiguously mark a repo as AI/ML. A repo qualifies when ≥2 of
+# these appear — single-mention "ai-analytics" tags from non-AI products
+# (e.g. PostHog's product-analytics platform) don't pass the bar.
+_STRONG_AI_TOPICS = frozenset({
+    "ai", "llm", "llms", "large-language-models", "large-language-model",
+    "gpt", "gpt-2", "gpt-3", "gpt-4", "gpt-oss", "chatgpt",
+    "claude", "claude-code", "anthropic", "openai", "gemini", "deepseek",
+    "qwen", "llama", "llama2", "llama3", "mistral", "gemma", "phi",
+    "agent", "agents", "ai-agents", "multiagent",
+    "transformer", "transformers",
+    "nlp", "natural-language-processing", "natural-language",
+    "rag", "graphrag", "retrieval-augmented-generation", "semantic-search",
+    "fine-tuning", "llm-training", "llm-fine-tuning",
+    "generative-ai", "diffusion", "multimodal", "vlm", "speech-synthesis", "tts",
+    "machine-learning", "machine-translation",
+    "deep-learning", "deeplearning",
+    "pytorch", "tensorflow", "keras", "jax",
+    "reinforcement-learning", "neural-networks", "neural-network",
+    "embedding", "embeddings", "prompt-engineering", "prompts",
+    "mlops", "ml-platform", "model-serving", "vector-database", "vectordb",
+    "computer-vision", "speech-recognition", "asr",
+})
+
+
+def _is_ai_relevant(repo: dict) -> bool:
+    topics = {t.lower() for t in repo.get("topics", [])}
+    return len(topics & _STRONG_AI_TOPICS) >= 2
+
+
 def _is_real_release(tag: str) -> bool:
     """Reject build counters + pre-releases. Patches still pass."""
     t = (tag or "").strip()
@@ -230,12 +259,17 @@ def run_pipeline() -> dict:
     print("\n[1/3] Searching trending AI repos...")
     trending = _search_trending()
     trending = _deduplicate(trending)
+    raw_t = len(trending)
+    # AI-relevance: drop repos that match the keyword search but aren't actually
+    # AI tools (PostHog matches "AI agent" because they have AI features but
+    # they're a product-analytics platform).
+    trending = [r for r in trending if _is_ai_relevant(r)]
+    after_ai = len(trending)
     # Cross-day novelty: drop repos shown yesterday so the page rotates instead
     # of repeating the same 4-6 megacorp repos every day.
-    before = len(trending)
     trending = [r for r in trending if r.get("name", "") not in yesterday_trending]
     trending.sort(key=lambda r: r.get("stars", 0), reverse=True)
-    print(f"  Found {len(trending)} trending repos ({before - len(trending)} dropped as already-shown yesterday)")
+    print(f"  Found {len(trending)} trending repos ({raw_t - after_ai} non-AI dropped, {after_ai - len(trending)} cross-day repeats dropped)")
 
     print("\n[2/3] Checking tracked repos for releases...")
     releases = _check_releases()

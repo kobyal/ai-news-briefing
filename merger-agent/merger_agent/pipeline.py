@@ -878,6 +878,96 @@ def run_pipeline() -> dict:
         merged_json = json.dumps(parsed, ensure_ascii=False)
         print(f"  URL validation: {total_urls - stripped_urls}/{total_urls} passed, {stripped_urls} stripped")
 
+    # Per-story URL relevance filter — a source URL's path slug must share at
+    # least one significant (non-stopword, ≥4 char) token with the story
+    # headline, otherwise the reader clicks a "source" and lands on a
+    # different topic. Today's incident (2026-05-05): the Amazon/Claude Code
+    # rollout story carried an xda-developers link titled
+    # "if-claude-code-is-going-away-for-pro-users-cant-recommend-claude-anymore"
+    # — vendor-matched but subject-orthogonal. A single required non-vendor
+    # token overlap is enough to catch this without blocking legitimate
+    # sources (press releases, tweets with slugless URLs are always kept).
+    _URL_STOP = {
+        "the","a","an","and","or","but","for","with","on","in","at","to","of","is","are","new",
+        "html","htm","php","aspx","index","news","article","blog","post","page","story","www","com",
+        "co","uk","io","ai","app","apps","read","full","more","view","main",
+    }
+    _VENDOR_STOP = {
+        "claude","anthropic","openai","gpt","chatgpt","codex","sora",
+        "google","gemini","gemma","deepmind",
+        "aws","amazon","bedrock","azure","microsoft","copilot","github",
+        "meta","llama","xai","grok","nvidia","mistral","apple","siri",
+        "cerebras","deepseek","samsung","alibaba","qwen","code",
+    }
+    def _headline_tokens(h: str) -> set:
+        toks = set(re.findall(r"[a-z0-9]{4,}", (h or "").lower()))
+        return toks - _URL_STOP
+    def _slug_tokens(u: str) -> set:
+        # last path segment — usually the SEO slug on news sites
+        try:
+            path = u.split("://", 1)[-1].split("/", 1)[-1]
+            # Keep only the last segment with alphabetic content (drops date dirs like /2026/05/04/)
+            segs = [s for s in re.split(r"[/?#]", path) if re.search(r"[a-z]{3,}", s, re.I)]
+            slug = segs[-1] if segs else path
+        except Exception:
+            slug = u
+        return set(re.findall(r"[a-z0-9]{4,}", slug.lower())) - _URL_STOP
+
+    parsed = _parse(merged_json)
+    total_checked = 0
+    total_dropped = 0
+    for item in parsed.get("news_items", []):
+        h_toks = _headline_tokens(item.get("headline", ""))
+        h_non_vendor = h_toks - _VENDOR_STOP
+        if not h_non_vendor:
+            continue  # headline too generic to score against; leave URLs alone
+        kept = []
+        for url in item.get("urls", []):
+            total_checked += 1
+            s_toks = _slug_tokens(url)
+            if not s_toks:
+                kept.append(url)  # slugless (press release, tweet, etc.) — trust
+                continue
+            # Must share at least one non-vendor token between headline + slug.
+            overlap = h_non_vendor & s_toks
+            if overlap:
+                kept.append(url)
+            else:
+                total_dropped += 1
+                print(f"  ✂ Irrelevant URL dropped from '{item.get('headline','')[:50]}': {url[:80]}")
+        item["urls"] = kept
+        item["source_count"] = len(kept)
+    if total_dropped:
+        merged_json = json.dumps(parsed, ensure_ascii=False)
+        print(f"  URL relevance filter: kept {total_checked - total_dropped}/{total_checked}, dropped {total_dropped}")
+
+    # TLDR orphan-bullet guard — every tldr bullet must map to a news_item,
+    # otherwise a click on the bullet card in the UI lands on the wrong story
+    # (e.g. 2026-05-05: a "Google webhooks for Gemini API" bullet existed with
+    # no matching story, so the frontend matcher picked the next Google story
+    # and sent readers to an unrelated Lemoni headline). The contract is:
+    # bullet text ↔ story headline. If there's no match, the bullet is wrong.
+    parsed = _parse(merged_json)
+    tldr = parsed.get("tldr", [])
+    items = parsed.get("news_items", [])
+    if tldr and items:
+        def _shared_words(a: str, b: str) -> int:
+            # Count shared 4+ char tokens (matches TldrSection.tsx scoring).
+            tok_a = {w.lower().strip(".,;:—-") for w in a.split() if len(w) >= 4}
+            tok_b = {w.lower().strip(".,;:—-") for w in b.split() if len(w) >= 4}
+            return len(tok_a & tok_b)
+        kept_tldr = []
+        for bullet in tldr:
+            best = max((_shared_words(bullet, it.get("headline", "")) for it in items), default=0)
+            if best >= 3:
+                kept_tldr.append(bullet)
+            else:
+                print(f"  ✂ Orphan TLDR bullet dropped (no matching story): {bullet[:80]}")
+        if len(kept_tldr) != len(tldr):
+            parsed["tldr"] = kept_tldr
+            merged_json = json.dumps(parsed, ensure_ascii=False)
+            print(f"  TLDR guard: kept {len(kept_tldr)}/{len(tldr)} bullets")
+
     try:
         hebrew_json = _step3_translate(merged_json, social_data=social_briefing, youtube_data=youtube_data, xai_data=xai_data)
     except Exception as e:

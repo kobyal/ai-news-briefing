@@ -66,21 +66,16 @@ def _explainer_input_hash(description: str, topics: list) -> str:
 
 
 def _generate_explainer(repo_name: str, description: str, topics: list, cache: dict) -> dict:
-    """Plain-language 2-3 sentence summary via Haiku, both EN + HE in one
-    call. Cached per-repo by description+topics hash so we only re-generate
-    when the upstream content changes. ~$0.0002 per repo on Haiku 4.5."""
+    """Plain-language 2-3 sentence summary, EN + HE in one call.
+
+    Routing mirrors the rest of the pipeline:
+    - local runs (MERGER_VIA_CLAUDE_CODE=1): `claude -p` subscription, OAuth — no API key.
+    - CI: Anthropic API via ANTHROPIC_API_KEY.
+    """
     sig = _explainer_input_hash(description, topics)
     cached = cache.get(repo_name)
     if cached and cached.get("hash") == sig and cached.get("en") and cached.get("he"):
         return {"en": cached["en"], "he": cached["he"]}
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return {"en": "", "he": ""}
-    try:
-        import anthropic
-    except ImportError:
-        return {"en": "", "he": ""}
 
     user = (
         f"Repo: {repo_name}\n"
@@ -88,18 +83,36 @@ def _generate_explainer(repo_name: str, description: str, topics: list, cache: d
         f"Topics: {', '.join(topics or [])}\n\n"
         "Write the 2-3 sentence summary in both English and Hebrew. Return JSON."
     )
+
+    raw = ""
+    en = ""
+    he = ""
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=600,
-            system=_EXPLAINER_PROMPT,
-            messages=[{"role": "user", "content": user}],
-            timeout=30,
-        )
-        raw = (resp.content[0].text.strip() if resp.content else "")
-        # Strip ```json fences if Haiku adds them despite the prompt.
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw)
+        if os.environ.get("MERGER_VIA_CLAUDE_CODE") == "1":
+            import sys as _sys
+            _sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+            from shared.anthropic_cc import agent as _cc_agent  # noqa: E402
+            raw = _cc_agent(
+                input_text=user,
+                instructions=_EXPLAINER_PROMPT,
+                json_mode=True,
+                label=f"GH-explainer",
+            )
+        else:
+            api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+            if not api_key:
+                return {"en": "", "he": ""}
+            import anthropic
+            client = anthropic.Anthropic(api_key=api_key)
+            resp = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=600,
+                system=_EXPLAINER_PROMPT,
+                messages=[{"role": "user", "content": user}],
+                timeout=30,
+            )
+            raw = (resp.content[0].text.strip() if resp.content else "")
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())
         parsed = json.loads(raw) if raw else {}
         en = str(parsed.get("en", "")).strip()
         he = str(parsed.get("he", "")).strip()
@@ -369,11 +382,17 @@ def run_pipeline() -> dict:
     # they're a product-analytics platform).
     trending = [r for r in trending if _is_ai_relevant(r)]
     after_ai = len(trending)
-    # Cross-day novelty: drop repos shown yesterday so the page rotates instead
-    # of repeating the same 4-6 megacorp repos every day.
-    trending = [r for r in trending if r.get("name", "") not in yesterday_trending]
-    trending.sort(key=lambda r: r.get("stars", 0), reverse=True)
-    print(f"  Found {len(trending)} trending repos ({raw_t - after_ai} non-AI dropped, {after_ai - len(trending)} cross-day repeats dropped)")
+    # Cross-day novelty: prefer fresh repos, but backfill from yesterday's seen
+    # list if we'd fall below 10 — a thin page (5 cards) is worse than some repeats.
+    fresh = [r for r in trending if r.get("name", "") not in yesterday_trending]
+    repeats = [r for r in trending if r.get("name", "") in yesterday_trending]
+    fresh.sort(key=lambda r: r.get("stars", 0), reverse=True)
+    repeats.sort(key=lambda r: r.get("stars", 0), reverse=True)
+    if len(fresh) >= 10:
+        trending = fresh
+    else:
+        trending = fresh + repeats[: max(0, 10 - len(fresh))]
+    print(f"  Found {len(trending)} trending repos ({raw_t - after_ai} non-AI dropped, {after_ai - len(fresh)} repeats — backfilled {max(0, len(trending)-len(fresh))})")
 
     print("\n[2/3] Latest stable release per tracked repo...")
     releases = _check_releases()

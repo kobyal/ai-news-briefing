@@ -2,10 +2,17 @@
 import os
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 
-from dotenv import load_dotenv
-load_dotenv()
+# Defer (and gate) the python-dotenv import — env vars are populated by
+# the wrapper (run.py / local-cycle.sh / CI secrets) before this module
+# imports, so the loader is only useful when a developer has dropped a
+# per-agent .env file alongside the package.
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    from dotenv import load_dotenv
+    load_dotenv(_env_path)
 
 from google.adk.agents import LlmAgent, SequentialAgent, ParallelAgent
 from google.adk.agents.callback_context import CallbackContext

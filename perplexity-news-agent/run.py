@@ -9,9 +9,16 @@ then saves a bilingual EN/Hebrew HTML briefing to output/YYYY-MM-DD/.
 import os
 import subprocess
 import sys
+from pathlib import Path
 
-from dotenv import load_dotenv
-load_dotenv()
+# Only pull in python-dotenv when a per-agent .env actually exists. In
+# production (local-cycle.sh sources private/.env; CI uses repo secrets)
+# env vars are already in os.environ, so dotenv is unused — and we don't
+# want a missing python-dotenv install to crash the agent at import time.
+_env_path = Path(__file__).parent / ".env"
+if _env_path.exists():
+    from dotenv import load_dotenv
+    load_dotenv(_env_path)
 
 from perplexity_news_agent.pipeline import run_pipeline
 

@@ -92,6 +92,11 @@ reddit_posts = sorted(_raw_reddit, key=lambda p: p.get("score", 0), reverse=True
 
 # DeepL translations (Reddit titles + X posts → Hebrew)
 _deepl_key = os.environ.get("DEEPL_API_KEY", "")
+# Loud warning so a missing key isn't a silent Hebrew regression — two
+# incidents on 2026-05-05 shipped English Reddit/X titles because this
+# block silently skipped translation.
+if not _deepl_key:
+    print("WARNING: DEEPL_API_KEY not set — Reddit/X Hebrew translations will be SKIPPED")
 if _deepl_key and reddit_posts:
     print("Translating Reddit titles to Hebrew via DeepL...")
     _titles = [p.get("title", "") for p in reddit_posts]

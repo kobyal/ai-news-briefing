@@ -40,6 +40,10 @@ _EXPLAINER_PROMPT = (
     "if you use a term like RAG, MCP, fine-tune, or inference, explain it briefly "
     "in passing.\n\n"
     "Return strict JSON: {\"en\": \"<English explainer>\", \"he\": \"<Hebrew explainer>\"}\n\n"
+    "CRITICAL: Your FIRST character must be `{`. Do not write any preamble like "
+    "'Let me...', 'I'll analyze...', 'Based on...'. Do not search, do not fetch, "
+    "do not use any tools — only write from what you already know about the repo "
+    "given the name/description/topics. Output ONLY the JSON object, nothing else.\n\n"
     "Hebrew rules: write naturally in Hebrew, but keep proper nouns and technical "
     "tokens in Latin (repo names, framework names, LLM, RAG, GPU, API, JSON, etc.). "
     "Do not transliterate brand names. No emojis."
@@ -112,8 +116,11 @@ def _generate_explainer(repo_name: str, description: str, topics: list, cache: d
                 timeout=30,
             )
             raw = (resp.content[0].text.strip() if resp.content else "")
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())
-        parsed = json.loads(raw) if raw else {}
+        raw = raw.strip()
+        # Claude sometimes wraps in ``` fences or prefaces with chatter —
+        # extract the first {...} block instead of trusting the envelope.
+        m = re.search(r"\{[\s\S]*\}", raw)
+        parsed = json.loads(m.group(0)) if m else {}
         en = str(parsed.get("en", "")).strip()
         he = str(parsed.get("he", "")).strip()
     except Exception as e:

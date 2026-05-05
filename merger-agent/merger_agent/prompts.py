@@ -78,6 +78,16 @@ Produce ONE merged briefing as a JSON object. Rules:
    even if the older story is "bigger" news. Within the same day, order by importance/impact.
    Aim for breadth: include stories from different vendors where possible.
 
+3.0 HARD FRESHNESS FLOOR (added 2026-05-05 after a briefing shipped with 13/22 stale stories):
+   - DROP any story whose published_date is more than 2 calendar days before TODAY, unless it is
+     a true CONTINUATION carrying a NEW concrete fact (apply the STRICT NEW-FACT TEST below).
+     A 3-day-old article with the same fact set as the original announcement is stale; drop it.
+   - At least 50% of news_items MUST have published_date == today OR yesterday. If you cannot
+     reach the floor with fresh stories, ship FEWER stories — do not backfill with old material.
+   - When two candidate stories cover overlapping ground, prefer the one with the more recent
+     published_date even when the older one has more sources. Source count is a tiebreaker, not
+     an override.
+
 3a. AVOID DEJA-VU — cross-reference each candidate story against the RECENT HEADLINES section above.
 
    STRICT NEW-FACT TEST (apply to EVERY story that has any topical overlap with RECENT HEADLINES):
@@ -185,6 +195,21 @@ Produce ONE merged briefing as a JSON object. Rules:
      or construct URLs. Do NOT substitute a vendor's official blog URL if the sources lacked one.
      Only include URLs that CLEARLY reference THIS specific story (headline/summary must match the URL's topic).
      If no source URL clearly matches this story, return an empty list []. A story with no URL is better than a wrong URL.
+
+     URL-VALIDATION GATE (added 2026-05-05 after a briefing shipped 4 wrong-topic URLs):
+     For each URL you keep, verify in your head that the URL's slug/title would describe THIS story
+     to a reader who only saw the URL. Drop URLs whose slug names a different topic, e.g.:
+       - story headline: "ChatGPT Images 2.0 weaponized for fraud"
+         URL: slashdot.com/.../chatgpt-became-so-obsessed-with-goblins-that-openai-had-to-intervene
+         → DROP (URL is about a different ChatGPT bug entirely; reader will be confused)
+       - story headline: "22-year-old reverse-engineers OpenClaw"
+         URL: decrypt.co/.../openclaw-apple-mac-mini-shortage-ai-2026
+         → DROP (URL is about a Mac Mini shortage, not the reverse-engineering story)
+       - story headline: "Grok 4.3 Custom Voices, two-stage verification, Tesla in-car"
+         URL: basenor.com/blogs/news/xai-launches-grok-text-to-speech-api...
+         → DROP (third-party blog covering only the API launch, omits the headline's specific claims)
+     A URL whose slug names something OTHER than your headline's subject is wrong, even if the
+     domain or vendor matches. Better to ship a story with 1 great URL than 3 with one wrong.
 
 Return ONLY valid JSON — no markdown fences, no explanation, just the JSON object.
 """

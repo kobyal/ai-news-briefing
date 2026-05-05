@@ -269,7 +269,9 @@ def is_logo_or_generic(image_url: str, headline: str = "", vendor: str = "") -> 
     URL-based image input on Anthropic respects robots.txt and many news
     CDNs block their fetcher.
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    # IMAGE_VISION_API_KEY is local-cycle.sh's stash so vision still works
+    # under MERGER_VIA_CLAUDE_CODE=1 (which unsets ANTHROPIC_API_KEY).
+    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("IMAGE_VISION_API_KEY")
     if not api_key or not image_url:
         return None
     try:
@@ -281,12 +283,21 @@ def is_logo_or_generic(image_url: str, headline: str = "", vendor: str = "") -> 
                              "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8"})
         if r.status_code >= 400 or not r.content:
             return None
-        ct = r.headers.get("content-type", "").split(";")[0].strip().lower()
-        if ct not in ("image/jpeg", "image/png", "image/gif", "image/webp"):
-            ext = image_url.lower().rsplit(".", 1)[-1].split("?")[0]
-            ct = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
-                  "gif": "image/gif", "webp": "image/webp"}.get(ext, "")
-        if not ct or len(r.content) > 4 * 1024 * 1024:
+        # Detect format from magic bytes — header content-type and URL extension
+        # are both unreliable (CDNs serve webp under .jpg, return image/jpeg
+        # for webp bytes, etc.) and Anthropic 400s if media_type lies.
+        magic = r.content[:12]
+        if magic.startswith(b"\xff\xd8\xff"):
+            ct = "image/jpeg"
+        elif magic.startswith(b"\x89PNG\r\n\x1a\n"):
+            ct = "image/png"
+        elif magic[:4] == b"RIFF" and magic[8:12] == b"WEBP":
+            ct = "image/webp"
+        elif magic.startswith(b"GIF87a") or magic.startswith(b"GIF89a"):
+            ct = "image/gif"
+        else:
+            return None
+        if len(r.content) > 4 * 1024 * 1024:
             return None
         b64 = base64.standard_b64encode(r.content).decode("ascii")
     except Exception:

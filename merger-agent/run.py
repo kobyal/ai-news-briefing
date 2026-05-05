@@ -38,7 +38,7 @@ if __name__ == "__main__":
     try:
         result = run_pipeline()
         path = result.get("saved_to", "")
-        if path and sys.platform == "darwin":
+        if path and sys.platform == "darwin" and os.environ.get("AI_NEWS_NO_OPEN") != "1":
             subprocess.run(["open", path], check=False)
     except Exception as e:
         import traceback

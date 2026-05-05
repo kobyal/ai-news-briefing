@@ -28,6 +28,8 @@ def main():
 
     if result.get("success"):
         path = result["saved_to"]
+        if os.environ.get("AI_NEWS_NO_OPEN") == "1":
+            return
         print(f"\nOpening {path} ...")
         try:
             subprocess.run(["open", path], check=False)   # macOS

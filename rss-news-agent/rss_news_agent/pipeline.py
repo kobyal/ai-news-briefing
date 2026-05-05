@@ -145,6 +145,17 @@ Write a structured briefing JSON with:
    - published_date: exact date from source
    - summary: 2-4 sentences with concrete details
    - urls: 1-3 URLs from the article list above (use the [N] index to pick matching URLs). Each URL once only.
+
+   COVERAGE FLOOR (added 2026-05-05 after a run shipped 17/18 arxiv-only items):
+   The VENDOR ARTICLES list above is dominated by arxiv papers — they push 50+ AI papers/day.
+   But the merger downstream NEEDS official vendor blog coverage (anthropic.com, openai.com,
+   blog.google, aws.amazon.com/blogs, etc.). Enforce these caps in your news_items selection:
+   - At MOST 3 arxiv.org items in news_items (was: 17 of 18 last incident).
+   - At LEAST 4 items must come from real vendor blog hosts: anthropic.com, openai.com,
+     blog.google, deepmind.google, aws.amazon.com, blogs.microsoft.com, ai.meta.com,
+     blogs.nvidia.com, mistral.ai, machinelearning.apple.com, huggingface.co/blog.
+   - If the input doesn't have 4 vendor-blog items, ship FEWER news_items (e.g. 8) rather
+     than padding with arxiv. The downstream merger is fine with 8 strong vendor items.
 3. community_pulse: 6-8 bullet points (each starting with "• ") covering specific developer reactions, hot HN threads, or Reddit discussions from the community posts above. Be concrete — mention actual subreddit names, HN scores, topics, and community sentiment.
 4. community_urls: 2-4 URLs from the community posts.
 

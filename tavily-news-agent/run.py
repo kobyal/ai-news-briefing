@@ -19,5 +19,5 @@ from tavily_news_agent import run_pipeline
 if __name__ == "__main__":
     result = run_pipeline()
     html_path = result.get("saved_to", "")
-    if html_path and sys.platform == "darwin":
+    if html_path and sys.platform == "darwin" and os.environ.get("AI_NEWS_NO_OPEN") != "1":
         subprocess.run(["open", html_path])

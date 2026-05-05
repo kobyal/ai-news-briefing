@@ -9,6 +9,7 @@ import urllib.request
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from pathlib import Path
 
 RECIPIENT    = "kobyal@gmail.com"
 SENDER       = "kobyal@gmail.com"
@@ -30,7 +31,7 @@ PAGES_BASE   = "https://kobyal.github.io/ai-news-briefing"
 files = sorted(glob.glob("merger-agent/output/**/*.html", recursive=True))
 if not files:
     print("No merged output found — skipping email.")
-    exit(0)
+    sys.exit(0)
 
 latest   = files[-1]
 # docs/index.html is now a redirect to CloudFront; raw merged HTML lives at docs/report/
@@ -64,6 +65,16 @@ def _friendly_model(model: str) -> str:
     return model or "Claude"
 
 
+def _load_json(path):
+    """Read and parse a JSON file. Raises on missing file or invalid JSON
+    so callers can choose whether to swallow it.
+
+    Wrapper around `json.load` that uses a `with` block so the file handle
+    is closed deterministically instead of waiting on GC."""
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
 def _collect_usage() -> list[dict]:
     """Per-agent totals, summed across TODAY's runs only (multi-run-safe).
 
@@ -89,7 +100,7 @@ def _collect_usage() -> list[dict]:
         api_set = set()
         for f in files:
             try:
-                d = json.load(open(f))
+                d = _load_json(f)
             except Exception:
                 continue
             agg["total_input_tokens"] += d.get("total_input_tokens", 0) or 0
@@ -135,7 +146,7 @@ def _per_run_breakdown() -> list[dict]:
             if ts == "usage":
                 ts = "legacy"
             try:
-                d = json.load(open(f))
+                d = _load_json(f)
             except Exception:
                 continue
             cost = float(d.get("total_cost_usd", 0) or 0)
@@ -202,7 +213,7 @@ def _load_dashboard_mtd() -> dict:
     for path in ("private/dashboard_mtd.json", os.path.expanduser("~/.ai-news-briefing-mtd.json")):
         if os.path.exists(path):
             try:
-                return json.load(open(path))
+                return _load_json(path)
             except Exception:
                 pass
     return {}
@@ -227,7 +238,7 @@ def _cost_by_provider_since(start_date: str) -> dict:
             if day < start_date:
                 continue
             try:
-                d = json.load(open(f))
+                d = _load_json(f)
             except Exception:
                 continue
             # Prefer per-call api labels (perplexity now mixes Perplexity + Anthropic)
@@ -501,7 +512,7 @@ def _check_apis() -> list[dict]:
     twitter_files = sorted(glob.glob(f"twitter-agent/output/{today}/twitter_*.json"))
     if twitter_files:
         try:
-            d = json.load(open(twitter_files[-1]))
+            d = _load_json(twitter_files[-1])
             b = d.get("briefing", d) or {}
             n_people = len(b.get("people_highlights", []) or [])
             n_trending = len(b.get("trending_posts", []) or [])
@@ -521,7 +532,7 @@ def _check_apis() -> list[dict]:
     rss_files = sorted(glob.glob(f"rss-news-agent/output/{today}/rss_*.json"))
     if rss_files:
         try:
-            d = json.load(open(rss_files[-1]))
+            d = _load_json(rss_files[-1])
             n_reddit = len((d.get("reddit_posts") or d.get("briefing", {}).get("reddit_posts", []) or []))
             if n_reddit > 0:
                 checks.append({"name": "Reddit (ArcticShift)", "status": "ok",
@@ -609,7 +620,7 @@ def _zero_streak(agent_dir: str, key_path: list, max_lookback: int = 7) -> int:
         if not files:
             continue
         try:
-            d = json.load(open(files[-1]))
+            d = _load_json(files[-1])
         except Exception:
             continue
         cur = d
@@ -637,7 +648,7 @@ def _collect_agent_delivery() -> list[dict]:
     json_path = f"docs/data/{today}.json"
     if os.path.exists(json_path):
         try:
-            json_data = json.load(open(json_path))
+            json_data = _load_json(json_path)
         except Exception:
             pass
     json_briefing = json_data.get("briefing", {}) or {}
@@ -659,7 +670,7 @@ def _collect_agent_delivery() -> list[dict]:
         if not files:
             return {}
         try:
-            return json.load(open(files[-1]))
+            return _load_json(files[-1])
         except Exception:
             return {}
 
@@ -806,7 +817,7 @@ def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dic
     json_path = f"docs/data/{today}.json"
     if os.path.exists(json_path):
         try:
-            jd = json.load(open(json_path))
+            jd = _load_json(json_path)
             for issue in (jd.get("data_quality_issues") or []):
                 out.append({"label": "data quality", "detail": issue, "severity": "warn"})
         except Exception:
@@ -825,7 +836,7 @@ def _collect_freshness() -> list[dict]:
     tw_files = sorted(glob.glob(f"twitter-agent/output/{today_str}/twitter_*.json"))
     if tw_files:
         try:
-            d = json.load(open(tw_files[-1]))
+            d = _load_json(tw_files[-1])
             ph = (d.get("briefing", {}) or {}).get("people_highlights", []) or []
             tp = (d.get("briefing", {}) or {}).get("trending_posts", []) or []
             latest = None
@@ -856,7 +867,7 @@ def _collect_freshness() -> list[dict]:
                     if not f_check:
                         continue
                     try:
-                        dd = json.load(open(f_check[-1]))
+                        dd = _load_json(f_check[-1])
                         if (dd.get("briefing", {}) or {}).get("trending_posts"):
                             break
                         streak += 1
@@ -874,7 +885,7 @@ def _collect_freshness() -> list[dict]:
     rss_files = sorted(glob.glob(f"rss-news-agent/output/{today_str}/rss_*.json"))
     if rss_files:
         try:
-            d = json.load(open(rss_files[-1]))
+            d = _load_json(rss_files[-1])
             posts = d.get("reddit_posts") or (d.get("briefing", {}) or {}).get("reddit_posts", []) or []
             if posts:
                 rows.append({"label": "Reddit · today's posts", "value": str(len(posts)),
@@ -1266,12 +1277,11 @@ print(f"Email sent → {RECIPIENT}")
 # Status marker for QA evaluator (data_integrity.email_not_sent check).
 # Only written on successful send — if sendmail throws above, this stays
 # stale and QA flags. Path is in private/ (gitignored).
-import datetime as _dt, pathlib as _pl
-_status_dir = _pl.Path(__file__).resolve().parent / "private"
+_status_dir = Path(__file__).resolve().parent / "private"
 _status_dir.mkdir(exist_ok=True)
 _status_path = _status_dir / "email_status.json"
 _status_path.write_text(json.dumps({
-    "sent_at":   _dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    "sent_at":   datetime.utcnow().isoformat(timespec="seconds") + "Z",
     "date":      date,
     "recipient": RECIPIENT,
     "subject":   subject,

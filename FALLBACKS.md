@@ -84,6 +84,12 @@ hand-rolled retry loop on transient failures:
   `claude -p`. **No automatic fallback to the API path** — if the `claude`
   binary is missing or hangs, the step fails. Recover by unsetting
   `MERGER_VIA_CLAUDE_CODE` and re-running with `ANTHROPIC_API_KEY` set.
+  **Vision exception**: subscription doesn't accept image input, so
+  `shared/image_fallback.py::is_logo_or_generic` (the og_image vision-judge)
+  needs the API path. `local-cycle.sh` stashes `ANTHROPIC_API_KEY` into
+  `IMAGE_VISION_API_KEY` before unsetting the former, and the vision call
+  reads either. Without this stash, vision silently no-op'd and 7 logo-only
+  hero images shipped on 2026-05-05.
 - **Perplexity Sonar** — `perplexity-news-agent/.../pipeline.py::_agent` same
   retry pattern as Anthropic.
 - **xAI / Google** — SDK retry behavior only.

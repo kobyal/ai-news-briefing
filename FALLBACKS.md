@@ -141,9 +141,17 @@ short X-post descriptions to Hebrew. **Not** used by the per-agent translators
 — those use Anthropic.
 
 If `DEEPL_API_KEY` is missing or exhausted, the Hebrew fields stay empty and
-the UI hides the Hebrew labels for those items. Pipeline continues. Free tier
+the UI falls back to showing the **English** source text to Hebrew readers on
+`/community/` (Reddit titles, X-post bodies). Pipeline continues. Free tier
 is 500,000 chars/month; current usage ~16k/day ≈ 480k/month — comfortably
 under.
+
+**Guardrails (added 2026-05-05 after a silent miss shipped English Reddit/X
+titles to HE readers twice in one day):**
+- `local-cycle.sh` exits 1 at startup when `DEEPL_API_KEY` is unset.
+- `publish_data.py` prints `WARNING: DEEPL_API_KEY not set — Reddit/X
+  Hebrew translations will be SKIPPED` so any future miss is visible in run
+  logs, not just at browse time.
 
 ## Where tracking is missing
 

@@ -135,8 +135,8 @@ In order of size:
 | `shared/fallback_tracker.py` | Logs every rotation event. |
 | `tavily-news-agent/.../searcher.py` | The 3-key cascade implementation. |
 | `shared/article_reader.py` | The Jina → Firecrawl → cache chain. |
-| `COSTS.md` | Live cost picture, refresh recipe. |
-| `FALLBACKS.md` | Live fallback contract. |
+| `docs/COSTS.md` | Live cost picture, refresh recipe. |
+| `docs/FALLBACKS.md` | Live fallback contract. |
 
 ## Cool tricks
 
@@ -149,4 +149,4 @@ In order of size:
 
 - **[19-visibility-email](./19-visibility-email.md)** — how the email reports fallback events.
 - **[21-tech-stack-and-tricks](./21-tech-stack-and-tricks.md)** — broader tricks across the codebase.
-- **[FALLBACKS.md](../../FALLBACKS.md)** — the full live fallback contract.
+- **[FALLBACKS.md](../FALLBACKS.md)** — the full live fallback contract.

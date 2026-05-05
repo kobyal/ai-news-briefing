@@ -919,19 +919,32 @@ def run_pipeline() -> dict:
     for item in parsed.get("news_items", []):
         h_toks = _headline_tokens(item.get("headline", ""))
         h_non_vendor = h_toks - _VENDOR_STOP
-        if not h_non_vendor:
+        if not h_toks:
             continue  # headline too generic to score against; leave URLs alone
         kept = []
         for url in item.get("urls", []):
             total_checked += 1
             s_toks = _slug_tokens(url)
-            if not s_toks:
-                kept.append(url)  # slugless (press release, tweet, etc.) — trust
+            if not s_toks or len(s_toks) <= 2:
+                kept.append(url)  # slugless or near-slugless (press release, tweet) — trust
                 continue
-            # Must share at least one non-vendor token between headline + slug.
-            overlap = h_non_vendor & s_toks
-            if overlap:
+            # Drop only on zero overlap. Audit on 2026-05-05 showed that
+            # requiring a NON-vendor token nuked legitimate sources
+            # (e.g. "9to5google gemini-full-redesign" under a Vertex-AI-retirement
+            # story, where the headline's non-vendor tokens were ["retires","unveils"]).
+            # Zero overlap still catches the xda "claude-code-going-away-pro"
+            # mis-attachment because headline+slug must share SOMETHING.
+            overlap_all = h_toks & s_toks
+            overlap_non_vendor = h_non_vendor & s_toks
+            # Keep if ANY overlap exists AND it's either non-vendor OR headline
+            # is vendor-dominated (no non-vendor tokens to match against).
+            if overlap_non_vendor or (overlap_all and not h_non_vendor):
                 kept.append(url)
+            elif overlap_all:
+                # Vendor-only overlap when headline DOES have non-vendor tokens =
+                # the wrong-topic signal (xda case). Drop.
+                total_dropped += 1
+                print(f"  ✂ Irrelevant URL dropped from '{item.get('headline','')[:50]}': {url[:80]}")
             else:
                 total_dropped += 1
                 print(f"  ✂ Irrelevant URL dropped from '{item.get('headline','')[:50]}': {url[:80]}")

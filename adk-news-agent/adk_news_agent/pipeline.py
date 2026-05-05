@@ -42,6 +42,18 @@ class _DegenerateGeminiOutput(RuntimeError):
     """
 
 
+class _NoBriefingWritten(RuntimeError):
+    """Pipeline finished without writing today's briefing_*.json.
+
+    Observed 2026-05-04: URLResolver was called twice in one chain, the second
+    call returned a degenerate 9-token response, and BriefingWriter was never
+    triggered — so state['briefing'] stayed empty and the Publisher safety
+    path skipped silently. No earlier-stage exception fired, so the original
+    retry guard (DegenerateGeminiOutput / PydValidationError) didn't catch it.
+    Raised by the end-of-pipeline safety check so run_pipeline can retry.
+    """
+
+
 def _is_degenerate_repetition(text: str) -> bool:
     """True if a 60-char window recurs >30× in a >20KB string.
 
@@ -160,7 +172,7 @@ async def _run_async():
     today_jsons = glob.glob(os.path.join(today_dir, "briefing_*.json"))
     if not today_jsons:
         reason = f"timed out after {_TIMEOUT}s" if timed_out else "Publisher never ran"
-        raise RuntimeError(
+        raise _NoBriefingWritten(
             f"[ADK] No briefing_*.json written for {today} — {reason}. "
             f"Bump ADK_TIMEOUT or investigate slow Gemini calls."
         )
@@ -172,16 +184,26 @@ def run_pipeline():
         try:
             asyncio.run(_run_async())
             return
-        except (_DegenerateGeminiOutput, _PydValidationError) as e:
+        except (_DegenerateGeminiOutput, _PydValidationError, _NoBriefingWritten) as e:
             # _DegenerateGeminiOutput: Gemini's grounding cycle (n-gram repetition,
             #   first observed 2026-05-02 in VendorResearcher).
             # _PydValidationError: Gemini truncates BriefingWriter output mid-JSON,
             #   so the BriefingContent schema fails to parse (observed 2026-05-03 —
-            #   cut off mid-URL inside an unresolved grounding redirect). Retrying
-            #   the chain with a fresh session usually produces a complete response.
+            #   cut off mid-URL inside an unresolved grounding redirect).
+            # _NoBriefingWritten: chain finished without producing briefing_*.json,
+            #   typically because an upstream stage (URLResolver, BriefingWriter)
+            #   returned an empty/truncated response without raising — so no other
+            #   guard fired (observed 2026-05-04: URLResolver second call returned
+            #   9 tokens, BriefingWriter never ran, state['briefing'] stayed empty).
+            # Retrying the chain with a fresh session usually produces a complete response.
             last_err = e
-            kind = "repetition loop" if isinstance(e, _DegenerateGeminiOutput) else "schema validation (likely Gemini truncation)"
-            print(f"[ADK] attempt {attempt}/2 hit Gemini {kind}: {e}")
+            if isinstance(e, _DegenerateGeminiOutput):
+                kind = "repetition loop"
+            elif isinstance(e, _PydValidationError):
+                kind = "schema validation (likely Gemini truncation)"
+            else:
+                kind = "no briefing produced (silent stage failure)"
+            print(f"[ADK] attempt {attempt}/2 hit {kind}: {e}")
             if attempt < 2:
                 print("[ADK] Retrying entire chain with a fresh session...")
     assert last_err is not None

@@ -78,15 +78,28 @@ Produce ONE merged briefing as a JSON object. Rules:
    even if the older story is "bigger" news. Within the same day, order by importance/impact.
    Aim for breadth: include stories from different vendors where possible.
 
-3.0 HARD FRESHNESS FLOOR (added 2026-05-05 after a briefing shipped with 13/22 stale stories):
-   - DROP any story whose published_date is more than 2 calendar days before TODAY, unless it is
-     a true CONTINUATION carrying a NEW concrete fact (apply the STRICT NEW-FACT TEST below).
-     A 3-day-old article with the same fact set as the original announcement is stale; drop it.
-   - At least 50% of news_items MUST have published_date == today OR yesterday. If you cannot
-     reach the floor with fresh stories, ship FEWER stories — do not backfill with old material.
-   - When two candidate stories cover overlapping ground, prefer the one with the more recent
-     published_date even when the older one has more sources. Source count is a tiebreaker, not
-     an override.
+3.0 FRESHNESS RANKING (added 2026-05-05; revised same day):
+   The reader cares about correctness first, freshness second. Stale-but-correct beats
+   fresh-but-broken. So we don't fanatically drop older stories — we DEPRIORITIZE them
+   and let the ranking handle prominence.
+
+   Editorial preference order, when picking what to include and what to skip:
+     1. Today's stories that pass STRICT NEW-FACT TEST and have valid sources.
+     2. Yesterday's stories that pass the same tests.
+     3. 2-3 day old stories — include ONLY when truly substantial AND you cannot fill the
+        slot with something fresher. A 3-day-old story with no new angle is stale; drop it.
+        A 3-day-old story that's still the dominant industry conversation is fine to keep.
+     4. >3 day old stories — drop unless a clear continuation chapter with a brand-new fact
+        you can name in the first sentence.
+
+   Soft floor: aim for ≥50% of news_items to have published_date == today OR yesterday.
+   This is a quality minimum, not a hard filter. If today is genuinely a slow news day,
+   ship FEWER stories rather than padding with stale ones — but don't drop a substantive
+   2-day-old story just to chase the date stamp.
+
+   When two candidate stories cover overlapping ground, prefer the more recent one.
+   Source count is a tiebreaker, not an override — a yesterday's story with src=4 should
+   not bump a today's story with src=1 from the news_items list.
 
 3a. AVOID DEJA-VU — cross-reference each candidate story against the RECENT HEADLINES section above.
 

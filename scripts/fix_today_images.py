@@ -28,7 +28,7 @@ from bs4 import BeautifulSoup
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
-sys.path.insert(0, str(REPO_ROOT / "qa-evaluator-agent"))
+sys.path.insert(0, str(REPO_ROOT / "private" / "qa-evaluator-agent"))
 
 from qa_evaluator.llm import image_is_logo_or_generic
 from shared.image_fallback import find_fallback
@@ -186,7 +186,7 @@ def main():
 
     # Read QA report to know exactly which stories the evaluator flagged.
     # If no report or it has no image findings, fall back to scanning all stories.
-    report_path = REPO_ROOT / "qa-evaluator-agent" / "output" / date / "report.json"
+    report_path = REPO_ROOT / "private" / "qa-evaluator-agent" / "output" / date / "report.json"
     targets: list[int] = []
     if report_path.exists():
         report = json.loads(report_path.read_text(encoding="utf-8"))

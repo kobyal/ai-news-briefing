@@ -58,6 +58,72 @@ def _generate_tldr_audio(text: str, voice: str, out_path: Path) -> bool:
         return False
 
 
+def _generate_per_story_audio(
+    news_items: list,
+    audio_dir: Path,
+    date_str: str,
+    voice_en: str,
+    voice_he: str,
+    base_url: str,
+    story_id_fn,
+    synth_fn=None,
+) -> dict:
+    """Generate 4 MP3s per story (summary+detail × EN+HE) and stamp the
+    audio_url fields on each item. Idempotent — skips MP3s that already
+    exist with non-zero bytes.
+
+    Args:
+        news_items: list of merger story dicts; mutated in place to add
+            summary_audio_url, summary_audio_url_he, detail_audio_url,
+            detail_audio_url_he.
+        audio_dir: filesystem dir to write MP3s to.
+        date_str: YYYY-MM-DD; only used to build the public URL.
+        voice_en: edge-tts voice id for English.
+        voice_he: edge-tts voice id for Hebrew.
+        base_url: e.g. "https://kobyal.github.io/ai-news-briefing".
+        story_id_fn: callable(item) -> str (12-char story_id).
+        synth_fn: optional callable(text, voice, out_path) -> bool, defaults
+            to _generate_tldr_audio. Pass a stub for tests.
+
+    Returns: {"generated": int, "skipped": int, "failed": int, "expected": int}
+    """
+    if synth_fn is None:
+        synth_fn = _generate_tldr_audio
+    expected = len(news_items) * 4
+    generated = skipped = failed = 0
+    for item in news_items:
+        sid = story_id_fn(item)
+        headline_en = (item.get("headline") or "").strip()
+        headline_he = (item.get("headline_he") or "").strip() or headline_en
+        summary_en  = (item.get("summary") or "").strip()
+        summary_he  = (item.get("summary_he") or "").strip()
+        detail_en   = (item.get("detail") or "").strip()
+        detail_he   = (item.get("detail_he") or "").strip()
+        # (URL field on item, filename, voice, headline-for-prefix, body)
+        specs = [
+            ("summary_audio_url",    f"story_{sid}_summary_en.mp3", voice_en, headline_en, summary_en),
+            ("summary_audio_url_he", f"story_{sid}_summary_he.mp3", voice_he, headline_he, summary_he),
+            ("detail_audio_url",     f"story_{sid}_detail_en.mp3",  voice_en, headline_en, detail_en),
+            ("detail_audio_url_he",  f"story_{sid}_detail_he.mp3",  voice_he, headline_he, detail_he),
+        ]
+        for field, fname, voice, hl, body in specs:
+            if not body:
+                continue
+            out = audio_dir / fname
+            url = f"{base_url}/audio/{date_str}/{fname}"
+            if out.exists() and out.stat().st_size > 0:
+                item[field] = url
+                skipped += 1
+                continue
+            text = f"{hl}.\n\n{body}".strip() if hl else body
+            if synth_fn(text, voice, out):
+                item[field] = url
+                generated += 1
+            else:
+                failed += 1
+    return {"generated": generated, "skipped": skipped, "failed": failed, "expected": expected}
+
+
 def _translate_deepl(texts: list, api_key: str) -> list:
     """Translate a batch of texts to Hebrew via DeepL free API."""
     if not texts or not api_key:
@@ -1269,6 +1335,22 @@ if _generate_tldr_audio(_tldr_he_text, _TLDR_VOICE_HE, _audio_dir / "tldr_he.mp3
     published.setdefault("briefing_he", {})["tldr_audio_url"] = (
         f"{_GH_PAGES_BASE}/audio/{date_str}/tldr_he.mp3"
     )
+
+# ── Per-story audio (Listen button on every card) ───────────────────────────
+# Two flavours per story per language so what-you-hear matches what-you-see:
+#   summary version (homepage cards, short)  +  detail version (/story page, long).
+# Both prefix the headline before the body. story_id is sha256(primary URL)[:12]
+# — same derivation handler.py uses, so DDB rows + GH Pages JSON share keys.
+# Idempotent: re-runs skip MP3s that already exist with non-zero bytes.
+_audio_stats = _generate_per_story_audio(
+    _news_items, _audio_dir, date_str,
+    _TLDR_VOICE_EN, _TLDR_VOICE_HE, _GH_PAGES_BASE, _story_id_hash,
+)
+print(
+    f"Per-story audio: {_audio_stats['generated']} generated, "
+    f"{_audio_stats['skipped']} skipped (existed), "
+    f"{_audio_stats['failed']} failed (of {_audio_stats['expected']} expected)"
+)
 
 os.makedirs("docs/data", exist_ok=True)
 path = f"docs/data/{date_str}.json"

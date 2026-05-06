@@ -354,7 +354,7 @@ flowchart LR
 ```
 
 **Run:** `cd youtube-news-agent && python3 run.py`
-**Env:** `YOUTUBE_API_KEY` (or `GOOGLE_API_KEY` as fallback), `LOOKBACK_DAYS`
+**Env:** `YOUTUBE_API_KEY` + optional `YOUTUBE_API_KEY2` (multi-key rotation on 403/429), `LOOKBACK_DAYS`. `GOOGLE_API_KEY*` is **not** an YT fallback any more — each Google API key is locked to a single service via per-key API restrictions (verified 2026-05-06).
 
 ### 9. GitHub Trending Agent — `github-trending-agent/`
 
@@ -591,7 +591,7 @@ Stories not matching a specific vendor are classified as `Other`.
 
 | Var | Used by |
 |-----|---------|
-| `GOOGLE_API_KEY` | ADK, YouTube fallback |
+| `GOOGLE_API_KEY` (+ `GOOGLE_API_KEY2`) | ADK / Gemini. Each Google Cloud API key is locked to one service via per-key API restrictions; the kobytest secondary acts as the Gemini fallback (subprocess relaunch on quota error — `adk-news-agent/run.py`). |
 | `GOOGLE_GENAI_MODEL` | ADK |
 | `PERPLEXITY_API_KEY` | Perplexity (Sonar) |
 | `PERPLEXITY_SEARCH_MODEL` / `_WRITER_MODEL` / `_TRANSLATOR_MODEL` | Perplexity |
@@ -604,7 +604,7 @@ Stories not matching a specific vendor are classified as `Other`.
 | `TAVILY_WRITER_MODEL` / `TAVILY_TRANSLATOR_MODEL` | Tavily |
 | `EXA_API_KEY` (+ `EXA_API_KEY2`) | Exa |
 | `NEWSAPI_KEY` (+ `NEWSAPI_KEY2`) | NewsAPI |
-| `YOUTUBE_API_KEY` | YouTube |
+| `YOUTUBE_API_KEY` (+ `YOUTUBE_API_KEY2`) | YouTube. Multi-key rotation on HTTP 403/429 (`youtube-news-agent/.../pipeline.py::_yt_get`, `publish_data.py::_yt_search`). |
 | `GITHUB_TOKEN` | GitHub Trending (optional) |
 | `XAI_API_KEY` | xAI Grok agent |
 | `JINA_API_KEY` (+ `JINA_API_KEY2`) | Article Reader |

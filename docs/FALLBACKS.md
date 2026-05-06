@@ -18,10 +18,10 @@ counts so you know which paths are actually keeping the pipeline alive.
 | Perplexity Sonar | `PERPLEXITY_API_KEY` | retry only (single key) | n/a | `perplexity-news-agent/.../pipeline.py::_agent` |
 | Anthropic direct (Perplexity writer + translator since 2026-04-23) | `ANTHROPIC_API_KEY` | retry only | n/a | shared with merger |
 | xAI API | `XAI_API_KEY` | retry only — agent disabled in CI anyway | n/a | single key |
-| Google Gemini (ADK) | `GOOGLE_API_KEY` | SDK retry only | n/a | single key |
+| Google Gemini (ADK) | `GOOGLE_API_KEY` | `GOOGLE_API_KEY2` (kobytest) — fresh subprocess on quota error → SDK retry only after | ✓ | `adk-news-agent/run.py::_run_with_fallback` |
 | Exa search | `EXA_API_KEY` | `EXA_API_KEY2` → empty result | not yet | `exa-news-agent/.../pipeline.py` |
 | NewsAPI | `NEWSAPI_KEY` | `NEWSAPI_KEY2` → empty result | not yet | `newsapi-agent/.../pipeline.py` |
-| YouTube | `YOUTUBE_API_KEY` | `GOOGLE_API_KEY` → skip | not yet | `youtube-news-agent/...` |
+| YouTube Data API | `YOUTUBE_API_KEY` (kobyal) | `YOUTUBE_API_KEY2` (kobytest) on 403/429 → skip | ✓ | `youtube-news-agent/.../pipeline.py::_yt_get`, `publish_data.py::_yt_search` |
 | Twitter scrape | cookies (`TWITTER_AUTH_TOKEN` + `TWITTER_CT0`) | xAI agent (if re-enabled) → empty section | partial (logs cookie failure) | `twitter-agent/...` |
 | Reddit (via Arctic Shift) | unauthenticated `arctic-shift.photon-reddit.com` | retry → empty `reddit_posts` | no | `rss-news-agent/.../feeds.py` |
 | DeepL | `DEEPL_API_KEY` | skip — Reddit/X stay English in `publish_data.py` output | no | `publish_data.py::_translate_deepl` |
@@ -71,7 +71,42 @@ Flow, see `shared/article_reader.py::_fetch_firecrawl`:
 
 Not actively tracked at the rotation level; add if you need visibility.
 
-### Retry-only services (Anthropic, Perplexity, xAI, Google)
+### YouTube Data API (kobyal + kobytest pool)
+
+Each Google Cloud API key is locked to a SINGLE service via the per-key
+"API restrictions" picker — verified 2026-05-06 — so we keep two pools.
+The YouTube pool: `YOUTUBE_API_KEY` (kobyal) primary, `YOUTUBE_API_KEY2`
+(kobytest) fallback. Combined free-tier quota: 20K units/day (typical
+pipeline use ~3K/run, so 6× headroom).
+
+Implementation: `youtube-news-agent/.../pipeline.py::_yt_get` is a wrapper
+around `requests.get(...)` that walks `_yt_keys()` in order and retries
+on HTTP 403 / 429. `publish_data.py::_yt_search` mirrors the same logic
+on the urllib path. Every rotation calls `fallback_tracker.track(...)`
+so the daily email's `FALLBACKS FIRED` panel surfaces a burned primary.
+
+Both `KEY2` and `KEY_2` env-var spellings are accepted (the repo's `.env`
+uses no-underscore; underscored form kept for forward compat).
+
+### Google Gemini (ADK) — kobyal + kobytest pool
+
+`GOOGLE_API_KEY` (kobyal) primary, `GOOGLE_API_KEY2` (kobytest) fallback.
+ADK calls Gemini through `google-genai`, which caches its API client at
+import time — so an in-process env swap can't reach the live client.
+`adk-news-agent/run.py::_run_with_fallback` instead **re-launches the
+script as a fresh subprocess** when the primary trips
+`ResourceExhausted` / 429 / "quota" / "rate limit", with
+`GOOGLE_API_KEY=$GOOGLE_API_KEY2` and a `_ADK_USING_BACKUP_KEY=1`
+sentinel in env. The sentinel prevents a retry loop when the backup is
+also exhausted.
+
+Re-running ADK from scratch is the right behaviour: a quota-exhausted
+primary takes the WHOLE chain (URLResolver, VendorResearcher,
+CommunityResearcher, BriefingWriter, Translator, Publisher) down, so
+partial state isn't recoverable anyway. Output files are timestamped,
+so `_latest()` picks the new one.
+
+### Retry-only services (Anthropic, Perplexity, xAI)
 
 These have no secondary key. They rely on the provider's SDK retry behavior or a
 hand-rolled retry loop on transient failures:
@@ -92,7 +127,7 @@ hand-rolled retry loop on transient failures:
   hero images shipped on 2026-05-05.
 - **Perplexity Sonar** — `perplexity-news-agent/.../pipeline.py::_agent` same
   retry pattern as Anthropic.
-- **xAI / Google** — SDK retry behavior only.
+- **xAI** — SDK retry behavior only.
 
 If any of these keys go down mid-run, the affected step writes empty output and
 the merger continues — its prompt accepts zero-source inputs gracefully (one

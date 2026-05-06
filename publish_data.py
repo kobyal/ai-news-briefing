@@ -11,6 +11,51 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+
+# ── TLDR audio (text-to-speech) ─────────────────────────────────────────────
+# Uses edge-tts (the free Python lib that taps Microsoft Edge's streaming
+# Read-Aloud endpoint — same Azure Neural backend as the paid Speech API,
+# but no key, no quota, no billing). Voices picked 2026-05-06 after a
+# side-by-side listening test:
+#   * EN → en-US-GuyNeural   (deep US news-anchor delivery)
+#   * HE → he-IL-AvriNeural  (clear, friendly Hebrew male voice)
+# Override via TLDR_TTS_VOICE_EN / TLDR_TTS_VOICE_HE env vars if you ever
+# want to change without editing code (e.g. swap to HilaNeural for a
+# female HE voice). edge-tts is unofficial — if the endpoint ever rate-
+# limits us, the fallback is Google Cloud TTS free tier (1M Neural2
+# chars/month free, enough for ~11x our daily TLDR volume).
+_TLDR_VOICE_EN = os.environ.get("TLDR_TTS_VOICE_EN", "en-US-GuyNeural")
+_TLDR_VOICE_HE = os.environ.get("TLDR_TTS_VOICE_HE", "he-IL-AvriNeural")
+_GH_PAGES_BASE = "https://kobyal.github.io/ai-news-briefing"
+
+
+def _generate_tldr_audio(text: str, voice: str, out_path: Path) -> bool:
+    """Synthesize one MP3 via edge-tts. True on success, False on missing
+    lib / empty text / network failure (caller decides whether to surface)."""
+    try:
+        import edge_tts  # noqa: F401  — imported lazily so a missing dep doesn't kill the publish step
+        import asyncio
+    except ImportError:
+        print("  TLDR audio: edge-tts not installed — `pip install edge-tts`. Skipping.")
+        return False
+    text = (text or "").strip()
+    if not text:
+        return False
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        async def _run():
+            import edge_tts as _et
+            comm = _et.Communicate(text, voice)
+            await comm.save(str(out_path))
+        asyncio.run(_run())
+        size_kb = out_path.stat().st_size / 1024
+        print(f"  TLDR audio: wrote {out_path.name} ({size_kb:.0f} KB, voice={voice})")
+        return True
+    except Exception as e:
+        print(f"  TLDR audio failed for voice={voice}: {e}")
+        return False
 
 
 def _translate_deepl(texts: list, api_key: str) -> list:
@@ -1207,6 +1252,23 @@ published = {
     # collapses) don't slip past the user.
     "data_quality_issues": _data_quality_issues,
 }
+
+# ── TLDR audio ──────────────────────────────────────────────────────────────
+# Generate one MP3 for the EN TLDR + one for the HE tldr_he, save under
+# docs/audio/<date>/, and stash the absolute GH-Pages URLs in the JSON so
+# the frontend can wire up a play-button. Best-effort: skip silently if
+# edge-tts isn't installed (publish_data must NEVER fail because the
+# audio extra is missing — the data is the contract, audio is gravy).
+_audio_dir = Path("docs/audio") / date_str
+_tldr_en_text = "\n\n".join(published["briefing"].get("tldr") or [])
+_tldr_he_text = "\n\n".join(published.get("briefing_he", {}).get("tldr_he") or [])
+
+if _generate_tldr_audio(_tldr_en_text, _TLDR_VOICE_EN, _audio_dir / "tldr_en.mp3"):
+    published["briefing"]["tldr_audio_url"] = f"{_GH_PAGES_BASE}/audio/{date_str}/tldr_en.mp3"
+if _generate_tldr_audio(_tldr_he_text, _TLDR_VOICE_HE, _audio_dir / "tldr_he.mp3"):
+    published.setdefault("briefing_he", {})["tldr_audio_url"] = (
+        f"{_GH_PAGES_BASE}/audio/{date_str}/tldr_he.mp3"
+    )
 
 os.makedirs("docs/data", exist_ok=True)
 path = f"docs/data/{date_str}.json"

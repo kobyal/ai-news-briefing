@@ -535,15 +535,20 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
         )
 
     # ── Call D: details (in-depth analysis) ────────────────────────────────────
-    def _translate_details():
-        details = [it.get("detail", "") for it in items]
-        if not any(details):
-            return '{"details_he": []}'
+    # Chunked: 18 details × ~1300 chars EN → ~30K chars HE output blew through
+    # the 1800s `claude -p` timeout on 2026-05-06 (entire details_he came back
+    # empty). Splitting into ≤6-story batches in parallel finished the same
+    # work in ~110s. Each batch is a self-contained Translator-D LLM call;
+    # outputs are stitched back into one JSON the parent expects.
+    _TRANSLATOR_D_CHUNK = 6
+
+    def _translate_details_chunk(offset: int, chunk_details: list) -> tuple[int, list]:
+        """Translate one slice; returns (offset, list_of_he_strings)."""
         details_input = json.dumps(
-            {"details": details},
+            {"details": chunk_details},
             ensure_ascii=False, indent=2,
         )
-        return _agent(
+        raw = _agent(
             input_text=(
                 "אתה כתב טכנולוגיה בכיר ב-Geektime. כתוב מחדש את הניתוחים המעמיקים הבאים בעברית — לא תרגום, כתיבה מאפס.\n\n"
                 "הקורא: מפתח/ת ישראלי/ת שעובד/ת עם AI ביומיום.\n\n"
@@ -564,8 +569,42 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
             ),
             json_mode=True,
             max_steps=1,
-            label="Translator-D (details)",
+            label=f"Translator-D[{offset}:{offset + len(chunk_details)}]",
         )
+        try:
+            parsed = json.loads(raw) if raw else {}
+        except Exception:
+            parsed = {}
+        return offset, parsed.get("details_he", [])
+
+    def _translate_details():
+        details = [it.get("detail", "") for it in items]
+        if not any(details):
+            return '{"details_he": []}'
+
+        chunks = [(i, details[i:i + _TRANSLATOR_D_CHUNK])
+                  for i in range(0, len(details), _TRANSLATOR_D_CHUNK)]
+        results: list[str] = [""] * len(details)
+
+        # Parallelism = number of chunks. Each is an independent `claude -p`
+        # subprocess; on a 4-core box 3 concurrent calls is fine.
+        with ThreadPoolExecutor(max_workers=len(chunks)) as inner_pool:
+            futs = [inner_pool.submit(_translate_details_chunk, off, ch)
+                    for off, ch in chunks]
+            for fut in futs:
+                try:
+                    off, he_list = fut.result()
+                    for i, t in enumerate(he_list):
+                        if off + i < len(results) and isinstance(t, str):
+                            results[off + i] = t
+                except Exception as e:
+                    print(f"  [Translator-D] chunk failed: {e}")
+
+        # Note: a partially-failed run yields some empty strings. Caller's
+        # `if details_he:` truthiness check at the merge step still treats
+        # the array as non-empty as long as at least one slot is filled,
+        # so partial coverage beats the previous all-or-nothing behaviour.
+        return json.dumps({"details_he": results}, ensure_ascii=False)
 
     # ── Call C: people highlights + community pulse items + twitter descs ─────
     def _translate_people_and_pulse():

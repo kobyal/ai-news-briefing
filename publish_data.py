@@ -842,11 +842,16 @@ def _yt_keys() -> list[str]:
 
     Mirrors Tavily's 3-key rotation (and youtube-news-agent/pipeline.py).
     Populate the secondary slots in private/.env (kobytestalmog Google
-    account, etc.) — primary 403/429 falls through to the next."""
+    account, etc.) — primary 403/429 falls through to the next.
+
+    Both KEY2 and KEY_2 forms are accepted (env file uses no-underscore)."""
     seen: set = set()
     out: list[str] = []
-    for var in ("YOUTUBE_API_KEY", "YOUTUBE_API_KEY_2", "YOUTUBE_API_KEY_3",
-                "GOOGLE_API_KEY", "GOOGLE_API_KEY_2"):
+    for var in ("YOUTUBE_API_KEY",
+                "YOUTUBE_API_KEY2", "YOUTUBE_API_KEY_2",
+                "YOUTUBE_API_KEY3", "YOUTUBE_API_KEY_3",
+                "GOOGLE_API_KEY",
+                "GOOGLE_API_KEY2", "GOOGLE_API_KEY_2"):
         v = (os.environ.get(var) or "").strip()
         if v and v not in seen:
             seen.add(v)

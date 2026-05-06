@@ -118,11 +118,18 @@ def _yt_keys() -> list[str]:
     Mirrors Tavily's 3-key rotation pattern. Populate the secondary keys
     in `private/.env` (kobytestalmog Google account, etc.). On a 403/429
     from one key, `_yt_get` walks down the list before giving up.
+
+    Both KEY2 and KEY_2 forms are accepted — first hit wins. (The repo's
+    env file uses the no-underscore form; the underscore form is kept for
+    forward compatibility with anyone who reads this code first.)
     """
     seen: set[str] = set()
     out: list[str] = []
-    for var in ("YOUTUBE_API_KEY", "YOUTUBE_API_KEY_2", "YOUTUBE_API_KEY_3",
-                "GOOGLE_API_KEY", "GOOGLE_API_KEY_2"):
+    for var in ("YOUTUBE_API_KEY",
+                "YOUTUBE_API_KEY2", "YOUTUBE_API_KEY_2",
+                "YOUTUBE_API_KEY3", "YOUTUBE_API_KEY_3",
+                "GOOGLE_API_KEY",
+                "GOOGLE_API_KEY2", "GOOGLE_API_KEY_2"):
         v = (os.environ.get(var) or "").strip()
         if v and v not in seen:
             seen.add(v)

@@ -749,28 +749,48 @@ def _collect_agent_delivery() -> list[dict]:
             status, note = "error", "0 people — refresh TWITTER_AUTH_TOKEN/CT0 from x.com"
         elif n_t == 0:
             t_streak = _zero_streak("twitter-agent", ["briefing", "trending_posts"])
-            # Scrape vs filter disambiguation: cookies/scrape are evidently
-            # working when people_highlights came through with non-empty
-            # handles. trending=0 in that case is the post-fetch filter
-            # (min_likes=50 + AI-relevance regex) eating everything — not
-            # a broken scrape. Calling that "scrape broken" sent the user
-            # chasing cookies that didn't need refreshing (2026-05-06).
-            if n_p > 0:
-                # People stream healthy → filter or genuinely-quiet day.
-                if t_streak >= 2:
-                    status, note = "error", (
-                        f"trending=0 ({t_streak}-day streak) — likes/AI-relevance "
-                        "filter too strict OR no qualifying posts. Cookies fine "
-                        f"({n_p} people came through)."
-                    )
+            # Read the agent's own diagnostics so we can name the actual
+            # cause instead of guessing. Falls back to old heuristic when
+            # the field isn't present (running an older agent build).
+            diag = b.get("_twitter_diagnostics") or {}
+            sev = "error" if t_streak >= 2 else "warn"
+            streak_tag = f" ({t_streak}-day streak)" if t_streak >= 2 else ""
+            if diag:
+                if not diag.get("signer_ok"):
+                    note = ("trending=0 — `x_client_transaction` Python lib not installed; "
+                            "SearchTimeline needs it for the x-client-transaction-id header. "
+                            "Re-install: `python3 -m pip install "
+                            "git+https://github.com/iSarabjitDhiman/XClientTransaction.git`")
+                elif diag.get("search_404_count", 0) >= max(1, diag.get("search_calls", 0)):
+                    note = ("trending=0 — every SearchTimeline call 404'd. "
+                            "X likely rotated the query ID. Capture a fresh hash "
+                            "from x.com Network tab and set `X_SEARCH_QUERY_ID` in private/.env.")
+                elif diag.get("search_404_count", 0) > 0:
+                    note = (f"trending=0 — {diag['search_404_count']}/{diag['search_calls']} "
+                            "search calls 404'd (partial query-ID rot or transient). "
+                            "If it persists, refresh `X_SEARCH_QUERY_ID` in private/.env.")
+                elif diag.get("search_other_error_count", 0) > 0:
+                    note = (f"trending=0 — {diag['search_other_error_count']} non-404 search errors. "
+                            "Check stderr / pipeline log for transport / 5xx details.")
+                elif diag.get("raw_tweets_total", 0) == 0:
+                    note = ("trending=0 — endpoint OK but X returned no tweets matching the "
+                            f"AI search queries. Genuinely quiet day on X for this filter. "
+                            f"Cookies fine ({n_p} people came through).")
                 else:
-                    status, note = "warn", "trending=0 (filter or quiet day; cookies fine)"
+                    # raw>0 but kept=0 → per-tweet filter ate everything
+                    note = (f"trending=0 — got {diag['raw_tweets_total']} raw tweets, "
+                            "all rejected by min_likes:50 + AI-relevance filter. "
+                            "Loosen `_TRENDING_MIN_LIKES` if this persists.")
+                note = note + streak_tag
+                status = sev
             else:
-                # Both streams thin → cookies / GraphQL likely broken.
-                if t_streak >= 2:
-                    status, note = "error", f"trending=0 ({t_streak}-day streak) — scrape/cookies broken"
+                # Pre-diagnostics agent build — fall back to old heuristic.
+                if n_p > 0:
+                    note = (f"trending=0{streak_tag} — likes/AI-relevance filter too strict "
+                            f"OR no qualifying posts. Cookies fine ({n_p} people came through).")
                 else:
-                    status, note = "warn", "trending=0 (scrape partial)"
+                    note = f"trending=0{streak_tag} — scrape/cookies broken"
+                status = sev
         else:
             status, note = "ok", ""
         rows.append({"agent": "twitter (X)",

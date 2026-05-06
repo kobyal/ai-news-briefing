@@ -443,9 +443,32 @@ def _parse_search_tweets(data: dict, cutoff_ts: float) -> list[dict]:
     return results
 
 
-def _fetch_trending(auth_token: str, ct0: str, cutoff_ts: float, signer=None) -> list[dict]:
-    all_tweets = []
+def _fetch_trending(auth_token: str, ct0: str, cutoff_ts: float,
+                    signer=None) -> tuple[list[dict], dict]:
+    """Returns (trending_posts, diagnostics).
+
+    `diagnostics` lets the daily email's freshness panel disambiguate why
+    trending might be empty:
+      * signer_ok=False         → x_client_transaction lib not installed
+      * all_404                  → SearchTimeline query ID rotated by X
+      * any_other_error          → transport / 5xx / unhandled
+      * raw_tweets_total=0       → endpoint succeeded but X returned no
+                                   tweets matching the AI search queries
+      * kept_after_filter=0      → the per-tweet filter (min_likes:50 +
+                                   AI-relevance regex) ate everything
+    Sent as `briefing._twitter_diagnostics` in the output JSON.
+    """
+    diag = {
+        "signer_ok": signer is not None,
+        "search_calls": 0,
+        "search_404_count": 0,
+        "search_other_error_count": 0,
+        "raw_tweets_total": 0,
+        "kept_after_filter": 0,
+    }
+    all_tweets: list[dict] = []
     for q in AI_SEARCH_QUERIES:
+        diag["search_calls"] += 1
         try:
             tx_id = _sign_path(signer, "GET", EP_SEARCH)
             data = _gql(EP_SEARCH,
@@ -454,9 +477,15 @@ def _fetch_trending(auth_token: str, ct0: str, cutoff_ts: float, signer=None) ->
                         FEATURES_SEARCH, ct0, auth_token, tx_id=tx_id)
             tweets = _parse_search_tweets(data, cutoff_ts)
             all_tweets.extend(tweets)
+            diag["raw_tweets_total"] += len(tweets)
             print(f"    ✓ search '{q[:50]}' → {len(tweets)} tweets")
         except Exception as e:
-            print(f"    ✗ search error: {str(e)[:60]}")
+            err = str(e)
+            if "404" in err:
+                diag["search_404_count"] += 1
+            else:
+                diag["search_other_error_count"] += 1
+            print(f"    ✗ search error: {err[:60]}")
 
     # Deduplicate by URL, sort by likes
     seen = set()
@@ -466,7 +495,8 @@ def _fetch_trending(auth_token: str, ct0: str, cutoff_ts: float, signer=None) ->
             seen.add(t["url"])
             t.pop("_likes", None)
             unique.append(t)
-    return unique[:10]
+    diag["kept_after_filter"] = len(unique[:10])
+    return unique[:10], diag
 
 
 # ---------------------------------------------------------------------------
@@ -505,7 +535,7 @@ def run_pipeline() -> dict:
     print(f"\n[2/2] Searching viral AI posts...")
     print("  Bootstrapping x-client-transaction-id signer (required for SearchTimeline)...")
     signer = _bootstrap_signer(auth_token, ct0)
-    trending = _fetch_trending(auth_token, ct0, cutoff_ts, signer=signer)
+    trending, twitter_diag = _fetch_trending(auth_token, ct0, cutoff_ts, signer=signer)
     print(f"  → {len(trending)} trending posts")
 
     output = {
@@ -517,6 +547,11 @@ def run_pipeline() -> dict:
             "community_urls":    [],
             "news_items":        [],
             "tldr":              [],
+            # Surfaces "why is trending=0?" in the daily email's freshness
+            # panel — distinguishes stale query ID, missing tx-id signer,
+            # filter eating everything, and genuinely-quiet day. Read by
+            # send_email.py freshness panel.
+            "_twitter_diagnostics": twitter_diag,
         },
     }
 

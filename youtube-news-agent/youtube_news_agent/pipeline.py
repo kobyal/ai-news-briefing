@@ -102,7 +102,73 @@ _MIN_DURATION_SECONDS = 120   # Skip Shorts (< 2 min)
 
 
 def _get_api_key() -> str:
-    return os.environ.get("YOUTUBE_API_KEY", "") or os.environ.get("GOOGLE_API_KEY", "")
+    """First configured key; kept for backward compat. Most call sites
+    should use `_yt_get` below to get automatic fallback rotation."""
+    for var in ("YOUTUBE_API_KEY", "YOUTUBE_API_KEY_2", "YOUTUBE_API_KEY_3",
+                "GOOGLE_API_KEY", "GOOGLE_API_KEY_2"):
+        v = (os.environ.get(var) or "").strip()
+        if v:
+            return v
+    return ""
+
+
+def _yt_keys() -> list[str]:
+    """All configured YouTube Data API keys, in failover order.
+
+    Mirrors Tavily's 3-key rotation pattern. Populate the secondary keys
+    in `private/.env` (kobytestalmog Google account, etc.). On a 403/429
+    from one key, `_yt_get` walks down the list before giving up.
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for var in ("YOUTUBE_API_KEY", "YOUTUBE_API_KEY_2", "YOUTUBE_API_KEY_3",
+                "GOOGLE_API_KEY", "GOOGLE_API_KEY_2"):
+        v = (os.environ.get(var) or "").strip()
+        if v and v not in seen:
+            seen.add(v)
+            out.append(v)
+    return out
+
+
+def _yt_get(url: str, params: dict, timeout: int = 15):
+    """GET a YouTube Data API endpoint, rotating through all configured
+    keys on quota/auth failure (HTTP 403 / 429). Returns the first OK
+    Response, or — if every key fails — the last Response (so call sites
+    keep their existing `if resp.ok` check working).
+
+    Returns None when no keys are configured at all.
+    """
+    keys = _yt_keys()
+    if not keys:
+        return None
+    last = None
+    for i, key in enumerate(keys):
+        p = dict(params, key=key)
+        try:
+            r = requests.get(url, params=p, timeout=timeout)
+        except Exception as e:
+            print(f"  YT key #{i+1} request error: {e}")
+            continue
+        last = r
+        if r.ok:
+            if i > 0:
+                # Surface the rotation in the daily email's fallback panel
+                # so a primary-key quota burn doesn't go unnoticed.
+                try:
+                    from shared.fallback_tracker import track
+                    track("youtube-news-agent",
+                          f"YOUTUBE_API_KEY (#{1})",
+                          f"key#{i+1}",
+                          f"primary returned {last.status_code if i==0 else 'transport error'}")
+                except Exception:
+                    pass
+            return r
+        if r.status_code in (403, 429):
+            print(f"  YT key #{i+1} got HTTP {r.status_code} — trying next key")
+            continue
+        # Other status (4xx, 5xx, etc.) — don't burn another key
+        return r
+    return last
 
 
 def _format_date(raw: str) -> str:
@@ -201,12 +267,12 @@ def _fetch_channel_latest_uploads(api_key: str) -> list[dict]:
     out = []
     for channel_name, uploads_playlist in AI_CHANNELS.items():
         try:
-            resp = requests.get(
+            resp = _yt_get(
                 "https://www.googleapis.com/youtube/v3/playlistItems",
-                params={"part": "snippet", "playlistId": uploads_playlist, "maxResults": 1, "key": api_key},
+                params={"part": "snippet", "playlistId": uploads_playlist, "maxResults": 1},
                 timeout=10,
             )
-            if not resp.ok:
+            if resp is None or not resp.ok:
                 continue
             items = resp.json().get("items", [])
             if not items:
@@ -237,17 +303,16 @@ def _fetch_channel_videos(api_key: str) -> list[dict]:
 
     for channel_name, uploads_playlist in AI_CHANNELS.items():
         try:
-            resp = requests.get(
+            resp = _yt_get(
                 "https://www.googleapis.com/youtube/v3/playlistItems",
                 params={
                     "part": "snippet",
                     "playlistId": uploads_playlist,
                     "maxResults": 5,
-                    "key": api_key,
                 },
                 timeout=10,
             )
-            if not resp.ok:
+            if resp is None or not resp.ok:
                 continue
 
             for item in resp.json().get("items", []):
@@ -303,7 +368,7 @@ def _search_videos(api_key: str) -> dict:
 
     for query in SEARCH_QUERIES:
         try:
-            resp = requests.get(
+            resp = _yt_get(
                 "https://www.googleapis.com/youtube/v3/search",
                 params={
                     "part": "snippet",
@@ -314,15 +379,15 @@ def _search_videos(api_key: str) -> dict:
                     "maxResults": 5,
                     "relevanceLanguage": "en",
                     "videoDuration": "medium",  # 4-20 min (skip Shorts)
-                    "key": api_key,
                 },
                 timeout=15,
             )
-            if not resp.ok:
-                error_msg = resp.text[:200]
-                print(f"  Search error {resp.status_code} for '{query[:30]}': {error_msg}")
-                if resp.status_code == 403:
-                    return videos
+            if resp is None or not resp.ok:
+                if resp is not None:
+                    print(f"  Search error {resp.status_code} for '{query[:30]}': {resp.text[:200]}")
+                    if resp.status_code == 403:
+                        # All keys exhausted on 403 — stop searching to avoid burning more
+                        return videos
                 continue
 
             for item in resp.json().get("items", []):
@@ -369,16 +434,15 @@ def _enrich_and_filter(api_key: str, videos: dict) -> list[dict]:
     for i in range(0, len(vid_ids), 50):
         batch = vid_ids[i:i+50]
         try:
-            resp = requests.get(
+            resp = _yt_get(
                 "https://www.googleapis.com/youtube/v3/videos",
                 params={
                     "part": "statistics,contentDetails",
                     "id": ",".join(batch),
-                    "key": api_key,
                 },
                 timeout=15,
             )
-            if resp.ok:
+            if resp is not None and resp.ok:
                 for item in resp.json().get("items", []):
                     vid_id = item["id"]
                     if vid_id in videos:

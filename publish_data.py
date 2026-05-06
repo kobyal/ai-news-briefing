@@ -837,17 +837,40 @@ def _video_url(v: dict) -> str:
     return str(urls[0]) if urls else ""
 
 
+def _yt_keys() -> list[str]:
+    """All configured YouTube Data API keys, in failover order.
+
+    Mirrors Tavily's 3-key rotation (and youtube-news-agent/pipeline.py).
+    Populate the secondary slots in private/.env (kobytestalmog Google
+    account, etc.) — primary 403/429 falls through to the next."""
+    seen: set = set()
+    out: list[str] = []
+    for var in ("YOUTUBE_API_KEY", "YOUTUBE_API_KEY_2", "YOUTUBE_API_KEY_3",
+                "GOOGLE_API_KEY", "GOOGLE_API_KEY_2"):
+        v = (os.environ.get(var) or "").strip()
+        if v and v not in seen:
+            seen.add(v)
+            out.append(v)
+    return out
+
+
 def _yt_search(api_key: str, query: str, max_results: int = 3, lookback_days: int = 14) -> list[dict]:
     """One YouTube Data API v3 search.list call. Returns news_item-shaped videos.
 
     100 quota units per call. Filters to videos uploaded in the last N days,
     medium duration (~4-20 min) to skip Shorts and very long uploads.
+
+    The `api_key` arg is kept for backward-compat callers but ignored —
+    we use `_yt_keys()` now and rotate through ALL configured keys on
+    403/429 before giving up. The first OK response wins.
     """
     if not query.strip():
         return []
+    keys = _yt_keys()
+    if not keys:
+        return []
     published_after = (datetime.utcnow() - timedelta(days=lookback_days)).strftime("%Y-%m-%dT00:00:00Z")
-    params = {
-        "key": api_key,
+    base_params = {
         "part": "snippet",
         "q": query.strip()[:80],
         "type": "video",
@@ -856,12 +879,35 @@ def _yt_search(api_key: str, query: str, max_results: int = 3, lookback_days: in
         "publishedAfter": published_after,
         "videoDuration": "medium",
     }
-    url = "https://www.googleapis.com/youtube/v3/search?" + urllib.parse.urlencode(params)
-    try:
-        with urllib.request.urlopen(url, timeout=30) as r:
-            data = json.loads(r.read())
-    except Exception as e:
-        print(f"  YT search '{query[:40]}' failed: {e}")
+    data = None
+    last_err = None
+    for i, key in enumerate(keys):
+        params = dict(base_params, key=key)
+        url = "https://www.googleapis.com/youtube/v3/search?" + urllib.parse.urlencode(params)
+        try:
+            with urllib.request.urlopen(url, timeout=30) as r:
+                data = json.loads(r.read())
+            if i > 0:
+                # Surface the rotation in the daily email's fallback panel.
+                try:
+                    from shared.fallback_tracker import track
+                    track("publish_data.yt_search", "key#1", f"key#{i+1}",
+                          "primary 403/429 fell through")
+                except Exception:
+                    pass
+            break
+        except urllib.error.HTTPError as e:
+            last_err = e
+            if e.code in (403, 429) and i < len(keys) - 1:
+                print(f"  YT search '{query[:40]}' key #{i+1} got {e.code} — trying next key")
+                continue
+            print(f"  YT search '{query[:40]}' failed (HTTP {e.code}): {e.reason}")
+            return []
+        except Exception as e:
+            last_err = e
+            print(f"  YT search '{query[:40]}' transport error on key #{i+1}: {e}")
+            continue
+    if data is None:
         return []
     out = []
     for item in data.get("items", []):

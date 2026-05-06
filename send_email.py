@@ -749,10 +749,28 @@ def _collect_agent_delivery() -> list[dict]:
             status, note = "error", "0 people — refresh TWITTER_AUTH_TOKEN/CT0 from x.com"
         elif n_t == 0:
             t_streak = _zero_streak("twitter-agent", ["briefing", "trending_posts"])
-            if t_streak >= 2:
-                status, note = "error", f"trending=0 ({t_streak}-day streak — scrape broken)"
+            # Scrape vs filter disambiguation: cookies/scrape are evidently
+            # working when people_highlights came through with non-empty
+            # handles. trending=0 in that case is the post-fetch filter
+            # (min_likes=50 + AI-relevance regex) eating everything — not
+            # a broken scrape. Calling that "scrape broken" sent the user
+            # chasing cookies that didn't need refreshing (2026-05-06).
+            if n_p > 0:
+                # People stream healthy → filter or genuinely-quiet day.
+                if t_streak >= 2:
+                    status, note = "error", (
+                        f"trending=0 ({t_streak}-day streak) — likes/AI-relevance "
+                        "filter too strict OR no qualifying posts. Cookies fine "
+                        f"({n_p} people came through)."
+                    )
+                else:
+                    status, note = "warn", "trending=0 (filter or quiet day; cookies fine)"
             else:
-                status, note = "warn", "trending=0 (scrape partial)"
+                # Both streams thin → cookies / GraphQL likely broken.
+                if t_streak >= 2:
+                    status, note = "error", f"trending=0 ({t_streak}-day streak) — scrape/cookies broken"
+                else:
+                    status, note = "warn", "trending=0 (scrape partial)"
         else:
             status, note = "ok", ""
         rows.append({"agent": "twitter (X)",

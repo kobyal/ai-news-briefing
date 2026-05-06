@@ -75,6 +75,11 @@ FEATURES_SEARCH = {
     "c9s_tweet_anatomy_moderator_badge_enabled": True,
     "responsive_web_grok_analyze_button_fetch_trends_enabled": False,
     "responsive_web_grok_analyze_post_followups_enabled": True,
+    # Added 2026-05-06 — captured from a live x.com search request. X rejects
+    # the GraphQL call with HTTP 400 if a feature flag in the picker isn't
+    # supplied, so this list has to track whatever the web client currently
+    # sends. Worth re-grabbing whenever SearchTimeline starts 400/404-ing.
+    "rweb_cashtags_composer_attachment_enabled": False,
     "responsive_web_jetfuel_frame": True,
     "responsive_web_grok_share_attachment_enabled": True,
     "responsive_web_grok_annotations_enabled": True,
@@ -100,10 +105,29 @@ FEATURES_SEARCH = {
     "responsive_web_enhance_cards_enabled": False,
 }
 
-# GraphQL endpoint IDs (stable, but may need updating if X rotates them)
-EP_USER_BY_SCREEN_NAME = "https://x.com/i/api/graphql/NimuplG1OB7Fd2btCLdBOw/UserByScreenName"
-EP_USER_TWEETS         = "https://x.com/i/api/graphql/QWF3SzpHmykQHsQMixG0cg/UserTweets"
-EP_SEARCH              = "https://x.com/i/api/graphql/XN_HccZ9SU-miQVvwTAlFQ/SearchTimeline"
+# GraphQL endpoint query IDs. X rotates these with every web-bundle deploy
+# (typically every few weeks); a stale ID 404s, breaking the corresponding
+# fetch. The defaults below were captured from a live x.com session on
+# 2026-05-06; override via env vars in `private/.env` next time something
+# starts 404-ing — much faster than a code edit + commit + push:
+#
+#     X_USER_BY_SCREEN_NAME_QUERY_ID=...
+#     X_USER_TWEETS_QUERY_ID=...
+#     X_SEARCH_QUERY_ID=...
+#
+# To grab a fresh ID: open x.com logged in → DevTools Network tab → trigger
+# the matching action (search a real query / view a profile) → look for
+# `/graphql/<22-char-hash>/<OperationName>` in the request URL.
+_X_USER_BY_SCREEN_NAME_QUERY_ID = (os.environ.get("X_USER_BY_SCREEN_NAME_QUERY_ID")
+                                   or "NimuplG1OB7Fd2btCLdBOw")
+_X_USER_TWEETS_QUERY_ID         = (os.environ.get("X_USER_TWEETS_QUERY_ID")
+                                   or "QWF3SzpHmykQHsQMixG0cg")
+_X_SEARCH_QUERY_ID              = (os.environ.get("X_SEARCH_QUERY_ID")
+                                   or "xrS3h-srT2mQT-g3lKsUjA")
+
+EP_USER_BY_SCREEN_NAME = f"https://x.com/i/api/graphql/{_X_USER_BY_SCREEN_NAME_QUERY_ID}/UserByScreenName"
+EP_USER_TWEETS         = f"https://x.com/i/api/graphql/{_X_USER_TWEETS_QUERY_ID}/UserTweets"
+EP_SEARCH              = f"https://x.com/i/api/graphql/{_X_SEARCH_QUERY_ID}/SearchTimeline"
 
 TRACKED_HANDLES = [
     # ── OpenAI ────────────────────────────────────────────────────────────────
@@ -426,7 +450,7 @@ def _fetch_trending(auth_token: str, ct0: str, cutoff_ts: float, signer=None) ->
             tx_id = _sign_path(signer, "GET", EP_SEARCH)
             data = _gql(EP_SEARCH,
                         {"rawQuery": q, "count": 20, "querySource": "typed_query",
-                         "product": "Latest", "withGrokTranslatedBio": True},
+                         "product": "Latest", "withGrokTranslatedBio": False},
                         FEATURES_SEARCH, ct0, auth_token, tx_id=tx_id)
             tweets = _parse_search_tweets(data, cutoff_ts)
             all_tweets.extend(tweets)

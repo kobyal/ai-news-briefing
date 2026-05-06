@@ -115,21 +115,19 @@ def _get_api_key() -> str:
 def _yt_keys() -> list[str]:
     """All configured YouTube Data API keys, in failover order.
 
-    Mirrors Tavily's 3-key rotation pattern. Populate the secondary keys
-    in `private/.env` (kobytestalmog Google account, etc.). On a 403/429
-    from one key, `_yt_get` walks down the list before giving up.
+    Strict separation of concerns by request: YouTube uses YOUTUBE_API_KEY*
+    only, ADK / Gemini uses GOOGLE_API_KEY*. Empirically (2026-05-06) each
+    Google API key is locked to a SINGLE service via the per-key
+    "API restrictions" picker, so cross-pool fallback always 403s anyway.
 
-    Both KEY2 and KEY_2 forms are accepted — first hit wins. (The repo's
-    env file uses the no-underscore form; the underscore form is kept for
-    forward compatibility with anyone who reads this code first.)
+    Both KEY2 and KEY_2 forms are accepted (env file uses no-underscore;
+    underscore variant kept for forward compat).
     """
     seen: set[str] = set()
     out: list[str] = []
     for var in ("YOUTUBE_API_KEY",
                 "YOUTUBE_API_KEY2", "YOUTUBE_API_KEY_2",
-                "YOUTUBE_API_KEY3", "YOUTUBE_API_KEY_3",
-                "GOOGLE_API_KEY",
-                "GOOGLE_API_KEY2", "GOOGLE_API_KEY_2"):
+                "YOUTUBE_API_KEY3", "YOUTUBE_API_KEY_3"):
         v = (os.environ.get(var) or "").strip()
         if v and v not in seen:
             seen.add(v)

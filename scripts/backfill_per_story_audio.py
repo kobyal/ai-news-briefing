@@ -172,6 +172,43 @@ def backfill_date(date: str, dry_run: bool, skip_existing: bool) -> dict:
             # Print per-story progress so a long backfill doesn't look stuck
             print(f"  story {sid}: gen={generated} skip={skipped} fail={failed}")
 
+        # ── TLDR audio for the date (one EN + one HE per date, not per story) ──
+        # api.ts reads tldr_audio_url from the freshest story's row, so we stamp
+        # the URL on every story to be safe (whichever one s0 ends up being will
+        # have it). The TLDR text itself is the same across rows (frozen at ingest).
+        s0 = stories[0]
+        tldr_en = "\n\n".join(s0.get("tldr") or [])
+        tldr_he = "\n\n".join(s0.get("tldr_he") or [])
+        tldr_specs = [
+            ("tldr_audio_url",    "tldr_en.mp3", VOICE_EN, tldr_en),
+            ("tldr_audio_url_he", "tldr_he.mp3", VOICE_HE, tldr_he),
+        ]
+        for field, fname, voice, text in tldr_specs:
+            if not text:
+                continue
+            url = f"{PUBLIC_BASE}/audio/{date}/{fname}"
+            # If every story already has a non-empty value, skip.
+            if all(s.get(field) for s in stories):
+                skipped += 1
+                continue
+            if dry_run:
+                print(f"  [DRY] would generate {fname}")
+                generated += 1
+                # Still stamp on stories that lack it
+                for s in stories:
+                    if not s.get(field):
+                        s[field] = url
+                continue
+            local_mp3 = audio_dir / fname
+            if synth_one(text, voice, local_mp3):
+                upload_s3_mp3(date, local_mp3)
+                # Stamp on every story so api.ts's s0-pick always finds it
+                for s in stories:
+                    s[field] = url
+                generated += 1
+            else:
+                failed += 1
+
         if not dry_run and generated > 0:
             json_local.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
             upload_s3_json(date, json_local)

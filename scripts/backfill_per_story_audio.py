@@ -181,17 +181,17 @@ def backfill_date(date: str, dry_run: bool, skip_existing: bool) -> dict:
 
 
 def invalidate_cloudfront(dates: list[str]) -> None:
-    """Invalidate /data/<date>.json + the audio prefix for each touched date."""
-    paths = []
-    for d in dates:
-        paths.append(f"/data/{d}.json")
-        paths.append(f"/audio/{d}/*")
-    if not paths:
+    """Invalidate the data + audio prefixes once. Uses 2 broad wildcards to stay
+    under CloudFront's 15-in-progress cap for wildcard invalidations — issuing
+    a per-date `/audio/<d>/*` for each date hits TooManyInvalidationsInProgress
+    on backfills > ~7 dates."""
+    if not dates:
         return
+    paths = ["/audio/*", "/data/*.json"]
     res = aws("cloudfront", "create-invalidation",
               "--distribution-id", CF_DIST,
               "--paths", *paths)
-    print(f"\nCloudFront invalidation queued for {len(paths)} paths.")
+    print(f"\nCloudFront invalidation queued: {paths} (covers {len(dates)} touched dates).")
     if res.returncode != 0:
         print("  (invalidation error)", res.stderr.strip())
 

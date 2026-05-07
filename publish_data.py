@@ -1342,6 +1342,24 @@ if _generate_tldr_audio(_tldr_he_text, _TLDR_VOICE_HE, _audio_dir / "tldr_he.mp3
 # Both prefix the headline before the body. story_id is sha256(primary URL)[:12]
 # — same derivation handler.py uses, so DDB rows + GH Pages JSON share keys.
 # Idempotent: re-runs skip MP3s that already exist with non-zero bytes.
+#
+# The merger keeps HE in parallel arrays (briefing_he.headlines_he[i] etc.) and
+# only the lambda merges them onto each news_item. Stamp the HE fields onto the
+# items here so _generate_per_story_audio can synthesize all 4 MP3s — without
+# this, the 2 HE flavours silently no-op'd (publish_data.yt_search.headline_he
+# was empty at gen time even though the published JSON would have HE later).
+_briefing_he_for_audio = merger.get("briefing_he", {}) or {}
+_headlines_he = _briefing_he_for_audio.get("headlines_he") or []
+_summaries_he = _briefing_he_for_audio.get("summaries_he") or []
+_details_he   = _briefing_he_for_audio.get("details_he") or []
+for _i, _item in enumerate(_news_items):
+    if _i < len(_headlines_he) and not _item.get("headline_he"):
+        _item["headline_he"] = _headlines_he[_i]
+    if _i < len(_summaries_he) and not _item.get("summary_he"):
+        _item["summary_he"] = _summaries_he[_i]
+    if _i < len(_details_he) and not _item.get("detail_he"):
+        _item["detail_he"] = _details_he[_i]
+
 _audio_stats = _generate_per_story_audio(
     _news_items, _audio_dir, date_str,
     _TLDR_VOICE_EN, _TLDR_VOICE_HE, _GH_PAGES_BASE, _story_id_hash,

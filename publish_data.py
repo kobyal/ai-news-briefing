@@ -271,6 +271,197 @@ _VENDOR_KEYWORDS = {
     "spacex": "SpaceX",
 }
 _briefing = merger.get("briefing", {})
+
+
+# ── A: Same-day union (cycle re-run on a date that already has published data) ──
+# When local-cycle.sh runs a second time on the same day, the merger picks
+# ~20 fresh stories — but the choice can shift dramatically between runs (on
+# 2026-05-05 evening, only 5/19 overlap with morning; 14 important stories
+# would have been lost without union). This block detects same-day re-runs
+# and unions the new merger output with the previously-published JSON before
+# the rest of publish_data sees _news_items.
+#
+# Match rule: jaccard(headline) >= 0.4 OR shared canonical URL.
+# On match, NEW (current run) wins.
+# Re-rank: source_count desc, has_og_image, detail length desc.
+# HE arrays kept aligned via per-item stamping → re-derived after sort.
+def _same_day_union(_merger: dict, _date: str) -> dict:
+    existing_path = os.path.join("docs", "data", f"{_date}.json")
+    if not os.path.exists(existing_path):
+        return {"detected": False}
+    try:
+        with open(existing_path, encoding="utf-8") as _f:
+            existing = json.load(_f)
+    except Exception as _e:
+        print(f"  Same-day check: couldn't read {existing_path}: {_e}")
+        return {"detected": False}
+
+    morning_items = (existing.get("briefing") or {}).get("news_items") or []
+    if not morning_items:
+        return {"detected": False}
+    morning_he = existing.get("briefing_he") or {}
+    new_briefing = _merger.get("briefing") or {}
+    new_items = new_briefing.get("news_items") or []
+    new_he = _merger.get("briefing_he") or {}
+
+    def _stamp_he(items, he_obj):
+        for _i, _it in enumerate(items):
+            for _src, _dst in (("headlines_he","headline_he"),("summaries_he","summary_he"),("details_he","detail_he")):
+                _arr = he_obj.get(_src) or []
+                if _i < len(_arr) and _arr[_i] and not _it.get(_dst):
+                    _it[_dst] = _arr[_i]
+    _stamp_he(morning_items, morning_he)
+    _stamp_he(new_items, new_he)
+
+    _word_re = re.compile(r"[a-z0-9]+")
+    def _words(s): return set(_word_re.findall((s or "").lower()))
+    def _jacc(a, b):
+        wa, wb = _words(a), _words(b)
+        return (len(wa & wb) / len(wa | wb)) if (wa and wb) else 0.0
+    def _canon(u):
+        if not u: return ""
+        _p = urllib.parse.urlsplit(u.strip())
+        _host = (_p.netloc or "").lower().removeprefix("www.")
+        _path = (_p.path or "/").rstrip("/")
+        return f"{_host}{_path}"
+    def _all_urls(it):
+        urls = list(it.get("urls") or [])
+        for _s in (it.get("sources") or []):
+            if isinstance(_s, dict) and _s.get("url"):
+                urls.append(_s["url"])
+        return {_canon(u) for u in urls if u}
+    def _matches(a, b):
+        if _jacc(a.get("headline",""), b.get("headline","")) >= 0.4: return True
+        return bool(_all_urls(a) & _all_urls(b))
+
+    _matched_morning = set()
+    for _mi, _m in enumerate(morning_items):
+        for _n in new_items:
+            if _matches(_m, _n):
+                _matched_morning.add(_mi)
+                break
+    morning_only = [morning_items[_i] for _i in range(len(morning_items)) if _i not in _matched_morning]
+    _unioned = list(new_items) + morning_only
+
+    # Drop dupe story_ids (same urls[0] → same sha256)
+    def _sid(it):
+        _urls = it.get("urls") or []
+        _primary = _urls[0] if _urls else (it.get("headline","") or "")
+        return hashlib.sha256(_primary.encode()).hexdigest()[:12]
+    _seen, _dedup = set(), []
+    for _it in _unioned:
+        _id = _sid(_it)
+        if _id in _seen: continue
+        _seen.add(_id); _dedup.append(_it)
+    _dropped_sid = len(_unioned) - len(_dedup)
+
+    # Re-rank: source_count desc, has_og_image, detail length desc
+    def _rank(it):
+        return (-(len(it.get("urls") or [])),
+                0 if it.get("og_image") else 1,
+                -(len(it.get("detail") or "")))
+    _dedup.sort(key=_rank)
+
+    new_briefing["news_items"] = _dedup
+    if "briefing_he" not in _merger or not _merger["briefing_he"]:
+        _merger["briefing_he"] = {}
+    _merger["briefing_he"]["headlines_he"] = [it.get("headline_he","") for it in _dedup]
+    _merger["briefing_he"]["summaries_he"] = [it.get("summary_he","") for it in _dedup]
+    _merger["briefing_he"]["details_he"]   = [it.get("detail_he","")   for it in _dedup]
+
+    print(f"Same-day union: morning={len(morning_items)} + new={len(new_items)}, "
+          f"overlap={len(_matched_morning)}, morning-only={len(morning_only)} "
+          f"→ unioned {len(_dedup)} (dropped {_dropped_sid} dupe story_ids)")
+    return {"detected": True,
+            "morning": len(morning_items), "new": len(new_items),
+            "overlap": len(_matched_morning), "morning_only": len(morning_only),
+            "unioned": len(_dedup), "dropped_sid": _dropped_sid}
+
+
+_union_stats = _same_day_union(merger, date_str)
+
+
+# ── B: TLDR regen over the unioned set ───────────────────────────────────────
+# When same-day union triggered, the merger's TLDR is scoped to its 20 stories
+# only — morning-only stories (carried forward by union) get no TLDR coverage.
+# Regenerate via claude -p (subscription, Opus 4.7) over the full unioned set.
+def _regen_tldr_over_union(_merger: dict) -> bool:
+    try:
+        import subprocess as _subp
+    except ImportError:
+        return False
+    _briefing_local = _merger.get("briefing") or {}
+    _items = _briefing_local.get("news_items") or []
+    if not _items:
+        return False
+    _lines = []
+    for _i, _it in enumerate(_items, 1):
+        _n = len(_it.get("urls") or [])
+        _hl = _it.get("headline","")
+        _sm = (_it.get("summary","") or "")[:300]
+        _lines.append(f"{_i:2d}. [{_n}srcs] {_hl}\n    {_sm}")
+    _block = "\n\n".join(_lines)
+    _prompt = (
+        f"You are the editor of a daily AI news briefing. Below are {len(_items)} "
+        "stories from today (already de-duplicated and ranked by source-count). "
+        "Write a 10-bullet TL;DR that captures the most important happenings.\n\n"
+        "Hard rules:\n"
+        "- EXACTLY 10 bullets, each 1-2 sentences, prefixed with \"• \".\n"
+        "- Cover the day holistically — mix multi-source headline stories with "
+        "notable single-source ones if genuinely important (vendor flagship release, "
+        "regulatory ruling, novel research).\n"
+        "- Each bullet self-contained: vendor + the specific number/fact that makes "
+        "the story matter (compute scale, model size, $ amount, % gain, etc.).\n"
+        "- No filler (\"interesting move\", \"notable development\"). Lead with the WHAT.\n"
+        "- One story per bullet — don't pack multiple.\n"
+        "- Source-count ranking is a hint, not a hard ordering.\n\n"
+        "Output: ONLY the 10 bullets, one per line, prefixed with \"• \". Nothing else.\n\n"
+        f"Today's stories:\n\n{_block}\n"
+    )
+    print(f"  Regenerating TLDR over unioned {len(_items)} stories via claude -p...")
+    try:
+        _res = _subp.run(
+            ["claude", "-p", "--model", os.environ.get("MERGER_CC_MODEL", "claude-opus-4-7"), _prompt],
+            capture_output=True, text=True, check=False, timeout=180,
+        )
+        if _res.returncode != 0:
+            print(f"  TLDR regen failed (rc={_res.returncode}): {_res.stderr[:300]}")
+            return False
+        _out = _res.stdout.strip()
+    except Exception as _e:
+        print(f"  TLDR regen exception: {_e}")
+        return False
+
+    _bullets = []
+    for _line in _out.splitlines():
+        _line = _line.strip()
+        if _line.startswith(("•","-","*")):
+            _b = _line.lstrip("•-* ").strip()
+            if _b: _bullets.append(_b)
+    if len(_bullets) < 8:
+        print(f"  TLDR regen got {len(_bullets)} bullets (expected 10), keeping original")
+        return False
+
+    # Translate to HE via DeepL (same key as elsewhere in script)
+    _deepl = os.environ.get("DEEPL_API_KEY", "")
+    if _deepl:
+        _bullets_he = _translate_deepl(_bullets, _deepl)
+    else:
+        print("  TLDR regen: no DEEPL_API_KEY — keeping previous HE TLDR (will be misaligned)")
+        _bullets_he = (_merger.get("briefing_he") or {}).get("tldr_he") or [""] * len(_bullets)
+
+    _briefing_local["tldr"] = _bullets
+    if "briefing_he" not in _merger:
+        _merger["briefing_he"] = {}
+    _merger["briefing_he"]["tldr_he"] = _bullets_he
+    print(f"  TLDR regen: {len(_bullets)} EN + {sum(1 for b in _bullets_he if b)} HE bullets")
+    return True
+
+
+if _union_stats.get("detected"):
+    _regen_tldr_over_union(merger)
+
+
 _news_items = _briefing.get("news_items", [])
 _fixed = 0
 _secondary_added = 0
@@ -913,6 +1104,89 @@ try:
         print(f"  Image fallback: {_fb_count} stories filled from vendor stock pool / Unsplash")
 except Exception as _e:
     print(f"  Image fallback skipped: {_e}")
+
+
+# ── 5th-tier og_image recovery: Tavily search → article og:image ──────────────
+# When the 4-step chain (og→twitter→content-img→Wikipedia/Unsplash) leaves a
+# story null, the source URLs were bad for og:image (YouTube videos, Hacker
+# News threads, content-farm aggregators). Search the web for the headline,
+# fetch top news article results, extract og:image, vision-validate. Mirrors
+# what scripts/fix_today_images.py does, but built into the cycle.
+# Skip .avif candidates — lambda's CDN ingest doesn't transcode them and
+# they show as broken on live (2026-05-07 thenextweb.com Anthropic.avif case).
+def _tavily_og_for_story(item: dict, api_key: str) -> str | None:
+    if not api_key:
+        return None
+    headline = (item.get("headline") or "").strip()
+    vendor = (item.get("vendor") or "").strip()
+    if not headline:
+        return None
+    query = (f"{vendor} {headline}" if vendor else headline)[:200]
+    try:
+        body = json.dumps({
+            "api_key": api_key,
+            "query": query,
+            "max_results": 5,
+            "search_depth": "basic",
+        }).encode("utf-8")
+        req = urllib.request.Request("https://api.tavily.com/search", data=body, method="POST",
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            tav = json.loads(r.read())
+    except Exception as e:
+        print(f"  Tavily og search failed: {e}")
+        return None
+
+    # Same skip-list as zero-URL recovery: news article required, not video/social/HN/aggregator.
+    _SKIP = (
+        "youtube.com", "youtu.be", "twitter.com", "x.com", "facebook.com",
+        "instagram.com", "tiktok.com", "linkedin.com", "pinterest.com",
+        "reddit.com", "news.ycombinator.com", "ground.news",
+    )
+    try:
+        from shared.image_fallback import is_logo_or_generic as _vision_judge
+    except Exception:
+        def _vision_judge(url, hl, v): return None
+
+    _LOGO_HINTS = ("logo", "favicon", "icon-", "avatar", "/sprites/", "wordmark")
+
+    for hit in tav.get("results", []):
+        url = hit.get("url") or ""
+        if not url.startswith("http"):
+            continue
+        if any(d in url.lower() for d in _SKIP):
+            continue
+        html, _title = _fetch_page(url)
+        if not html:
+            continue
+        og = _extract_og_image(html)
+        if not og or not og.startswith("http"):
+            continue
+        og_l = og.lower()
+        # Skip AVIF (lambda CDN doesn't transcode) + obvious logos
+        if og_l.endswith(".avif") or ".avif?" in og_l:
+            continue
+        if any(h in og_l for h in _LOGO_HINTS):
+            continue
+        verdict = _vision_judge(og, headline, vendor)
+        if verdict is True:  # vision says it's a logo — skip
+            continue
+        return og  # False (real photo) or None (uncertain — ship it)
+    return None
+
+
+_tavily_og_count = 0
+if _tavily_key:
+    for item in _news_items:
+        if item.get("og_image") and str(item["og_image"]).startswith("http"):
+            continue
+        url = _tavily_og_for_story(item, _tavily_key)
+        if url:
+            item["og_image"] = url
+            _tavily_og_count += 1
+            print(f"  ↻ Tavily og_image: '{(item.get('headline') or '')[:50]}' → {url[:60]}")
+if _tavily_og_count:
+    print(f"  Tavily og recovery: {_tavily_og_count} stories rescued via headline search")
 
 
 # ── LLM-judged story-explainer pairing ────────────────────────────────────────

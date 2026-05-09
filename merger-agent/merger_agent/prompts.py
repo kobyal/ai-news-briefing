@@ -203,7 +203,9 @@ Produce ONE merged briefing as a JSON object. Rules:
        (d) Skeptical takes / caveats from the sources, OR what readers should watch next.
      This is the "full article" view — your reader should understand the story fully without
      clicking through. Use FULL ARTICLE CONTENT above for facts the summary omits.
-     Don't pad. If a story genuinely warrants only 250 words, write 250 — but most do warrant 300+.
+     Aim for 350+ words. If you find yourself under 300, you're missing depth — go back and add
+     competitive context, skeptical takes, or technical specifics from the sources. Don't fluff or
+     repeat yourself, but don't ship a thin body either: under 300 words means the story is incomplete.
    - urls: 1-4 deduplicated source URLs. MUST be copied verbatim from the sources above — do NOT invent, guess,
      or construct URLs. Do NOT substitute a vendor's official blog URL if the sources lacked one.
      Only include URLs that CLEARLY reference THIS specific story (headline/summary must match the URL's topic).

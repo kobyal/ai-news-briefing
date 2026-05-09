@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Community Redesign — Full Mockup (X / Reddit / Pulse)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-base: #f7f7fb;
+    --text-primary: #0f0f1a;
+    --text-body: #3d3d5a;
+    --text-muted: #9a9ab8;
+    --card-border: #ededf5;
+    --font-display: "Heebo", "Inter", system-ui, sans-serif;
+    --font-body: "Heebo", "Inter", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg-base);
+    font-family: var(--font-body);
+    color: var(--text-primary);
+    padding: 32px 16px 64px;
+  }
+  .page { max-width: 720px; margin: 0 auto; }
+
+  .page-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    margin: 0 0 6px;
+  }
+  .page-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0 0 24px;
+  }
+
+  .changelog {
+    background: #fff;
+    border: 1px dashed #c7c7d6;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    font-size: 13px;
+    line-height: 1.65;
+    color: #3d3d5a;
+  }
+  .changelog h3 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #9a9ab8;
+  }
+  .changelog ul { margin: 0 0 8px; padding-inline-start: 20px; }
+  .changelog li { margin: 2px 0; }
+  .changelog code {
+    background: #f4f4f8;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  /* ---------- Shared Card System ---------- */
+  .card {
+    background: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+    margin-bottom: 24px;
+  }
+  /* Per-section card border tint (very subtle, not bombastic) */
+  .card.x      { border: 1px solid #e0e0e8; }
+  .card.reddit { border: 1px solid #fbe1d0; }
+  .card.pulse  { border: 1px solid #d9e2f7; }
+
+  .accent-bar { height: 3px; }
+  .accent-bar.x      { background: #000000; }
+  .accent-bar.reddit { background: #ff4500; }
+  .accent-bar.pulse  { background: #2563eb; }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  /* Per-section header background tint — subtle */
+  .card-header.x      { background: #f8f8fa; }
+  .card-header.reddit { background: #fff7f2; }
+  .card-header.pulse  { background: #f4f7ff; }
+
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .header-title-block { display: flex; flex-direction: column; gap: 2px; }
+  .card-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f0f1a;
+    margin: 0;
+  }
+  .card-subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  .count-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 999px;
+  }
+  .count-badge.x      { color: #1a1a1a; background: rgba(0,0,0,0.06);     border: 1px solid rgba(0,0,0,0.1); }
+  .count-badge.reddit { color: #b91c1c; background: rgba(255,69,0,0.08);  border: 1px solid rgba(255,69,0,0.2); }
+  .count-badge.pulse  { color: #1d4ed8; background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.2); }
+
+  /* Section icons */
+  .section-icon {
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .section-icon.x {
+    width: 28px; height: 28px;
+    background: #000; color: #fff; font-size: 16px;
+  }
+  .section-icon.reddit {
+    width: 36px; height: 36px;
+    background: #ff4500; color: #fff; font-size: 22px;
+    border-radius: 10px;
+  }
+  .section-icon.pulse {
+    width: 28px; height: 28px;
+    background: #2563eb; color: #fff; font-size: 14px;
+  }
+
+  /* Item base */
+  .item {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .item:last-child { border-bottom: none; }
+
+  .item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .author-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f0f1a;
+  }
+  .author-handle {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: ui-monospace, monospace;
+  }
+  .dot-sep { color: #d0d0e0; font-size: 8px; }
+  .post-date { font-size: 10px; color: var(--text-muted); }
+
+  /* Post body */
+  .post-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-body);
+    margin: 0 0 8px;
+    direction: rtl;
+    text-align: right;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    overflow: hidden;
+  }
+  .post-headline {
+    font-size: 14.5px;
+    font-weight: 700;
+    line-height: 1.45;
+    color: #0f0f1a;
+    margin: 0 0 6px;
+    direction: rtl;
+    text-align: right;
+  }
+  .post-snippet {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text-body);
+    margin: 0 0 8px;
+    direction: rtl;
+    text-align: right;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .item-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .engagement-chip {
+    font-size: 10px;
+    font-weight: 600;
+    color: #6b6b8a;
+    background: #f4f4f8;
+    border: 1px solid #e0e0ec;
+    padding: 3px 10px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .topic-chip {
+    font-size: 9px;
+    font-weight: 700;
+    color: #b45309;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .source-domain {
+    font-size: 10px;
+    font-weight: 600;
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-family: ui-monospace, monospace;
+  }
+
+  .source-pill {
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-inline-start: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .source-pill.following {
+    color: #4f46e5;
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.25);
+  }
+  .source-pill.trending {
+    color: #fff;
+    background: #0f0f1a;
+    border: 1px solid #0f0f1a;
+  }
+
+  .heat-pill {
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-inline-start: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .heat-pill.hot   { color: #b91c1c; background: rgba(239,68,68,0.10); border: 1px solid rgba(239,68,68,0.3); }
+  .heat-pill.warm  { color: #b45309; background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.3); }
+  .heat-pill.mild  { color: #475569; background: rgba(100,116,139,0.10); border: 1px solid rgba(100,116,139,0.3); }
+
+  .view-link {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    margin-inline-start: auto;
+    transition: color 0.15s;
+  }
+  .view-link:hover { color: #000; }
+
+  .rank-stripe {
+    width: 2px;
+    height: 36px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #ef4444 0%, #f97316 50%, #eab308 100%);
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+
+  /* Subreddit icon — try real icon, fall back to colored initial */
+  .subreddit-icon-host {
+    position: relative;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 13px;
+    font-family: ui-monospace, monospace;
+    overflow: hidden;
+  }
+  .subreddit-icon-host .sr-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    z-index: 1;
+    background: inherit;
+  }
+  .subreddit-icon-host .sr-fallback {
+    position: relative;
+    z-index: 0;
+  }
+
+  /* Pulse thumbnail (og_image slot) */
+  .pulse-item {
+    display: flex;
+    gap: 14px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .pulse-item:last-child { border-bottom: none; }
+  .pulse-thumb {
+    width: 88px;
+    height: 88px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    text-align: center;
+    overflow: hidden;
+    position: relative;
+  }
+  .pulse-thumb.hn        { background: linear-gradient(135deg, #f97316, #c2410c); }
+  .pulse-thumb.arxiv     { background: linear-gradient(135deg, #b91c1c, #7f1d1d); }
+  .pulse-thumb.simonw    { background: linear-gradient(135deg, #16a34a, #166534); }
+  .pulse-thumb.neurips   { background: linear-gradient(135deg, #2563eb, #1e3a8a); }
+  .pulse-body { flex: 1; min-width: 0; }
+
+  /* Infinite scroll loader (placeholder) */
+  .scroll-loader {
+    text-align: center;
+    padding: 24px 16px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .scroll-loader .dots::after {
+    content: "...";
+    animation: dot 1.5s steps(4, end) infinite;
+  }
+  @keyframes dot {
+    0%, 20% { content: ""; }
+    40% { content: "."; }
+    60% { content: ".."; }
+    80%, 100% { content: "..."; }
+  }
+  .day-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 32px 0 16px;
+    padding: 0 4px;
+  }
+  .day-divider::before, .day-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #e0e0ec;
+  }
+  .day-divider-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9a9ab8;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1 class="page-title">Community — Redesign Mockup</h1>
+  <p class="page-subtitle">3 cards, 1 pattern. Distinct accent colors + subtle background tints. Visuals: avatars (X) · subreddit icons (Reddit) · og_image thumbnails (Pulse). Infinite scroll loads previous days at the bottom.</p>
+
+  <div class="changelog">
+    <h3>Changes vs. current — all three cards</h3>
+    <ul>
+      <li><strong>X (black):</strong> merged Following + Trending into one list, sorted by likes+retweets×3, per-item source pill, drop the duplicate "מה מדברים ב-X" Pulse card.</li>
+      <li><strong>Reddit (red):</strong> per-subreddit score floor (singularity ≥ 300, ML/Anthropic ≥ 50, others ≥ 100), bigger Reddit icon (36px vs 28px), date + comment count visible, body snippet under headline, drop the duplicate "מה מדברים ב-Reddit" Pulse card.</li>
+      <li><strong>Pulse (blue):</strong> og_image thumbnail (left), source domain badge ("ycombinator.com"), subtitle naming what it's built from, URL HEAD probe (kills broken links), date stamp, heat pill stays.</li>
+      <li><strong>Section distinction (subtle):</strong> each card gets a faint header-band tint + matching border tint — neutral cool gray (X), warm orange wash (Reddit), cool blue wash (Pulse). Items stay white.</li>
+    </ul>
+    <h3 style="margin-top:10px;">Live-data fallback chain (matches articles)</h3>
+    <ul>
+      <li><strong>Reddit subreddit icon:</strong> 1) try real <code>community_icon</code> from Reddit API · 2) S3 mirror if cached · 3) colored circle with subreddit initial. Post is always rendered, even if all three fail — icon is decorative, never gates the data.</li>
+      <li><strong>Pulse og_image:</strong> 1) try og_image from page meta · 2) Tavily/Perplexity fallback (same as articles) · 3) source-domain gradient block with initials (what's shown for the placeholders here). Post always rendered.</li>
+    </ul>
+    <h3 style="margin-top:10px;">Infinite scroll</h3>
+    <ul>
+      <li>Bottom of community page → loads previous days' community sections (X / Reddit / Pulse) the same way the articles page does. Replaces the removed archive section.</li>
+      <li>Day divider (e.g. <em>"8 במאי"</em>) separates each historical day visually. Mock shows it after the current-day stack.</li>
+    </ul>
+  </div>
+
+  <!-- ============ X CARD ============ -->
+  <div class="card x">
+    <div class="accent-bar x"></div>
+
+    <div class="card-header x">
+      <div class="header-left">
+        <div class="section-icon x">𝕏</div>
+        <div class="header-title-block">
+          <h2 class="card-title">מה מדברים ב-X</h2>
+          <p class="card-subtitle">מסודר לפי השפעה · אנשים שאני עוקב אחריהם + טרנדים</p>
+        </div>
+      </div>
+      <span class="count-badge x">5 פוסטים</span>
+    </div>
+
+    <!-- 1 -->
+    <div class="item">
+      <div class="item-header">
+        <div class="rank-stripe"></div>
+        <img class="avatar" src="https://unavatar.io/x/AnthropicAI" alt="" referrerpolicy="no-referrer" />
+        <span class="author-name">Anthropic</span>
+        <span class="author-handle">@AnthropicAI</span>
+        <span class="dot-sep">·</span>
+        <span class="post-date">9 May</span>
+        <span class="source-pill following">👤 עוקב</span>
+      </div>
+      <p class="post-text">"Today we're rolling out Claude 4.7 to all Pro users — improved long-context recall and a new memory primitive. Full release notes in the thread."</p>
+      <div class="item-footer">
+        <span class="engagement-chip">💗 24K likes · 5.1K reposts · 1.2M views</span>
+        <span class="topic-chip">Anthropic</span>
+        <a href="#" class="view-link">לפוסט →</a>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="item">
+      <div class="item-header">
+        <div class="rank-stripe"></div>
+        <img class="avatar" src="https://unavatar.io/x/sama" alt="" referrerpolicy="no-referrer" />
+        <span class="author-name">Sam Altman</span>
+        <span class="author-handle">@sama</span>
+        <span class="dot-sep">·</span>
+        <span class="post-date">9 May</span>
+        <span class="source-pill trending">🔥 טרנד</span>
+      </div>
+      <p class="post-text">"GPT-5.1-mini benchmarks dropped — we're seeing 3x cost reduction at near-parity quality on coding evals. mini is now the default for routing in the API."</p>
+      <div class="item-footer">
+        <span class="engagement-chip">💗 18K likes · 3.4K reposts · 890K views</span>
+        <span class="topic-chip">OpenAI</span>
+        <a href="#" class="view-link">לפוסט →</a>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="item">
+      <div class="item-header">
+        <div class="rank-stripe"></div>
+        <img class="avatar" src="https://unavatar.io/x/karpathy" alt="" referrerpolicy="no-referrer" />
+        <span class="author-name">Andrej Karpathy</span>
+        <span class="author-handle">@karpathy</span>
+        <span class="dot-sep">·</span>
+        <span class="post-date">8 May</span>
+        <span class="source-pill following">👤 עוקב</span>
+      </div>
+      <p class="post-text">"subquadratic claims need ablations against FlashAttention-3, not vanilla attention. otherwise we keep relitigating the same '1000x' headline every 6 months."</p>
+      <div class="item-footer">
+        <span class="engagement-chip">💗 9.2K likes · 1.8K reposts · 420K views</span>
+        <span class="topic-chip">Research</span>
+        <a href="#" class="view-link">לפוסט →</a>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="item">
+      <div class="item-header">
+        <div class="rank-stripe"></div>
+        <img class="avatar" src="https://unavatar.io/x/ylecun" alt="" referrerpolicy="no-referrer" />
+        <span class="author-name">Yann LeCun</span>
+        <span class="author-handle">@ylecun</span>
+        <span class="dot-sep">·</span>
+        <span class="post-date">8 May</span>
+        <span class="source-pill trending">🔥 טרנד</span>
+      </div>
+      <p class="post-text">"The Rubin FP4 numbers people are quoting include 2:4 sparsity uplift. real dense throughput is closer to half. been saying this for two cycles now."</p>
+      <div class="item-footer">
+        <span class="engagement-chip">💗 4.1K likes · 620 reposts · 180K views</span>
+        <span class="topic-chip">NVIDIA</span>
+        <a href="#" class="view-link">לפוסט →</a>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="item">
+      <div class="item-header">
+        <div class="rank-stripe"></div>
+        <img class="avatar" src="https://unavatar.io/x/swyx" alt="" referrerpolicy="no-referrer" />
+        <span class="author-name">swyx</span>
+        <span class="author-handle">@swyx</span>
+        <span class="dot-sep">·</span>
+        <span class="post-date">8 May</span>
+        <span class="source-pill following">👤 עוקב</span>
+      </div>
+      <p class="post-text">"Anthropic's deal with Musk for 220k GPUs is the optics story of the week, but the real story is capacity — they're 3 quarters supply-constrained vs OpenAI."</p>
+      <div class="item-footer">
+        <span class="engagement-chip">💗 2.8K likes · 410 reposts · 95K views</span>
+        <span class="topic-chip">Industry</span>
+        <a href="#" class="view-link">לפוסט →</a>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ============ REDDIT CARD ============ -->
+  <div class="card reddit">
+    <div class="accent-bar reddit"></div>
+
+    <div class="card-header reddit">
+      <div class="header-left">
+        <div class="section-icon reddit">👽</div>
+        <div class="header-title-block">
+          <h2 class="card-title">לוהט ב-Reddit</h2>
+          <p class="card-subtitle">דיונים עם רף ציון מינימלי לכל subreddit · ממוין לפי upvotes</p>
+        </div>
+      </div>
+      <span class="count-badge reddit">5 דיונים</span>
+    </div>
+
+    <!-- 1 -->
+    <div class="item">
+      <div class="item-header">
+        <div class="subreddit-icon-host" style="background: #d97706;">
+          <img class="sr-img" src="https://unavatar.io/reddit/Anthropic" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';" />
+          <span class="sr-fallback">A</span>
+        </div>
+        <span class="author-name">r/Anthropic</span>
+        <span class="author-handle">u/ml_engineer_42</span>
+        <span class="dot-sep">·</span>
+        <span class="post-date">9 May</span>
+        <span class="heat-pill hot">🔥 hot</span>
+      </div>
+      <h3 class="post-headline">Anthropic בדיוק קיבלה 220,000 GPUs מהבן אדם שקרא ל-Claude מיזנתרופי</h3>
+      <p class="post-snippet">המשתמשים צחקו על האופטיקה של מעבדה safety-first ששוכרת מ-xAI/SpaceX, ושאלו אם המיתוג של ethics-first שורד עסקה כזו. ה-thread הגיע ל-95 upvotes תוך 6 שעות.</p>
+      <div class="item-footer">
+        <span class="engagement-chip">⬆ 1,428 upvotes · 💬 367 comments</span>
+        <span class="topic-chip">Anthropic</span>
+        <a href="#" class="view-link">לדיון →</a>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="item">
+      <div class="item-header">
+        <div class="subreddit-icon-host" style="background: #7c3aed;">
+          <img class="sr-img" src="https://unavatar.io/reddit/singularity" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';" />
+          <span class="sr-fallback">S</span>
+        </div>
+        <span class="author-name">r/singularity</span>
+        <span class="author-handle">u/AGI_2027</span>
+        <span class="dot-sep">·</span>
+        <span class="post-date">8 May</span>
+        <span class="heat-pill hot">🔥 hot</span>
+      </div>
+      <h3 class="post-headline">שמועה ש-"xAI תפורק" מציתה דיונים סוערים</h3>
+      <p class="post-snippet">דיווחים ש-xAI עשויה להתפרק כישות נפרדת עוררו ספקולציות על מיזוג עם Tesla/X או IPO דרך SpaceX. תגובות מובילות קישרו את השמועה לירידה בשימוש ב-Grok.</p>
+      <div class="item-footer">
+        <span class="engagement-chip">⬆ 1,107 upvotes · 💬 287 comments</span>
+        <span class="topic-chip">xAI</span>
+        <a href="#" class="view-link">לדיון →</a>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="item">
+      <div class="item-header">
+        <div class="subreddit-icon-host" style="background: #2563eb;">
+          <img class="sr-img" src="https://unavatar.io/reddit/MachineLearning" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';" />
+          <span class="sr-fallback">M</span>
+        </div>
+        <span class="author-name">r/MachineLearning</span>
+        <span class="author-handle">u/phd_student_22</span>
+        <span class="dot-sep">·</span>
+        <span class="post-date">8 May</span>
+        <span class="heat-pill warm">🟡 warm</span>
+      </div>
+      <h3 class="post-headline">מאמר "Subquadratic 1000x" מוצף בספקנים שדורשים שחזורים [D]</h3>
+      <p class="post-snippet">החוקרים דורשים ablations מול FlashAttention-3 ולא רק vanilla attention. תגובות מובילות ציינו היסטוריה ארוכה של טענות subquadratic שלא שורדות מפגש עם baselines מכווננות.</p>
+      <div class="item-footer">
+        <span class="engagement-chip">⬆ 717 upvotes · 💬 142 comments</span>
+        <span class="topic-chip">Research</span>
+        <a href="#" class="view-link">לדיון →</a>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="item">
+      <div class="item-header">
+        <div class="subreddit-icon-host" style="background: #16a34a;">
+          <img class="sr-img" src="https://unavatar.io/reddit/LocalLLaMA" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';" />
+          <span class="sr-fallback">L</span>
+        </div>
+        <span class="author-name">r/LocalLLaMA</span>
+        <span class="author-handle">u/gpu_poor_dev</span>
+        <span class="dot-sep">·</span>
+        <span class="post-date">8 May</span>
+        <span class="heat-pill warm">🟡 warm</span>
+      </div>
+      <h3 class="post-headline">המודל הכי טוב להרצה מקומית במאי 2026? Qwen3 או DeepSeek-V4?</h3>
+      <p class="post-snippet">השרשור הפך ל-go-to-reference ל-LocalLLaMA, עם בנצ'מרקים מקיפים על MacBook M3/M4 ו-RTX 4090. ההסכמה: Qwen3 32B מנצח ב-throughput, DeepSeek-V4 ב-reasoning.</p>
+      <div class="item-footer">
+        <span class="engagement-chip">⬆ 312 upvotes · 💬 89 comments</span>
+        <span class="topic-chip">Local AI</span>
+        <a href="#" class="view-link">לדיון →</a>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="item">
+      <div class="item-header">
+        <div class="subreddit-icon-host" style="background: #d97706;">
+          <img class="sr-img" src="https://unavatar.io/reddit/Anthropic" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';" />
+          <span class="sr-fallback">A</span>
+        </div>
+        <span class="author-name">r/Anthropic</span>
+        <span class="author-handle">u/prod_user_99</span>
+        <span class="dot-sep">·</span>
+        <span class="post-date">7 May</span>
+        <span class="heat-pill mild">🟢 mild</span>
+      </div>
+      <h3 class="post-headline">Sonnet 4.5 vs GPT-5.1-mini ב-production — מי באמת זול יותר?</h3>
+      <p class="post-snippet">משתמש פרסם השוואת עלויות מדויקת על 3 חודשי שימוש. המסקנה: Sonnet 4.5 מנצח ב-context usage, mini מנצח ב-throughput פשוט. Haiku 4.5 עדיין מקיים latency lead.</p>
+      <div class="item-footer">
+        <span class="engagement-chip">⬆ 156 upvotes · 💬 47 comments</span>
+        <span class="topic-chip">Cost</span>
+        <a href="#" class="view-link">לדיון →</a>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ============ COMMUNITY PULSE CARD ============ -->
+  <div class="card pulse">
+    <div class="accent-bar pulse"></div>
+
+    <div class="card-header pulse">
+      <div class="header-left">
+        <div class="section-icon pulse">💬</div>
+        <div class="header-title-block">
+          <h2 class="card-title">דופק הקהילה</h2>
+          <p class="card-subtitle">דיונים מ-Hacker News, arXiv, בלוגים וכנסים · קישורים מאומתים</p>
+        </div>
+      </div>
+      <span class="count-badge pulse">4 נושאים</span>
+    </div>
+
+    <!-- 1 -->
+    <div class="pulse-item">
+      <div class="pulse-thumb hn">HN</div>
+      <div class="pulse-body">
+        <div class="item-header">
+          <span class="source-domain">news.ycombinator.com</span>
+          <span class="dot-sep">·</span>
+          <span class="post-date">9 May</span>
+          <span class="heat-pill hot">🔥 hot</span>
+        </div>
+        <h3 class="post-headline">למה החלפנו את Pinecone ב-PostgreSQL pgvector ב-scale</h3>
+        <p class="post-snippet">פוסט שעלה ל-#1 ב-HN. המחבר מתאר חיסכון של 84% בעלות תשתית מעבר מ-Pinecone ל-pgvector על RDS, עם latency דומה עד 50M וקטורים. השרשור מלא מהנדסים שמתלבטים ביניהם.</p>
+        <div class="item-footer">
+          <span class="engagement-chip">📈 312 points · 💬 145 comments</span>
+          <span class="topic-chip">Vector DBs</span>
+          <a href="#" class="view-link">למקור →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="pulse-item">
+      <div class="pulse-thumb simonw">SW</div>
+      <div class="pulse-body">
+        <div class="item-header">
+          <span class="source-domain">simonwillison.net</span>
+          <span class="dot-sep">·</span>
+          <span class="post-date">9 May</span>
+          <span class="heat-pill hot">🔥 hot</span>
+        </div>
+        <h3 class="post-headline">Notes on running Claude 4.7 locally with Anthropic's new tool spec</h3>
+        <p class="post-snippet">סיימון רושם תהליך setup של Claude 4.7 עם tool use משופר ופורמט memory חדש. הפוסט עלה לדף הבית של HN וצוטט 12 פעמים על X תוך 4 שעות מההצגה.</p>
+        <div class="item-footer">
+          <span class="engagement-chip">🔗 12 X mentions · HN front page</span>
+          <span class="topic-chip">Anthropic</span>
+          <a href="#" class="view-link">למקור →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="pulse-item">
+      <div class="pulse-thumb arxiv">arXiv</div>
+      <div class="pulse-body">
+        <div class="item-header">
+          <span class="source-domain">arxiv.org</span>
+          <span class="dot-sep">·</span>
+          <span class="post-date">8 May</span>
+          <span class="heat-pill warm">🟡 warm</span>
+        </div>
+        <h3 class="post-headline">Long-context evaluations are saturated: a survey of 47 benchmarks</h3>
+        <p class="post-snippet">המחברים סוקרים 47 בנצ'מרקים של long-context ומראים ש-12 מהם רוויים ע"י מודלים פרונטיאריים. ההמלצה: לעבור ל-needle-in-haystack מורכבים יותר עם משימות reasoning שרשרת.</p>
+        <div class="item-footer">
+          <span class="engagement-chip">📄 cited 8× already · 4 ML influencers</span>
+          <span class="topic-chip">Eval</span>
+          <a href="#" class="view-link">למקור →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="pulse-item">
+      <div class="pulse-thumb neurips">NeurIPS</div>
+      <div class="pulse-body">
+        <div class="item-header">
+          <span class="source-domain">neurips.cc</span>
+          <span class="dot-sep">·</span>
+          <span class="post-date">8 May</span>
+          <span class="heat-pill mild">🟢 mild</span>
+        </div>
+        <h3 class="post-headline">NeurIPS 2026 paper acceptances: breakdown by track</h3>
+        <p class="post-snippet">הוועדה פרסמה התפלגות מאמרים מתקבלים. שיעור הקבלה: 24.7%, ירידה מ-26.1% בשנה שעברה. RL ו-Robotics ירדו, Mech Interp עלה ב-180% בכמות הגשות.</p>
+        <div class="item-footer">
+          <span class="engagement-chip">📊 official announcement</span>
+          <span class="topic-chip">Conference</span>
+          <a href="#" class="view-link">למקור →</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ INFINITE SCROLL — DAY DIVIDER + NEXT DAY ============ -->
+  <div class="day-divider">
+    <span class="day-divider-label">8 במאי 2026</span>
+  </div>
+
+  <!-- Compact placeholder representation of previous day's stack -->
+  <div class="card x" style="opacity: 0.92;">
+    <div class="accent-bar x"></div>
+    <div class="card-header x">
+      <div class="header-left">
+        <div class="section-icon x">𝕏</div>
+        <div class="header-title-block">
+          <h2 class="card-title">מה מדברים ב-X</h2>
+          <p class="card-subtitle">8 במאי · 6 פוסטים</p>
+        </div>
+      </div>
+      <span class="count-badge x">6 פוסטים</span>
+    </div>
+    <div class="item">
+      <div class="item-header">
+        <div class="rank-stripe"></div>
+        <img class="avatar" src="https://unavatar.io/x/elonmusk" alt="" referrerpolicy="no-referrer" />
+        <span class="author-name">Elon Musk</span>
+        <span class="author-handle">@elonmusk</span>
+        <span class="dot-sep">·</span>
+        <span class="post-date">8 May</span>
+        <span class="source-pill trending">🔥 טרנד</span>
+      </div>
+      <p class="post-text">"Grok 4 will be the most truth-seeking AI ever built. Open weights coming soon."</p>
+      <div class="item-footer">
+        <span class="engagement-chip">💗 142K likes · 28K reposts · 6.2M views</span>
+        <span class="topic-chip">xAI</span>
+        <a href="#" class="view-link">לפוסט →</a>
+      </div>
+    </div>
+    <div class="item" style="text-align:center; padding: 8px 20px; color: var(--text-muted); font-size: 11px;">
+      ... (5 more posts from May 8)
+    </div>
+  </div>
+
+  <div class="scroll-loader">
+    טוען עוד ימים<span class="dots"></span>
+  </div>
+
+</div>
+</body>
+</html>

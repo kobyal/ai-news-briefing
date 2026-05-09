@@ -16,7 +16,7 @@ from pathlib import Path
 
 import anthropic
 
-from .feeds import fetch_all, VENDOR_KEYWORDS
+from .feeds import fetch_all, fetch_subreddit_icon, VENDOR_KEYWORDS
 from .tools import _parse
 
 # Shared subscription path — shells to `claude -p` when MERGER_VIA_CLAUDE_CODE=1
@@ -225,6 +225,7 @@ def _step4_publish(briefing_json: str, hebrew_json: str, community_articles: lis
     import re as _re
     reddit_posts = []
     subreddit_counts: dict = {}
+    subreddit_icons: dict = {}  # sub_name → community_icon URL (lazily fetched, once per sub)
     MAX_PER_SUB = 3
     MIN_COMMENTS = 20
     for a in (community_articles or []):
@@ -241,8 +242,11 @@ def _step4_publish(briefing_json: str, hebrew_json: str, community_articles: lis
         if subreddit_counts.get(sub, 0) >= MAX_PER_SUB:
             continue
         subreddit_counts[sub] = subreddit_counts.get(sub, 0) + 1
+        if sub not in subreddit_icons:
+            subreddit_icons[sub] = fetch_subreddit_icon(sub) or ""
         reddit_posts.append({
             "subreddit": sub,
+            "subreddit_icon_url": subreddit_icons[sub],
             "title":     title,
             "url":       url,
             "score":     a.get("_score", 0),  # comments count (scores are fuzzed by Reddit)

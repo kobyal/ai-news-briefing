@@ -917,6 +917,35 @@ def run_pipeline() -> dict:
         merged_json = json.dumps(parsed, ensure_ascii=False)
         print(f"  URL validation: {total_urls - stripped_urls}/{total_urls} passed, {stripped_urls} stripped")
 
+    # Validate community pulse URLs — drop items with broken source_url.
+    # Runs before _step3_translate so Hebrew variants are only generated for
+    # surviving items (index alignment with pulse_items_he stays intact).
+    pulse_items = parsed.get("community_pulse_items", []) or []
+    if pulse_items:
+        valid_pulse = []
+        pulse_dropped = 0
+        for item in pulse_items:
+            src = item.get("source_url", "")
+            keep = True
+            if src:
+                try:
+                    resp = requests.head(src, timeout=8, allow_redirects=True,
+                        headers={"User-Agent": "Mozilla/5.0 (compatible; ai-news-briefing/1.0)"})
+                    if not (resp.status_code < 400 or resp.status_code in (403, 405)):
+                        keep = False
+                        print(f"  ✂ Pulse URL {resp.status_code}: {item.get('headline', '?')[:50]} → {src[:60]}")
+                except Exception:
+                    keep = False
+                    print(f"  ✂ Pulse URL timeout: {item.get('headline', '?')[:50]} → {src[:60]}")
+            if keep:
+                valid_pulse.append(item)
+            else:
+                pulse_dropped += 1
+        if pulse_dropped:
+            parsed["community_pulse_items"] = valid_pulse
+            merged_json = json.dumps(parsed, ensure_ascii=False)
+            print(f"  Pulse URL validation: {len(valid_pulse)}/{len(pulse_items)} kept, {pulse_dropped} dropped")
+
     # Per-story URL relevance filter — a source URL's path slug must share at
     # least one significant (non-stopword, ≥4 char) token with the story
     # headline, otherwise the reader clicks a "source" and lands on a

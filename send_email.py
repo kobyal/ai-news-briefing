@@ -24,7 +24,7 @@ except KeyError:
 # Where this run is happening — surfaces in the email so a re-run from
 # your laptop doesn't get mistaken for the morning CI email.
 RUNNER = "CI" if os.environ.get("GITHUB_ACTIONS") == "true" else "local"
-WEBSITE_URL  = "https://d2p40aowelo4td.cloudfront.net"
+WEBSITE_URL  = "https://aibriefing.dev"
 PAGES_BASE   = "https://kobyal.github.io/ai-news-briefing"
 
 # Find latest merged HTML
@@ -85,7 +85,7 @@ def _collect_usage() -> list[dict]:
     results = []
     for agent_dir in [
         "merger-agent", "rss-news-agent", "tavily-news-agent",
-        "perplexity-news-agent", "adk-news-agent", "exa-news-agent",
+        "perplexity-news-agent", "adk-news-agent",
     ]:
         pattern = f"{agent_dir}/output/{today}/usage*.json"
         files = sorted(glob.glob(pattern))
@@ -680,8 +680,6 @@ def _collect_agent_delivery() -> list[dict]:
         ("rss-news-agent",        "rss-news"),
         ("tavily-news-agent",     "tavily"),
         ("adk-news-agent",        "adk"),
-        ("exa-news-agent",        "exa"),
-        ("newsapi-agent",         "newsapi"),
     ]:
         d = _latest(dirname)
         items = ((d.get("briefing") or {}).get("news_items") or []) if isinstance(d, dict) else []
@@ -978,8 +976,6 @@ def _active_sources_today() -> list[str]:
         ("perplexity-news-agent", "Perplexity"),
         ("rss-news-agent", "RSS"),
         ("tavily-news-agent", "Tavily"),
-        ("exa-news-agent", "Exa"),
-        ("newsapi-agent", "NewsAPI"),
         ("youtube-news-agent", "YouTube"),
         ("github-trending-agent", "GitHub"),
         ("twitter-agent", "X"),

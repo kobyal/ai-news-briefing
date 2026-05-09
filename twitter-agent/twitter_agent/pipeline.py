@@ -158,9 +158,17 @@ TRACKED_HANDLES = [
 ]
 
 AI_SEARCH_QUERIES = [
-    "LLM release OR model release -is:retweet lang:en min_faves:500",
-    "(Claude OR ChatGPT OR Gemini OR GPT) announcement -is:retweet lang:en min_faves:1000",
-    "AI agent tool release -is:retweet lang:en min_faves:500",
+    # min_faves:50 matches the _TRENDING_MIN_LIKES post-filter floor.
+    # Was 500/1000 prior to 2026-05-09 — higher values made X return
+    # evergreen-viral old tweets (March-April timeframe) instead of recent
+    # ones, which the 3-day cutoff then dropped → 0 trending for 3 days.
+    # Funnel observed: 22 entries → 17 AI-relevant → 0 in 3-day window
+    # because oldest meeting min_faves:1000 was 2026-03-13. Bumping the
+    # in-query bar gives X latitude to return recent tweets above our floor
+    # instead of all-time-viral ones.
+    "LLM release OR model release -is:retweet lang:en min_faves:50",
+    "(Claude OR ChatGPT OR Gemini OR GPT) announcement -is:retweet lang:en min_faves:50",
+    "AI agent tool release -is:retweet lang:en min_faves:50",
 ]
 
 

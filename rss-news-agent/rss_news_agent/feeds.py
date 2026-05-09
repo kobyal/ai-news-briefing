@@ -293,6 +293,43 @@ def _fetch_hf_papers(url: str, since: datetime) -> List[dict]:
         return []
 
 
+def fetch_subreddit_icon(sub_name: str) -> Optional[str]:
+    """Fetch subreddit's community_icon URL from Reddit's /about.json.
+
+    Returns a hotlinkable image URL (Reddit's CDN allows cross-origin <img> use)
+    or None on failure / no icon set. Frontend falls back to a colored circle
+    with the subreddit's initial when this is empty.
+    """
+    try:
+        about_url = f"https://www.reddit.com/r/{sub_name}/about.json"
+        headers = {"User-Agent": "ai-briefing-bot/1.0"}
+        resp = _requests.get(about_url, headers=headers, timeout=5)
+        resp.raise_for_status()
+        data = resp.json().get("data") or {}
+        icon = data.get("community_icon") or data.get("icon_img") or ""
+        return icon or None
+    except Exception as e:
+        print(f"  [Reddit] r/{sub_name} icon fetch failed: {e}")
+        return None
+
+
+# Per-subreddit minimum upvote score for inclusion in "Hot on Reddit".
+# Raises the bar so low-engagement posts in high-traffic subs (e.g., 29-56pt
+# r/MachineLearning threads competing with legitimate 1k+ discussions) don't
+# pollute the feed. Tune here without code changes elsewhere.
+SUBREDDIT_SCORE_FLOORS = {
+    "singularity":     300,   # high-traffic, low-signal — needs higher bar
+    "OpenAI":          300,
+    "ChatGPT":         300,
+    "MachineLearning": 50,    # niche/research — slower but high signal
+    "Anthropic":       50,
+    "ClaudeAI":        50,
+    "LocalLLaMA":      50,
+    # artificial, GoogleGemini, AINews → DEFAULT_SUBREDDIT_SCORE_FLOOR
+}
+DEFAULT_SUBREDDIT_SCORE_FLOOR = 100
+
+
 def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[dict]:
     """Fetch Reddit posts via Arctic Shift archive API (no auth required).
 
@@ -301,7 +338,11 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
 
     Uses a 7-day lookback (regardless of pipeline lookback_days) so posts have had
     time to accumulate upvotes — gives the "Hot on Reddit" section meaningful scores.
+    Posts below the per-subreddit upvote floor (SUBREDDIT_SCORE_FLOORS) are dropped.
     """
+
+    sub_name = url.split("subreddit=")[-1].split("&")[0]
+    floor = SUBREDDIT_SCORE_FLOORS.get(sub_name, DEFAULT_SUBREDDIT_SCORE_FLOOR)
 
     # Use at least 7-day window for Reddit so posts have time to accumulate comments
     min_since = datetime.now(tz=timezone.utc) - timedelta(days=7)
@@ -320,10 +361,10 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
         resp.raise_for_status()
         posts = resp.json().get("data") or []
     except Exception as e:
-        sub = url.split("subreddit=")[-1]
-        print(f"  [ArcticShift] r/{sub} error: {e}")
+        print(f"  [ArcticShift] r/{sub_name} error: {e}")
         return []
 
+    dropped_below_floor = 0
     articles = []
     for post in posts:
         ts    = post.get("created_utc", 0)
@@ -337,6 +378,10 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
             continue
         # Skip removed/deleted posts
         if title.startswith("[") or not post.get("author") or post.get("removed_by_category"):
+            continue
+        # Apply per-subreddit upvote floor
+        if score < floor:
+            dropped_below_floor += 1
             continue
 
         reddit_link = f"https://reddit.com{permalink}"
@@ -357,6 +402,9 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
             "_score":         num_comments,  # use comments as engagement proxy (scores fuzzed)
             "_is_community":  True,
         })
+
+    if dropped_below_floor > 0:
+        print(f"  [ArcticShift] r/{sub_name} dropped {dropped_below_floor} posts below {floor}-upvote floor (kept {len(articles)})")
 
     # Sort by comment count (most engaged posts first), then take top max_items
     articles.sort(key=lambda a: a.get("_score", 0), reverse=True)

@@ -1013,6 +1013,50 @@ if _pulse_items:
         print(f"  community_pulse_items: dropped {_dropped_pulse} fabricated, kept {len(_kept_pulse)}")
 
 
+# ── Fetch og_image for community_pulse_items ────────────────────────────────
+# Mirrors the article og_image pipeline. Each pulse item gets:
+#   1. og:image scraped from source_url (vision-judged against logos)
+#   2. find_fallback() chain (prewarmed → Wikipedia → Unsplash)
+#   3. Empty — frontend renders source-domain gradient block as final fallback
+def _fetch_og_for_pulse_item(item: dict) -> str:
+    src = item.get("source_url", "")
+    if not src:
+        return ""
+    try:
+        from shared.image_fallback import is_logo_or_generic as _vision_is_logo
+    except Exception:
+        _vision_is_logo = lambda *a, **kw: None
+    html, _title = _fetch_page(src)
+    if html:
+        cand = _extract_og_image(html)
+        if cand:
+            verdict = _vision_is_logo(cand, item.get("headline", ""), "")
+            if verdict is not True:
+                return cand
+    try:
+        from shared.image_fallback import find_fallback
+        return find_fallback({
+            "headline": item.get("headline", ""),
+            "vendor":   item.get("related_vendor", ""),
+        }) or ""
+    except Exception:
+        return ""
+
+_pulse_for_og = _briefing.get("community_pulse_items") or []
+if _pulse_for_og:
+    print(f"Fetching og_image for {len(_pulse_for_og)} community pulse items...")
+    _pulse_og_count = 0
+    with ThreadPoolExecutor(max_workers=4) as _og_pool:
+        _og_futures = {_og_pool.submit(_fetch_og_for_pulse_item, it): idx for idx, it in enumerate(_pulse_for_og)}
+        for _fut in as_completed(_og_futures):
+            _idx = _og_futures[_fut]
+            _og = _fut.result()
+            if _og:
+                _pulse_for_og[_idx]["og_image"] = _og
+                _pulse_og_count += 1
+    print(f"  Pulse og_image: {_pulse_og_count}/{len(_pulse_for_og)} fetched")
+
+
 # ── Zero-URL recovery via Tavily ──────────────────────────────────────────────
 # Some stories arrive with 0 URLs (Mistral Large 3 on 2026-04-27: the only
 # source was mistral.ai/news/mistral-large-3 which legitimately 404s now).

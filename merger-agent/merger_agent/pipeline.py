@@ -198,12 +198,25 @@ def _agent_via_claude_code(
         "--effort", effort,
     ]
 
+    # Soft-retry: try a fast 600s window first; if that times out (cold-start
+    # or transient throttle — see 2026-05-09 incident where the 1800s wall was
+    # hit once, then a manual re-run succeeded in 462s), fall back to the full
+    # 1800s. If BOTH attempts time out the prompt is genuinely too large and
+    # the loud failure is the right signal.
     t0 = time.time()
+    _SOFT_TIMEOUT = 600
+    _HARD_TIMEOUT = 1800
+    r = None
     try:
         r = subprocess.run(cmd, input=input_text, capture_output=True,
-                           text=True, timeout=1800)
+                           text=True, timeout=_SOFT_TIMEOUT)
     except subprocess.TimeoutExpired:
-        raise RuntimeError(f"[{label}] claude -p timed out after 1800s")
+        print(f"    ⟳  [{label}] merger soft-retry: first {_SOFT_TIMEOUT}s timed out, falling back to {_HARD_TIMEOUT}s")
+        try:
+            r = subprocess.run(cmd, input=input_text, capture_output=True,
+                               text=True, timeout=_HARD_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"[{label}] claude -p timed out after {_HARD_TIMEOUT}s (soft-retry also failed)")
     if r.returncode != 0:
         raise RuntimeError(
             f"[{label}] claude -p failed (rc={r.returncode}): {r.stderr[:500]}"

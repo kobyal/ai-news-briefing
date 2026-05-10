@@ -78,9 +78,44 @@ VENDOR_STOCK_POOL: dict[str, list[str]] = {
 # like "AI" or single common words ("Apple"-the-fruit risk is mitigated by
 # matching vendor exactly, but still — keep this list curated).
 _WIKI_VENDOR_ALLOWLIST: set[str] = {
-    "alibaba", "anthropic", "apple", "amazon", "cohere", "deepmind",
-    "deepseek", "google", "hugging face", "meta", "microsoft", "mistral",
-    "nvidia", "openai", "perplexity", "samsung", "stability ai", "xai",
+    "alibaba", "anthropic", "apple", "amazon", "aws", "azure", "bedrock",
+    "claude", "cohere", "deepmind", "deepseek", "gemini", "google",
+    "hugging face", "meta", "microsoft", "mistral", "nvidia", "openai",
+    "perplexity", "samsung", "stability ai", "xai",
+}
+
+# Wikipedia disambiguation: bare vendor name search returns wrong subject for
+# common-word vendors (Apple → fruit, Alibaba → Ali Baba folktale, Meta → Greek
+# prefix). Map vendor → search term that lands on the company's Wikipedia page.
+# Established 2026-05-10 after QA reported og_image_wikipedia_random for Apple
+# (Pink Lady fruit photo) and Alibaba (TaobaoCity campus photo, semi-related
+# but not the AI/Qwen news subject).
+_WIKI_VENDOR_QUERY: dict[str, str] = {
+    "apple":     "Apple Inc.",
+    "alibaba":   "Alibaba Group",
+    "amazon":    "Amazon (company)",
+    "meta":      "Meta Platforms",
+    "google":    "Google",
+    "microsoft": "Microsoft",
+    "nvidia":    "Nvidia",
+    "openai":    "OpenAI",
+    "anthropic": "Anthropic",
+    "deepmind":  "Google DeepMind",
+    "samsung":   "Samsung Electronics",
+    "xai":       "XAI (company)",
+    "deepseek":  "DeepSeek",
+    "perplexity": "Perplexity AI",
+    "mistral":   "Mistral AI",
+    "cohere":    "Cohere",
+    "hugging face": "Hugging Face",
+    "stability ai": "Stability AI",
+    # Sub-product / sub-brand vendors → roll up to parent company's Wikipedia
+    # page so we get a meaningful subject photo instead of a generic logo.
+    "azure":     "Microsoft",
+    "aws":       "Amazon Web Services",
+    "bedrock":   "Amazon Web Services",
+    "claude":    "Anthropic",
+    "gemini":    "Google",
 }
 
 
@@ -287,7 +322,11 @@ def wikipedia_vendor_image(story: dict) -> str | None:
     vendor = (story.get("vendor") or "").strip()
     if not vendor or vendor.lower() not in _WIKI_VENDOR_ALLOWLIST:
         return None
-    img = _wikipedia_image_for_query(vendor)
+    # Use the disambiguated search term when available (e.g. "Apple" → "Apple Inc."
+    # so we land on the company's page, not the fruit's). Falls back to the bare
+    # vendor name for vendors not in _WIKI_VENDOR_QUERY.
+    query = _WIKI_VENDOR_QUERY.get(vendor.lower(), vendor)
+    img = _wikipedia_image_for_query(query)
     if img and _looks_like_obvious_logo(img):
         return None
     return img

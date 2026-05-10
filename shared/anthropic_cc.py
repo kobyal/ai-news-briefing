@@ -116,7 +116,20 @@ def agent(
 
     if json_mode and text:
         stripped = text.strip()
-        if not (stripped.startswith("{") or stripped.startswith("[")):
+        # ```json … ``` fenced responses are common for Claude Code and the
+        # caller (qa_evaluator/llm.py, merger _agent) strips fences before
+        # parsing — silence the noise. Only flag genuinely non-JSON output.
+        if stripped.startswith("```"):
+            inner = stripped[3:]
+            if inner.startswith("json"):
+                inner = inner[4:]
+            inner = inner.lstrip("\n").rstrip()
+            if inner.endswith("```"):
+                inner = inner[:-3].rstrip()
+            stripped_eff = inner
+        else:
+            stripped_eff = stripped
+        if not (stripped_eff.startswith("{") or stripped_eff.startswith("[")):
             print(f"    ⚠  [{label}] Expected JSON but got: {repr(stripped[:80])}")
 
     return text

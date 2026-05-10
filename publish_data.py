@@ -189,6 +189,12 @@ twitter_raw = _latest("twitter-agent/output/**/*.json") or _latest("xai-twitter-
 # Extract news_items from standard agent format
 youtube_items = (youtube_raw.get("briefing", {}) if isinstance(youtube_raw, dict) else {}).get("news_items", [])
 youtube_channel_latest = youtube_raw.get("channel_latest", []) if isinstance(youtube_raw, dict) else []
+# Snapshot URLs of videos the merger saw — used post-cap to realign
+# briefing_he.youtube_descs_he by URL (since the cap reorders the list).
+_youtube_initial_urls = []
+for _v in youtube_items:
+    _u = ((_v.get("urls") or [None])[0]) or _v.get("url") or ""
+    _youtube_initial_urls.append(_u)
 github_items = (github_raw.get("briefing", {}) if isinstance(github_raw, dict) else {}).get("news_items", [])
 
 # Twitter/social source (people + trending + community)
@@ -1401,12 +1407,20 @@ def _yt_search(api_key: str, query: str, max_results: int = 3, lookback_days: in
         vid = (item.get("id") or {}).get("videoId", "")
         if not vid:
             continue
+        thumbs = snippet.get("thumbnails") or {}
+        thumb = ""
+        for k in ("maxres", "standard", "high", "medium", "default"):
+            if (thumbs.get(k) or {}).get("url"):
+                thumb = thumbs[k]["url"]
+                break
         out.append({
             "headline": snippet.get("title", ""),
             "summary": f"[{snippet.get('channelTitle','?')}] {snippet.get('description','')}"[:280],
             "vendor":   "Other",  # we don't classify vendor here; LLM pairing uses headlines
             "urls":     [f"https://www.youtube.com/watch?v={vid}"],
             "published_date": (snippet.get("publishedAt") or "")[:10],
+            "channel":   snippet.get("channelTitle", ""),
+            "thumbnail": thumb or f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
         })
     return out
 
@@ -1618,6 +1632,68 @@ if _yt_api_key:
     _added_p2 = _gap_fill_unpaired(_news_items, youtube_items, _yt_api_key)
     if _added_p2:
         print(f"  Phase 2 gap-fill: +{_added_p2} additional pairings recovered")
+
+
+def _video_channel(v: dict) -> str:
+    """Channel name from structured field, with legacy `[Channel · views] desc`
+    summary regex as fallback for any items still missing the field."""
+    if isinstance(v.get("channel"), str) and v["channel"]:
+        return v["channel"].strip().lower()
+    m = re.match(r"^\[([^·\]]+)", str(v.get("summary") or ""))
+    return m.group(1).strip().lower() if m else ""
+
+
+def _cap_per_channel(videos: list, cap: int = 2) -> list:
+    """Keep at most `cap` videos per channel — protects against the same
+    creator (e.g. Wes Roth, Theo) flooding the top-videos shelf. Paired
+    explainers are exempt: a story↔video LLM pair earns its slot regardless
+    of channel concentration. Order is preserved."""
+    seen: dict[str, int] = {}
+    out: list = []
+    dropped = 0
+    for v in videos:
+        if v.get("paired_with_story_id"):
+            out.append(v)
+            continue
+        ch = _video_channel(v)
+        if ch and seen.get(ch, 0) >= cap:
+            dropped += 1
+            continue
+        seen[ch] = seen.get(ch, 0) + 1
+        out.append(v)
+    if dropped:
+        print(f"  Per-channel cap (max {cap}): dropped {dropped} duplicates "
+              f"({len(videos)} → {len(out)})")
+    return out
+
+
+youtube_items = _cap_per_channel(youtube_items, cap=2)
+
+
+def _realign_youtube_descs_he():
+    """Per-channel cap reorders youtube_items vs the merger's view. Rebuild
+    `briefing_he.youtube_descs_he` so descs[i] aligns with `youtube_items[i]`
+    by URL. Slots without a HE translation (phase-1/2 enriched videos that
+    the merger never saw) get an empty string — frontend falls back to EN."""
+    bh = merger.get("briefing_he") or {}
+    descs = bh.get("youtube_descs_he") or []
+    if not descs or not _youtube_initial_urls:
+        return
+    url_to_desc = {}
+    for i in range(min(len(_youtube_initial_urls), len(descs))):
+        u = _youtube_initial_urls[i]
+        if u:
+            url_to_desc[u] = descs[i]
+    new_descs = []
+    for v in youtube_items:
+        u = ((v.get("urls") or [None])[0]) or v.get("url") or ""
+        new_descs.append(url_to_desc.get(u, ""))
+    if "briefing_he" not in merger or not merger["briefing_he"]:
+        merger["briefing_he"] = {}
+    merger["briefing_he"]["youtube_descs_he"] = new_descs
+
+
+_realign_youtube_descs_he()
 
 
 # ── Data-quality audit ────────────────────────────────────────────────────────

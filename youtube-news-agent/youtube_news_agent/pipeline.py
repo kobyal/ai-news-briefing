@@ -260,6 +260,29 @@ def _parse_duration(duration: str) -> int:
     return h * 3600 + mins * 60 + s
 
 
+def _best_thumbnail(thumbnails: dict | None) -> str:
+    """Pick highest-resolution thumbnail URL from snippet.thumbnails. Falls
+    back to the canonical hqdefault path if the API didn't return any."""
+    if not isinstance(thumbnails, dict):
+        return ""
+    for key in ("maxres", "standard", "high", "medium", "default"):
+        url = (thumbnails.get(key) or {}).get("url")
+        if url:
+            return url
+    return ""
+
+
+def _format_duration(seconds: int) -> str:
+    """Render seconds as 'M:SS' or 'H:MM:SS'."""
+    if not seconds or seconds <= 0:
+        return ""
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+
 # ---------------------------------------------------------------------------
 # Step 1: Pull latest videos from known channels (cheap: 1 unit each)
 # ---------------------------------------------------------------------------
@@ -293,6 +316,7 @@ def _fetch_channel_latest_uploads(api_key: str) -> list[dict]:
                 "title": title,
                 "url": f"https://www.youtube.com/watch?v={vid_id}",
                 "published_at": sn.get("publishedAt", ""),
+                "thumbnail": _best_thumbnail(sn.get("thumbnails")) or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
             })
         except Exception:
             continue
@@ -352,6 +376,7 @@ def _fetch_channel_videos(api_key: str) -> list[dict]:
                     "published_at": pub,
                     "description": (snippet.get("description") or "")[:500],
                     "url": f"https://www.youtube.com/watch?v={vid_id}",
+                    "thumbnail": _best_thumbnail(snippet.get("thumbnails")) or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
                     "source": "channel",
                 }
         except Exception:
@@ -416,6 +441,7 @@ def _search_videos(api_key: str) -> dict:
                     "published_at": snippet.get("publishedAt", ""),
                     "description": (snippet.get("description") or "")[:500],
                     "url": f"https://www.youtube.com/watch?v={vid_id}",
+                    "thumbnail": _best_thumbnail(snippet.get("thumbnails")) or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
                     "source": "search",
                 }
         except Exception as e:
@@ -535,7 +561,10 @@ def run_pipeline() -> dict:
     print("\n[bonus] Fetching per-channel latest upload (no filters)...")
     channel_latest = _fetch_channel_latest_uploads(api_key)
 
-    # Format output
+    # Format output. Structured fields (channel/views/duration/thumbnail) live
+    # alongside the legacy `[Channel · views] desc` summary string so the
+    # frontend's redesigned cards can render thumbnails + view counts directly
+    # without reparsing summary text.
     news_items = []
     for v in filtered[:20]:
         views_str = _format_views(v.get("views", 0))
@@ -552,6 +581,12 @@ def run_pipeline() -> dict:
             "published_date": _format_date(v.get("published_at", "")),
             "summary": summary[:600],
             "urls": [v["url"]] if v.get("url") else [],
+            "channel": channel,
+            "views": v.get("views", 0),
+            "views_text": views_str,
+            "duration_seconds": v.get("duration", 0),
+            "duration_text": _format_duration(v.get("duration", 0)),
+            "thumbnail": v.get("thumbnail", ""),
         })
 
     briefing = {

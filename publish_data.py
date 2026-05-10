@@ -1013,11 +1013,39 @@ if _pulse_items:
         print(f"  community_pulse_items: dropped {_dropped_pulse} fabricated, kept {len(_kept_pulse)}")
 
 
-# ── Fetch og_image for community_pulse_items ────────────────────────────────
+# ── Fetch og_image + date for community_pulse_items ─────────────────────────
 # Mirrors the article og_image pipeline. Each pulse item gets:
 #   1. og:image scraped from source_url (vision-judged against logos)
-#   2. find_fallback() chain (prewarmed → Wikipedia → Unsplash)
-#   3. Empty — frontend renders source-domain gradient block as final fallback
+#   2. body-image fallback for Wordpress/Reddit/HN-style pages without og:image
+#   3. find_fallback() chain (prewarmed → Wikipedia → Unsplash)
+#   4. Empty — frontend renders source-domain gradient block as final fallback
+# Date extracted from URL paths (/YYYY/MM/DD/ or /YYYY/Mon/D/) where possible.
+def _extract_date_from_url(url: str) -> "str | None":
+    if not url:
+        return None
+    # /YYYY/MM/DD/ — Wordpress, theregister, many news sites
+    m = re.search(r"/(\d{4})/(\d{2})/(\d{2})(?:/|$)", url)
+    if m:
+        try:
+            y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            datetime(y, mo, d)  # validate
+            return f"{y:04d}-{mo:02d}-{d:02d}"
+        except (ValueError, OverflowError):
+            pass
+    # /YYYY/MonthName/D/ — Simon Willison style
+    m = re.search(r"/(\d{4})/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*/(\d{1,2})(?:/|#|$)", url, re.IGNORECASE)
+    if m:
+        mo_map = {"jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,"jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12}
+        try:
+            y = int(m.group(1))
+            mo = mo_map[m.group(2).lower()[:3]]
+            d = int(m.group(3))
+            datetime(y, mo, d)
+            return f"{y:04d}-{mo:02d}-{d:02d}"
+        except (ValueError, KeyError, OverflowError):
+            pass
+    return None
+
 def _fetch_og_for_pulse_item(item: dict) -> str:
     src = item.get("source_url", "")
     if not src:
@@ -1026,13 +1054,22 @@ def _fetch_og_for_pulse_item(item: dict) -> str:
         from shared.image_fallback import is_logo_or_generic as _vision_is_logo
     except Exception:
         _vision_is_logo = lambda *a, **kw: None
+
+    def _ok(url: str) -> bool:
+        if not url:
+            return False
+        verdict = _vision_is_logo(url, item.get("headline", ""), "")
+        return verdict is not True  # True=logo (drop), False/None=keep
+
     html, _title = _fetch_page(src)
     if html:
         cand = _extract_og_image(html)
-        if cand:
-            verdict = _vision_is_logo(cand, item.get("headline", ""), "")
-            if verdict is not True:
-                return cand
+        if _ok(cand):
+            return cand
+        # Body-image tier — catches Wordpress/blogs/Reddit pages without og:image
+        for bi in _extract_body_images(html, src, max_n=3):
+            if _ok(bi):
+                return bi
     try:
         from shared.image_fallback import find_fallback
         return find_fallback({
@@ -1054,7 +1091,14 @@ if _pulse_for_og:
             if _og:
                 _pulse_for_og[_idx]["og_image"] = _og
                 _pulse_og_count += 1
-    print(f"  Pulse og_image: {_pulse_og_count}/{len(_pulse_for_og)} fetched")
+    # Attach date extracted from URL where possible (HN/Reddit/X URLs return None)
+    _pulse_date_count = 0
+    for _it in _pulse_for_og:
+        _d = _extract_date_from_url(_it.get("source_url", ""))
+        if _d:
+            _it["date"] = _d
+            _pulse_date_count += 1
+    print(f"  Pulse og_image: {_pulse_og_count}/{len(_pulse_for_og)} fetched · dates extracted: {_pulse_date_count}/{len(_pulse_for_og)}")
 
 
 # ── Zero-URL recovery via Tavily ──────────────────────────────────────────────

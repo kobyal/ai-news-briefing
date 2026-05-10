@@ -959,6 +959,16 @@ def run_pipeline() -> dict:
         "the","a","an","and","or","but","for","with","on","in","at","to","of","is","are","new",
         "html","htm","php","aspx","index","news","article","blog","post","page","story","www","com",
         "co","uk","io","ai","app","apps","read","full","more","view","main",
+        # Generic action/slug words that match across unrelated stories. The
+        # 2026-05-10 Barrons-NVIDIA-stock slug got attached to an xAI/Colossus
+        # story because both headline+slug shared "deal" — vendor-stop and
+        # subject-stop on this set keeps that single-token coincidence from
+        # validating an off-topic source.
+        "deal","deals","news","brief","plan","plans","plan","says","said","told",
+        "raise","raised","raises","launch","launched","launches","ship","ships","shipped",
+        "debut","debuts","sale","sales","week","month","year","years","day","days","time",
+        "ipo","valuation","stock","stocks","price","prices","report","reports","update","updates",
+        "partner","partners","partnership","deal-with","based","amid","over",
     }
     _VENDOR_STOP = {
         "claude","anthropic","openai","gpt","chatgpt","codex","sora",

@@ -177,6 +177,13 @@ Produce ONE merged briefing as a JSON object. Rules:
      If the subject company doesn't match any known vendor (e.g. Moonshot AI, Cohere, Inflection,
      Taurus, Project Prometheus, a new research lab), use "Other". Better to say Other than to
      grab-bag into a wrong vendor because of a keyword in the summary.
+     KNOWN SUBSIDIARIES — map these to the parent vendor, NOT "Other":
+       * Isomorphic Labs, Verily, Waymo, X (Alphabet's "X Development"), Google DeepMind,
+         Wing, CapitalG, GV — all → vendor="Google"
+       * GitHub, LinkedIn, Bing, Xbox — all → vendor="Microsoft" (or "Azure" when AI-cloud-specific)
+       * Instagram, WhatsApp, Threads, Facebook AI Research (FAIR) — all → vendor="Meta"
+       * AWS Bedrock, AWS SageMaker, Amazon Bedrock — all → vendor="AWS"
+       * Iyo, Vision Pro, Apple Intelligence — all → vendor="Apple"
    - secondary_vendor: {vendor_enum}  (optional — empty string "" when not applicable)
      SET this ONLY when a story PROMINENTLY involves TWO companies AS CO-ACTORS in the same event,
      and BOTH names appear in the headline AND the second is one of the canonical vendors above.

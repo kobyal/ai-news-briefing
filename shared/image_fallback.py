@@ -4,11 +4,18 @@ Chain (tried in order), see `find_fallback()`:
   1. Pre-warmed S3 cache — first-party, zero-latency lookup for ~30 common AI subjects
      (Altman, Bezos, Jensen, Claude, ChatGPT, etc.). Populated by
      scripts/prewarm_fallback_images.py. Always prefer this over external lookups.
-  2. Wikipedia subject photo — for named people/products not in the prewarm cache
-  3. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
+  2. Wikipedia VENDOR-name photo — allowlisted AI vendors only (Alibaba, xAI,
+     OpenAI, etc.); vision-judge is BYPASSED for this tier because the judge
+     was producing false-positive 'logo' verdicts on legitimate Wikipedia hero
+     photos (e.g. Alibaba HQ photo + xAI Grok screenshot, both rejected on
+     2026-05-10). See `_WIKI_VENDOR_ALLOWLIST`.
+  3. Wikipedia subject photo — headline-driven (people / 'Other'-vendor proper
+     nouns); still vision-judged.
+  4. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
 
 Each tier's result is vision-judged via Claude Haiku (when ANTHROPIC_API_KEY is
-set) — if the candidate is just a logo/wordmark/wrong-subject, we skip it.
+set) EXCEPT tier 2 (allowlist-vendor Wikipedia) — if the candidate is just a
+logo/wordmark/wrong-subject, we skip it.
 
 vendor_pool_image (Google favicon at 256px) was REMOVED from the chain on
 2026-04-30 — it always produces a vendor logo on its own, and the QA evaluator
@@ -57,6 +64,23 @@ _VENDOR_DOMAIN: dict[str, str] = {
 VENDOR_STOCK_POOL: dict[str, list[str]] = {
     vendor: [f"https://www.google.com/s2/favicons?domain={domain}&sz=256"]
     for vendor, domain in _VENDOR_DOMAIN.items()
+}
+
+
+# Vendors whose Wikipedia subject pages are reliable enough to bypass the
+# vision-judge filter. The judge was producing false-positive "logo" verdicts
+# on legitimate Wikipedia hero photos (2026-05-10: Alibaba HQ photo + xAI Grok
+# screenshot both rejected, shipped image-less until manually patched). For
+# these well-known AI vendors, an exact-name Wikipedia search overwhelmingly
+# returns a real subject photo, not a misfire — trust it. Keys are matched
+# case-insensitively against both the story's vendor and the Wikipedia query.
+# Be conservative: only true AI-vendor names; do NOT include generic terms
+# like "AI" or single common words ("Apple"-the-fruit risk is mitigated by
+# matching vendor exactly, but still — keep this list curated).
+_WIKI_VENDOR_ALLOWLIST: set[str] = {
+    "alibaba", "anthropic", "apple", "amazon", "cohere", "deepmind",
+    "deepseek", "google", "hugging face", "meta", "microsoft", "mistral",
+    "nvidia", "openai", "perplexity", "samsung", "stability ai", "xai",
 }
 
 
@@ -211,6 +235,64 @@ def wikipedia_subject_image(story: dict) -> str | None:
     return None
 
 
+def _wikipedia_image_for_query(query: str) -> str | None:
+    """Run a single Wikipedia pageimages search for `query` and return the
+    'original' image URL or None. Internal helper — used by both the headline-
+    driven `wikipedia_subject_image` and the vendor-allowlist bypass tier."""
+    if not query or not query.strip():
+        return None
+    import json as _json, urllib.parse as _up, urllib.request as _ur
+    api = "https://en.wikipedia.org/w/api.php"
+    try:
+        url = (f"{api}?action=query&format=json&prop=pageimages&piprop=original"
+               f"&generator=search&gsrsearch={_up.quote(query.strip())}&gsrlimit=1")
+        req = _ur.Request(url, headers={"User-Agent": "ai-briefing/1.0"})
+        with _ur.urlopen(req, timeout=5) as r:
+            d = _json.loads(r.read())
+        for p in ((d.get("query") or {}).get("pages") or {}).values():
+            img = (p.get("original") or {}).get("source")
+            if img:
+                return img
+    except Exception:
+        pass
+    return None
+
+
+# Cheap URL-only logo heuristic for the bypass tier. The full LLM vision-judge
+# was over-rejecting Wikipedia hero photos for known vendors, but we still want
+# to drop the obvious cases — Wikipedia's 'pageimages' will sometimes return an
+# SVG wordmark for vendor pages that lead with the logo (e.g. xAI's article).
+_OBVIOUS_LOGO_HINTS = ("/logo", "_logo", "-logo", "wordmark", "favicon")
+
+
+def _looks_like_obvious_logo(url: str) -> bool:
+    """URL-only heuristic — true only for clear logo-ish URLs we should skip
+    even when the vision-judge bypass is active. Cheap, no network."""
+    if not url:
+        return False
+    u = url.lower()
+    if u.endswith(".svg") or ".svg?" in u:
+        return True
+    return any(h in u for h in _OBVIOUS_LOGO_HINTS)
+
+
+def wikipedia_vendor_image(story: dict) -> str | None:
+    """Allowlist-only vendor-name Wikipedia search. Returns a hit when the
+    story's vendor exactly (case-insensitive) matches `_WIKI_VENDOR_ALLOWLIST`.
+    Caller is expected to skip the LLM vision-judge for this tier — the
+    allowlist exists precisely because that judge had false-positive 'logo'
+    verdicts on legitimate Wikipedia subject photos for these vendors. We
+    DO still apply a cheap URL-only heuristic here (`_looks_like_obvious_logo`)
+    to drop the unambiguous misfires (SVG wordmarks, /logo*.png paths)."""
+    vendor = (story.get("vendor") or "").strip()
+    if not vendor or vendor.lower() not in _WIKI_VENDOR_ALLOWLIST:
+        return None
+    img = _wikipedia_image_for_query(vendor)
+    if img and _looks_like_obvious_logo(img):
+        return None
+    return img
+
+
 # Universities, research labs, and major tech firms whose GitHub org pages exist
 # but produce a generic GitHub-branded image instead of a story-relevant one.
 # E.g. "Stanford/Berkeley/NVIDIA's LLM-as-a-Verifier" picked up Stanford's GitHub
@@ -352,12 +434,15 @@ def _vision_keep(url: str | None, story: dict) -> str | None:
 
 def find_fallback(story: dict) -> str | None:
     """Fallback chain, best-to-worst. Used when the article's og:image fails
-    or is itself a logo. Each tier is vision-judged.
+    or is itself a logo. Each tier is vision-judged EXCEPT the allowlist-
+    vendor Wikipedia tier, which is trusted because the judge over-rejects
+    legitimate subject photos for known AI vendors (see _WIKI_VENDOR_ALLOWLIST).
 
     1. Pre-warmed S3 cache — first-party, zero-latency subject photos
-    2. Wikipedia subject photo — for named people/products/companies on Wikipedia
-    3. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
-    4. None — frontend renders colored gradient + vendor icon
+    2. Wikipedia VENDOR photo (allowlisted AI vendors only, vision-judge BYPASSED)
+    3. Wikipedia subject photo — headline-driven (people/products), vision-judged
+    4. Unsplash keyword search — optional, skipped if UNSPLASH_ACCESS_KEY unset
+    5. None — frontend renders colored gradient + vendor icon
 
     NOTE: vendor_pool_image (Google's s2/favicons) was REMOVED 2026-04-30 — it
     always produces vendor logos at 256px (QA finding: og_image_vendor_favicon
@@ -366,6 +451,14 @@ def find_fallback(story: dict) -> str | None:
     url = _vision_keep(prewarmed_image(story), story)
     if url:
         return url
+    # Tier 2: allowlist-vendor Wikipedia bypass. Trust without vision-judge.
+    # Logged so we can audit how often the bypass fires + whether any of the
+    # accepted images turn out to be junk in practice.
+    vendor_wiki = wikipedia_vendor_image(story)
+    if vendor_wiki:
+        print(f"  [image_fallback] wiki-vendor bypass: vendor={story.get('vendor','')!r} "
+              f"headline={(story.get('headline') or '')[:60]!r} → {vendor_wiki[:80]}")
+        return vendor_wiki
     url = _vision_keep(wikipedia_subject_image(story), story)
     if url:
         return url

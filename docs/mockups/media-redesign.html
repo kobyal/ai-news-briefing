@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Media Redesign — Mockup (Hero / Channels / Podcasts)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-base: #f7f7fb;
+    --text-primary: #0f0f1a;
+    --text-body: #3d3d5a;
+    --text-muted: #9a9ab8;
+    --card-border: #ededf5;
+    --yt-red: #dc2626;
+    --yt-red-soft: rgba(220,38,38,0.08);
+    --sp-green: #1DB954;
+    --sp-green-soft: rgba(29,185,84,0.08);
+    --font-display: "Heebo", "Inter", system-ui, sans-serif;
+    --font-body: "Heebo", "Inter", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg-base);
+    font-family: var(--font-body);
+    color: var(--text-primary);
+    padding: 32px 16px 64px;
+  }
+  .page { max-width: 880px; margin: 0 auto; }
+
+  .page-title {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 800;
+    margin: 0 0 6px;
+  }
+  .page-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0 0 24px;
+  }
+
+  .changelog {
+    background: #fff;
+    border: 1px dashed #c7c7d6;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 32px;
+    font-size: 13px;
+    line-height: 1.65;
+    color: #3d3d5a;
+  }
+  .changelog h3 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #9a9ab8;
+  }
+  .changelog ul { margin: 0 0 8px; padding-inline-start: 20px; }
+  .changelog li { margin: 2px 0; }
+  .changelog code {
+    background: #f4f4f8;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  /* ─── Section headers ───────────────────────────── */
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 36px 0 14px;
+  }
+  .section-head:first-of-type { margin-top: 12px; }
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 800;
+    margin: 0;
+    color: #0f0f1a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-icon {
+    width: 26px; height: 26px;
+    border-radius: 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+  .section-icon.yt { background: var(--yt-red); color: #fff; }
+  .section-icon.sp { background: var(--sp-green); color: #fff; }
+  .section-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 4px 0 0;
+  }
+
+  /* ─── HERO video ────────────────────────────────── */
+  .hero-card {
+    background: #fff;
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 6px 22px rgba(0,0,0,0.05);
+    margin-bottom: 8px;
+  }
+  .hero-thumb {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #0f0f1a;
+    overflow: hidden;
+  }
+  .hero-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hero-thumb::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 45%);
+    pointer-events: none;
+  }
+  .hero-play {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 78px; height: 78px;
+    border-radius: 50%;
+    background: rgba(220,38,38,0.95);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    transition: transform 0.2s ease;
+  }
+  .hero-card:hover .hero-play { transform: translate(-50%, -50%) scale(1.05); }
+  .duration-badge {
+    position: absolute;
+    bottom: 12px;
+    inset-inline-end: 12px;
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    z-index: 2;
+  }
+  .hero-pick-badge {
+    position: absolute;
+    top: 12px;
+    inset-inline-start: 12px;
+    background: var(--yt-red);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 5px 12px;
+    border-radius: 999px;
+    letter-spacing: 0.04em;
+    box-shadow: 0 2px 8px rgba(220,38,38,0.4);
+    z-index: 2;
+  }
+  .hero-body { padding: 20px 22px 22px; }
+  .hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .channel-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--yt-red-soft);
+    color: var(--yt-red);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(220,38,38,0.18);
+  }
+  .channel-pill::before {
+    content: "▶";
+    font-size: 9px;
+  }
+  .channel-pill.sp {
+    background: var(--sp-green-soft);
+    color: #0e7a3a;
+    border-color: rgba(29,185,84,0.22);
+  }
+  .channel-pill.sp::before { content: "♪"; font-size: 11px; }
+  .meta-dot { color: #d0d0e0; font-size: 8px; }
+  .meta-text { font-size: 12px; color: var(--text-muted); font-family: ui-monospace, monospace; }
+  .hero-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.3;
+    margin: 0 0 8px;
+    color: #0f0f1a;
+    direction: rtl;
+    text-align: right;
+  }
+  .hero-desc {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text-body);
+    margin: 0;
+    direction: rtl;
+    text-align: right;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+
+  /* ─── Story explainers (paired) ─────────────────── */
+  .pair-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .pair-card {
+    background: #fff;
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+  }
+  .pair-story {
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid #f3f3f8;
+  }
+  .pair-story-headline {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f0f1a;
+    line-height: 1.4;
+    margin: 0 0 6px;
+    direction: rtl;
+    text-align: right;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+  .vendor-tag {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: #6b6b8a;
+    background: #f3f3f8;
+    border: 1px solid #e0e0ec;
+    padding: 2px 7px;
+    border-radius: 999px;
+  }
+  .pair-video {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  .pair-thumb {
+    flex-shrink: 0;
+    width: 96px;
+    aspect-ratio: 16 / 9;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #0f0f1a;
+    position: relative;
+  }
+  .pair-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pair-thumb .duration-mini {
+    position: absolute;
+    bottom: 3px;
+    inset-inline-end: 3px;
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: ui-monospace, monospace;
+  }
+  .pair-video-text { flex: 1; min-width: 0; }
+  .pair-video-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #4a4a6a;
+    line-height: 1.4;
+    margin: 0 0 4px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+  .pair-video-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pair-channel {
+    font-weight: 700;
+    color: var(--yt-red);
+  }
+
+  /* ─── Top-videos shelf (3-col grid, expandable) ──── */
+  .video-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .vcard {
+    background: #fff;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .vcard:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,0.07); }
+  .vcard-thumb {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #0f0f1a;
+    overflow: hidden;
+  }
+  .vcard-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vcard-body { padding: 10px 12px 12px; }
+  .vcard-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #0f0f1a;
+    line-height: 1.4;
+    margin: 0 0 6px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    min-height: 35px;
+  }
+  .vcard-meta {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .vcard-channel { font-weight: 700; color: var(--yt-red); }
+
+  /* ─── Channel grid (collapsible) ────────────────── */
+  .channels-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .ch-card {
+    background: #fff;
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+  }
+  .ch-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #f3f3f8;
+    text-decoration: none;
+    color: inherit;
+  }
+  .ch-avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: var(--yt-red-soft);
+    color: var(--yt-red);
+    border: 1.5px solid rgba(220,38,38,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .ch-avatar.sp { background: var(--sp-green-soft); color: #0e7a3a; border-color: rgba(29,185,84,0.22); }
+  .ch-info { flex: 1; min-width: 0; }
+  .ch-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f0f1a;
+    margin: 0 0 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .lang-flag {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #f3f3f8;
+    color: #6b6b8a;
+    border: 1px solid #e0e0ec;
+  }
+  .ch-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    overflow: hidden;
+  }
+  .ch-latest {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    text-decoration: none;
+    color: inherit;
+  }
+  .ch-latest-thumb {
+    flex-shrink: 0;
+    width: 80px;
+    aspect-ratio: 16 / 9;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #0f0f1a;
+    position: relative;
+  }
+  .ch-latest-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ch-latest-text { flex: 1; min-width: 0; }
+  .ch-latest-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #4a4a6a;
+    line-height: 1.4;
+    margin: 0 0 3px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+  .ch-latest-date {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: ui-monospace, monospace;
+  }
+  .ch-empty {
+    padding: 14px;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    font-style: italic;
+    background: #fafafd;
+  }
+
+  /* ─── Show more / expand button ─────────────────── */
+  .show-more {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    background: #fff;
+    border: 1.5px dashed #d0d0e0;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #4a4a6a;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-top: 4px;
+  }
+  .show-more:hover {
+    border-color: var(--yt-red);
+    color: var(--yt-red);
+    background: var(--yt-red-soft);
+  }
+  .show-more.sp:hover {
+    border-color: var(--sp-green);
+    color: #0e7a3a;
+    background: var(--sp-green-soft);
+  }
+  .show-more::after {
+    content: "▾";
+    font-size: 11px;
+  }
+
+  /* ─── Podcast covers ────────────────────────────── */
+  .pod-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .pod-card {
+    background: #fff;
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    display: flex;
+    align-items: stretch;
+  }
+  .pod-cover {
+    flex-shrink: 0;
+    width: 96px;
+    background: linear-gradient(135deg, #1DB954 0%, #0e7a3a 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 800;
+    font-family: var(--font-display);
+  }
+  .pod-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pod-body {
+    flex: 1;
+    padding: 12px 14px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .pod-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0f0f1a;
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pod-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 0 0 8px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    overflow: hidden;
+  }
+  .pod-latest {
+    font-size: 11px;
+    color: #4a4a6a;
+    line-height: 1.4;
+    padding-top: 6px;
+    border-top: 1px dashed #ededf5;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+  .pod-latest::before {
+    content: "♪ ";
+    color: var(--sp-green);
+    font-weight: 800;
+  }
+
+  /* ─── Hidden state for collapsed items ──────────── */
+  .collapsed { display: none; }
+
+  @media (max-width: 720px) {
+    .video-grid { grid-template-columns: 1fr 1fr; }
+    .pair-grid, .channels-grid, .pod-grid { grid-template-columns: 1fr; }
+    .hero-title { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1 class="page-title">/media/ — redesign mockup</h1>
+  <p class="page-subtitle">Hero · paired explainers · top-videos shelf · collapsible channels & podcasts</p>
+
+  <div class="changelog">
+    <h3>What changed vs. current</h3>
+    <ul>
+      <li><b>Hero "Today's Pick"</b> — single high-impact video at the top with real thumbnail, duration, channel, view count. Replaces the wall-of-text "Story Explainers" intro.</li>
+      <li><b>Story explainers</b> shrink to a 2-up grid — only paired stories show, with thumbnails. (Currently: 9/28 videos are LLM-paired; rest were padding.)</li>
+      <li><b>Top videos shelf</b> uses 3-up thumbnail cards instead of full-width text rows. Per-channel cap (max 2) so Wes Roth doesn't appear 4×.</li>
+      <li><b>Channels grid</b>: 6 cards visible, "Show all 23" expands the rest. Each shows latest video as a real thumbnail strip.</li>
+      <li><b>Podcasts</b> get cover art (Spotify oEmbed) + latest episode title, not just static link cards.</li>
+    </ul>
+    <h3 style="margin-top: 8px;">Required pipeline changes</h3>
+    <ul>
+      <li>Add <code>thumbnail</code> field to youtube items (snippet.thumbnails.high.url — already returned by API, just dropped at serialization).</li>
+      <li>Add structured <code>views</code>, <code>duration</code> fields (currently embedded in summary text).</li>
+      <li>Per-channel cap of 2 in top-videos selection (de-concentrate).</li>
+      <li>Fetch Spotify oEmbed once per show for cover + latest episode.</li>
+    </ul>
+  </div>
+
+  <!-- ───────── HERO ───────────────────────────── -->
+  <div class="section-head">
+    <h2 class="section-title">
+      <span class="section-icon yt">▶</span>
+      הסרטון של היום
+    </h2>
+  </div>
+  <p class="section-sub" style="margin: -8px 0 14px;">המלצה אחת מתוך 28 סרטונים שנבדקו — לפי צפיות, רלוונטיות, ושיוך לסיפור הראשי</p>
+
+  <a class="hero-card" href="https://www.youtube.com/watch?v=lkifbWtxxlk" target="_blank" rel="noopener" style="text-decoration: none; color: inherit; display: block;">
+    <div class="hero-thumb">
+      <img src="https://i.ytimg.com/vi/lkifbWtxxlk/hqdefault.jpg" alt="" />
+      <span class="hero-pick-badge">★ TODAY'S PICK</span>
+      <div class="hero-play">▶</div>
+      <span class="duration-badge">8:42</span>
+    </div>
+    <div class="hero-body">
+      <div class="hero-meta">
+        <span class="channel-pill">Fireship</span>
+        <span class="meta-dot">●</span>
+        <span class="meta-text">845K צפיות</span>
+        <span class="meta-dot">●</span>
+        <span class="meta-text">04 May 2026</span>
+      </div>
+      <h3 class="hero-title">732 bytes of Python just borked every Linux machine on earth…</h3>
+      <p class="hero-desc">פגיעות ב-kernel של לינוקס שנחשפה השבוע — וכלי AI שכתב אקספלויט מלא. כל המכונות מאז 2017 נפגעו. הסבר קצר וטכני בקצב של Fireship.</p>
+    </div>
+  </a>
+
+  <!-- ───────── STORY EXPLAINERS (PAIRED) ──────── -->
+  <div class="section-head">
+    <h2 class="section-title">
+      <span class="section-icon yt">🎬</span>
+      סרטוני הסבר לכתבות
+    </h2>
+    <span style="font-size: 11px; color: var(--text-muted);">3 כתבות עם שיוך</span>
+  </div>
+  <p class="section-sub" style="margin: -8px 0 14px;">סרטונים ש-LLM שייך לסיפורי היום (לא keyword-overlap). מציגים רק כתבות עם שיוך אמיתי.</p>
+
+  <div class="pair-grid">
+    <div class="pair-card">
+      <div class="pair-story">
+        <p class="pair-story-headline">Anthropic ו-SpaceX: עסקה של 220K GPUs לחיזוק Claude</p>
+        <span class="vendor-tag">Anthropic</span>
+      </div>
+      <a class="pair-video" href="https://www.youtube.com/watch?v=3pkz-Ie_k_c" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">
+        <div class="pair-thumb">
+          <img src="https://i.ytimg.com/vi/3pkz-Ie_k_c/hqdefault.jpg" alt="" />
+          <span class="duration-mini">12:18</span>
+        </div>
+        <div class="pair-video-text">
+          <p class="pair-video-title">Anthropic just…wait what</p>
+          <div class="pair-video-meta"><span class="pair-channel">Theo - t3.gg</span><span class="meta-dot">●</span>149K</div>
+        </div>
+      </a>
+    </div>
+
+    <div class="pair-card">
+      <div class="pair-story">
+        <p class="pair-story-headline">Microsoft ו-OpenAI מסיימים את השותפות; Amazon נכנס</p>
+        <span class="vendor-tag">Microsoft</span>
+      </div>
+      <a class="pair-video" href="https://www.youtube.com/watch?v=fxxpQhJyupQ" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">
+        <div class="pair-thumb">
+          <img src="https://i.ytimg.com/vi/fxxpQhJyupQ/hqdefault.jpg" alt="" />
+          <span class="duration-mini">9:54</span>
+        </div>
+        <div class="pair-video-text">
+          <p class="pair-video-title">Microsoft and OpenAI break up (Amazon is pumped)</p>
+          <div class="pair-video-meta"><span class="pair-channel">Theo - t3.gg</span><span class="meta-dot">●</span>108K</div>
+        </div>
+      </a>
+    </div>
+
+    <div class="pair-card">
+      <div class="pair-story">
+        <p class="pair-story-headline">OpenAI חושפת שלושה מודלי אודיו חדשים ב-API</p>
+        <span class="vendor-tag">OpenAI</span>
+      </div>
+      <a class="pair-video" href="https://www.youtube.com/watch?v=JOu8v6CBjkE" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">
+        <div class="pair-thumb">
+          <img src="https://i.ytimg.com/vi/JOu8v6CBjkE/hqdefault.jpg" alt="" />
+          <span class="duration-mini">5:21</span>
+        </div>
+        <div class="pair-video-text">
+          <p class="pair-video-title">We're introducing three audio models in the API</p>
+          <div class="pair-video-meta"><span class="pair-channel">OpenAI</span><span class="meta-dot">●</span>132K</div>
+        </div>
+      </a>
+    </div>
+
+    <div class="pair-card">
+      <div class="pair-story">
+        <p class="pair-story-headline">DeepSeek V4 — מודל קוד פתוח שעוקף מערכות בעלות מיליארדים</p>
+        <span class="vendor-tag">DeepSeek</span>
+      </div>
+      <a class="pair-video" href="https://www.youtube.com/watch?v=p7K3xfViWCE" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">
+        <div class="pair-thumb">
+          <img src="https://i.ytimg.com/vi/p7K3xfViWCE/hqdefault.jpg" alt="" />
+          <span class="duration-mini">14:02</span>
+        </div>
+        <div class="pair-video-text">
+          <p class="pair-video-title">DeepSeek V4 AI Beats Billion Dollar Systems…For Free</p>
+          <div class="pair-video-meta"><span class="pair-channel">Two Minute Papers</span><span class="meta-dot">●</span>151K</div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- ───────── TOP VIDEOS SHELF ───────────────── -->
+  <div class="section-head">
+    <h2 class="section-title">
+      <span class="section-icon yt">▶</span>
+      סרטוני AI מובילים השבוע
+    </h2>
+    <span style="font-size: 11px; color: var(--text-muted);">9 סרטונים</span>
+  </div>
+  <p class="section-sub" style="margin: -8px 0 14px;">הנצפים ביותר מ-25+ ערוצי AI — מקסימום 2 לערוץ למניעת חזרתיות</p>
+
+  <div class="video-grid">
+    <a class="vcard" href="https://www.youtube.com/watch?v=Nn2eXwch-K0" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">
+      <div class="vcard-thumb">
+        <img src="https://i.ytimg.com/vi/Nn2eXwch-K0/hqdefault.jpg" alt="" />
+        <span class="duration-badge">13:42</span>
+      </div>
+      <div class="vcard-body">
+        <p class="vcard-title">we JUST figured out how AI thinks</p>
+        <div class="vcard-meta"><span class="vcard-channel">Wes Roth</span><span class="meta-dot">●</span>61K</div>
+      </div>
+    </a>
+    <a class="vcard" href="https://www.youtube.com/watch?v=SXneZ3bRKO4" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">
+      <div class="vcard-thumb">
+        <img src="https://i.ytimg.com/vi/SXneZ3bRKO4/hqdefault.jpg" alt="" />
+        <span class="duration-badge">11:08</span>
+      </div>
+      <div class="vcard-body">
+        <p class="vcard-title">AI News: OpenAI Absolutely Cooked This Week!</p>
+        <div class="vcard-meta"><span class="vcard-channel">Matt Wolfe</span><span class="meta-dot">●</span>66K</div>
+      </div>
+    </a>
+    <a class="vcard" href="https://www.youtube.com/watch?v=Gtt-xnzoIDc" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">
+      <div class="vcard-thumb">
+        <img src="https://i.ytimg.com/vi/Gtt-xnzoIDc/hqdefault.jpg" alt="" />
+        <span class="duration-badge">9:33</span>
+      </div>
+      <div class="vcard-body">
+        <p class="vcard-title">The Anthropic Situation is INSANE</p>
+        <div class="vcard-meta"><span class="vcard-channel">Matthew Berman</span><span class="meta-dot">●</span>100K</div>
+      </div>
+    </a>
+
+    <a class="vcard" href="https://www.youtube.com/watch?v=nepKKz-MzFM" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">
+      <div class="vcard-thumb">
+        <img src="https://i.ytimg.com/vi/nepKKz-MzFM/hqdefault.jpg" alt="" />
+        <span class="duration-badge">2:17:03</span>
+      </div>
+      <div class="vcard-body">
+        <p class="vcard-title">FFmpeg: The Incredible Technology Behind Video on the Internet</p>
+        <div class="vcard-meta"><span class="vcard-channel">Lex Fridman</span><span class="meta-dot">●</span>137K</div>
+      </div>
+    </a>
+    <a class="vcard" href="https://www.youtube.com/watch?v=b6Mxcv1pyBU" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">
+      <div class="vcard-thumb">
+        <img src="https://i.ytimg.com/vi/b6Mxcv1pyBU/hqdefault.jpg" alt="" />
+        <span class="duration-badge">3:48</span>
+      </div>
+      <div class="vcard-body">
+        <p class="vcard-title">Codex can now use Chrome directly on macOS and Windows</p>
+        <div class="vcard-meta"><span class="vcard-channel">OpenAI</span><span class="meta-dot">●</span>74K</div>
+      </div>
+    </a>
+    <a class="vcard" href="https://www.youtube.com/watch?v=VDPMXSAxiWk" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">
+      <div class="vcard-thumb">
+        <img src="https://i.ytimg.com/vi/VDPMXSAxiWk/hqdefault.jpg" alt="" />
+        <span class="duration-badge">22:14</span>
+      </div>
+      <div class="vcard-body">
+        <p class="vcard-title">Prime is (mostly) right about AI</p>
+        <div class="vcard-meta"><span class="vcard-channel">Theo - t3.gg</span><span class="meta-dot">●</span>118K</div>
+      </div>
+    </a>
+  </div>
+
+  <!-- ───────── CHANNELS (collapsible) ─────────── -->
+  <div class="section-head">
+    <h2 class="section-title">
+      <span class="section-icon yt">📺</span>
+      ערוצי YouTube
+    </h2>
+    <span style="font-size: 11px; color: var(--text-muted);">23 ערוצים במעקב</span>
+  </div>
+  <p class="section-sub" style="margin: -8px 0 14px;">6 הראשונים — לחצי "הצג עוד" לכולם. כל ערוץ עם הסרטון האחרון שלו.</p>
+
+  <div class="channels-grid">
+    <div class="ch-card">
+      <a class="ch-head" href="https://www.youtube.com/@CloudAI_Hebrew" target="_blank" rel="noopener">
+        <div class="ch-avatar">CA</div>
+        <div class="ch-info">
+          <div class="ch-name">CloudAI עברית <span class="lang-flag">🇮🇱 HE</span></div>
+          <p class="ch-desc">הדרכות וחדשות AI בעברית</p>
+        </div>
+      </a>
+      <a class="ch-latest" href="#">
+        <div class="ch-latest-thumb"><img src="https://i.ytimg.com/vi/dEnQHhutwDk/hqdefault.jpg" alt="" /></div>
+        <div class="ch-latest-text">
+          <p class="ch-latest-title">איך אני בונה אפליקציות מלאות עם Claude Code</p>
+          <span class="ch-latest-date">2026-04-28</span>
+        </div>
+      </a>
+    </div>
+
+    <div class="ch-card">
+      <a class="ch-head" href="https://www.youtube.com/@yuv-ai" target="_blank" rel="noopener">
+        <div class="ch-avatar">YA</div>
+        <div class="ch-info">
+          <div class="ch-name">yuv-ai <span class="lang-flag">🇮🇱 HE</span></div>
+          <p class="ch-desc">כישורי AI, Claude Code וכלי פיתוח</p>
+        </div>
+      </a>
+      <a class="ch-latest" href="https://www.youtube.com/watch?v=_yuvai_latest">
+        <div class="ch-latest-thumb"><img src="https://i.ytimg.com/vi/yuvai00000/hqdefault.jpg" alt="" onerror="this.style.background='linear-gradient(135deg,#dc2626,#7c1d1d)';this.style.display='block';this.removeAttribute('src');" /></div>
+        <div class="ch-latest-text">
+          <p class="ch-latest-title">Claude Code 2.0 — כל מה שחדש בגרסה</p>
+          <span class="ch-latest-date">2026-05-09</span>
+        </div>
+      </a>
+    </div>
+
+    <div class="ch-card">
+      <a class="ch-head" href="https://www.youtube.com/@claude" target="_blank" rel="noopener">
+        <div class="ch-avatar">An</div>
+        <div class="ch-info">
+          <div class="ch-name">Claude (Anthropic) <span class="lang-flag">🇺🇸 EN</span></div>
+          <p class="ch-desc">הערוץ הרשמי של Anthropic</p>
+        </div>
+      </a>
+      <a class="ch-latest" href="#">
+        <div class="ch-latest-thumb"><img src="https://i.ytimg.com/vi/claude0000/hqdefault.jpg" alt="" /></div>
+        <div class="ch-latest-text">
+          <p class="ch-latest-title">Building agents with the new Claude API</p>
+          <span class="ch-latest-date">2026-05-09</span>
+        </div>
+      </a>
+    </div>
+
+    <div class="ch-card">
+      <a class="ch-head" href="https://www.youtube.com/@Fireship" target="_blank" rel="noopener">
+        <div class="ch-avatar">Fi</div>
+        <div class="ch-info">
+          <div class="ch-name">Fireship <span class="lang-flag">🇺🇸 EN</span></div>
+          <p class="ch-desc">חדשות AI ופיתוח בקצב מהיר</p>
+        </div>
+      </a>
+      <a class="ch-latest" href="https://www.youtube.com/watch?v=MtxP2pyCvYA">
+        <div class="ch-latest-thumb"><img src="https://i.ytimg.com/vi/MtxP2pyCvYA/hqdefault.jpg" alt="" /></div>
+        <div class="ch-latest-text">
+          <p class="ch-latest-title">Every operating system concept in one video…</p>
+          <span class="ch-latest-date">2026-05-07</span>
+        </div>
+      </a>
+    </div>
+
+    <div class="ch-card">
+      <a class="ch-head" href="https://www.youtube.com/@aiexplained-official" target="_blank" rel="noopener">
+        <div class="ch-avatar">AE</div>
+        <div class="ch-info">
+          <div class="ch-name">AI Explained <span class="lang-flag">🇺🇸 EN</span></div>
+          <p class="ch-desc">ניתוחים מעמיקים של פריצות דרך</p>
+        </div>
+      </a>
+      <a class="ch-latest" href="https://www.youtube.com/watch?v=jz0rNhfAKo8">
+        <div class="ch-latest-thumb"><img src="https://i.ytimg.com/vi/jz0rNhfAKo8/hqdefault.jpg" alt="" /></div>
+        <div class="ch-latest-text">
+          <p class="ch-latest-title">GPT 5.5 Arrives, DeepSeek V4 Drops, and the Compute War Intensifies</p>
+          <span class="ch-latest-date">2026-04-24</span>
+        </div>
+      </a>
+    </div>
+
+    <div class="ch-card">
+      <a class="ch-head" href="https://www.youtube.com/@matthew_berman" target="_blank" rel="noopener">
+        <div class="ch-avatar">MB</div>
+        <div class="ch-info">
+          <div class="ch-name">Matthew Berman <span class="lang-flag">🇺🇸 EN</span></div>
+          <p class="ch-desc">סקירות LLM מעשיות + מודלים מקומיים</p>
+        </div>
+      </a>
+      <a class="ch-latest" href="https://www.youtube.com/watch?v=1a_k48eco2c">
+        <div class="ch-latest-thumb"><img src="https://i.ytimg.com/vi/1a_k48eco2c/hqdefault.jpg" alt="" /></div>
+        <div class="ch-latest-text">
+          <p class="ch-latest-title">AI is taking over video games</p>
+          <span class="ch-latest-date">2026-05-09</span>
+        </div>
+      </a>
+    </div>
+
+    <button class="show-more" onclick="document.querySelectorAll('.ch-extra').forEach(e=>e.classList.toggle('collapsed')); this.style.display='none';">
+      הצג את כל 23 הערוצים
+    </button>
+
+    <div class="ch-card ch-extra collapsed">
+      <a class="ch-head" href="#"><div class="ch-avatar">WR</div><div class="ch-info"><div class="ch-name">Wes Roth <span class="lang-flag">🇺🇸 EN</span></div><p class="ch-desc">פרשנות AGI וחדשות בטיחות AI</p></div></a>
+      <a class="ch-latest" href="#"><div class="ch-latest-thumb"><img src="https://i.ytimg.com/vi/Nn2eXwch-K0/hqdefault.jpg" alt="" /></div><div class="ch-latest-text"><p class="ch-latest-title">we JUST figured out how AI thinks</p><span class="ch-latest-date">2026-05-09</span></div></a>
+    </div>
+    <div class="ch-card ch-extra collapsed">
+      <a class="ch-head" href="#"><div class="ch-avatar">2P</div><div class="ch-info"><div class="ch-name">Two Minute Papers <span class="lang-flag">🇺🇸 EN</span></div><p class="ch-desc">מחקרי AI מוסברים בקצרה</p></div></a>
+      <a class="ch-latest" href="#"><div class="ch-latest-thumb"><img src="https://i.ytimg.com/vi/p7K3xfViWCE/hqdefault.jpg" alt="" /></div><div class="ch-latest-text"><p class="ch-latest-title">DeepSeek V4 AI Beats Billion Dollar Systems…For Free</p><span class="ch-latest-date">2026-05-08</span></div></a>
+    </div>
+    <div class="ch-card ch-extra collapsed">
+      <a class="ch-head" href="#"><div class="ch-avatar">AK</div><div class="ch-info"><div class="ch-name">Andrej Karpathy <span class="lang-flag">🇺🇸 EN</span></div><p class="ch-desc">צלילות עומק לרשתות נוירונים</p></div></a>
+      <div class="ch-empty">לא פורסם סרטון חדש מאז 2026-01-05</div>
+    </div>
+  </div>
+
+  <!-- ───────── PODCASTS ─────────────────────── -->
+  <div class="section-head">
+    <h2 class="section-title">
+      <span class="section-icon sp">🎙</span>
+      פודקאסטים
+    </h2>
+    <span style="font-size: 11px; color: var(--text-muted);">14 שאוות לעקוב</span>
+  </div>
+  <p class="section-sub" style="margin: -8px 0 14px;">4 הראשונים — לחצי "הצג עוד" לכולם. עם הפרק האחרון מ-Spotify oEmbed.</p>
+
+  <div class="pod-grid">
+    <div class="pod-card">
+      <div class="pod-cover">בז</div>
+      <div class="pod-body">
+        <div class="pod-name">בזמן שעבדתם <span class="lang-flag">🇮🇱 HE</span></div>
+        <p class="pod-desc">חדשות שפספסתם — AI, טק ותרבות</p>
+        <p class="pod-latest">פרק 412: GPT-5.5 וכל מה שקרה השבוע ב-AI · 1:08:22</p>
+      </div>
+    </div>
+    <div class="pod-card">
+      <div class="pod-cover">פש</div>
+      <div class="pod-body">
+        <div class="pod-name">פשוט AI <span class="lang-flag">🇮🇱 HE</span></div>
+        <p class="pod-desc">בינה מלאכותית בשפה פשוטה — בני פרבר</p>
+        <p class="pod-latest">איך AI משנה את עולם החינוך · 42:15</p>
+      </div>
+    </div>
+    <div class="pod-card">
+      <div class="pod-cover">LX</div>
+      <div class="pod-body">
+        <div class="pod-name">Lex Fridman Podcast <span class="lang-flag">🇺🇸 EN</span></div>
+        <p class="pod-desc">Deep conversations with AI leaders</p>
+        <p class="pod-latest">#496 – Jean-Baptiste Kempf: FFmpeg & VLC · 2:17:03</p>
+      </div>
+    </div>
+    <div class="pod-card">
+      <div class="pod-cover">HF</div>
+      <div class="pod-body">
+        <div class="pod-name">Hard Fork <span class="lang-flag">🇺🇸 EN</span></div>
+        <p class="pod-desc">NYT podcast on AI, tech & the internet</p>
+        <p class="pod-latest">Microsoft & OpenAI Divorce + AI Bubble Talk · 1:02:45</p>
+      </div>
+    </div>
+
+    <button class="show-more sp" onclick="document.querySelectorAll('.pod-extra').forEach(e=>e.classList.toggle('collapsed')); this.style.display='none';">
+      הצג את כל 14 הפודקאסטים
+    </button>
+
+    <div class="pod-card pod-extra collapsed">
+      <div class="pod-cover">בק</div>
+      <div class="pod-body">
+        <div class="pod-name">בינה בקטנה <span class="lang-flag">🇮🇱 HE</span></div>
+        <p class="pod-desc">סיכום שבועי של 5 דקות</p>
+        <p class="pod-latest">סיכום השבוע: GPT-5.5 ו-DeepSeek V4 · 5:42</p>
+      </div>
+    </div>
+    <div class="pod-card pod-extra collapsed">
+      <div class="pod-cover">DW</div>
+      <div class="pod-body">
+        <div class="pod-name">Dwarkesh Podcast <span class="lang-flag">🇺🇸 EN</span></div>
+        <p class="pod-desc">Long-form AI leader interviews</p>
+        <p class="pod-latest">Sam Altman: The OpenAI Pivot · 3:14:00</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

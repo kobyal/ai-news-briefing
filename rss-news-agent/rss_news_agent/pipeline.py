@@ -249,7 +249,12 @@ def _step4_publish(briefing_json: str, hebrew_json: str, community_articles: lis
             "subreddit_icon_url": subreddit_icons[sub],
             "title":     title,
             "url":       url,
-            "score":     a.get("_score", 0),  # comments count (scores are fuzzed by Reddit)
+            # score = real Reddit upvotes (was previously mis-labeled comment
+            # count — incident 2026-05-10: user saw "39 הצבעות" on a post that
+            # had 378 actual upvotes). num_comments preserved separately so the
+            # frontend renders both honestly.
+            "score":     a.get("_upvotes", a.get("_score", 0)),
+            "num_comments": a.get("_num_comments", 0),
             "date":      a.get("published_date", ""),
             "body":      a.get("_selftext", ""),
         })

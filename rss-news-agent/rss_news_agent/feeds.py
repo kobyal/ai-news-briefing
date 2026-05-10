@@ -399,7 +399,15 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
             "summary":        f"r/{sub} — {score} upvotes, {num_comments} comments.",
             "urls":           urls,
             "_pub_dt":        pub,
-            "_score":         num_comments,  # use comments as engagement proxy (scores fuzzed)
+            # _score (sort key) stays as comments count — comments correlate with
+            # engagement better than fuzzed upvotes for sorting.
+            "_score":         num_comments,
+            # _upvotes + _num_comments preserved separately so the downstream
+            # pipeline can render BOTH "1.4k upvotes · 367 comments" instead of
+            # mis-labelling the comments count as upvotes (incident 2026-05-10:
+            # user saw "39 הצבעות" on a post with 378 actual upvotes).
+            "_upvotes":       score,
+            "_num_comments":  num_comments,
             "_is_community":  True,
         })
 

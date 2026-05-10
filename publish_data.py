@@ -304,6 +304,16 @@ def _same_day_union(_merger: dict, _date: str) -> dict:
     new_items = new_briefing.get("news_items") or []
     new_he = _merger.get("briefing_he") or {}
 
+    # Self-overlap guard: if the existing file's primary-URL set is identical
+    # to the current merger's set, this is a same-cycle recovery (publish_data
+    # crashed mid-flight and re-ran on the same merger output), NOT a real
+    # same-day re-run. Skip union+TLDR-regen to avoid burning a `claude -p` call.
+    _existing_urls = {(_it.get("urls") or [None])[0] for _it in morning_items if (_it.get("urls") or [])}
+    _new_urls = {(_it.get("urls") or [None])[0] for _it in new_items if (_it.get("urls") or [])}
+    if _existing_urls and _new_urls and _existing_urls == _new_urls:
+        print(f"Same-day union: self-overlap detected (cycle recovery, {len(_existing_urls)} urls identical), skipping union+TLDR-regen")
+        return {"detected": False}
+
     def _stamp_he(items, he_obj):
         for _i, _it in enumerate(items):
             for _src, _dst in (("headlines_he","headline_he"),("summaries_he","summary_he"),("details_he","detail_he")):

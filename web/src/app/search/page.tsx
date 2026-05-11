@@ -129,7 +129,7 @@ function SearchResultCard({ result: r, isHe }: { result: SearchResult; isHe: boo
               fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em",
               color: "var(--text-ghost)", textTransform: "uppercase",
             }}>
-              {formatDate(r.date, isHe)}
+              {formatDate(r.posted_date || r.date, isHe)}
             </span>
             {r.vendor && (
               <span style={{

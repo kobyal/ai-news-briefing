@@ -93,7 +93,14 @@ export type SearchResultType = "article" | "video" | "repo" | "community" | "red
 export interface SearchResult {
   type?: SearchResultType;
   story_id?: string;
+  /** Archive date — which daily JSON contains this item. Used by the
+   *  deep-link URL `?date=...` so the receiving page loads the right file
+   *  before trying to scroll to the anchor. May differ from posted_date
+   *  when an item was captured a day after it was posted. */
   date: string;
+  /** Original post/publish date for the item (ISO). Optional — falls back
+   *  to `date` when missing. Shown on the search result card. */
+  posted_date?: string;
   vendor?: string;
   headline: string;
   headline_he?: string;

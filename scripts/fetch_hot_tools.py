@@ -412,17 +412,206 @@ def fetch_hf_spaces(limit: int = 10) -> list[dict]:
     return out
 
 
+# ── Docker Hub ─────────────────────────────────────────────────────────────
+# No "trending" endpoint, so we maintain a curated allowlist of AI/ML images
+# people actually use. The per-repo API gives description + pull_count +
+# star_count. Sorted by pull_count to surface the most-used at the top.
+
+DOCKER_AI_IMAGES = [
+    ("ollama", "ollama"),                      # local LLM runner
+    ("vllm", "vllm-openai"),                   # serving framework
+    ("huggingface", "text-generation-inference"),  # TGI
+    ("langgenius", "dify"),                    # open-source LLM platform
+    ("n8nio", "n8n"),                          # workflow / agent automation
+    ("qdrant", "qdrant"),                      # vector DB
+    ("ghcr.io/chroma-core", "chroma"),         # vector DB (note: ghcr, fallback)
+    ("weaviate", "weaviate"),                  # vector DB
+    ("mintplexlabs", "anythingllm"),           # private chat with docs
+    ("comfyanonymous", "comfyui"),             # node-based image gen
+    ("nvidia", "cuda"),                        # GPU base image
+    ("library", "pytorch"),                    # PyTorch (alt: pytorch/pytorch)
+    ("pytorch", "pytorch"),                    # official PyTorch
+    ("tensorflow", "tensorflow"),              # TF official
+    ("milvusdb", "milvus"),                    # vector DB
+    ("flowiseai", "flowise"),                  # LangChain visual builder
+]
+
+
+def fetch_docker_hub(limit: int = 10) -> list[dict]:
+    """Curated AI/ML Docker images sorted by pull count.
+    API: https://hub.docker.com/v2/repositories/{namespace}/{name}/"""
+    items: list[dict] = []
+    for namespace, name in DOCKER_AI_IMAGES:
+        if namespace.startswith("ghcr.io"):
+            # GHCR is a different registry; skip for the Docker Hub section.
+            # We could add a GHCR fetcher later but it requires auth tokens.
+            continue
+        url = f"https://hub.docker.com/v2/repositories/{namespace}/{name}/"
+        d = _http_json(url)
+        if not isinstance(d, dict):
+            continue
+        desc = (d.get("description") or "").strip()
+        full_desc = (d.get("full_description") or "").strip()
+        # Clean full_description (markdown → plain)
+        long_desc = _clean_readme_intro(full_desc, kind="models")
+        chosen_desc = long_desc or desc
+        if not chosen_desc:
+            chosen_desc = f"{name} container image from {namespace}"
+        items.append({
+            "namespace":     namespace,
+            "name":          name,
+            "id":            f"{namespace}/{name}",
+            "url":           f"https://hub.docker.com/r/{namespace}/{name}",
+            "description":   chosen_desc[:280],
+            "pull_count":    int(d.get("pull_count") or 0),
+            "pull_count_text": _fmt_count(d.get("pull_count")),
+            "star_count":    int(d.get("star_count") or 0),
+            "star_count_text": _fmt_count(d.get("star_count")),
+            "last_updated":  (d.get("last_updated") or "")[:10],
+            "is_official":   bool(d.get("user") == "library" or d.get("is_official")),
+        })
+    items.sort(key=lambda i: i.get("pull_count", 0), reverse=True)
+    # Translate top-N descriptions to Hebrew (cap to limit to save DeepL quota)
+    for it in items[:limit]:
+        it["description_he"] = deepl_translate(it["description"]) or ""
+    return items[:limit]
+
+
+# ── PyPI ──────────────────────────────────────────────────────────────────
+# Curated trending AI/ML Python packages. PyPI JSON API gives summary +
+# project_urls. Download stats via pypistats.org (free, no auth).
+
+PYPI_AI_PACKAGES = [
+    "anthropic", "openai", "google-generativeai", "google-genai",
+    "langchain", "langchain-core", "langgraph", "llama-index",
+    "transformers", "tokenizers", "accelerate", "peft",
+    "vllm", "ollama", "litellm", "instructor",
+    "pydantic-ai", "tiktoken", "huggingface-hub",
+    "chromadb", "qdrant-client", "weaviate-client",
+    "sentence-transformers", "diffusers",
+]
+
+
+def _pypi_downloads(name: str) -> int:
+    """Last-month download count from pypistats.org. 0 on failure."""
+    d = _http_json(f"https://pypistats.org/api/packages/{urllib.parse.quote(name)}/recent")
+    if isinstance(d, dict):
+        return int(((d.get("data") or {}).get("last_month")) or 0)
+    return 0
+
+
+def fetch_pypi(limit: int = 10) -> list[dict]:
+    items: list[dict] = []
+    for name in PYPI_AI_PACKAGES:
+        d = _http_json(f"https://pypi.org/pypi/{urllib.parse.quote(name)}/json")
+        if not isinstance(d, dict):
+            continue
+        info = d.get("info") or {}
+        summary = (info.get("summary") or "").strip()
+        version = info.get("version") or ""
+        author = info.get("author") or info.get("author_email") or ""
+        author = re.sub(r"\s*<[^>]+>", "", author).strip() or "—"
+        home = info.get("home_page") or (info.get("project_urls") or {}).get("Homepage") or ""
+        downloads = _pypi_downloads(name)
+        items.append({
+            "name":             name,
+            "id":               name,
+            "url":              f"https://pypi.org/project/{name}/",
+            "home":             home,
+            "version":          version,
+            "author":           author,
+            "description":      summary[:280],
+            "downloads_month":  downloads,
+            "downloads_text":   _fmt_count(downloads),
+        })
+    items.sort(key=lambda i: i.get("downloads_month", 0), reverse=True)
+    for it in items[:limit]:
+        it["description_he"] = deepl_translate(it["description"]) or ""
+    return items[:limit]
+
+
+# ── npm ───────────────────────────────────────────────────────────────────
+# Curated AI/ML JavaScript packages. registry.npmjs.org has metadata;
+# api.npmjs.org has download stats. JS AI ecosystem is smaller than Python
+# but the Vercel AI SDK + LangChain JS are mainstream.
+
+NPM_AI_PACKAGES = [
+    "@anthropic-ai/sdk",
+    "@anthropic-ai/claude-agent-sdk",
+    "openai",
+    "ai",                              # Vercel AI SDK
+    "@ai-sdk/openai",
+    "@ai-sdk/anthropic",
+    "@google/generative-ai",
+    "@google/genai",
+    "@mistralai/mistralai",
+    "langchain",
+    "@langchain/core",
+    "@langchain/openai",
+    "@langchain/anthropic",
+    "replicate",
+    "ollama",
+    "groq-sdk",
+]
+
+
+def _npm_downloads(name: str) -> int:
+    """Last-week download count. 0 on failure."""
+    d = _http_json(f"https://api.npmjs.org/downloads/point/last-week/{urllib.parse.quote(name, safe='@')}")
+    if isinstance(d, dict):
+        return int(d.get("downloads") or 0)
+    return 0
+
+
+def fetch_npm(limit: int = 10) -> list[dict]:
+    items: list[dict] = []
+    for name in NPM_AI_PACKAGES:
+        d = _http_json(f"https://registry.npmjs.org/{urllib.parse.quote(name, safe='@')}/latest")
+        if not isinstance(d, dict):
+            continue
+        version = d.get("version") or ""
+        description = (d.get("description") or "").strip()
+        home = d.get("homepage") or ""
+        author = ""
+        if isinstance(d.get("author"), dict):
+            author = (d["author"].get("name") or "").strip()
+        elif isinstance(d.get("author"), str):
+            author = re.sub(r"\s*<[^>]+>", "", d["author"]).strip()
+        downloads = _npm_downloads(name)
+        items.append({
+            "name":            name,
+            "id":              name,
+            "url":             f"https://www.npmjs.com/package/{name}",
+            "home":            home,
+            "version":         version,
+            "author":          author or "—",
+            "description":     description[:280],
+            "downloads_week":  downloads,
+            "downloads_text":  _fmt_count(downloads),
+        })
+    items.sort(key=lambda i: i.get("downloads_week", 0), reverse=True)
+    for it in items[:limit]:
+        it["description_he"] = deepl_translate(it["description"]) or ""
+    return items[:limit]
+
+
 def main() -> None:
     print("Fetching Hot Tools data...")
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "hf_models":  fetch_hf_models(limit=12),
         "hf_spaces":  fetch_hf_spaces(limit=10),
+        "docker":     fetch_docker_hub(limit=10),
+        "pypi":       fetch_pypi(limit=12),
+        "npm":        fetch_npm(limit=10),
     }
     OUT_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
     print(f"✓ wrote {OUT_PATH}")
     print(f"   HF models: {len(payload['hf_models'])}")
     print(f"   HF spaces: {len(payload['hf_spaces'])}")
+    print(f"   Docker:    {len(payload['docker'])}")
+    print(f"   PyPI:      {len(payload['pypi'])}")
+    print(f"   npm:       {len(payload['npm'])}")
 
 
 if __name__ == "__main__":

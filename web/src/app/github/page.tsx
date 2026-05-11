@@ -42,10 +42,51 @@ interface HFSpace {
   description?: string;
   description_he?: string;
 }
+interface DockerImage {
+  id: string;
+  namespace: string;
+  name: string;
+  url: string;
+  description: string;
+  description_he?: string;
+  pull_count: number;
+  pull_count_text: string;
+  star_count: number;
+  star_count_text: string;
+  last_updated: string;
+  is_official: boolean;
+}
+interface PyPIPackage {
+  id: string;
+  name: string;
+  url: string;
+  home: string;
+  version: string;
+  author: string;
+  description: string;
+  description_he?: string;
+  downloads_month: number;
+  downloads_text: string;
+}
+interface NpmPackage {
+  id: string;
+  name: string;
+  url: string;
+  home: string;
+  version: string;
+  author: string;
+  description: string;
+  description_he?: string;
+  downloads_week: number;
+  downloads_text: string;
+}
 interface HotTools {
   fetched_at?: string;
   hf_models?: HFModel[];
   hf_spaces?: HFSpace[];
+  docker?: DockerImage[];
+  pypi?: PyPIPackage[];
+  npm?: NpmPackage[];
 }
 
 interface RepoCard {
@@ -395,6 +436,176 @@ function HFSpaceCard({ s, isHe }: { s: HFSpace; isHe: boolean }) {
   );
 }
 
+// ── Docker / PyPI / npm cards (curated AI/ML packages) ─────────────────────
+function DockerCard({ d, isHe }: { d: DockerImage; isHe: boolean }) {
+  const desc = isHe && d.description_he ? d.description_he : d.description;
+  return (
+    <a
+      href={d.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block rounded-xl p-4 transition-all"
+      style={{ background: "#ffffff", border: "1px solid #bfdbfe", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#2563eb"; e.currentTarget.style.boxShadow = "0 2px 12px rgba(37,99,235,0.18)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#bfdbfe"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex items-center justify-center shrink-0" style={{ width: 40, height: 40, borderRadius: 10, background: "#dbeafe", color: "#1d4ed8", fontSize: 22 }}>
+          🐳
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span style={{ fontSize: "11px", color: "#9a9ab8", fontFamily: "var(--font-mono, ui-monospace)" }}>{d.namespace}/</span>
+            <span className="font-bold" style={{ fontSize: "14px", color: "#0f0f1a", fontFamily: "var(--font-mono, ui-monospace)" }}>{d.name}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-2 flex-wrap" style={{ fontSize: "11px", color: "#6b6b8a" }}>
+            <span className="inline-flex items-center gap-1">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+              </svg>
+              {d.pull_count_text}
+            </span>
+            {d.star_count > 0 && <span>★ {d.star_count_text}</span>}
+            {d.is_official && (
+              <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full" style={{ color: "#1d4ed8", background: "#dbeafe", border: "1px solid #bfdbfe" }}>
+                OFFICIAL
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      {desc && (
+        <p
+          className="mt-2.5 text-[12.5px] leading-relaxed"
+          style={{
+            color: "#4a4a6a",
+            direction: isHe ? "rtl" : "ltr",
+            textAlign: isHe ? "right" : "left",
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical" as const,
+            WebkitLineClamp: 3,
+            overflow: "hidden",
+          }}
+        >
+          {desc}
+        </p>
+      )}
+    </a>
+  );
+}
+
+function PyPICard({ p, isHe }: { p: PyPIPackage; isHe: boolean }) {
+  const desc = isHe && p.description_he ? p.description_he : p.description;
+  return (
+    <a
+      href={p.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block rounded-xl p-4 transition-all"
+      style={{ background: "#ffffff", border: "1px solid #fde68a", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.boxShadow = "0 2px 12px rgba(59,130,246,0.18)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#fde68a"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex items-center justify-center shrink-0" style={{ width: 40, height: 40, borderRadius: 10, background: "#fef3c7", fontSize: 22 }}>
+          🐍
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span className="font-bold" style={{ fontSize: "14px", color: "#0f0f1a", fontFamily: "var(--font-mono, ui-monospace)" }}>{p.name}</span>
+            <span style={{ fontSize: "10.5px", color: "#9a9ab8", fontFamily: "var(--font-mono, ui-monospace)" }}>v{p.version}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-2 flex-wrap" style={{ fontSize: "11px", color: "#6b6b8a" }}>
+            {p.downloads_text && (
+              <span className="inline-flex items-center gap-1">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                {p.downloads_text}{isHe ? " / חודש" : "/mo"}
+              </span>
+            )}
+            {p.author && p.author !== "—" && (
+              <span style={{ fontSize: "10.5px" }}>· {p.author.slice(0, 30)}</span>
+            )}
+          </div>
+        </div>
+      </div>
+      {desc && (
+        <p
+          className="mt-2.5 text-[12.5px] leading-relaxed"
+          style={{
+            color: "#4a4a6a",
+            direction: isHe ? "rtl" : "ltr",
+            textAlign: isHe ? "right" : "left",
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical" as const,
+            WebkitLineClamp: 2,
+            overflow: "hidden",
+          }}
+        >
+          {desc}
+        </p>
+      )}
+    </a>
+  );
+}
+
+function NpmCard({ n, isHe }: { n: NpmPackage; isHe: boolean }) {
+  const desc = isHe && n.description_he ? n.description_he : n.description;
+  return (
+    <a
+      href={n.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block rounded-xl p-4 transition-all"
+      style={{ background: "#ffffff", border: "1px solid #fecaca", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#cb3837"; e.currentTarget.style.boxShadow = "0 2px 12px rgba(203,56,55,0.18)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#fecaca"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex items-center justify-center shrink-0 font-extrabold" style={{ width: 40, height: 40, borderRadius: 10, background: "#cb3837", color: "#ffffff", fontSize: 14, letterSpacing: "-0.05em" }}>
+          npm
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span className="font-bold" style={{ fontSize: "14px", color: "#0f0f1a", fontFamily: "var(--font-mono, ui-monospace)" }}>{n.name}</span>
+            <span style={{ fontSize: "10.5px", color: "#9a9ab8", fontFamily: "var(--font-mono, ui-monospace)" }}>v{n.version}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-2 flex-wrap" style={{ fontSize: "11px", color: "#6b6b8a" }}>
+            {n.downloads_text && (
+              <span className="inline-flex items-center gap-1">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                {n.downloads_text}{isHe ? " / שבוע" : "/wk"}
+              </span>
+            )}
+            {n.author && n.author !== "—" && (
+              <span style={{ fontSize: "10.5px" }}>· {n.author.slice(0, 30)}</span>
+            )}
+          </div>
+        </div>
+      </div>
+      {desc && (
+        <p
+          className="mt-2.5 text-[12.5px] leading-relaxed"
+          style={{
+            color: "#4a4a6a",
+            direction: isHe ? "rtl" : "ltr",
+            textAlign: isHe ? "right" : "left",
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical" as const,
+            WebkitLineClamp: 2,
+            overflow: "hidden",
+          }}
+        >
+          {desc}
+        </p>
+      )}
+    </a>
+  );
+}
+
 export default function GitHubPage() {
   const { isHe } = useLang();
   const [data, setData] = useState<DayData | null>(null);
@@ -460,11 +671,11 @@ export default function GitHubPage() {
         </div>
         <p className="mb-8 text-[13px]" style={{ color: "#9a9ab8" }}>
           {isHe
-            ? "GitHub trending, מודלים ו-Spaces מובילים ב-Hugging Face. מתעדכן יומית."
-            : "GitHub trending, top Hugging Face models & Spaces. Refreshed daily."}
+            ? "GitHub trending · Hugging Face · Docker Hub · PyPI · npm — מתעדכן יומית"
+            : "GitHub trending · Hugging Face · Docker Hub · PyPI · npm — refreshed daily"}
         </p>
 
-        {trending.length === 0 && releases.length === 0 && !hotTools?.hf_models?.length && !hotTools?.hf_spaces?.length ? (
+        {trending.length === 0 && releases.length === 0 && !hotTools?.hf_models?.length && !hotTools?.hf_spaces?.length && !hotTools?.docker?.length && !hotTools?.pypi?.length && !hotTools?.npm?.length ? (
           <div className="text-center py-16 rounded-2xl" style={{ color: "#9a9ab8", background: "#ffffff", border: "1px solid #ededf5" }}>
             {isHe ? "אין נתונים זמינים להיום" : "No data available for today"}
           </div>
@@ -535,6 +746,66 @@ export default function GitHubPage() {
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {hotTools.hf_spaces.map((s, i) => <HFSpaceCard key={i} s={s} isHe={isHe} />)}
+                </div>
+              </section>
+            )}
+
+            {hotTools?.docker && hotTools.docker.length > 0 && (
+              <section className="mb-10">
+                <div className="flex items-center gap-2 mb-4">
+                  <span style={{ fontSize: 20 }}>🐳</span>
+                  <h2 className="text-[16px] font-bold" style={{ color: "#0f0f1a" }}>
+                    {isHe ? "Docker Hub — אימג'ים של AI/ML" : "Docker Hub — AI/ML Images"}
+                  </h2>
+                  <span className="text-[11px]" style={{ color: "#9a9ab8" }}>{hotTools.docker.length}</span>
+                </div>
+                <p className="text-[12px] mb-3" style={{ color: "#9a9ab8" }}>
+                  {isHe
+                    ? "אימג'ים פופולריים להרצת AI מקומית — מודלים, וקטור-DB, frameworks"
+                    : "Popular images for running AI locally — model servers, vector DBs, frameworks"}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {hotTools.docker.map((d, i) => <DockerCard key={i} d={d} isHe={isHe} />)}
+                </div>
+              </section>
+            )}
+
+            {hotTools?.pypi && hotTools.pypi.length > 0 && (
+              <section className="mb-10">
+                <div className="flex items-center gap-2 mb-4">
+                  <span style={{ fontSize: 20 }}>🐍</span>
+                  <h2 className="text-[16px] font-bold" style={{ color: "#0f0f1a" }}>
+                    {isHe ? "PyPI — חבילות פייתון מובילות" : "PyPI — Top Python Packages"}
+                  </h2>
+                  <span className="text-[11px]" style={{ color: "#9a9ab8" }}>{hotTools.pypi.length}</span>
+                </div>
+                <p className="text-[12px] mb-3" style={{ color: "#9a9ab8" }}>
+                  {isHe
+                    ? "ספריות AI שמשתמשים מורידים הכי הרבה בחודש האחרון"
+                    : "AI libraries with the highest monthly downloads"}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {hotTools.pypi.map((p, i) => <PyPICard key={i} p={p} isHe={isHe} />)}
+                </div>
+              </section>
+            )}
+
+            {hotTools?.npm && hotTools.npm.length > 0 && (
+              <section className="mb-10">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="inline-flex items-center justify-center font-extrabold" style={{ width: 22, height: 22, borderRadius: 6, background: "#cb3837", color: "#fff", fontSize: 9, letterSpacing: "-0.05em" }}>npm</span>
+                  <h2 className="text-[16px] font-bold" style={{ color: "#0f0f1a" }}>
+                    {isHe ? "npm — חבילות JavaScript מובילות" : "npm — Top JavaScript Packages"}
+                  </h2>
+                  <span className="text-[11px]" style={{ color: "#9a9ab8" }}>{hotTools.npm.length}</span>
+                </div>
+                <p className="text-[12px] mb-3" style={{ color: "#9a9ab8" }}>
+                  {isHe
+                    ? "SDK-ים וספריות AI ב-JavaScript/TypeScript עם הכי הרבה הורדות"
+                    : "AI SDKs + libraries for JS/TS with the most weekly downloads"}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {hotTools.npm.map((n, i) => <NpmCard key={i} n={n} isHe={isHe} />)}
                 </div>
               </section>
             )}

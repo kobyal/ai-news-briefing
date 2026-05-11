@@ -238,9 +238,60 @@ if HOT_TOOLS_PATH.exists():
             "date":         today_iso,
             "posted_date":  today_iso,
             "headline":     s.get("id") or "",
-            "summary":      f"Hugging Face Space · {s.get('sdk','')} · {s.get('likes_text','')} likes",
-            "summary_he":   f"Hugging Face Space · {s.get('sdk','')} · {s.get('likes_text','')} לייקים",
+            "summary":      s.get("description") or f"Hugging Face Space · {s.get('sdk','')} · {s.get('likes_text','')} likes",
+            "summary_he":   s.get("description_he") or f"Hugging Face Space · {s.get('sdk','')} · {s.get('likes_text','')} לייקים",
             "vendor":       s.get("vendor") or s.get("owner") or "",
+            "url":          url,
+        })
+    # Docker Hub images
+    for d in (ht.get("docker") or []):
+        url = d.get("url")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        extras.append({
+            "type":         "tool",
+            "tool_source":  "docker",
+            "date":         today_iso,
+            "posted_date":  today_iso,
+            "headline":     d.get("id") or "",
+            "summary":      d.get("description") or "",
+            "summary_he":   d.get("description_he") or "",
+            "vendor":       d.get("namespace") or "",
+            "url":          url,
+        })
+    # PyPI packages
+    for p in (ht.get("pypi") or []):
+        url = p.get("url")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        extras.append({
+            "type":         "tool",
+            "tool_source":  "pypi",
+            "date":         today_iso,
+            "posted_date":  today_iso,
+            "headline":     p.get("name") or "",
+            "summary":      p.get("description") or "",
+            "summary_he":   p.get("description_he") or "",
+            "vendor":       p.get("author") or "",
+            "url":          url,
+        })
+    # npm packages
+    for n in (ht.get("npm") or []):
+        url = n.get("url")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        extras.append({
+            "type":         "tool",
+            "tool_source":  "npm",
+            "date":         today_iso,
+            "posted_date":  today_iso,
+            "headline":     n.get("name") or "",
+            "summary":      n.get("description") or "",
+            "summary_he":   n.get("description_he") or "",
+            "vendor":       n.get("author") or "",
             "url":          url,
         })
 

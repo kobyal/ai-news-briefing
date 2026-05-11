@@ -80,7 +80,7 @@ export function inSiteHref(
   const sectionPath = (() => {
     switch (type) {
       case "video":  return "/media/";
-      case "repo":   return "/github/";
+      case "repo":   return "/tools/";
       case "tweet":
       case "reddit":
       case "pulse":  return "/community/";

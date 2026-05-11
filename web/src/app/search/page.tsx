@@ -65,10 +65,10 @@ function SearchResultCard({ result: r, isHe }: { result: SearchResult; isHe: boo
       href = inSiteHref(anchorType, sourceUrl, r.date, today, r.story_id);
       external = false;
     } else if (type === "tool") {
-      // HF models / Spaces live on the /github/ page (renamed "Hot AI Tools").
-      // No deep-link anchor yet — land at the page top; user scrolls to the
-      // HF section. Keeps external icon hidden so search feels in-site.
-      href = "/github/";
+      // HF models / Spaces / Docker / PyPI / npm all live on the /tools/
+      // page (renamed from /github/ on 2026-05-11). No deep-link anchor
+      // yet — land at the page top; user scrolls to the relevant section.
+      href = "/tools/";
       external = false;
     }
   }

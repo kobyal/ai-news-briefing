@@ -9,7 +9,7 @@ const TABS = [
   "/",
   "/community/",
   "/media/",
-  "/github/",
+  "/tools/",
   "/archive/",
   "/search/",
 ];

@@ -51,7 +51,7 @@ export function Header({ date }: HeaderProps) {
     { href: "/", label: isHe ? "כתבות" : "Stories" },
     { href: "/community/", label: isHe ? "חברתי" : "Community" },
     { href: "/media/", label: isHe ? "מדיה" : "Media" },
-    { href: "/github/", label: "GitHub" },
+    { href: "/tools/", label: isHe ? "כלים" : "Tools" },
     { href: "/search/", label: isHe ? "חיפוש" : "Search" },
   ];
 

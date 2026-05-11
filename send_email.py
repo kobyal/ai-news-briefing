@@ -845,50 +845,78 @@ def _read_run_log(path: Path) -> dict | None:
         return None
 
 
+# Hot Tools delivery thresholds (sum across HF + Docker + PyPI + npm).
+HOT_TOOLS_OK_FLOOR = 40
+HOT_TOOLS_WARN_FLOOR = 20
+
+# Podcasts: 13 shows curated; cover-art success rate threshold.
+PODCASTS_OK_FLOOR = 10
+PODCASTS_COVER_RATIO = 0.7
+
+# Search index: ~200 extras (videos + community + reddit + X + repos + tools)
+# is the steady-state floor.
+SEARCH_EXTRAS_OK_FLOOR = 200
+
+
+def _sidedata_row(agent: str, log_path: Path, today: str, build_row) -> dict:
+    """Boilerplate for the 3 side-data rows: read the JSONL tail; if today's
+    record is present, hand it to `build_row(log)` for the row body; otherwise
+    emit the "off" placeholder so the email shows the gap."""
+    log = _read_run_log(log_path)
+    if log and log.get("date") == today:
+        return build_row(log)
+    return {"agent": agent, "raw": "—", "json": "—", "site": "—",
+            "status": "off", "note": "no run-log today"}
+
+
 def _add_sidedata_rows(rows: list) -> None:
     """Append agent-delivery rows for the 3 side-data sources. Each script
     writes one line/day to its run-log JSONL; we surface the last record."""
     repo = Path(__file__).resolve().parent
     today = datetime.now(timezone.utc).date().isoformat()
 
-    # Hot Tools (HF + Docker + PyPI + npm)
-    ht_log = _read_run_log(repo / "docs/data/_hot_tools_runs.jsonl")
-    if ht_log and ht_log.get("date") == today:
-        total = sum(int(ht_log.get(k, 0)) for k in ("hf_models","hf_spaces","docker","pypi","npm"))
-        note = (f"HF {ht_log.get('hf_models',0)} + Spaces {ht_log.get('hf_spaces',0)} + "
-                f"Docker {ht_log.get('docker',0)} + PyPI {ht_log.get('pypi',0)} + npm {ht_log.get('npm',0)}")
-        status = "ok" if total >= 40 else ("warn" if total >= 20 else "error")
-        rows.append({"agent": "hot tools", "raw": str(total), "json": str(total), "site": str(total),
-                     "status": status, "note": note})
-    else:
-        rows.append({"agent": "hot tools", "raw": "—", "json": "—", "site": "—",
-                     "status": "off", "note": "no run-log today"})
+    def _hot_tools(log: dict) -> dict:
+        total = sum(int(log.get(k, 0)) for k in ("hf_models","hf_spaces","docker","pypi","npm"))
+        note = (f"HF {log.get('hf_models',0)} + Spaces {log.get('hf_spaces',0)} + "
+                f"Docker {log.get('docker',0)} + PyPI {log.get('pypi',0)} + npm {log.get('npm',0)}")
+        if total >= HOT_TOOLS_OK_FLOOR:
+            status = "ok"
+        elif total >= HOT_TOOLS_WARN_FLOOR:
+            status = "warn"
+        else:
+            status = "error"
+        return {"agent": "hot tools", "raw": str(total), "json": str(total), "site": str(total),
+                "status": status, "note": note}
 
-    # Podcasts (latest episode + cover per show)
-    pc_log = _read_run_log(repo / "docs/data/_podcasts_runs.jsonl")
-    if pc_log and pc_log.get("date") == today:
-        n = int(pc_log.get("total", 0))
-        covers = int(pc_log.get("with_cover", 0))
-        eps = int(pc_log.get("with_episode", 0))
-        status = "ok" if n >= 10 and covers >= n * 0.7 else ("warn" if n > 0 else "error")
-        rows.append({"agent": "podcasts", "raw": str(n), "json": f"{covers}/cover", "site": f"{eps}/ep",
-                     "status": status, "note": f"{covers} covers · {eps} episodes"})
-    else:
-        rows.append({"agent": "podcasts", "raw": "—", "json": "—", "site": "—",
-                     "status": "off", "note": "no run-log today"})
+    def _podcasts(log: dict) -> dict:
+        n = int(log.get("total", 0))
+        covers = int(log.get("with_cover", 0))
+        eps = int(log.get("with_episode", 0))
+        if n >= PODCASTS_OK_FLOOR and covers >= n * PODCASTS_COVER_RATIO:
+            status = "ok"
+        elif n > 0:
+            status = "warn"
+        else:
+            status = "error"
+        return {"agent": "podcasts", "raw": str(n), "json": f"{covers}/cover", "site": f"{eps}/ep",
+                "status": status, "note": f"{covers} covers · {eps} episodes"}
 
-    # Search index (post-ingest expansion)
-    si_log = _read_run_log(repo / "docs/data/_search_index_runs.jsonl")
-    if si_log and si_log.get("date") == today:
-        stories = int(si_log.get("stories", 0))
-        extras = int(si_log.get("extras", 0))
-        status = "ok" if extras >= 200 else ("warn" if extras > 0 else "error")
-        rows.append({"agent": "search index", "raw": "—", "json": f"{stories}+{extras}",
-                     "site": f"{stories + extras}", "status": status,
-                     "note": f"{stories} articles + {extras} extras (videos/repos/X/reddit/community/tools)"})
-    else:
-        rows.append({"agent": "search index", "raw": "—", "json": "—", "site": "—",
-                     "status": "off", "note": "no run-log today"})
+    def _search_index(log: dict) -> dict:
+        stories = int(log.get("stories", 0))
+        extras = int(log.get("extras", 0))
+        if extras >= SEARCH_EXTRAS_OK_FLOOR:
+            status = "ok"
+        elif extras > 0:
+            status = "warn"
+        else:
+            status = "error"
+        return {"agent": "search index", "raw": "—", "json": f"{stories}+{extras}",
+                "site": f"{stories + extras}", "status": status,
+                "note": f"{stories} articles + {extras} extras (videos/repos/X/reddit/community/tools)"}
+
+    rows.append(_sidedata_row("hot tools",    repo / "docs/data/_hot_tools_runs.jsonl",     today, _hot_tools))
+    rows.append(_sidedata_row("podcasts",     repo / "docs/data/_podcasts_runs.jsonl",      today, _podcasts))
+    rows.append(_sidedata_row("search index", repo / "docs/data/_search_index_runs.jsonl", today, _search_index))
 
 
 def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dict]:

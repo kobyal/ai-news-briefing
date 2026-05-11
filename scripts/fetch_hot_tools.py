@@ -11,6 +11,7 @@ Phase 1.1 (2026-05-11 PM): real owner avatars + README-derived descriptions
 import json
 import os
 import re
+import sys
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -18,6 +19,9 @@ from pathlib import Path
 
 REPO = Path("/Users/kobyalmog/vscode/projects/ai-news-briefing")
 OUT_PATH = REPO / "docs/data/hot_tools.json"
+
+sys.path.insert(0, str(REPO / "scripts"))
+from _run_log import append_run_log  # noqa: E402
 
 # DeepL key lives in private/.env; loaded from there by local-cycle.sh. When
 # absent we ship without Hebrew descriptions (frontend falls back to EN).
@@ -45,10 +49,9 @@ def _http_text(url: str, timeout: int = 12) -> str:
         return ""
 
 
-# Simple owner→avatar cache. One HTTP call per distinct owner regardless of
-# how many of their models trend today.
-_avatar_cache: dict[str, str] = {}
-_fullname_cache: dict[str, str] = {}
+# Simple owner→(avatar, fullname) cache. One HTTP call per distinct owner
+# regardless of how many of their models trend today.
+_owner_cache: dict[str, tuple[str, str]] = {}
 
 def fetch_owner_avatar(owner: str) -> tuple[str, str]:
     """Return (avatar_url, fullname). HF's API has both org + user endpoints;
@@ -56,8 +59,8 @@ def fetch_owner_avatar(owner: str) -> tuple[str, str]:
     back to 🤗 emoji)."""
     if not owner:
         return "", ""
-    if owner in _avatar_cache:
-        return _avatar_cache[owner], _fullname_cache.get(owner, "")
+    if owner in _owner_cache:
+        return _owner_cache[owner]
     avatar, fullname = "", ""
     for endpoint in ("organizations", "users"):
         d = _http_json(f"https://huggingface.co/api/{endpoint}/{urllib.parse.quote(owner)}/overview")
@@ -65,8 +68,7 @@ def fetch_owner_avatar(owner: str) -> tuple[str, str]:
             avatar = d.get("avatarUrl") or ""
             fullname = d.get("fullname") or d.get("name") or ""
             break
-    _avatar_cache[owner] = avatar
-    _fullname_cache[owner] = fullname
+    _owner_cache[owner] = (avatar, fullname)
     return avatar, fullname
 
 
@@ -186,17 +188,15 @@ def _clean_readme_intro(md: str, *, kind: str = "models", max_chars: int = 500) 
     return " ".join(collected)
 
 
-def _synthesize_description(*, kind: str, owner_fullname: str, pipeline_tag: str = "", sdk: str = "", name: str = "") -> tuple[str, str]:
+def _synthesize_description(*, kind: str, owner_fullname: str, pipeline_tag: str = "", sdk: str = "") -> tuple[str, str]:
     """When the README has no usable prose, build a 1-liner from the API
     metadata so every card still has SOMETHING readable. Returns (en, he)."""
     if kind == "models":
         tag = pipeline_tag or "AI"
         en = f"{tag.replace('-', ' ')} model from {owner_fullname}"
-        # Hebrew template: "מודל {tag_he} מאת {owner}"
         tag_he = PIPELINE_TAG_HE.get(pipeline_tag, pipeline_tag) or "AI"
         he = f"מודל {tag_he} מאת {owner_fullname}"
         return en, he
-    # spaces
     sdk_label = sdk or "AI"
     en = f"Interactive {sdk_label} demo by {owner_fullname}"
     he = f"דמו אינטראקטיבי מבוסס {sdk_label} מאת {owner_fullname}"
@@ -346,7 +346,7 @@ def fetch_hf_models(limit: int = 12) -> list[dict]:
             # Synthesize a 1-liner when README has nothing usable. Better
             # than an empty card; keeps the visual rhythm consistent.
             description, description_he = _synthesize_description(
-                kind="models", owner_fullname=owner_fullname, pipeline_tag=pipeline_tag, name=name,
+                kind="models", owner_fullname=owner_fullname, pipeline_tag=pipeline_tag,
             )
         out.append({
             "id":              mid,
@@ -400,7 +400,7 @@ def fetch_hf_spaces(limit: int = 10) -> list[dict]:
             description_he = deepl_translate(description)
         else:
             description, description_he = _synthesize_description(
-                kind="spaces", owner_fullname=owner_fullname, sdk=sdk, name=name,
+                kind="spaces", owner_fullname=owner_fullname, sdk=sdk,
             )
         out.append({
             "id":             sid,
@@ -691,23 +691,13 @@ def main() -> None:
     for k, v in counts.items():
         print(f"   {k:11s}: {v}")
 
-    # Append a one-line run-log so send_email.py's monitoring panel can
-    # report today's Hot Tools health alongside the other agents. Best-
-    # effort — never crash the fetcher if the log write fails.
-    try:
-        elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
-        log_record = {
-            "date":       started_at.date().isoformat(),
-            "fetched_at": payload["fetched_at"],
-            "duration_s": round(elapsed, 1),
-            **counts,
-        }
-        log_path = REPO / "docs/data/_hot_tools_runs.jsonl"
-        with log_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(log_record) + "\n")
-        print(f"   ✓ logged to {log_path.name}")
-    except Exception as e:
-        print(f"   ⚠ run-log write failed: {e}")
+    elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+    append_run_log(REPO / "docs/data/_hot_tools_runs.jsonl", {
+        "date":       started_at.date().isoformat(),
+        "fetched_at": payload["fetched_at"],
+        "duration_s": round(elapsed, 1),
+        **counts,
+    })
 
 
 if __name__ == "__main__":

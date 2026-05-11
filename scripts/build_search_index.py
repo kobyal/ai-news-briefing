@@ -9,6 +9,7 @@ unnecessary.
 One-shot fallback established 2026-05-11."""
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 REPO = Path("/Users/kobyalmog/vscode/projects/ai-news-briefing")
@@ -16,6 +17,9 @@ DATA_DIR = REPO / "docs/data"
 BUCKET = "ai-news-briefing-web2"
 KEY = "data/search-index.json"
 PROFILE = "koby-personal"
+
+sys.path.insert(0, str(REPO / "scripts"))
+from _run_log import append_run_log  # noqa: E402
 
 stories: list[dict] = []
 extras: list[dict] = []
@@ -301,21 +305,10 @@ out_path = REPO / "docs/data/search-index.json"
 out_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 print(f"Wrote {out_path}: {len(stories)} stories + {len(extras)} extras")
 
-# One-line run-log for send_email.py's monitoring panel (best-effort).
-try:
-    from datetime import datetime, timezone
-    log_record = {
-        "date":         datetime.now(timezone.utc).date().isoformat(),
-        "fetched_at":   datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "stories":      len(stories),
-        "extras":       len(extras),
-    }
-    log_path = REPO / "docs/data/_search_index_runs.jsonl"
-    with log_path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(log_record) + "\n")
-    print(f"   ✓ logged to {log_path.name}")
-except Exception as e:
-    print(f"   ⚠ run-log write failed: {e}")
+append_run_log(REPO / "docs/data/_search_index_runs.jsonl", {
+    "stories":      len(stories),
+    "extras":       len(extras),
+})
 
 # Upload to S3 directly so the live site picks it up without waiting for
 # the ingest Lambda redeploy.

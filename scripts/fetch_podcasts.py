@@ -14,6 +14,7 @@ Run after each pipeline cycle (or daily) to keep latest-episode fresh.
 """
 import json
 import re
+import sys
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -21,6 +22,9 @@ from email.utils import parsedate_to_datetime
 
 REPO = Path("/Users/kobyalmog/vscode/projects/ai-news-briefing")
 OUT_PATH = REPO / "docs/data/podcasts.json"
+
+sys.path.insert(0, str(REPO / "scripts"))
+from _run_log import append_run_log  # noqa: E402
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 
@@ -177,22 +181,11 @@ def main():
     print(f"\n✓ wrote {OUT_PATH}: {have_cover}/{len(out)} covers, "
           f"{have_ep}/{len(out)} with latest episode")
 
-    # One-line run-log for the email monitoring panel.
-    try:
-        from datetime import datetime, timezone
-        log_record = {
-            "date":          datetime.now(timezone.utc).date().isoformat(),
-            "fetched_at":    datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "total":         len(out),
-            "with_cover":    have_cover,
-            "with_episode":  have_ep,
-        }
-        log_path = REPO / "docs/data/_podcasts_runs.jsonl"
-        with log_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(log_record) + "\n")
-        print(f"   ✓ logged to {log_path.name}")
-    except Exception as e:
-        print(f"   ⚠ run-log write failed: {e}")
+    append_run_log(REPO / "docs/data/_podcasts_runs.jsonl", {
+        "total":         len(out),
+        "with_cover":    have_cover,
+        "with_episode":  have_ep,
+    })
 
 
 if __name__ == "__main__":

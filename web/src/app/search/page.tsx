@@ -29,6 +29,7 @@ const TYPE_META: Record<NonNullable<SearchResult["type"]>, TypeMeta> = {
   community: { label: "COMMUNITY", label_he: "קהילה",  color: "#0e7a3a", bg: "rgba(14,122,58,0.08)" },
   reddit:    { label: "REDDIT",    label_he: "רדיט",   color: "#ff4500", bg: "rgba(255,69,0,0.08)" },
   twitter:   { label: "X",         label_he: "X",       color: "#0f172a", bg: "rgba(15,23,42,0.08)" },
+  tool:      { label: "TOOL",      label_he: "כלי",     color: "#b45309", bg: "rgba(180,83,9,0.08)" },
 };
 
 function videoIdFromUrl(url: string): string {
@@ -62,6 +63,12 @@ function SearchResultCard({ result: r, isHe }: { result: SearchResult; isHe: boo
     const anchorType = anchorTypeMap[type];
     if (anchorType) {
       href = inSiteHref(anchorType, sourceUrl, r.date, today, r.story_id);
+      external = false;
+    } else if (type === "tool") {
+      // HF models / Spaces live on the /github/ page (renamed "Hot AI Tools").
+      // No deep-link anchor yet — land at the page top; user scrolls to the
+      // HF section. Keeps external icon hidden so search feels in-site.
+      href = "/github/";
       external = false;
     }
   }
@@ -188,6 +195,7 @@ const TYPE_FILTERS: { value: TypeFilter; label: string; label_he: string }[] = [
   { value: "reddit",    label: "Reddit",    label_he: "רדיט" },
   { value: "twitter",   label: "X",         label_he: "X" },
   { value: "repo",      label: "GitHub",    label_he: "GitHub" },
+  { value: "tool",      label: "Tools",     label_he: "כלים" },
 ];
 
 function SearchContent() {

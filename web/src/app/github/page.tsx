@@ -7,6 +7,39 @@ import { fetchArchive, fetchDayData } from "@/lib/api";
 import { useLang } from "@/context/LangContext";
 import type { DayData } from "@/lib/types";
 
+// Hot Tools data (HF models + HF spaces today; Docker/PyPI/npm in future
+// phases). Built by scripts/fetch_hot_tools.py → docs/data/hot_tools.json.
+interface HFModel {
+  id: string;
+  owner: string;
+  name: string;
+  url: string;
+  pipeline_tag: string;
+  pipeline_tag_he: string;
+  downloads: number;
+  downloads_text: string;
+  likes: number;
+  likes_text: string;
+  trending_score: number;
+  vendor: string;
+  tags: string[];
+}
+interface HFSpace {
+  id: string;
+  owner: string;
+  name: string;
+  url: string;
+  sdk: string;
+  likes: number;
+  likes_text: string;
+  vendor: string;
+}
+interface HotTools {
+  fetched_at?: string;
+  hf_models?: HFModel[];
+  hf_spaces?: HFSpace[];
+}
+
 interface RepoCard {
   repo: string;
   description: string;
@@ -186,11 +219,145 @@ function ReleaseRow({ r, isHe }: { r: ReleaseCard; isHe: boolean }) {
   );
 }
 
+// ── HF Model / Space cards ─────────────────────────────────────────────────
+function HFAvatar({ owner, size = 40 }: { owner: string; size?: number }) {
+  // Use HF org avatar — they serve a public 200x200. If 404, fallback emoji.
+  const src = `https://huggingface.co/${encodeURIComponent(owner)}/resolve/main/avatar.png`;
+  return (
+    <div
+      className="flex items-center justify-center shrink-0"
+      style={{
+        width: size, height: size, borderRadius: 10,
+        background: "linear-gradient(135deg, #fef3c7, #fde68a)",
+        color: "#92400e", fontSize: size * 0.55, fontWeight: 800,
+      }}
+    >
+      <img
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        style={{ width: size, height: size, borderRadius: 10, objectFit: "cover" }}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+      />
+      <span style={{ position: "absolute" }}>🤗</span>
+    </div>
+  );
+}
+
+function HFModelCard({ m, isHe }: { m: HFModel; isHe: boolean }) {
+  const tag = isHe && m.pipeline_tag_he ? m.pipeline_tag_he : m.pipeline_tag;
+  return (
+    <a
+      href={m.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block rounded-xl p-4 transition-all"
+      style={{ background: "#ffffff", border: "1px solid #fde68a", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "#f59e0b";
+        e.currentTarget.style.boxShadow = "0 2px 12px rgba(245,158,11,0.18)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "#fde68a";
+        e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="relative shrink-0" style={{ width: 40, height: 40 }}>
+          <HFAvatar owner={m.owner} size={40} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span style={{ fontSize: "11px", color: "#9a9ab8", fontFamily: "var(--font-mono, ui-monospace)" }}>{m.owner}/</span>
+            <span className="font-bold" style={{ fontSize: "14px", color: "#0f0f1a", fontFamily: "var(--font-mono, ui-monospace)" }}>{m.name}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            {tag && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                style={{ color: "#b45309", background: "#fef3c7", border: "1px solid #fde68a", letterSpacing: "0.02em" }}
+              >
+                {tag}
+              </span>
+            )}
+            {m.vendor && m.vendor !== m.owner && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                style={{ color: "#6b6b8a", background: "#f3f3f8", border: "1px solid #e0e0ec" }}
+              >
+                {m.vendor}
+              </span>
+            )}
+            {m.downloads_text && (
+              <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "#6b6b8a" }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                {m.downloads_text}
+              </span>
+            )}
+            {m.likes_text && (
+              <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "#6b6b8a" }}>
+                <span style={{ color: "#dc2626" }}>❤</span>
+                {m.likes_text}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </a>
+  );
+}
+
+function HFSpaceCard({ s, isHe }: { s: HFSpace; isHe: boolean }) {
+  return (
+    <a
+      href={s.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block rounded-xl p-3 transition-all"
+      style={{ background: "#ffffff", border: "1px solid #ddd6fe", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "#7c3aed";
+        e.currentTarget.style.boxShadow = "0 2px 12px rgba(124,58,237,0.18)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "#ddd6fe";
+        e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center shrink-0" style={{ width: 32, height: 32, borderRadius: 8, background: "#ede9fe", color: "#7c3aed", fontSize: 18 }}>
+          {isHe ? "▶" : "▶"}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span style={{ fontSize: "10.5px", color: "#9a9ab8", fontFamily: "var(--font-mono, ui-monospace)" }}>{s.owner}/</span>
+            <span className="font-bold truncate" style={{ fontSize: "13px", color: "#0f0f1a", fontFamily: "var(--font-mono, ui-monospace)" }}>{s.name}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full" style={{ color: "#5b21b6", background: "#ede9fe", border: "1px solid #ddd6fe" }}>
+              {s.sdk}
+            </span>
+            {s.likes_text && (
+              <span className="text-[10.5px]" style={{ color: "#6b6b8a" }}>
+                <span style={{ color: "#dc2626" }}>❤</span> {s.likes_text}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </a>
+  );
+}
+
 export default function GitHubPage() {
   const { isHe } = useLang();
   const [data, setData] = useState<DayData | null>(null);
   const [archive, setArchive] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hotTools, setHotTools] = useState<HotTools | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -203,6 +370,16 @@ export default function GitHubPage() {
       setLoading(false);
     }
     load();
+  }, []);
+
+  // Hot Tools (HF models + Spaces today; Docker/PyPI/npm in future phases).
+  // Static JSON refreshed daily by scripts/fetch_hot_tools.py + uploaded to
+  // S3 in local-cycle.sh's [3b/6] step.
+  useEffect(() => {
+    fetch("/data/hot_tools.json")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setHotTools(d); })
+      .catch(() => {});
   }, []);
 
   const { trending, releases } = useMemo(() => {
@@ -233,18 +410,18 @@ export default function GitHubPage() {
       <Header date={today} archive={archive} />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 pb-8 pt-8">
         <div className="flex items-center gap-3 mb-2">
-          <span style={{ color: "#1f2937" }}><GitHubIcon size={28} /></span>
+          <span style={{ fontSize: "26px" }}>🔥</span>
           <h1 style={{ fontFamily: "var(--font-display)", fontSize: "24px", fontWeight: 800, color: "var(--text-primary)" }}>
-            {isHe ? "GitHub Trending" : "GitHub Trending"}
+            {isHe ? "כלים חמים ב-AI" : "Hot AI Tools"}
           </h1>
         </div>
         <p className="mb-8 text-[13px]" style={{ color: "#9a9ab8" }}>
           {isHe
-            ? "פרויקטי AI חמים ו-releases חדשים, מתעדכן יומית"
-            : "Hot AI repos and new releases, refreshed daily"}
+            ? "GitHub trending, מודלים ו-Spaces מובילים ב-Hugging Face. מתעדכן יומית."
+            : "GitHub trending, top Hugging Face models & Spaces. Refreshed daily."}
         </p>
 
-        {trending.length === 0 && releases.length === 0 ? (
+        {trending.length === 0 && releases.length === 0 && !hotTools?.hf_models?.length && !hotTools?.hf_spaces?.length ? (
           <div className="text-center py-16 rounded-2xl" style={{ color: "#9a9ab8", background: "#ffffff", border: "1px solid #ededf5" }}>
             {isHe ? "אין נתונים זמינים להיום" : "No data available for today"}
           </div>
@@ -252,9 +429,10 @@ export default function GitHubPage() {
           <>
             {trending.length > 0 && (
               <section className="mb-10">
-                <div className="flex items-baseline gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <span style={{ color: "#1f2937" }}><GitHubIcon size={18} /></span>
                   <h2 className="text-[16px] font-bold" style={{ color: "#0f0f1a" }}>
-                    🔥 {isHe ? "פרויקטים חמים" : "Trending Repos"}
+                    {isHe ? "GitHub — פרויקטים חמים" : "GitHub Trending Repos"}
                   </h2>
                   <span className="text-[11px]" style={{ color: "#9a9ab8" }}>{trending.length}</span>
                 </div>
@@ -265,7 +443,7 @@ export default function GitHubPage() {
             )}
 
             {releases.length > 0 && (
-              <section>
+              <section className="mb-10">
                 <div className="flex items-baseline gap-2 mb-4">
                   <h2 className="text-[16px] font-bold" style={{ color: "#0f0f1a" }}>
                     🚀 {isHe ? "Releases חדשים" : "New Releases"}
@@ -274,6 +452,46 @@ export default function GitHubPage() {
                 </div>
                 <div className="flex flex-col gap-3">
                   {releases.map((r, i) => <ReleaseRow key={i} r={r} isHe={isHe} />)}
+                </div>
+              </section>
+            )}
+
+            {hotTools?.hf_models && hotTools.hf_models.length > 0 && (
+              <section className="mb-10">
+                <div className="flex items-center gap-2 mb-4">
+                  <span style={{ fontSize: 20 }}>🤗</span>
+                  <h2 className="text-[16px] font-bold" style={{ color: "#0f0f1a" }}>
+                    {isHe ? "Hugging Face — מודלים מובילים" : "Hugging Face Trending Models"}
+                  </h2>
+                  <span className="text-[11px]" style={{ color: "#9a9ab8" }}>{hotTools.hf_models.length}</span>
+                </div>
+                <p className="text-[12px] mb-3" style={{ color: "#9a9ab8" }}>
+                  {isHe
+                    ? "מודלים פתוחים שמשכו את מירב הצפיות וההורדות החודש"
+                    : "Open-source models with the most pulls + likes this month"}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {hotTools.hf_models.map((m, i) => <HFModelCard key={i} m={m} isHe={isHe} />)}
+                </div>
+              </section>
+            )}
+
+            {hotTools?.hf_spaces && hotTools.hf_spaces.length > 0 && (
+              <section className="mb-10">
+                <div className="flex items-center gap-2 mb-4">
+                  <span style={{ fontSize: 18 }}>✨</span>
+                  <h2 className="text-[16px] font-bold" style={{ color: "#0f0f1a" }}>
+                    {isHe ? "Hugging Face — Spaces מובילים" : "Hugging Face Trending Spaces"}
+                  </h2>
+                  <span className="text-[11px]" style={{ color: "#9a9ab8" }}>{hotTools.hf_spaces.length}</span>
+                </div>
+                <p className="text-[12px] mb-3" style={{ color: "#9a9ab8" }}>
+                  {isHe
+                    ? "דמואים אינטראקטיביים של AI לבדיקה ישירה בדפדפן"
+                    : "Interactive AI demos you can try in the browser"}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {hotTools.hf_spaces.map((s, i) => <HFSpaceCard key={i} s={s} isHe={isHe} />)}
                 </div>
               </section>
             )}

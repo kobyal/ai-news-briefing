@@ -188,6 +188,62 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
 stories.sort(key=lambda i: i.get("date") or "", reverse=True)
 extras.sort(key=lambda i: i.get("date") or "", reverse=True)
 
+# ── Hot Tools (HF models + Spaces) ─────────────────────────────────────────
+# Pulled from docs/data/hot_tools.json (built by scripts/fetch_hot_tools.py).
+# Indexed globally (not per-date) since dataset is small + already deduped.
+# Search hrefs route to /github/#tool-{...} where these render. Established
+# 2026-05-11.
+HOT_TOOLS_PATH = REPO / "docs/data/hot_tools.json"
+if HOT_TOOLS_PATH.exists():
+    try:
+        ht = json.loads(HOT_TOOLS_PATH.read_text())
+    except Exception:
+        ht = {}
+    today_iso = max((s.get("date") or "" for s in stories), default="")
+    for m in (ht.get("hf_models") or []):
+        url = m.get("url")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        tag_en = m.get("pipeline_tag") or ""
+        tag_he = m.get("pipeline_tag_he") or tag_en
+        bits_en = [f"{tag_en} model" if tag_en else "model"]
+        bits_he = [f"מודל {tag_he}" if tag_he else "מודל"]
+        if m.get("downloads_text"):
+            bits_en.append(f"{m['downloads_text']} downloads")
+            bits_he.append(f"{m['downloads_text']} הורדות")
+        if m.get("likes_text"):
+            bits_en.append(f"{m['likes_text']} likes")
+            bits_he.append(f"{m['likes_text']} לייקים")
+        extras.append({
+            "type":         "tool",
+            "tool_source":  "hf_model",
+            "date":         today_iso,
+            "posted_date":  today_iso,
+            "headline":     m.get("id") or "",
+            "headline_he":  m.get("id") or "",
+            "summary":      f"Hugging Face · {' · '.join(bits_en)}",
+            "summary_he":   f"Hugging Face · {' · '.join(bits_he)}",
+            "vendor":       m.get("vendor") or m.get("owner") or "",
+            "url":          url,
+        })
+    for s in (ht.get("hf_spaces") or []):
+        url = s.get("url")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        extras.append({
+            "type":         "tool",
+            "tool_source":  "hf_space",
+            "date":         today_iso,
+            "posted_date":  today_iso,
+            "headline":     s.get("id") or "",
+            "summary":      f"Hugging Face Space · {s.get('sdk','')} · {s.get('likes_text','')} likes",
+            "summary_he":   f"Hugging Face Space · {s.get('sdk','')} · {s.get('likes_text','')} לייקים",
+            "vendor":       s.get("vendor") or s.get("owner") or "",
+            "url":          url,
+        })
+
 payload = {"stories": stories, "extras": extras}
 
 out_path = REPO / "docs/data/search-index.json"

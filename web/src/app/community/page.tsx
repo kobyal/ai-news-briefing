@@ -11,6 +11,7 @@ import { useLang } from "@/context/LangContext";
 import type { DayData, CommunityPulseItem } from "@/lib/types";
 import { getVendorLogo, getVendor } from "@/lib/vendors";
 import { LoadingSpinner, DaySeparator, INFINITE_SCROLL_ROOT_MARGIN, withMinDelay } from "@/components/ui/InfiniteScroll";
+import { BackToTopButton } from "@/components/ui/BackToTopButton";
 import { readDateParam, scrollToHash } from "@/lib/anchors";
 
 // Mirror BriefingPage's relative-date label helper so historical day dividers
@@ -702,6 +703,7 @@ function CommunityPageInner() {
           </div>
         )}
       </main>
+      <BackToTopButton isHe={isHe} />
       <Footer />
     </div>
   );

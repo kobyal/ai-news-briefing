@@ -8,6 +8,7 @@ import { fetchDayData, fetchArchive } from "@/lib/api";
 import { useLang } from "@/context/LangContext";
 import type { DayData, NewsItem, YouTubeVideo, ChannelLatestVideo } from "@/lib/types";
 import { LoadingSpinner, DaySeparator, INFINITE_SCROLL_ROOT_MARGIN, withMinDelay } from "@/components/ui/InfiniteScroll";
+import { BackToTopButton } from "@/components/ui/BackToTopButton";
 import { readDateParam, scrollToHash } from "@/lib/anchors";
 
 // Mirrors BriefingPage / community page relative-date label helper.
@@ -1257,6 +1258,7 @@ function MediaPageInner() {
           </div>
         )}
       </main>
+      <BackToTopButton isHe={isHe} />
       <Footer />
     </div>
   );

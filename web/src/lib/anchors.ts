@@ -99,25 +99,39 @@ export function readDateParam(params: URLSearchParams | null | undefined): strin
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
 }
 
-/** Scroll to `location.hash` smoothly, waiting one tick for layout to
- *  settle. Falls back silently when the anchor isn't in the DOM yet —
- *  callers re-invoke after data loads. */
-export function scrollToHash(behavior: ScrollBehavior = "smooth") {
-  if (typeof window === "undefined") return;
+/** Poll for `#hash` element to appear, then scroll + highlight. Older-day
+ *  anchors need this: the receiving page kicks off a fetch, the older-day
+ *  DOM only commits after the fetch resolves + React re-renders, and
+ *  scrollIntoView is no-op on a missing target. A bare double-RAF wasn't
+ *  enough (timing-dependent under React 18 concurrent rendering).
+ *
+ *  Polls every 150ms for up to 6 seconds. Returns a cleanup fn so callers
+ *  can cancel from a useEffect. Idempotent — once it finds the element
+ *  and scrolls, further calls during the same poll are no-op. */
+export function scrollToHash(behavior: ScrollBehavior = "smooth"): () => void {
+  if (typeof window === "undefined") return () => {};
   const hash = window.location.hash.slice(1);
-  if (!hash) return;
-  // Two RAFs: 1st lets React commit, 2nd lets the new DOM lay out.
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      const el = document.getElementById(hash);
-      if (el) {
-        el.scrollIntoView({ behavior, block: "start" });
-        // Soft highlight so the reader sees what was just landed on.
-        el.style.transition = "background 0.4s ease";
-        const prev = el.style.background;
-        el.style.background = "rgba(124,58,237,0.08)";
-        setTimeout(() => { el.style.background = prev; }, 1600);
-      }
-    });
-  });
+  if (!hash) return () => {};
+  let tries = 0;
+  let found = false;
+  const tick = () => {
+    if (found) return;
+    const el = document.getElementById(hash);
+    if (el) {
+      found = true;
+      el.scrollIntoView({ behavior, block: "start" });
+      // Soft purple highlight so the reader sees what was landed on.
+      el.style.transition = "background 0.4s ease";
+      const prev = el.style.background;
+      el.style.background = "rgba(124,58,237,0.10)";
+      setTimeout(() => { el.style.background = prev; }, 1800);
+      return;
+    }
+    if (++tries < 40) {
+      setTimeout(tick, 150);
+    }
+  };
+  // Start once on this RAF so React has a chance to commit current state.
+  requestAnimationFrame(tick);
+  return () => { found = true; };
 }

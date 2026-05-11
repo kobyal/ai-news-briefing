@@ -696,16 +696,31 @@ function ChannelCard({ channel, latest, isHe }: { channel: Channel; latest?: Cha
 }
 
 // ── Podcast card ────────────────────────────────────────────────────────────
-function PodCard({ channel, isHe }: { channel: Channel; isHe: boolean }) {
+// Podcast metadata loaded from /data/podcasts.json (built by /tmp/fetch_podcasts.py).
+interface PodcastEpisode {
+  title?: string;
+  date?: string;          // ISO YYYY-MM-DD
+  duration_text?: string; // e.g. "1:42:18" or "23:45"
+}
+interface PodcastMeta {
+  name?: string;
+  spotify_url?: string;
+  cover_url?: string;
+  latest_episode?: PodcastEpisode;
+}
+
+function PodCard({ channel, isHe, meta }: { channel: Channel; isHe: boolean; meta?: PodcastMeta }) {
   const name = isHe ? channel.name_he : channel.name;
   const desc = isHe ? channel.desc_he : channel.desc;
+  const ep = meta?.latest_episode;
+  const cover = meta?.cover_url;
 
   return (
     <a
       href={channel.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex transition-transform"
+      className="block transition-transform"
       style={{
         background: "#fff",
         border: "1px solid #ededf5",
@@ -716,49 +731,119 @@ function PodCard({ channel, isHe }: { channel: Channel; isHe: boolean }) {
         color: "inherit",
       }}
     >
-      <div
-        className="shrink-0 flex items-center justify-center font-extrabold"
-        style={{
-          width: "88px",
-          background: "linear-gradient(135deg, #1DB954 0%, #0e7a3a 100%)",
-          color: "#fff",
-          fontSize: "26px",
-          fontFamily: "var(--font-display)",
-        }}
-      >
-        {podCoverLetters(name)}
-      </div>
-      <div className="flex-1 min-w-0" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-        <div className="flex items-center gap-2 mb-1">
-          <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#0f0f1a" }} className="truncate">{name}</span>
-          <span
+      <div className="flex">
+        {/* Cover art (or letter fallback) */}
+        {cover ? (
+          <div
+            className="shrink-0"
             style={{
-              fontSize: "9px",
-              fontWeight: 700,
-              padding: "1px 6px",
-              borderRadius: "999px",
-              background: "#f3f3f8",
-              color: "#6b6b8a",
-              border: "1px solid #e0e0ec",
+              width: "96px",
+              height: "96px",
+              backgroundImage: `url("${cover}")`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          />
+        ) : (
+          <div
+            className="shrink-0 flex items-center justify-center font-extrabold"
+            style={{
+              width: "96px",
+              height: "96px",
+              background: "linear-gradient(135deg, #1DB954 0%, #0e7a3a 100%)",
+              color: "#fff",
+              fontSize: "26px",
+              fontFamily: "var(--font-display)",
             }}
           >
-            {channel.lang === "he" ? "🇮🇱 HE" : "🇺🇸 EN"}
-          </span>
+            {podCoverLetters(name)}
+          </div>
+        )}
+        {/* Name + lang + description */}
+        <div className="flex-1 min-w-0" style={{ padding: "10px 14px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#0f0f1a" }} className="truncate">{name}</span>
+            <span
+              style={{
+                fontSize: "9px",
+                fontWeight: 700,
+                padding: "1px 6px",
+                borderRadius: "999px",
+                background: "#f3f3f8",
+                color: "#6b6b8a",
+                border: "1px solid #e0e0ec",
+              }}
+            >
+              {channel.lang === "he" ? "🇮🇱 HE" : "🇺🇸 EN"}
+            </span>
+          </div>
+          <p
+            style={{
+              fontSize: "11px",
+              color: "#9a9ab8",
+              margin: 0,
+              display: "-webkit-box",
+              WebkitBoxOrient: "vertical" as const,
+              WebkitLineClamp: 2,
+              overflow: "hidden",
+            }}
+          >
+            {desc}
+          </p>
         </div>
-        <p
+      </div>
+      {/* Latest episode row */}
+      {ep?.title && (
+        <div
+          className="flex items-center gap-2.5"
           style={{
-            fontSize: "11px",
-            color: "#9a9ab8",
-            margin: 0,
-            display: "-webkit-box",
-            WebkitBoxOrient: "vertical" as const,
-            WebkitLineClamp: 2,
-            overflow: "hidden",
+            padding: "9px 14px",
+            borderTop: "1px solid #f3f3f8",
+            background: "rgba(29,185,84,0.03)",
           }}
         >
-          {desc}
-        </p>
-      </div>
+          <span
+            className="shrink-0 flex items-center justify-center"
+            style={{
+              width: "22px",
+              height: "22px",
+              borderRadius: "50%",
+              background: "#1DB954",
+              color: "#fff",
+              fontSize: "10px",
+              fontWeight: 800,
+            }}
+          >
+            ▶
+          </span>
+          <div className="flex-1 min-w-0">
+            <p
+              style={{
+                fontSize: "11.5px",
+                fontWeight: 600,
+                color: "#4a4a6a",
+                lineHeight: 1.35,
+                margin: 0,
+                display: "-webkit-box",
+                WebkitBoxOrient: "vertical" as const,
+                WebkitLineClamp: 1,
+                overflow: "hidden",
+              }}
+            >
+              {ep.title}
+            </p>
+            <div className="flex items-center gap-1.5" style={{ fontSize: "10px", color: "#9a9ab8", fontFamily: "ui-monospace, monospace" }}>
+              {ep.date && <span>{ep.date}</span>}
+              {ep.duration_text && (
+                <>
+                  <span style={{ color: "#d0d0e0" }}>·</span>
+                  <span>{ep.duration_text}</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </a>
   );
 }
@@ -940,6 +1025,7 @@ function MediaPageInner() {
   const [showAllVideos, setShowAllVideos] = useState(false);
   const [olderDays, setOlderDays] = useState<OlderMediaDay[]>([]);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [podcastMeta, setPodcastMeta] = useState<Record<string, PodcastMeta>>({});
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const inFlightDates = useRef<Set<string>>(new Set());
   const searchParams = useSearchParams();
@@ -962,6 +1048,16 @@ function MediaPageInner() {
       }
     }
     load();
+  }, []);
+
+  // Podcasts metadata — keyed by spotify show URL. Built by
+  // /tmp/fetch_podcasts.py via iTunes Search + RSS parse (cover art +
+  // latest episode title/date/duration). Static JSON cached at the CDN.
+  useEffect(() => {
+    fetch("/data/podcasts.json")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setPodcastMeta(d); })
+      .catch(() => {});
   }, []);
 
   const olderDates = useMemo(
@@ -1227,7 +1323,7 @@ function MediaPageInner() {
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {podChannels.map((c) => (
-            <PodCard key={c.url} channel={c} isHe={isHe} />
+            <PodCard key={c.url} channel={c} isHe={isHe} meta={podcastMeta[c.url]} />
           ))}
         </div>
 

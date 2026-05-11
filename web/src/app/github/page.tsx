@@ -49,6 +49,7 @@ interface DockerImage {
   namespace: string;
   name: string;
   url: string;
+  icon_url?: string;
   description: string;
   description_he?: string;
   pull_count: number;
@@ -65,6 +66,8 @@ interface PyPIPackage {
   home: string;
   version: string;
   author: string;
+  icon_url?: string;
+  github_org?: string;
   description: string;
   description_he?: string;
   downloads_month: number;
@@ -77,6 +80,8 @@ interface NpmPackage {
   home: string;
   version: string;
   author: string;
+  icon_url?: string;
+  github_org?: string;
   description: string;
   description_he?: string;
   downloads_week: number;
@@ -187,6 +192,46 @@ function PythonIcon({ size = 22 }: { size?: number }) {
       <path fill="url(#py-blue)" d="M23.8 4c-9.9 0-9.2 4.3-9.2 4.3v4.5h9.4v1.3H10.3s-6.3-.7-6.3 9.1c0 9.9 5.5 9.5 5.5 9.5h3.3v-4.7s-.2-5.5 5.4-5.5h9.3s5.2.1 5.2-5.1V9.1S33.5 4 23.8 4zm-5.2 3c.9 0 1.7.8 1.7 1.7s-.8 1.7-1.7 1.7-1.7-.8-1.7-1.7.7-1.7 1.7-1.7z"/>
       <path fill="url(#py-yellow)" d="M24.2 44c9.9 0 9.2-4.3 9.2-4.3v-4.5H24v-1.3h13.7s6.3.7 6.3-9.1c0-9.9-5.5-9.5-5.5-9.5h-3.3v4.7s.2 5.5-5.4 5.5h-9.3s-5.2-.1-5.2 5.1v9.5s-.8 5.4 8.9 5.4zm5.2-3c-.9 0-1.7-.8-1.7-1.7s.8-1.7 1.7-1.7 1.7.8 1.7 1.7-.7 1.7-1.7 1.7z"/>
     </svg>
+  );
+}
+
+// Per-project avatar with brand-icon fallback. We try the GitHub avatar
+// first (most projects have a recognizable org logo there) and fall back
+// to the source's brand icon when the image fails to load or no icon_url
+// is set in the data.
+function ProjectIcon({
+  iconUrl,
+  brand,
+  alt,
+  bg,
+  size = 40,
+}: {
+  iconUrl?: string;
+  brand: React.ReactNode;
+  alt: string;
+  bg: string;
+  size?: number;
+}) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div
+      className="flex items-center justify-center shrink-0 overflow-hidden"
+      style={{ width: size, height: size, borderRadius: 10, background: bg }}
+    >
+      {iconUrl && !failed ? (
+        <img
+          src={iconUrl}
+          alt={alt}
+          width={size}
+          height={size}
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+          style={{ width: size, height: size, objectFit: "cover" }}
+        />
+      ) : (
+        brand
+      )}
+    </div>
   );
 }
 
@@ -489,9 +534,12 @@ function DockerCard({ d, isHe }: { d: DockerImage; isHe: boolean }) {
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#bfdbfe"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}
     >
       <div className="flex items-start gap-3">
-        <div className="flex items-center justify-center shrink-0" style={{ width: 40, height: 40, borderRadius: 10, background: "#dbeafe" }}>
-          <DockerIcon size={26} />
-        </div>
+        <ProjectIcon
+          iconUrl={d.icon_url}
+          brand={<DockerIcon size={26} />}
+          alt={d.namespace}
+          bg="#dbeafe"
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span style={{ fontSize: "11px", color: "#9a9ab8", fontFamily: "var(--font-mono, ui-monospace)" }}>{d.namespace}/</span>
@@ -546,9 +594,12 @@ function PyPICard({ p, isHe }: { p: PyPIPackage; isHe: boolean }) {
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#fde68a"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}
     >
       <div className="flex items-start gap-3">
-        <div className="flex items-center justify-center shrink-0" style={{ width: 40, height: 40, borderRadius: 10, background: "#fef3c7" }}>
-          <PythonIcon size={26} />
-        </div>
+        <ProjectIcon
+          iconUrl={p.icon_url}
+          brand={<PythonIcon size={26} />}
+          alt={p.name}
+          bg="#fef3c7"
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="font-bold" style={{ fontSize: "14px", color: "#0f0f1a", fontFamily: "var(--font-mono, ui-monospace)" }}>{p.name}</span>
@@ -602,9 +653,12 @@ function NpmCard({ n, isHe }: { n: NpmPackage; isHe: boolean }) {
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#fecaca"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}
     >
       <div className="flex items-start gap-3">
-        <div className="flex items-center justify-center shrink-0" style={{ width: 40, height: 40, borderRadius: 10, overflow: "hidden" }}>
-          <NpmIcon size={40} />
-        </div>
+        <ProjectIcon
+          iconUrl={n.icon_url}
+          brand={<NpmIcon size={40} />}
+          alt={n.name}
+          bg="#fee2e2"
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="font-bold" style={{ fontSize: "14px", color: "#0f0f1a", fontFamily: "var(--font-mono, ui-monospace)" }}>{n.name}</span>

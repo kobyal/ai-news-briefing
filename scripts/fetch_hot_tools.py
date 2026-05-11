@@ -426,32 +426,49 @@ def fetch_hf_spaces(limit: int = 10) -> list[dict]:
 # No "trending" endpoint, so we maintain a curated allowlist of AI/ML images
 # people actually use. The per-repo API gives description + pull_count +
 # star_count. Sorted by pull_count to surface the most-used at the top.
+#
+# Tuple: (docker_namespace, docker_image, github_org_or_None)
+# The 3rd element maps to a GitHub org we can pull an avatar from — Docker
+# Hub namespaces don't always match GH org names (e.g. n8nio → n8n-io).
 
-DOCKER_AI_IMAGES = [
-    ("ollama", "ollama"),                      # local LLM runner
-    ("vllm", "vllm-openai"),                   # serving framework
-    ("huggingface", "text-generation-inference"),  # TGI
-    ("langgenius", "dify"),                    # open-source LLM platform
-    ("n8nio", "n8n"),                          # workflow / agent automation
-    ("qdrant", "qdrant"),                      # vector DB
-    ("ghcr.io/chroma-core", "chroma"),         # vector DB (note: ghcr, fallback)
-    ("weaviate", "weaviate"),                  # vector DB
-    ("mintplexlabs", "anythingllm"),           # private chat with docs
-    ("comfyanonymous", "comfyui"),             # node-based image gen
-    ("nvidia", "cuda"),                        # GPU base image
-    ("library", "pytorch"),                    # PyTorch (alt: pytorch/pytorch)
-    ("pytorch", "pytorch"),                    # official PyTorch
-    ("tensorflow", "tensorflow"),              # TF official
-    ("milvusdb", "milvus"),                    # vector DB
-    ("flowiseai", "flowise"),                  # LangChain visual builder
+DOCKER_AI_IMAGES: list[tuple[str, str, str | None]] = [
+    ("ollama",         "ollama",                       "ollama"),
+    ("vllm",           "vllm-openai",                  "vllm-project"),
+    ("huggingface",    "text-generation-inference",    "huggingface"),
+    ("langgenius",     "dify",                         "langgenius"),
+    ("n8nio",          "n8n",                          "n8n-io"),
+    ("qdrant",         "qdrant",                       "qdrant"),
+    ("weaviate",       "weaviate",                     "weaviate"),
+    ("mintplexlabs",   "anythingllm",                  "Mintplex-Labs"),
+    ("comfyanonymous", "comfyui",                      "comfyanonymous"),
+    ("nvidia",         "cuda",                         "NVIDIA"),
+    ("pytorch",        "pytorch",                      "pytorch"),
+    ("tensorflow",     "tensorflow",                   "tensorflow"),
+    ("milvusdb",       "milvus",                       "milvus-io"),
+    ("flowiseai",      "flowise",                      "FlowiseAI"),
 ]
+
+
+def _github_avatar(org: str | None) -> str:
+    """GitHub serves a sized PNG avatar for any user/org at
+    `https://github.com/{name}.png?size=80`. Empty when org is unknown."""
+    return f"https://github.com/{urllib.parse.quote(org)}.png?size=80" if org else ""
+
+
+def _github_org_from_url(url: str) -> str:
+    """Extract `{org}` from a github.com URL. Works for git+https://,
+    https://github.com/owner/repo[.git], etc."""
+    if not url:
+        return ""
+    m = re.search(r"github\.com[/:]([\w.-]+)/", url)
+    return m.group(1) if m else ""
 
 
 def fetch_docker_hub(limit: int = 10) -> list[dict]:
     """Curated AI/ML Docker images sorted by pull count.
     API: https://hub.docker.com/v2/repositories/{namespace}/{name}/"""
     items: list[dict] = []
-    for namespace, name in DOCKER_AI_IMAGES:
+    for namespace, name, github_org in DOCKER_AI_IMAGES:
         if namespace.startswith("ghcr.io"):
             # GHCR is a different registry; skip for the Docker Hub section.
             # We could add a GHCR fetcher later but it requires auth tokens.
@@ -479,7 +496,8 @@ def fetch_docker_hub(limit: int = 10) -> list[dict]:
             "name":          name,
             "id":            f"{namespace}/{name}",
             "url":           f"https://hub.docker.com/r/{namespace}/{name}",
-            "description":   chosen_desc[:280],
+            "icon_url":      _github_avatar(github_org),
+            "description":   chosen_desc[:500],
             "pull_count":    int(d.get("pull_count") or 0),
             "pull_count_text": _fmt_count(d.get("pull_count")),
             "star_count":    int(d.get("star_count") or 0),
@@ -528,7 +546,24 @@ def fetch_pypi(limit: int = 10) -> list[dict]:
         version = info.get("version") or ""
         author = info.get("author") or info.get("author_email") or ""
         author = re.sub(r"\s*<[^>]+>", "", author).strip() or "—"
-        home = info.get("home_page") or (info.get("project_urls") or {}).get("Homepage") or ""
+        project_urls = info.get("project_urls") or {}
+        home = info.get("home_page") or project_urls.get("Homepage") or ""
+        # GitHub org is usually under project_urls (Source / Repository /
+        # Code / Homepage). Try each key in priority order, then fall back
+        # to scanning every value for a github.com URL.
+        gh_org = ""
+        for key in ("Source", "Source Code", "Repository", "Code", "GitHub", "Homepage"):
+            v = project_urls.get(key) or ""
+            if "github.com" in v:
+                gh_org = _github_org_from_url(v)
+                if gh_org:
+                    break
+        if not gh_org:
+            for v in list(project_urls.values()) + [home]:
+                if v and "github.com" in v:
+                    gh_org = _github_org_from_url(v)
+                    if gh_org:
+                        break
         # Long README — combine with summary for a richer card description.
         long_desc = _clean_readme_intro(info.get("description") or "", kind="models", max_chars=500)
         if summary and long_desc:
@@ -543,6 +578,8 @@ def fetch_pypi(limit: int = 10) -> list[dict]:
             "home":             home,
             "version":          version,
             "author":           author,
+            "icon_url":         _github_avatar(gh_org),
+            "github_org":       gh_org,
             "description":      description[:500],
             "downloads_month":  downloads,
             "downloads_text":   _fmt_count(downloads),
@@ -609,6 +646,14 @@ def fetch_npm(limit: int = 10) -> list[dict]:
             description = long_desc if short[:40].lower() in long_desc.lower() else f"{short}. {long_desc}"
         else:
             description = long_desc or short or f"{name} — JavaScript package"
+        # GitHub org from `repository.url` (often "git+https://github.com/x/y.git").
+        repo_url = ""
+        repo = latest.get("repository")
+        if isinstance(repo, dict):
+            repo_url = repo.get("url") or ""
+        elif isinstance(repo, str):
+            repo_url = repo
+        gh_org = _github_org_from_url(repo_url) or _github_org_from_url(home)
         downloads = _npm_downloads(name)
         items.append({
             "name":            name,
@@ -617,6 +662,8 @@ def fetch_npm(limit: int = 10) -> list[dict]:
             "home":            home,
             "version":         version,
             "author":          author or "—",
+            "icon_url":        _github_avatar(gh_org),
+            "github_org":      gh_org,
             "description":     description[:500],
             "downloads_week":  downloads,
             "downloads_text":  _fmt_count(downloads),

@@ -70,14 +70,70 @@ def fetch_owner_avatar(owner: str) -> tuple[str, str]:
     return avatar, fullname
 
 
-def _clean_readme_intro(md: str) -> str:
+def _parse_frontmatter_short_description(md: str) -> str:
+    """HF Spaces commonly have a `short_description:` field in YAML
+    front-matter that's a nice 1-liner. Return it when present."""
+    m = re.match(r"^---\n(.*?)\n---\n", md, flags=re.DOTALL)
+    if not m:
+        return ""
+    front = m.group(1)
+    sd = re.search(r"^short_description:\s*(.+?)$", front, flags=re.MULTILINE)
+    if not sd:
+        return ""
+    val = sd.group(1).strip().strip('"\'')
+    # Strip trailing comment + leading "|" or ">" YAML block markers
+    val = re.sub(r"\s+#.*$", "", val)
+    return val[:280]
+
+
+def _looks_like_junk_paragraph(p: str) -> bool:
+    """Detect link-bars / pure-URL paragraphs / bullet-style captions
+    that pass the >=30-char min but aren't actually descriptions.
+    Example junk seen on /github/ today:
+      - "Hugging Face | GitHub | MTP Documentation"        (link bar)
+      - "https://huggingface.co/Foo/Foo_Workflows"         (raw URL)
+      - "Full Fine-Tune • Rich Aesthetics • Strong Diversity • ..."  (bullets)
+    """
+    # 1. Mostly pipes (link bar). >=2 pipes and <50% alpha words → junk.
+    pipe_count = p.count("|")
+    if pipe_count >= 2:
+        # Average word length between pipes; link bars have short words like "GitHub", "HF", "Docs"
+        words = [w.strip() for w in p.split("|") if w.strip()]
+        if all(len(w) < 30 for w in words):
+            return True
+    # 2. Bullet chars (•, ●, ▪, ★, ✦) used as separators
+    if sum(p.count(c) for c in "•●▪★✦◆◇") >= 2:
+        return True
+    # 3. Mostly URL — >=80% of chars are inside http(s) tokens
+    url_chars = sum(len(u) for u in re.findall(r"https?://\S+", p))
+    if url_chars > len(p) * 0.5:
+        return True
+    # 4. Looks like a heading ("See also", "Documentation", etc.)
+    if re.match(r"^(see|check|homepage|documentation|quickstart|installation|usage|references?|links?|notes?)\b", p.lower()):
+        return True
+    return False
+
+
+def _clean_readme_intro(md: str, *, kind: str = "models") -> str:
     """Extract a 2-3 sentence description from a HF README. README structure
     varies wildly — most start with a YAML front-matter block, then HTML
     shield badges (Twitter/HF/license), then headings, then the "## Intro"
     or first prose paragraph. We strip everything that isn't readable
-    prose and return up to ~280 chars of the first non-empty paragraph."""
+    prose and return up to ~280 chars of the first non-junk paragraph.
+
+    For HF Spaces, also tries the YAML `short_description` field as the
+    first preference — many Space READMEs have no body, just front-matter."""
     if not md:
         return ""
+
+    # First — Spaces often pack their best 1-liner into the YAML front-matter.
+    # Author-curated, so we accept down to ~15 chars (way under the 50-char
+    # min applied to body paragraphs).
+    if kind == "spaces":
+        short = _parse_frontmatter_short_description(md)
+        if short and len(short) >= 15 and not _looks_like_junk_paragraph(short):
+            return short
+
     # 1. Strip YAML front-matter
     md = re.sub(r"^---\n.*?\n---\n", "", md, count=1, flags=re.DOTALL)
     # 2. Strip HTML blocks (shields, alignment divs, etc.)
@@ -90,7 +146,7 @@ def _clean_readme_intro(md: str) -> str:
     md = re.sub(r"`([^`]+)`", r"\1", md)
     md = re.sub(r"^\s*\|.*\|\s*$", "", md, flags=re.MULTILINE)
     md = re.sub(r"^[-*_]{3,}\s*$", "", md, flags=re.MULTILINE)
-    # 5. Walk paragraphs, find the first prose one (skip headings + bullets)
+    # 5. Walk paragraphs, find the first prose one (skip headings + bullets + junk)
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", md)]
     for p in paragraphs:
         if not p:
@@ -104,10 +160,11 @@ def _clean_readme_intro(md: str) -> str:
         p = re.sub(r"\*([^*]+)\*", r"\1", p)
         p = re.sub(r"_([^_]+)_", r"\1", p)
         p = re.sub(r"\s+", " ", p).strip()
-        # Skip paragraphs that look like badge rows or short captions
-        if len(p) < 30:
+        # Skip paragraphs too short to be meaningful (was 30, now 50 — eliminates
+        # link bars like "HF | GitHub | Docs" and 1-line URL captions)
+        if len(p) < 50:
             continue
-        if p.lower().startswith(("see ", "check ", "homepage", "[")):
+        if _looks_like_junk_paragraph(p):
             continue
         if len(p) > 280:
             # Cut at sentence boundary near 280
@@ -119,6 +176,23 @@ def _clean_readme_intro(md: str) -> str:
     return ""
 
 
+def _synthesize_description(*, kind: str, owner_fullname: str, pipeline_tag: str = "", sdk: str = "", name: str = "") -> tuple[str, str]:
+    """When the README has no usable prose, build a 1-liner from the API
+    metadata so every card still has SOMETHING readable. Returns (en, he)."""
+    if kind == "models":
+        tag = pipeline_tag or "AI"
+        en = f"{tag.replace('-', ' ')} model from {owner_fullname}"
+        # Hebrew template: "מודל {tag_he} מאת {owner}"
+        tag_he = PIPELINE_TAG_HE.get(pipeline_tag, pipeline_tag) or "AI"
+        he = f"מודל {tag_he} מאת {owner_fullname}"
+        return en, he
+    # spaces
+    sdk_label = sdk or "AI"
+    en = f"Interactive {sdk_label} demo by {owner_fullname}"
+    he = f"דמו אינטראקטיבי מבוסס {sdk_label} מאת {owner_fullname}"
+    return en, he
+
+
 def fetch_readme_intro(model_or_space_id: str, kind: str = "models") -> str:
     """Pull README from the raw GitHub-style endpoint + clean it."""
     base = "https://huggingface.co"
@@ -126,7 +200,7 @@ def fetch_readme_intro(model_or_space_id: str, kind: str = "models") -> str:
     md = _http_text(f"{base}{path}/raw/main/README.md")
     if not md:
         md = _http_text(f"{base}{path}/raw/master/README.md")
-    return _clean_readme_intro(md)
+    return _clean_readme_intro(md, kind=kind)
 
 
 def deepl_translate(text: str, target: str = "HE") -> str:
@@ -254,12 +328,20 @@ def fetch_hf_models(limit: int = 12) -> list[dict]:
         score = m.get("trendingScore") or 0
         tags = m.get("tags") or []
         avatar_url, fullname = fetch_owner_avatar(owner)
+        owner_fullname = fullname or _vendor_for(owner) or owner
         description = fetch_readme_intro(mid, kind="models")
-        description_he = deepl_translate(description) if description else ""
+        if description:
+            description_he = deepl_translate(description)
+        else:
+            # Synthesize a 1-liner when README has nothing usable. Better
+            # than an empty card; keeps the visual rhythm consistent.
+            description, description_he = _synthesize_description(
+                kind="models", owner_fullname=owner_fullname, pipeline_tag=pipeline_tag, name=name,
+            )
         out.append({
             "id":              mid,
             "owner":           owner,
-            "owner_fullname":  fullname or _vendor_for(owner) or owner,
+            "owner_fullname":  owner_fullname,
             "owner_avatar":    avatar_url,
             "name":            name,
             "url":             f"https://huggingface.co/{mid}",
@@ -302,12 +384,18 @@ def fetch_hf_spaces(limit: int = 10) -> list[dict]:
         sdk = s.get("sdk") or "static"
         score = s.get("trendingScore") or 0
         avatar_url, fullname = fetch_owner_avatar(owner)
+        owner_fullname = fullname or _vendor_for(owner) or owner
         description = fetch_readme_intro(sid, kind="spaces")
-        description_he = deepl_translate(description) if description else ""
+        if description:
+            description_he = deepl_translate(description)
+        else:
+            description, description_he = _synthesize_description(
+                kind="spaces", owner_fullname=owner_fullname, sdk=sdk, name=name,
+            )
         out.append({
             "id":             sid,
             "owner":          owner,
-            "owner_fullname": fullname or _vendor_for(owner) or owner,
+            "owner_fullname": owner_fullname,
             "owner_avatar":   avatar_url,
             "name":           name,
             "url":            f"https://huggingface.co/spaces/{sid}",

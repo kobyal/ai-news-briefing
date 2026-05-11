@@ -114,40 +114,43 @@ def _looks_like_junk_paragraph(p: str) -> bool:
     return False
 
 
-def _clean_readme_intro(md: str, *, kind: str = "models") -> str:
-    """Extract a 2-3 sentence description from a HF README. README structure
-    varies wildly — most start with a YAML front-matter block, then HTML
-    shield badges (Twitter/HF/license), then headings, then the "## Intro"
-    or first prose paragraph. We strip everything that isn't readable
-    prose and return up to ~280 chars of the first non-junk paragraph.
+def _clean_readme_intro(md: str, *, kind: str = "models", max_chars: int = 500) -> str:
+    """Extract a 2-4 sentence description from a HF README. Walks paragraphs
+    in order; accumulates up to `max_chars` of prose. For HF Spaces, blends
+    the YAML `short_description` field with body prose so cards have a
+    proper paragraph even when the body is sparse.
 
-    For HF Spaces, also tries the YAML `short_description` field as the
-    first preference — many Space READMEs have no body, just front-matter."""
+    2026-05-11 PM: bumped max_chars 280→500 + accumulate multiple paragraphs
+    on user feedback that descriptions felt too short."""
     if not md:
         return ""
 
-    # First — Spaces often pack their best 1-liner into the YAML front-matter.
-    # Author-curated, so we accept down to ~15 chars (way under the 50-char
-    # min applied to body paragraphs).
+    short_desc = ""
     if kind == "spaces":
         short = _parse_frontmatter_short_description(md)
         if short and len(short) >= 15 and not _looks_like_junk_paragraph(short):
-            return short
+            short_desc = short
+            # If short_description is long enough, we may still skip body walk.
+            # But we'd rather grow it with body context when available.
 
     # 1. Strip YAML front-matter
     md = re.sub(r"^---\n.*?\n---\n", "", md, count=1, flags=re.DOTALL)
-    # 2. Strip HTML blocks (shields, alignment divs, etc.)
+    # 2. Strip HTML blocks
     md = re.sub(r"<[^>]+>", "", md)
     # 3. Strip image+link markdown
     md = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", md)
     md = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", md)
-    # 4. Strip code fences, table syntax, horizontal rules
+    # 4. Strip code fences + table syntax + horizontal rules
     md = re.sub(r"```[\s\S]*?```", "", md)
     md = re.sub(r"`([^`]+)`", r"\1", md)
     md = re.sub(r"^\s*\|.*\|\s*$", "", md, flags=re.MULTILINE)
     md = re.sub(r"^[-*_]{3,}\s*$", "", md, flags=re.MULTILINE)
-    # 5. Walk paragraphs, find the first prose one (skip headings + bullets + junk)
+
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", md)]
+    collected: list[str] = []
+    if short_desc:
+        collected.append(short_desc)
+    total = sum(len(p) for p in collected)
     for p in paragraphs:
         if not p:
             continue
@@ -155,25 +158,32 @@ def _clean_readme_intro(md: str, *, kind: str = "models") -> str:
             continue
         if p.startswith(("- ", "* ", "1. ", ">")):
             continue
-        # Strip remaining markdown emphasis
         p = re.sub(r"\*\*([^*]+)\*\*", r"\1", p)
         p = re.sub(r"\*([^*]+)\*", r"\1", p)
         p = re.sub(r"_([^_]+)_", r"\1", p)
         p = re.sub(r"\s+", " ", p).strip()
-        # Skip paragraphs too short to be meaningful (was 30, now 50 — eliminates
-        # link bars like "HF | GitHub | Docs" and 1-line URL captions)
         if len(p) < 50:
             continue
         if _looks_like_junk_paragraph(p):
             continue
-        if len(p) > 280:
-            # Cut at sentence boundary near 280
-            cut = re.match(r"^(.{180,280}?[.!?])\s", p)
-            if cut:
-                return cut.group(1)
-            return p[:280].rsplit(" ", 1)[0] + "…"
-        return p
-    return ""
+        # Skip near-duplicates of what we already collected (e.g. front-matter
+        # short_description echoing the first body line).
+        if collected and (p[:60].lower() in collected[0].lower()
+                          or collected[0][:60].lower() in p.lower()):
+            continue
+        # Append; cut at sentence boundary if it would overflow.
+        if total + len(p) + 1 > max_chars:
+            remaining = max_chars - total - 1
+            if remaining < 80:
+                break
+            cut = re.match(rf"^(.{{60,{remaining}}}?[.!?])\s", p)
+            collected.append(cut.group(1) if cut else (p[:remaining].rsplit(" ", 1)[0] + "…"))
+            break
+        collected.append(p)
+        total += len(p) + 1
+        if total >= max_chars * 0.85:
+            break
+    return " ".join(collected)
 
 
 def _synthesize_description(*, kind: str, owner_fullname: str, pipeline_tag: str = "", sdk: str = "", name: str = "") -> tuple[str, str]:
@@ -450,11 +460,18 @@ def fetch_docker_hub(limit: int = 10) -> list[dict]:
         d = _http_json(url)
         if not isinstance(d, dict):
             continue
-        desc = (d.get("description") or "").strip()
+        short = (d.get("description") or "").strip()
         full_desc = (d.get("full_description") or "").strip()
-        # Clean full_description (markdown → plain)
-        long_desc = _clean_readme_intro(full_desc, kind="models")
-        chosen_desc = long_desc or desc
+        # Pull 2-4 sentences from the full README. Combine with short
+        # description when they don't overlap so the card has a proper paragraph.
+        long_desc = _clean_readme_intro(full_desc, kind="models", max_chars=500)
+        if short and long_desc:
+            if short[:40].lower() in long_desc.lower():
+                chosen_desc = long_desc
+            else:
+                chosen_desc = f"{short}. {long_desc}"
+        else:
+            chosen_desc = long_desc or short
         if not chosen_desc:
             chosen_desc = f"{name} container image from {namespace}"
         items.append({
@@ -512,6 +529,12 @@ def fetch_pypi(limit: int = 10) -> list[dict]:
         author = info.get("author") or info.get("author_email") or ""
         author = re.sub(r"\s*<[^>]+>", "", author).strip() or "—"
         home = info.get("home_page") or (info.get("project_urls") or {}).get("Homepage") or ""
+        # Long README — combine with summary for a richer card description.
+        long_desc = _clean_readme_intro(info.get("description") or "", kind="models", max_chars=500)
+        if summary and long_desc:
+            description = long_desc if summary[:40].lower() in long_desc.lower() else f"{summary}. {long_desc}"
+        else:
+            description = long_desc or summary or f"{name} — Python package"
         downloads = _pypi_downloads(name)
         items.append({
             "name":             name,
@@ -520,7 +543,7 @@ def fetch_pypi(limit: int = 10) -> list[dict]:
             "home":             home,
             "version":          version,
             "author":           author,
-            "description":      summary[:280],
+            "description":      description[:500],
             "downloads_month":  downloads,
             "downloads_text":   _fmt_count(downloads),
         })
@@ -566,17 +589,26 @@ def _npm_downloads(name: str) -> int:
 def fetch_npm(limit: int = 10) -> list[dict]:
     items: list[dict] = []
     for name in NPM_AI_PACKAGES:
-        d = _http_json(f"https://registry.npmjs.org/{urllib.parse.quote(name, safe='@')}/latest")
-        if not isinstance(d, dict):
+        # /latest gives `version`, `description`, `author`, `homepage`.
+        # The package-root endpoint also has `readme` (full markdown).
+        latest = _http_json(f"https://registry.npmjs.org/{urllib.parse.quote(name, safe='@')}/latest")
+        if not isinstance(latest, dict):
             continue
-        version = d.get("version") or ""
-        description = (d.get("description") or "").strip()
-        home = d.get("homepage") or ""
+        root = _http_json(f"https://registry.npmjs.org/{urllib.parse.quote(name, safe='@')}")
+        version = latest.get("version") or ""
+        short = (latest.get("description") or "").strip()
+        home = latest.get("homepage") or ""
         author = ""
-        if isinstance(d.get("author"), dict):
-            author = (d["author"].get("name") or "").strip()
-        elif isinstance(d.get("author"), str):
-            author = re.sub(r"\s*<[^>]+>", "", d["author"]).strip()
+        if isinstance(latest.get("author"), dict):
+            author = (latest["author"].get("name") or "").strip()
+        elif isinstance(latest.get("author"), str):
+            author = re.sub(r"\s*<[^>]+>", "", latest["author"]).strip()
+        readme = (root.get("readme") or "") if isinstance(root, dict) else ""
+        long_desc = _clean_readme_intro(readme, kind="models", max_chars=500)
+        if short and long_desc:
+            description = long_desc if short[:40].lower() in long_desc.lower() else f"{short}. {long_desc}"
+        else:
+            description = long_desc or short or f"{name} — JavaScript package"
         downloads = _npm_downloads(name)
         items.append({
             "name":            name,
@@ -585,7 +617,7 @@ def fetch_npm(limit: int = 10) -> list[dict]:
             "home":            home,
             "version":         version,
             "author":          author or "—",
-            "description":     description[:280],
+            "description":     description[:500],
             "downloads_week":  downloads,
             "downloads_text":  _fmt_count(downloads),
         })

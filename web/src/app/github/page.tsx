@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { fetchArchive, fetchDayData } from "@/lib/api";
 import { useLang } from "@/context/LangContext";
 import type { DayData } from "@/lib/types";
+import { LoadingSpinner, DaySeparator, INFINITE_SCROLL_ROOT_MARGIN, withMinDelay } from "@/components/ui/InfiniteScroll";
+import { BackToTopButton } from "@/components/ui/BackToTopButton";
 
 // Hot Tools data (HF models + HF spaces today; Docker/PyPI/npm in future
 // phases). Built by scripts/fetch_hot_tools.py → docs/data/hot_tools.json.
@@ -157,6 +159,43 @@ function GitHubIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
+    </svg>
+  );
+}
+
+// Brand SVG icons for the Hot Tools sections — keeps things on-brand and
+// crisp at any size. The Docker whale + Python snake + npm wordmark are
+// simplified renditions of the official logos.
+function DockerIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#1d63ed" d="M44.96 19.16c-.36-.24-3-2.04-8.16-1.32-.6-4.92-3.96-7.32-4.08-7.44l-.96-.6-.72.96c-.96 1.44-1.68 3.36-1.92 5.16-.36 2.04-.24 4.32.84 6.36-1.32.84-3.6.96-4.08.96H4.8c-.84 0-1.68.72-1.68 1.68 0 3.96.6 7.92 2.04 11.64 1.68 4.08 4.2 7.08 7.32 8.88 3.6 2.04 9.36 3.24 15.84 3.24 3 0 5.88-.24 8.64-.84 3.96-.72 7.68-2.16 10.92-4.2 2.52-1.68 4.8-3.84 6.6-6.6 3-4.68 4.8-9.96 6.12-14.76 1.32.36 3.96.84 5.16-.96.36-.48.84-1.56-.36-3l-.96-.96z"/>
+      <path fill="#fff" d="M6 26h4v4H6zm5 0h4v4h-4zm5 0h4v4h-4zm5 0h4v4h-4zm-10-5h4v4h-4zm5 0h4v4h-4zm5 0h4v4h-4zm0-5h4v4h-4zm5 5h4v4h-4z"/>
+    </svg>
+  );
+}
+
+function PythonIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <linearGradient id="py-blue" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#387eb8"/><stop offset="1" stopColor="#366994"/>
+      </linearGradient>
+      <linearGradient id="py-yellow" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#ffe052"/><stop offset="1" stopColor="#ffc331"/>
+      </linearGradient>
+      <path fill="url(#py-blue)" d="M23.8 4c-9.9 0-9.2 4.3-9.2 4.3v4.5h9.4v1.3H10.3s-6.3-.7-6.3 9.1c0 9.9 5.5 9.5 5.5 9.5h3.3v-4.7s-.2-5.5 5.4-5.5h9.3s5.2.1 5.2-5.1V9.1S33.5 4 23.8 4zm-5.2 3c.9 0 1.7.8 1.7 1.7s-.8 1.7-1.7 1.7-1.7-.8-1.7-1.7.7-1.7 1.7-1.7z"/>
+      <path fill="url(#py-yellow)" d="M24.2 44c9.9 0 9.2-4.3 9.2-4.3v-4.5H24v-1.3h13.7s6.3.7 6.3-9.1c0-9.9-5.5-9.5-5.5-9.5h-3.3v4.7s.2 5.5-5.4 5.5h-9.3s-5.2-.1-5.2 5.1v9.5s-.8 5.4 8.9 5.4zm5.2-3c-.9 0-1.7-.8-1.7-1.7s.8-1.7 1.7-1.7 1.7.8 1.7 1.7-.7 1.7-1.7 1.7z"/>
+    </svg>
+  );
+}
+
+function NpmIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <rect width="48" height="48" rx="4" fill="#cb3837"/>
+      <path fill="#fff" d="M9 16h30v14H24v2h-7v-2H9V16zm2 12h7v-9h4v9h2v-9h4v9h2v-9h4v9h2v-9h4v9h-2v2h-7v-2h-7v2h-7v-2H11v-2z"/>
+      <path fill="#cb3837" d="M13 18h5v8h-2v-6h-3v-2zm6 0h12v8h-3v-6h-2v6h-2v-6h-2v6h-3v-8zm14 0h5v8h-3v-6h-2v6h2v2h-2v-10z"/>
     </svg>
   );
 }
@@ -425,7 +464,7 @@ function HFSpaceCard({ s, isHe }: { s: HFSpace; isHe: boolean }) {
             textAlign: isHe ? "right" : "left",
             display: "-webkit-box",
             WebkitBoxOrient: "vertical" as const,
-            WebkitLineClamp: 2,
+            WebkitLineClamp: 3,
             overflow: "hidden",
           }}
         >
@@ -450,8 +489,8 @@ function DockerCard({ d, isHe }: { d: DockerImage; isHe: boolean }) {
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#bfdbfe"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}
     >
       <div className="flex items-start gap-3">
-        <div className="flex items-center justify-center shrink-0" style={{ width: 40, height: 40, borderRadius: 10, background: "#dbeafe", color: "#1d4ed8", fontSize: 22 }}>
-          🐳
+        <div className="flex items-center justify-center shrink-0" style={{ width: 40, height: 40, borderRadius: 10, background: "#dbeafe" }}>
+          <DockerIcon size={26} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5 flex-wrap">
@@ -483,7 +522,7 @@ function DockerCard({ d, isHe }: { d: DockerImage; isHe: boolean }) {
             textAlign: isHe ? "right" : "left",
             display: "-webkit-box",
             WebkitBoxOrient: "vertical" as const,
-            WebkitLineClamp: 3,
+            WebkitLineClamp: 4,
             overflow: "hidden",
           }}
         >
@@ -507,8 +546,8 @@ function PyPICard({ p, isHe }: { p: PyPIPackage; isHe: boolean }) {
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#fde68a"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}
     >
       <div className="flex items-start gap-3">
-        <div className="flex items-center justify-center shrink-0" style={{ width: 40, height: 40, borderRadius: 10, background: "#fef3c7", fontSize: 22 }}>
-          🐍
+        <div className="flex items-center justify-center shrink-0" style={{ width: 40, height: 40, borderRadius: 10, background: "#fef3c7" }}>
+          <PythonIcon size={26} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5 flex-wrap">
@@ -539,7 +578,7 @@ function PyPICard({ p, isHe }: { p: PyPIPackage; isHe: boolean }) {
             textAlign: isHe ? "right" : "left",
             display: "-webkit-box",
             WebkitBoxOrient: "vertical" as const,
-            WebkitLineClamp: 2,
+            WebkitLineClamp: 4,
             overflow: "hidden",
           }}
         >
@@ -563,8 +602,8 @@ function NpmCard({ n, isHe }: { n: NpmPackage; isHe: boolean }) {
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#fecaca"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}
     >
       <div className="flex items-start gap-3">
-        <div className="flex items-center justify-center shrink-0 font-extrabold" style={{ width: 40, height: 40, borderRadius: 10, background: "#cb3837", color: "#ffffff", fontSize: 14, letterSpacing: "-0.05em" }}>
-          npm
+        <div className="flex items-center justify-center shrink-0" style={{ width: 40, height: 40, borderRadius: 10, overflow: "hidden" }}>
+          <NpmIcon size={40} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5 flex-wrap">
@@ -595,7 +634,7 @@ function NpmCard({ n, isHe }: { n: NpmPackage; isHe: boolean }) {
             textAlign: isHe ? "right" : "left",
             display: "-webkit-box",
             WebkitBoxOrient: "vertical" as const,
-            WebkitLineClamp: 2,
+            WebkitLineClamp: 4,
             overflow: "hidden",
           }}
         >
@@ -626,9 +665,8 @@ export default function GitHubPage() {
     load();
   }, []);
 
-  // Hot Tools (HF models + Spaces today; Docker/PyPI/npm in future phases).
-  // Static JSON refreshed daily by scripts/fetch_hot_tools.py + uploaded to
-  // S3 in local-cycle.sh's [3b/6] step.
+  // Hot Tools (HF + Docker + PyPI + npm). Static JSON refreshed daily by
+  // scripts/fetch_hot_tools.py + uploaded to S3 in local-cycle.sh's [3b/6] step.
   useEffect(() => {
     fetch("/data/hot_tools.json")
       .then((r) => (r.ok ? r.json() : null))
@@ -636,8 +674,56 @@ export default function GitHubPage() {
       .catch(() => {});
   }, []);
 
-  const { trending, releases } = useMemo(() => {
-    const items = (data?.github || []) as unknown[];
+  // Infinite scroll for older-day GitHub trending + releases. Hot Tools
+  // sections (HF/Docker/PyPI/npm) are TIMELESS, only the per-day github
+  // data paginates — same pattern as /media/.
+  interface OlderGitHubDay { date: string; data: DayData }
+  const [olderDays, setOlderDays] = useState<OlderGitHubDay[]>([]);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const inFlightDates = useRef<Set<string>>(new Set());
+
+  const olderDates = useMemo(
+    () => (data ? archive.filter((d) => d < data.date) : []),
+    [archive, data]
+  );
+  const hasMoreOlderDays = olderDays.length < olderDates.length;
+
+  const loadNextOlderDay = useCallback(async () => {
+    const nextDate = olderDates.find((d) => !inFlightDates.current.has(d));
+    if (!nextDate) return;
+    inFlightDates.current.add(nextDate);
+    setLoadingOlder(true);
+    const dayData = await withMinDelay(fetchDayData(nextDate));
+    setOlderDays((prev) => {
+      if (prev.some((d) => d.date === nextDate)) return prev;
+      if (!dayData) return prev;
+      return [...prev, { date: nextDate, data: dayData }];
+    });
+    setLoadingOlder(false);
+  }, [olderDates]);
+
+  useEffect(() => {
+    if (!hasMoreOlderDays) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && !loadingOlder) {
+            loadNextOlderDay();
+            break;
+          }
+        }
+      },
+      { rootMargin: INFINITE_SCROLL_ROOT_MARGIN }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMoreOlderDays, loadingOlder, loadNextOlderDay]);
+
+  const parseDay = (day?: DayData | null) => {
+    const items = (day?.github || []) as unknown[];
     const trending: RepoCard[] = [];
     const releases: ReleaseCard[] = [];
     for (const item of items) {
@@ -647,7 +733,9 @@ export default function GitHubPage() {
       if (rel) releases.push(rel);
     }
     return { trending, releases };
-  }, [data]);
+  };
+
+  const { trending, releases } = useMemo(() => parseDay(data), [data]);
 
   if (loading) {
     return (
@@ -809,9 +897,74 @@ export default function GitHubPage() {
                 </div>
               </section>
             )}
+
+            {/* ── INFINITE SCROLL: older days' GitHub trending + releases ── */}
+            {olderDays.map((day) => {
+              const { trending: t, releases: r } = parseDay(day.data);
+              if (!t.length && !r.length) return null;
+              const labelDate = day.date;
+              const today = data?.date || new Date().toISOString().split("T")[0];
+              const [ty, tm, td] = today.split("-").map(Number);
+              const [y, m, dd] = labelDate.split("-").map(Number);
+              const diff = Math.round(
+                (new Date(ty, tm - 1, td).getTime() - new Date(y, m - 1, dd).getTime()) / 86400000
+              );
+              const labelMain = isHe
+                ? (diff === 1 ? "אתמול" : diff < 7 ? `לפני ${diff} ימים` : labelDate)
+                : (diff === 1 ? "Yesterday" : diff < 7 ? `${diff} days ago` : labelDate);
+              return (
+                <section key={day.date}>
+                  <DaySeparator label={labelMain} sublabel={labelDate} />
+                  {t.length > 0 && (
+                    <section className="mb-8">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span style={{ color: "#1f2937" }}><GitHubIcon size={18} /></span>
+                        <h2 className="text-[16px] font-bold" style={{ color: "#0f0f1a" }}>
+                          {isHe ? "GitHub — פרויקטים חמים" : "GitHub Trending Repos"}
+                        </h2>
+                        <span className="text-[11px]" style={{ color: "#9a9ab8" }}>{t.length}</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {t.map((repo, i) => <TrendingCard key={i} r={repo} isHe={isHe} />)}
+                      </div>
+                    </section>
+                  )}
+                  {r.length > 0 && (
+                    <section className="mb-8">
+                      <div className="flex items-baseline gap-2 mb-4">
+                        <h2 className="text-[16px] font-bold" style={{ color: "#0f0f1a" }}>
+                          🚀 {isHe ? "Releases" : "Releases"}
+                        </h2>
+                        <span className="text-[11px]" style={{ color: "#9a9ab8" }}>{r.length}</span>
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        {r.map((rel, i) => <ReleaseRow key={i} r={rel} isHe={isHe} />)}
+                      </div>
+                    </section>
+                  )}
+                </section>
+              );
+            })}
+
+            {hasMoreOlderDays && (
+              <div ref={sentinelRef}>
+                {loadingOlder && (
+                  <LoadingSpinner label={isHe ? "טוען ימים קודמים..." : "Loading earlier days..."} />
+                )}
+              </div>
+            )}
+
+            {!hasMoreOlderDays && olderDays.length > 0 && (
+              <div className="flex items-center justify-center py-8 mb-8">
+                <span className="text-xs" style={{ color: "#9a9ab8", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                  {isHe ? "סוף הארכיון" : "End of archive"}
+                </span>
+              </div>
+            )}
           </>
         )}
       </main>
+      <BackToTopButton isHe={isHe} />
       <Footer />
     </div>
   );

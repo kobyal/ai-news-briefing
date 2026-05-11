@@ -148,7 +148,8 @@ export const INFINITE_SCROLL_ROOT_MARGIN = "80px 0px";
 // that older content is loading — avoids the "did anything happen?" jump
 // where new cards appear instantly with no transition. Established
 // 2026-05-11 after reader feedback that the new spinner was barely visible.
-export const INFINITE_SCROLL_MIN_DELAY_MS = 700;
+// Bumped 700→2500ms same-day after the user said "even slower (3-4x)".
+export const INFINITE_SCROLL_MIN_DELAY_MS = 2500;
 
 /** Wrap an async fetch so it takes at least `minMs`. Use to give the
  *  LoadingSpinner enough screen time to register visually:

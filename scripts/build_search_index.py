@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+"""Build the expanded search index (stories + videos + repos + community +
+reddit + twitter) from local docs/data/*.json files and upload to S3.
+
+Use until the ingest Lambda is redeployed with the same logic — then the
+Lambda's hourly invocation owns the index, and this script becomes
+unnecessary.
+
+One-shot fallback established 2026-05-11."""
+import json
+import subprocess
+from pathlib import Path
+
+REPO = Path("/Users/kobyalmog/vscode/projects/ai-news-briefing")
+DATA_DIR = REPO / "docs/data"
+BUCKET = "ai-news-briefing-web2"
+KEY = "data/search-index.json"
+PROFILE = "koby-personal"
+
+stories: list[dict] = []
+extras: list[dict] = []
+
+# Track URLs globally so the same viral tweet / reddit post / video that
+# appears across multiple days' fetches only shows once in search.
+# Use the earliest (canonical) date for each URL.
+seen_urls: set[str] = set()
+
+# Normalize "May 07, 2026" / "May 7, 2026" / "2026-05-07T..." → "2026-05-07".
+# Search hrefs encode this as ?date=YYYY-MM-DD; the receiving page's
+# readDateParam() rejects anything that doesn't match /^\d{4}-\d{2}-\d{2}$/,
+# so non-ISO dates silently broke the deep-link useEffect.
+import re as _re
+_MONTHS = {"jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,
+           "jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12}
+def _to_iso(s: str, fallback: str = "") -> str:
+    if not s:
+        return fallback
+    s = s.strip()
+    # Already ISO (with optional time component)
+    m = _re.match(r"^(\d{4}-\d{2}-\d{2})", s)
+    if m:
+        return m.group(1)
+    # "May 7, 2026" / "May 07, 2026" / "Jan 12, 2026"
+    m = _re.match(r"^(\w{3,9})\s+(\d{1,2}),\s*(\d{4})$", s)
+    if m:
+        mon = _MONTHS.get(m.group(1)[:3].lower())
+        if mon:
+            return f"{m.group(3)}-{mon:02d}-{int(m.group(2)):02d}"
+    return fallback
+
+for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
+    try:
+        d = json.loads(f.read_text())
+    except Exception:
+        continue
+    date = d.get("date") or f.stem
+    # The published JSON has briefing + youtube + github + social + twitter at top.
+    briefing = d.get("briefing") or {}
+    briefing_he = d.get("briefing_he") or {}
+    # Older days (pre-2026-05-09 schema) store Hebrew translations in
+    # briefing_he.headlines_he[] / summaries_he[] index-aligned arrays
+    # instead of per-story fields. Fall back to those arrays so the search
+    # index includes Hebrew for ALL archived days, not just recent ones.
+    # The user-visible bug was searching "הברית" returning 0 results even
+    # though the May 6 Microsoft-OpenAI alliance story has it in headline_he.
+    headlines_he_arr = briefing_he.get("headlines_he") or []
+    summaries_he_arr = briefing_he.get("summaries_he") or []
+    # ── Articles ─────────────────────────────────────────────
+    for idx, s in enumerate(briefing.get("news_items") or []):
+        # Story ID derivation matches publish_data._story_id_hash + ingest lambda
+        import hashlib
+        urls = s.get("urls") or []
+        primary = urls[0] if urls else s.get("headline", "")
+        story_id = hashlib.sha256(primary.encode()).hexdigest()[:12]
+        headline_he = s.get("headline_he") or (headlines_he_arr[idx] if idx < len(headlines_he_arr) else "")
+        summary_he = s.get("summary_he") or (summaries_he_arr[idx] if idx < len(summaries_he_arr) else "")
+        stories.append({
+            "type":         "article",
+            "story_id":     story_id,
+            "date":         date,
+            "vendor":       s.get("vendor"),
+            "headline":     s.get("headline"),
+            "headline_he":  headline_he,
+            "summary":      s.get("summary"),
+            "summary_he":   summary_he,
+            "og_image":     s.get("og_image"),
+        })
+    # IMPORTANT: `date` MUST be the date of the JSON file the item is
+    # surfaced in (the "archive date"), NOT the original post/published
+    # date. Reason: search result URLs encode `?date=X` and the receiving
+    # page loads X's daily JSON to find the anchor. If a tweet was posted
+    # May 7 but first captured on May 8, only May 8's JSON contains it —
+    # using May 7 as the URL date means the anchor is never present.
+    # The original post date goes into `posted_date` for display.
+    # ── Videos ───────────────────────────────────────────────
+    for v in d.get("youtube") or []:
+        url = (v.get("urls") or [None])[0] or v.get("url") or ""
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        extras.append({
+            "type":         "video",
+            "date":         date,
+            "posted_date":  _to_iso(v.get("published_date") or "", date),
+            "headline":     v.get("headline") or v.get("title") or "",
+            "summary":      v.get("summary") or v.get("description") or "",
+            "channel":      v.get("channel") or "",
+            "thumbnail":    v.get("thumbnail") or "",
+            "vendor":       v.get("vendor") or "",
+            "url":          url,
+        })
+    # ── GitHub ───────────────────────────────────────────────
+    for r in d.get("github") or []:
+        url = (r.get("urls") or [None])[0] or r.get("url") or ""
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        extras.append({
+            "type":         "repo",
+            "date":         date,
+            "posted_date":  _to_iso(r.get("published_date") or "", date),
+            "headline":     r.get("headline") or r.get("name") or "",
+            "summary":      r.get("summary") or r.get("description") or "",
+            "explainer":    r.get("explainer") or "",
+            "vendor":       r.get("vendor") or "",
+            "url":          url,
+        })
+    # ── Community pulse ─────────────────────────────────────
+    pulse_he_arr = briefing.get("community_pulse_items_he") or []
+    for i, p in enumerate(briefing.get("community_pulse_items") or []):
+        url = p.get("source_url") or ""
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        he = pulse_he_arr[i] if i < len(pulse_he_arr) else {}
+        extras.append({
+            "type":         "community",
+            "date":         date,
+            "posted_date":  _to_iso(p.get("date") or "", date),
+            "headline":     p.get("headline") or "",
+            "headline_he":  he.get("headline_he") if isinstance(he, dict) else "",
+            "summary":      p.get("body") or "",
+            "summary_he":   he.get("body_he") if isinstance(he, dict) else "",
+            "vendor":       p.get("related_vendor") or "",
+            "og_image":     p.get("og_image") or "",
+            "source_label": p.get("source_label") or "",
+            "url":          url,
+        })
+    # ── Reddit ───────────────────────────────────────────────
+    top_reddit = ((d.get("social") or {}).get("top_reddit")) or []
+    for rd in top_reddit:
+        url = rd.get("url") or ""
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        extras.append({
+            "type":         "reddit",
+            "date":         date,
+            "posted_date":  _to_iso(rd.get("date") or "", date),
+            "headline":     rd.get("title") or "",
+            "headline_he":  rd.get("title_he") or "",
+            "summary":      rd.get("body") or "",
+            "summary_he":   rd.get("body_he") or "",
+            "subreddit":    rd.get("subreddit") or "",
+            "url":          url,
+        })
+    # ── Twitter posts — people + trending (both have `post` + `post_he`) ──
+    twitter = d.get("twitter") or {}
+    for group in (twitter.get("people") or [], twitter.get("trending") or []):
+        for p in group:
+            url = p.get("url") or ""
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            name = p.get("name") or p.get("author") or "?"
+            handle = (p.get("handle") or "").lstrip("@")
+            extras.append({
+                "type":         "twitter",
+                "date":         date,
+                "posted_date":  _to_iso(p.get("date") or "", date),
+                "headline":     f"{name} (@{handle})" if handle else name,
+                "summary":      p.get("post") or "",
+                "summary_he":   p.get("post_he") or "",
+                "vendor":       p.get("org") or p.get("vendor") or "",
+                "url":          url,
+            })
+
+stories.sort(key=lambda i: i.get("date") or "", reverse=True)
+extras.sort(key=lambda i: i.get("date") or "", reverse=True)
+
+payload = {"stories": stories, "extras": extras}
+
+out_path = REPO / "docs/data/search-index.json"
+out_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+print(f"Wrote {out_path}: {len(stories)} stories + {len(extras)} extras")
+
+# Upload to S3 directly so the live site picks it up without waiting for
+# the ingest Lambda redeploy.
+result = subprocess.run([
+    "aws", "s3", "cp", str(out_path), f"s3://{BUCKET}/{KEY}",
+    "--content-type", "application/json",
+    "--cache-control", "no-cache, public, max-age=300",
+    "--profile", PROFILE, "--region", "us-east-1",
+], capture_output=True, text=True)
+print("Upload stdout:", result.stdout)
+print("Upload stderr:", result.stderr)
+print(f"S3 upload exit code: {result.returncode}")
+
+# CloudFront invalidate for /data/search-index.json
+if result.returncode == 0:
+    inv = subprocess.run([
+        "aws", "cloudfront", "create-invalidation",
+        "--distribution-id", "E1TSW76SSEILK4",
+        "--paths", "/data/search-index.json",
+        "--profile", PROFILE,
+    ], capture_output=True, text=True)
+    print("Invalidation stdout:", inv.stdout[:200])

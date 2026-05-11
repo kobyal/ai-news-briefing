@@ -1314,10 +1314,29 @@ print(f"Email sent → {RECIPIENT}")
 _status_dir = Path(__file__).resolve().parent / "private"
 _status_dir.mkdir(exist_ok=True)
 _status_path = _status_dir / "email_status.json"
+_sent_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
 _status_path.write_text(json.dumps({
-    "sent_at":   datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    "sent_at":   _sent_at,
     "date":      date,
     "recipient": RECIPIENT,
     "subject":   subject,
     "runner":    RUNNER,
 }, indent=2), encoding="utf-8")
+
+# Append-only history for the duplicate-email QA check. email_status.json
+# only stores the LATEST send (last writer wins); we need history to detect
+# "two emails went out today" (the 2026-05-11 duplicate-email day —
+# launchd autopilot at 06:00 + manual run later → 2 emails to inbox).
+# Added 2026-05-11.
+_history_path = _status_dir / "email_history.jsonl"
+try:
+    with _history_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps({
+            "sent_at":   _sent_at,
+            "date":      date,
+            "recipient": RECIPIENT,
+            "subject":   subject,
+            "runner":    RUNNER,
+        }) + "\n")
+except Exception:
+    pass  # history append is best-effort — never block the main email path

@@ -189,19 +189,40 @@ def _fetch_firecrawl(url: str) -> Optional[ArticleContent]:
         try:
             from firecrawl import FirecrawlApp
             app = FirecrawlApp(api_key=api_key)
-            result = app.scrape_url(url, params={"formats": ["markdown"]})
-            md = result.get("markdown", "")
+            # Firecrawl SDK 2.x renamed scrape_url() → scrape() and returned a
+            # dataclass instead of dict. Try both shapes so the agent works
+            # across SDK versions. Established 2026-05-11 after 2 days of
+            # silent zero-article output (the AttributeError was caught and
+            # swallowed by the bare `except Exception: pass` below).
+            if hasattr(app, "scrape"):
+                resp = app.scrape(url, formats=["markdown"])
+            else:
+                resp = app.scrape_url(url, params={"formats": ["markdown"]})
+            # SDK 2.x: ScrapeResponse object with .markdown / .metadata
+            # SDK 1.x: plain dict
+            if hasattr(resp, "markdown"):
+                md = getattr(resp, "markdown", "") or ""
+                meta = getattr(resp, "metadata", None) or {}
+                title = getattr(meta, "title", None) if hasattr(meta, "title") else (meta.get("title") if isinstance(meta, dict) else "")
+                title = title or ""
+            elif isinstance(resp, dict):
+                md = resp.get("markdown", "") or ""
+                title = (resp.get("metadata") or {}).get("title", "") or ""
+            else:
+                md, title = "", ""
             if not _is_valid_content(md):
                 return None
 
-            title = result.get("metadata", {}).get("title", "")
             full_len = len(md)
             md = _truncate(md, _MAX_CHARS)
             return ArticleContent(
                 url=url, title=title, text=md,
                 source="firecrawl", char_count=full_len,
             )
-        except Exception:
+        except Exception as e:
+            # Log so future SDK drift surfaces in run logs instead of silently
+            # dropping all articles to Firecrawl.
+            print(f"  [article_reader] Firecrawl error for {url[:80]}: {type(e).__name__}: {e}", flush=True)
             return None
 
 

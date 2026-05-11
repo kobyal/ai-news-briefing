@@ -1,0 +1,343 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ============================================================
+   DESIGN SYSTEM TOKENS — Light palette
+   ============================================================ */
+:root {
+  /* Backgrounds — layered depth system */
+  --bg-base:    #f4f4f8;
+  --bg-surface: #ffffff;
+  --bg-raised:  #fafafa;
+  --bg-overlay: #f0f0f6;
+
+  /* Text hierarchy */
+  --text-primary:   #0f0f1a;
+  --text-secondary: #3d3d5a;
+  --text-tertiary:  #6b6b8a;
+  --text-ghost:     #9a9ab8;
+
+  /* Borders */
+  --border-subtle:  #ededf5;
+  --border-default: #e0e0ec;
+  --border-strong:  #ccccde;
+
+  /* Accent */
+  --accent-primary: #4f46e5;
+  --accent-bright:  #6366f1;
+  --accent-glow:    rgba(79, 70, 229, 0.12);
+
+  /* Status */
+  --color-live: #16a34a;
+
+  /* Card shadows */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.10), 0 8px 32px rgba(0,0,0,0.07);
+
+  /* shadcn compat */
+  --background: var(--bg-base);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent-primary);
+  --primary-foreground: #ffffff;
+  --secondary: #f0f0f8;
+  --secondary-foreground: var(--text-primary);
+  --muted: #f4f4f8;
+  --muted-foreground: var(--text-tertiary);
+  --accent: var(--accent-primary);
+  --accent-foreground: #ffffff;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: var(--border-default);
+  --input: var(--border-default);
+  --ring: var(--accent-primary);
+  --radius: 0.75rem;
+  --sidebar: var(--bg-surface);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--accent-primary);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0f0f8;
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-default);
+  --sidebar-ring: var(--accent-primary);
+}
+
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    background: var(--bg-base);
+    color: var(--text-primary);
+    /* Subtle warm gradient wash from top */
+    background-image:
+      linear-gradient(180deg, rgba(79,70,229,0.03) 0%, transparent 600px),
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(79,70,229,0.04) 0%, transparent 50%);
+    background-attachment: fixed;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* Prevent black flash on page load */
+html {
+  background: #f4f4f8;
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar — light mode */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #aaaacc; }
+
+/* Hide scrollbar but keep scrolling — used on horizontal overflow rails like
+   the vendor filter pills + trending topics. touch-action and overflow-scrolling
+   are critical on iOS Safari: without them, near-horizontal swipes get hijacked
+   by the page's vertical scroll detector and the rail becomes un-swipeable on
+   mobile. (Bug reported 2026-05-04.) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Prevent the whole page from scrolling horizontally. Some inner content
+   (the mobile nav with 6 tabs, the vendor pill rail) renders wider than the
+   viewport — without these locks, the BODY ends up wider than the screen
+   and a finger swipe pans the entire page instead of the inner rail or the
+   SwipeNavigator gesture. Found 2026-05-04: HTML/body was 431px on a 386px
+   viewport. */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Hebrew font support */
+.font-hebrew {
+  font-family: 'Noto Sans Hebrew', 'Arial Hebrew', Arial, sans-serif;
+}
+
+/* ============================================================
+   TYPOGRAPHY SYSTEM
+   ============================================================ */
+
+/* Editorial headline — tight, heavy */
+.headline-xl {
+  font-weight: 900;
+  font-size: 2rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.headline-lg {
+  font-weight: 800;
+  font-size: 1.375rem;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+.headline-md {
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+/* Section label — uppercase, wide tracking */
+.section-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* Mono numerics */
+.mono-num {
+  font-family: var(--font-mono, 'Courier New', monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ============================================================
+   STORY CARD SYSTEM
+   ============================================================ */
+
+/* Lift on hover */
+.story-card-hover {
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.22s ease;
+  cursor: pointer;
+}
+.story-card-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* Vendor accent bar animation */
+@keyframes bar-slide-in {
+  from { transform: scaleX(0); transform-origin: left; }
+  to   { transform: scaleX(1); transform-origin: left; }
+}
+
+.vendor-bar-animate {
+  animation: bar-slide-in 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ============================================================
+   FEATURED CARD — Hero treatment (light)
+   ============================================================ */
+
+.featured-gradient-bg {
+  background: #ffffff;
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.featured-shimmer {
+  background: linear-gradient(90deg, #f0f0f8 0%, #e8e8f4 50%, #f0f0f8 100%);
+  background-size: 200% auto;
+  animation: shimmer 4s linear infinite;
+}
+
+@keyframes pulse-ring {
+  0%   { opacity: 1; transform: scale(0.8); }
+  100% { opacity: 0; transform: scale(2.4); }
+}
+
+.live-dot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--color-live);
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+
+/* Fade-in for page sections */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up {
+  animation: fade-up 0.4s ease forwards;
+}
+
+/* ============================================================
+   GRADIENT TEXT
+   ============================================================ */
+.gradient-text {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================================
+   TOP TICKER / BANNER  — now light
+   ============================================================ */
+.top-banner {
+  background: #f0f0f8;
+  border-bottom: 1px solid #e0e0ec;
+  height: 30px;
+  display: flex;
+  align-items: center;
+}
+
+/* ============================================================
+   SECTION DIVIDERS
+   ============================================================ */
+.section-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-default) 20%, var(--border-default) 80%, transparent);
+}
+
+/* ============================================================
+   COMMUNITY SECTION
+   ============================================================ */
+.community-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.community-card-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}

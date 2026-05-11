@@ -111,4 +111,16 @@ In order of size:
 4. **Cerebras Free / Groq Free for supplementary runs** — main keeps Sonnet 4.6; cheap supplementaries. Requires signup.
 5. **Drop Perplexity Sonar** — $34.90/mo → $0. Risk: lose ~24% of headline contribution (measured across 15 days).
 
+## Side-data cost additions (2026-05-10 / 11)
+
+These are cheap but worth tracking:
+
+- **Per-story audio** — 4 MP3s/story × ~22 stories = 88 MP3s/day via `edge-tts` (Microsoft Edge TTS, free; no API key). Adds ~2-3 min to publish_data wall-clock, $0 cost.
+- **Hot Tools fetcher (`scripts/fetch_hot_tools.py`)** — 50+ HF API hits (free, no auth) + 14 Docker Hub hits (free) + 24 PyPI hits + pypistats hits (rate-limited, ~70% fill rate) + 16 npm registry hits. **DeepL Hebrew translations** for descriptions: ~50 strings × ~200 chars = ~10K chars/day → free tier covers (500K chars/month). Runs ~5-7 min wall-clock daily.
+- **Podcasts fetcher (`scripts/fetch_podcasts.py`)** — 13 iTunes Search hits + 13 RSS parses. Free. ~30 sec wall-clock.
+- **Search index builder (`scripts/build_search_index.py`)** — local file scan + S3 upload + CloudFront invalidation. Free for CF invalidations under 1000/month (we do 2-3/day = ~90/month).
+- **QA functional probes** — Playwright launches one headless Chromium, runs 7 interaction tests, ~30-45 sec wall-clock. Free.
+
+Total daily cost addition: **$0 (subscription path) or marginal DeepL overage if it tips past 500K chars** (currently nowhere close).
+
 None of these are decided beyond the subscription path. See README → "Two ways to run the merger" for the active options.

@@ -6,10 +6,10 @@ import re
 import smtplib
 import sys
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from pathlib import Path
 
 RECIPIENT    = "kobyal@gmail.com"
 SENDER       = "kobyal@gmail.com"
@@ -824,7 +824,71 @@ def _collect_agent_delivery() -> list[dict]:
                                           at_least=json_at_least),
                      "status": status, "note": note})
 
+    # ── Side-data (not per-agent — built by scripts/ at [3b/6] + [5c/6]) ──
+    # hot_tools.json, podcasts.json, search-index.json. Each script writes
+    # a run-log JSONL we read for status; if the log is missing the row
+    # falls back to a "off" state so we know to investigate.
+    # Established 2026-05-11.
+    _add_sidedata_rows(rows)
     return rows
+
+
+def _read_run_log(path: Path) -> dict | None:
+    """Tail-read the last JSON line from a run-log JSONL. Returns the parsed
+    record or None when the file is missing/empty/unparseable."""
+    if not path.exists():
+        return None
+    try:
+        lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        return json.loads(lines[-1]) if lines else None
+    except Exception:
+        return None
+
+
+def _add_sidedata_rows(rows: list) -> None:
+    """Append agent-delivery rows for the 3 side-data sources. Each script
+    writes one line/day to its run-log JSONL; we surface the last record."""
+    repo = Path(__file__).resolve().parent
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    # Hot Tools (HF + Docker + PyPI + npm)
+    ht_log = _read_run_log(repo / "docs/data/_hot_tools_runs.jsonl")
+    if ht_log and ht_log.get("date") == today:
+        total = sum(int(ht_log.get(k, 0)) for k in ("hf_models","hf_spaces","docker","pypi","npm"))
+        note = (f"HF {ht_log.get('hf_models',0)} + Spaces {ht_log.get('hf_spaces',0)} + "
+                f"Docker {ht_log.get('docker',0)} + PyPI {ht_log.get('pypi',0)} + npm {ht_log.get('npm',0)}")
+        status = "ok" if total >= 40 else ("warn" if total >= 20 else "error")
+        rows.append({"agent": "hot tools", "raw": str(total), "json": str(total), "site": str(total),
+                     "status": status, "note": note})
+    else:
+        rows.append({"agent": "hot tools", "raw": "—", "json": "—", "site": "—",
+                     "status": "off", "note": "no run-log today"})
+
+    # Podcasts (latest episode + cover per show)
+    pc_log = _read_run_log(repo / "docs/data/_podcasts_runs.jsonl")
+    if pc_log and pc_log.get("date") == today:
+        n = int(pc_log.get("total", 0))
+        covers = int(pc_log.get("with_cover", 0))
+        eps = int(pc_log.get("with_episode", 0))
+        status = "ok" if n >= 10 and covers >= n * 0.7 else ("warn" if n > 0 else "error")
+        rows.append({"agent": "podcasts", "raw": str(n), "json": f"{covers}/cover", "site": f"{eps}/ep",
+                     "status": status, "note": f"{covers} covers · {eps} episodes"})
+    else:
+        rows.append({"agent": "podcasts", "raw": "—", "json": "—", "site": "—",
+                     "status": "off", "note": "no run-log today"})
+
+    # Search index (post-ingest expansion)
+    si_log = _read_run_log(repo / "docs/data/_search_index_runs.jsonl")
+    if si_log and si_log.get("date") == today:
+        stories = int(si_log.get("stories", 0))
+        extras = int(si_log.get("extras", 0))
+        status = "ok" if extras >= 200 else ("warn" if extras > 0 else "error")
+        rows.append({"agent": "search index", "raw": "—", "json": f"{stories}+{extras}",
+                     "site": f"{stories + extras}", "status": status,
+                     "note": f"{stories} articles + {extras} extras (videos/repos/X/reddit/community/tools)"})
+    else:
+        rows.append({"agent": "search index", "raw": "—", "json": "—", "site": "—",
+                     "status": "off", "note": "no run-log today"})
 
 
 def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dict]:

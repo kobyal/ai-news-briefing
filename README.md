@@ -414,6 +414,34 @@ flowchart LR
 
 ---
 
+### Side-data scripts (added 2026-05-10/11)
+
+Three small Python scripts in `scripts/` produce auxiliary JSON files alongside the agent outputs. They run from `local-cycle.sh`'s `[3b/6]` step + the post-ingest `[5c/6]` step. Each writes a one-line run-log JSONL that `send_email.py` reads for the daily monitoring panel.
+
+- **`scripts/fetch_hot_tools.py`** → `docs/data/hot_tools.json` (+ run-log `_hot_tools_runs.jsonl`).
+  Hits free public APIs (no auth) for **HF trending models, HF trending Spaces, Docker Hub** (14 curated AI/ML images), **PyPI** (24 curated AI packages), **npm** (16 curated AI SDKs). Per-item: GitHub-org avatar URL, README-derived description (cleaned of front-matter, shields, link bars), DeepL Hebrew translation. Powers `/tools/`.
+
+- **`scripts/fetch_podcasts.py`** → `docs/data/podcasts.json` (+ run-log `_podcasts_runs.jsonl`).
+  iTunes Search API → cover art + feedUrl + latest releaseDate; then parses the RSS for the latest episode title + duration. Falls back to Spotify oEmbed for cover-only when iTunes doesn't index the show (mostly Hebrew shows). Powers the Podcasts grid on `/media/`.
+
+- **`scripts/build_search_index.py`** → `docs/data/search-index.json` (+ run-log `_search_index_runs.jsonl`).
+  Walks every `docs/data/<date>.json`, extracts ~7 resource types (articles, videos, GitHub, community pulse, reddit, X, tools), normalizes dates to ISO + deduplicates by URL, uploads to S3, invalidates CloudFront. Powers `/search/` (the type-filter chips + in-site deep links). **Must run AFTER ingest** since the ingest Lambda overwrites the index with its own stories-only version on every invoke.
+
+### QA evaluator — `private/qa-evaluator-agent/` (local-only)
+
+LangGraph-orchestrated nightly quality check. Runs after `[6/6]` email-send in `local-cycle.sh`. Six parallel nodes:
+- `data_integrity` — counts, required fields, EN/HE parity, agent-output health (per-agent floors + `feedparser`-style silent-failure detection), email status + duplicate-email detection, Twitter cookie health, Hot Tools freshness, **rss_vendor_blogs_dead** (distinguishes feedparser-broken from LLM-ranking-skew).
+- `url_health` — HEAD/GET every URL, LLM-semantic-match for hard cases.
+- `icons_images` — OG-image presence + vision-judge (Claude Haiku) catching logo-only fallbacks.
+- `sections` — per-section thresholds (YouTube count + paired-ratio + thumbnail coverage + channel concentration; GitHub field schema; Twitter screen-name regression detection; Reddit staleness).
+- `content_quality` — word-count floors, vendor classification.
+- `live_site` — Playwright DOM probes: route `must_contain` checks, per-story detail page checks, vendor-toggle, homepage card health.
+- **`functional_probes`** *(added 2026-05-11)* — Playwright interaction tests: search-returns-results, type-filter chips, Hot Tools sections all render, per-project icons load, podcast covers display, back-to-top button appears, infinite scroll fires on `/community/`. Catches regressions the JSON checks miss.
+
+Output: `private/qa-evaluator-agent/output/<DATE>/report.md` + `report.json`. Severities P0/P1/P2. Config in `private/qa-evaluator-agent/qa_evaluator/config/checks.yaml`.
+
+---
+
 ## Model Stack
 
 | Agent | API path default | Subscription path | Provider |
@@ -533,12 +561,24 @@ git add -f docs/ && git commit -m "briefing: ${DATE}" && git push
 
 ---
 
-## Frontend & Infrastructure (separate repos)
+## Frontend & Infrastructure
 
-The maintainer's deployment has two extra components that are **not in this public repo**:
+The maintainer's deployment has two extra components in the public repo's tracked source as of 2026-05-11 (`web/` is no longer gitignored):
 
-- **`web/`** — Next.js static-export site, deployed to S3 + CloudFront. Reads `docs/data/<date>.json` (or its mirrored copy in DynamoDB via `/api/stories`) and renders `/`, `/community/`, `/media/`, `/archive/`, `/[date]/`, `/story?id=...`. Local dev: `cd web && npm install && npm run dev`. Build/deploy: `npm run build && aws s3 sync out s3://<bucket> --delete --exclude "data/*"` (the `data/*` exclude is critical — that folder is written by the ingest Lambda and would be wiped by `--delete`).
-- **`infra/`** — AWS CDK (Python). Five stacks: `DatabaseStack` (DynamoDB), `TriggerStack` (Lambda → GH Actions dispatch), `IngestStack` (Lambda → DynamoDB), `ApiStack` (Lambda + API Gateway → `/api/stories`, `/api/archive`, `/api/story/:id`), `FrontendStack` (S3 + CloudFront with OAC).
+- **`web/`** — Next.js static-export site, deployed to S3 + CloudFront. Now tracked in this repo (`web/node_modules` + `web/.next` + `web/out` still gitignored).
+- **`infra/`** — AWS CDK (Python). Five stacks: `DatabaseStack` (DynamoDB), `TriggerStack` (Lambda → GH Actions dispatch), `IngestStack` (Lambda → DynamoDB), `ApiStack` (Lambda + API Gateway → `/api/stories`, `/api/archive`, `/api/story/:id`), `FrontendStack` (S3 + CloudFront with OAC). Still gitignored — local-only.
+
+### Live pages (`aibriefing.dev`)
+
+- **`/`** — articles homepage with TLDR + KEY POINTS + the 22 story cards, vendor filter bar, infinite scroll back through archive days with a heavy day-separator + animated spinner.
+- **`/community/`** — three-card layout (Twitter / Reddit / Community Pulse), vendor clustering, infinite scroll, in-site anchor-deep-links from `/search/?q=...` results.
+- **`/media/`** — "Top Picks This Week" 2×3 grid (paired-explainers first, vendor cap=2), Story Explainers, Top Videos shelf, YouTube channels grid with collapsible "Show all 23", Podcasts grid with **real cover art + latest episode + duration** (built by `scripts/fetch_podcasts.py` via iTunes Search + RSS parse).
+- **`/tools/`** — "Hot AI Tools" (renamed from `/github/` 2026-05-11; old path redirects). Five sections: GitHub Trending repos + releases, Hugging Face Trending Models, HF Spaces, **Docker Hub AI/ML images, PyPI Python packages, npm JavaScript packages**. Each card has its own org avatar from `github.com/{org}.png` + DeepL-translated Hebrew description. Built by `scripts/fetch_hot_tools.py`.
+- **`/search/`** — site-wide search across `articles / videos / community / reddit / X / GitHub / tools` with type-filter chips, in-site deep-link routing (clicking a tweet result opens `/community/?date=...#tweet-{id}` with smooth-scroll-to-anchor + soft highlight). Index built by `scripts/build_search_index.py`.
+- **`/archive/`** — archive listing.
+- **`/story?id=...`** — story detail page (community discussion + paired videos when present).
+- **Back-to-top floating pill** on `/`, `/community/`, `/media/`, `/tools/` once you scroll past 600px.
+- **Per-story audio** (4 MP3s/story: summary+detail × EN+HE) generated by `publish_data.py` via edge-tts.
 
 **Both directories are gitignored from this repo by design** — they exist only in the maintainer's local checkout as separate git repos with no remote. For a fork, you have two clean choices:
 1. **Stop at `docs/`** — GitHub Pages serves the merged briefing and the daily JSON. That's a complete product.

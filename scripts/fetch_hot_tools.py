@@ -676,8 +676,9 @@ def fetch_npm(limit: int = 10) -> list[dict]:
 
 def main() -> None:
     print("Fetching Hot Tools data...")
+    started_at = datetime.now(timezone.utc)
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "fetched_at": started_at.isoformat(timespec="seconds"),
         "hf_models":  fetch_hf_models(limit=12),
         "hf_spaces":  fetch_hf_spaces(limit=10),
         "docker":     fetch_docker_hub(limit=10),
@@ -686,11 +687,27 @@ def main() -> None:
     }
     OUT_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
     print(f"✓ wrote {OUT_PATH}")
-    print(f"   HF models: {len(payload['hf_models'])}")
-    print(f"   HF spaces: {len(payload['hf_spaces'])}")
-    print(f"   Docker:    {len(payload['docker'])}")
-    print(f"   PyPI:      {len(payload['pypi'])}")
-    print(f"   npm:       {len(payload['npm'])}")
+    counts = {k: len(payload[k]) for k in ("hf_models","hf_spaces","docker","pypi","npm")}
+    for k, v in counts.items():
+        print(f"   {k:11s}: {v}")
+
+    # Append a one-line run-log so send_email.py's monitoring panel can
+    # report today's Hot Tools health alongside the other agents. Best-
+    # effort — never crash the fetcher if the log write fails.
+    try:
+        elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+        log_record = {
+            "date":       started_at.date().isoformat(),
+            "fetched_at": payload["fetched_at"],
+            "duration_s": round(elapsed, 1),
+            **counts,
+        }
+        log_path = REPO / "docs/data/_hot_tools_runs.jsonl"
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(log_record) + "\n")
+        print(f"   ✓ logged to {log_path.name}")
+    except Exception as e:
+        print(f"   ⚠ run-log write failed: {e}")
 
 
 if __name__ == "__main__":

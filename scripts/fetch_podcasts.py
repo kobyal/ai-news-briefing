@@ -177,6 +177,23 @@ def main():
     print(f"\n✓ wrote {OUT_PATH}: {have_cover}/{len(out)} covers, "
           f"{have_ep}/{len(out)} with latest episode")
 
+    # One-line run-log for the email monitoring panel.
+    try:
+        from datetime import datetime, timezone
+        log_record = {
+            "date":          datetime.now(timezone.utc).date().isoformat(),
+            "fetched_at":    datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "total":         len(out),
+            "with_cover":    have_cover,
+            "with_episode":  have_ep,
+        }
+        log_path = REPO / "docs/data/_podcasts_runs.jsonl"
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(log_record) + "\n")
+        print(f"   ✓ logged to {log_path.name}")
+    except Exception as e:
+        print(f"   ⚠ run-log write failed: {e}")
+
 
 if __name__ == "__main__":
     main()

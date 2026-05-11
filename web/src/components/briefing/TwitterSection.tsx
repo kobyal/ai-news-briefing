@@ -354,12 +354,16 @@ export function TwitterSection({ data, descsHe = [], pulseItems = [] }: TwitterS
           const engStr = formatEngagement(item._eng, isHe);
           const isLastInGroup = i === vendorItems.length - 1;
 
+          // Stable anchor for /search?q=... → /community/#tweet-xxx deep links.
+          const tweetAnchor = url ? `tweet-${(url.match(/\/status\/(\d+)/) || [])[1] || ""}` : "";
           return (
             <div
               key={i}
+              id={tweetAnchor || undefined}
               className="px-5 py-4"
               style={{
                 borderBottom: !isLastInGroup ? "1px solid #ededf5" : undefined,
+                scrollMarginTop: "80px",
               }}
             >
               {/* Author row */}

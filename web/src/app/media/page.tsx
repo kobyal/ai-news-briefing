@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { fetchDayData, fetchArchive } from "@/lib/api";
 import { useLang } from "@/context/LangContext";
 import type { DayData, NewsItem, YouTubeVideo, ChannelLatestVideo } from "@/lib/types";
 import { LoadingSpinner, DaySeparator, INFINITE_SCROLL_ROOT_MARGIN, withMinDelay } from "@/components/ui/InfiniteScroll";
+import { readDateParam, scrollToHash } from "@/lib/anchors";
 
 // Mirrors BriefingPage / community page relative-date label helper.
 function formatOlderDayLabel(dateStr: string, todayStr: string, isHe: boolean): string {
@@ -287,8 +289,13 @@ function HeroCard({ video, isHe, descHe, featured = false }: { video: YouTubeVid
   const enDesc = String(video.description || video.summary || "").replace(/^\[[^\]]+\]\s*/, "").slice(0, 160);
   const desc = isHe && descHe ? descHe : enDesc;
 
+  // Anchor for /search → /media/#video-{vid_id} deep links.
+  const vidMatch = url.match(/[?&]v=([\w-]{11})/);
+  const videoAnchor = vidMatch ? `video-${vidMatch[1]}` : undefined;
+
   return (
     <a
+      id={videoAnchor}
       href={url}
       target="_blank"
       rel="noopener noreferrer"
@@ -301,6 +308,7 @@ function HeroCard({ video, isHe, descHe, featured = false }: { video: YouTubeVid
         boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.04)",
         textDecoration: "none",
         color: "inherit",
+        scrollMarginTop: "80px",
       }}
     >
       <div className="relative" style={{ aspectRatio: "16 / 9", background: "#0f0f1a" }}>
@@ -419,14 +427,19 @@ function HeroCard({ video, isHe, descHe, featured = false }: { video: YouTubeVid
 
 // ── Story-explainer pair card ───────────────────────────────────────────────
 function PairCard({ story, video, isHe }: { story: NewsItem; video: YouTubeVideo; isHe: boolean }) {
+  const url = videoUrl(video);
+  const vidMatch = url.match(/[?&]v=([\w-]{11})/);
+  const videoAnchor = vidMatch ? `video-${vidMatch[1]}` : undefined;
   return (
     <div
+      id={videoAnchor}
       style={{
         background: "#fff",
         border: "1px solid #ededf5",
         borderRadius: "14px",
         overflow: "hidden",
         boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        scrollMarginTop: "80px",
       }}
     >
       <div style={{ padding: "12px 14px 10px", borderBottom: "1px solid #f3f3f8" }}>
@@ -509,9 +522,13 @@ function PairCard({ story, video, isHe }: { story: NewsItem; video: YouTubeVideo
 
 // ── Top-shelf video card (3-col grid) ───────────────────────────────────────
 function VideoCard({ video }: { video: YouTubeVideo }) {
+  const url = videoUrl(video);
+  const vidMatch = url.match(/[?&]v=([\w-]{11})/);
+  const videoAnchor = vidMatch ? `video-${vidMatch[1]}` : undefined;
   return (
     <a
-      href={videoUrl(video)}
+      id={videoAnchor}
+      href={url}
       target="_blank"
       rel="noopener noreferrer"
       className="block group transition-transform"
@@ -519,6 +536,7 @@ function VideoCard({ video }: { video: YouTubeVideo }) {
         background: "#fff",
         border: "1px solid #ededf5",
         borderRadius: "12px",
+        scrollMarginTop: "80px",
         overflow: "hidden",
         boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
         textDecoration: "none",
@@ -910,7 +928,9 @@ interface OlderMediaDay {
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────
-export default function MediaPage() {
+// useSearchParams() forces a Suspense boundary under static export. The
+// default export at the bottom wraps this inner component.
+function MediaPageInner() {
   const { isHe } = useLang();
   const [data, setData] = useState<DayData | null>(null);
   const [archive, setArchive] = useState<string[]>([]);
@@ -921,6 +941,8 @@ export default function MediaPage() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const inFlightDates = useRef<Set<string>>(new Set());
+  const searchParams = useSearchParams();
+  const deepLinkDate = readDateParam(searchParams);
 
   useEffect(() => {
     async function load() {
@@ -933,6 +955,10 @@ export default function MediaPage() {
       setData(dayData || null);
       setArchive(archiveDates);
       setLoading(false);
+      // Retry scroll-to-hash after data lands (browser gave up earlier).
+      if (typeof window !== "undefined" && window.location.hash) {
+        scrollToHash();
+      }
     }
     load();
   }, []);
@@ -956,6 +982,29 @@ export default function MediaPage() {
     });
     setLoadingOlder(false);
   }, [olderDates]);
+
+  // Deep-link from /search: /media/?date=YYYY-MM-DD#video-xxx force-loads
+  // that day's media block and scrolls to the anchor. Same pattern as the
+  // community page deep-link useEffect.
+  useEffect(() => {
+    if (!deepLinkDate || !data) return;
+    if (deepLinkDate === data.date) {
+      scrollToHash();
+      return;
+    }
+    if (inFlightDates.current.has(deepLinkDate)) return;
+    inFlightDates.current.add(deepLinkDate);
+    (async () => {
+      const dayData = await fetchDayData(deepLinkDate);
+      if (!dayData) return;
+      setOlderDays((prev) =>
+        prev.some((d) => d.date === deepLinkDate)
+          ? prev
+          : [{ date: deepLinkDate, data: dayData }, ...prev]
+      );
+      scrollToHash();
+    })();
+  }, [deepLinkDate, data]);
 
   useEffect(() => {
     if (!hasMoreOlderDays) return;
@@ -1210,5 +1259,13 @@ export default function MediaPage() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+export default function MediaPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh" }} />}>
+      <MediaPageInner />
+    </Suspense>
   );
 }

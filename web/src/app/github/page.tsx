@@ -96,13 +96,17 @@ function RepoAvatar({ src, fallback }: { src: string; fallback: React.ReactNode 
 }
 
 function TrendingCard({ r, isHe }: { r: RepoCard; isHe: boolean }) {
+  // Anchor for /search → /github/#repo-{owner}-{name}.
+  const m = (r.url || "").match(/github\.com\/([\w.-]+)\/([\w.-]+)/);
+  const repoAnchor = m ? `repo-${m[1]}-${m[2]}`.toLowerCase() : undefined;
   return (
     <a
+      id={repoAnchor}
       href={r.url}
       target="_blank"
       rel="noopener noreferrer"
       className="block rounded-xl p-4 transition-all"
-      style={{ background: "#ffffff", border: "1px solid #ededf5", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
+      style={{ background: "#ffffff", border: "1px solid #ededf5", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", scrollMarginTop: "80px" }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = "#9ca3af";
         e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)";

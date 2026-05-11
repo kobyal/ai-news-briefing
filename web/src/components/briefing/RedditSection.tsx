@@ -268,15 +268,22 @@ export function RedditSection({ posts, pulseItems = [] }: RedditSectionProps) {
           const subColor = getSubColor(post.subreddit);
           const isLastInGroup = i === subPosts.length - 1;
 
+          // Reddit post anchor — /comments/{id}/ → reddit-{id}. For /search
+          // deep-link landings via /community/#reddit-xxx.
+          const redditAnchor = post.url
+            ? `reddit-${(post.url.match(/\/comments\/([\w-]+)/) || [])[1] || ""}`
+            : "";
           return (
             <a
               key={i}
+              id={redditAnchor || undefined}
               href={post.url}
               target="_blank"
               rel="noopener noreferrer"
               className="block px-5 py-4 transition-colors"
               style={{
                 borderBottom: !isLastInGroup ? "1px solid #ededf5" : undefined,
+                scrollMarginTop: "80px",
               }}
               onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "#fffaf5")}
               onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}

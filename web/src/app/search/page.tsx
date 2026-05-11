@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { fetchArchive, fetchSearchIndex, searchIndex, type SearchResult } from "@/lib/api";
 import { useLang } from "@/context/LangContext";
+import { inSiteHref, type AnchorType } from "@/lib/anchors";
 
 function formatDate(dateStr: string, he?: boolean): string {
   const [year, month, day] = dateStr.split("-").map(Number);
@@ -39,14 +40,30 @@ function SearchResultCard({ result: r, isHe }: { result: SearchResult; isHe: boo
   const type = (r.type || "article") as NonNullable<SearchResult["type"]>;
   const meta = TYPE_META[type] || TYPE_META.article;
 
-  // Where the card links to:
-  // - article → /{date}/#story-{story_id} (existing anchor)
-  // - everything else → the source URL directly (external)
-  let href = r.url || (r.urls && r.urls[0]) || "#";
+  // Where the card links to. We always prefer the IN-SITE deep link
+  // (community/media/github with anchor) over the external source URL —
+  // search is for discovery within the site. External link still
+  // accessible by clicking the source pill on the rendered card.
+  // Map search-result type → AnchorType for inSiteHref:
+  //   twitter → tweet, repo→repo, reddit→reddit, community→pulse,
+  //   video → video, article → story (handled inline).
+  const today = new Date().toISOString().split("T")[0];
+  const sourceUrl = r.url || (r.urls && r.urls[0]) || "";
+  let href = sourceUrl || "#";
   let external = true;
   if (type === "article" && r.story_id) {
     href = `/${r.date}/#story-${r.story_id}`;
     external = false;
+  } else if (sourceUrl) {
+    const anchorTypeMap: Record<string, AnchorType> = {
+      video: "video", repo: "repo", reddit: "reddit",
+      twitter: "tweet", community: "pulse", article: "story",
+    };
+    const anchorType = anchorTypeMap[type];
+    if (anchorType) {
+      href = inSiteHref(anchorType, sourceUrl, r.date, today, r.story_id);
+      external = false;
+    }
   }
 
   // Thumbnail logic varies by type

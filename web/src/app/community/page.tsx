@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { TwitterSection } from "@/components/briefing/TwitterSection";
@@ -10,6 +11,7 @@ import { useLang } from "@/context/LangContext";
 import type { DayData, CommunityPulseItem } from "@/lib/types";
 import { getVendorLogo, getVendor } from "@/lib/vendors";
 import { LoadingSpinner, DaySeparator, INFINITE_SCROLL_ROOT_MARGIN, withMinDelay } from "@/components/ui/InfiniteScroll";
+import { readDateParam, scrollToHash } from "@/lib/anchors";
 
 // Mirror BriefingPage's relative-date label helper so historical day dividers
 // say "אתמול" / "Yesterday" / "3 days ago" instead of bare ISO dates.
@@ -251,11 +253,24 @@ function CommunityPulseSection({
           const date = item.date ? formatPulseDate(item.date, isHe) : "";
           const isLastInGroup = i === vendorPairs.length - 1;
 
+          // Pulse item anchor — hash of source_url. For /search → /community/#pulse-xxx.
+          const pulseAnchor = item.source_url
+            ? `pulse-${(() => {
+                let h = 5381;
+                const s = item.source_url || "";
+                for (let k = 0; k < s.length; k++) h = ((h << 5) + h + s.charCodeAt(k)) | 0;
+                return (h >>> 0).toString(16);
+              })()}`
+            : "";
           return (
             <div
               key={i}
+              id={pulseAnchor || undefined}
               className="flex gap-3.5 px-5 py-4"
-              style={{ borderBottom: !isLastInGroup ? "1px solid #ededf5" : undefined }}
+              style={{
+                borderBottom: !isLastInGroup ? "1px solid #ededf5" : undefined,
+                scrollMarginTop: "80px",
+              }}
             >
               <PulseThumb src={item.og_image} domain={domain} alt={item.headline} />
 
@@ -521,7 +536,9 @@ function DayDivider({ label }: { label: string }) {
 }
 
 // ── Page ──────────────────────────────────────────────────────────────
-export default function CommunityPage() {
+// useSearchParams() requires a Suspense boundary for static export — wrap
+// the actual page below at the default export so prerender doesn't bail.
+function CommunityPageInner() {
   const { isHe } = useLang();
   const [data, setData] = useState<DayData | null>(null);
   const [archive, setArchive] = useState<string[]>([]);
@@ -534,6 +551,8 @@ export default function CommunityPage() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const inFlightDates = useRef<Set<string>>(new Set());
+  const searchParams = useSearchParams();
+  const deepLinkDate = readDateParam(searchParams);
 
   useEffect(() => {
     async function load() {
@@ -546,9 +565,39 @@ export default function CommunityPage() {
       setData(dayData || null);
       setArchive(archiveDates);
       setLoading(false);
+      // Hash arrived before data — browser already gave up scrolling.
+      // Retry after the first render commits.
+      if (typeof window !== "undefined" && window.location.hash) {
+        scrollToHash();
+      }
     }
     load();
   }, []);
+
+  // Deep-link: when /community/?date=YYYY-MM-DD#anchor is opened from a
+  // search result, force-load that specific day and scroll to the anchor
+  // once the DOM commits. Without this, the anchor only exists in today's
+  // markup and the browser silently no-ops scroll-to-hash.
+  useEffect(() => {
+    if (!deepLinkDate || !data) return;
+    if (deepLinkDate === data.date) {
+      scrollToHash();
+      return;
+    }
+    if (inFlightDates.current.has(deepLinkDate)) return;
+    inFlightDates.current.add(deepLinkDate);
+    (async () => {
+      const dayData = await fetchDayData(deepLinkDate);
+      if (!dayData) return;
+      setOlderDays((prev) =>
+        prev.some((d) => d.date === deepLinkDate)
+          ? prev
+          : [{ date: deepLinkDate, data: dayData }, ...prev]
+      );
+      // scrollToHash uses double-RAF so React commits before scroll.
+      scrollToHash();
+    })();
+  }, [deepLinkDate, data]);
 
   const olderDates = useMemo(
     () => (data ? archive.filter((d) => d < data.date) : []),
@@ -655,5 +704,13 @@ export default function CommunityPage() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+export default function CommunityPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh" }} />}>
+      <CommunityPageInner />
+    </Suspense>
   );
 }

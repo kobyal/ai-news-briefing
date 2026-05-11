@@ -102,7 +102,9 @@ _WIKI_VENDOR_QUERY: dict[str, str] = {
     "anthropic": "Anthropic",
     "deepmind":  "Google DeepMind",
     "samsung":   "Samsung Electronics",
-    "xai":       "XAI (company)",
+    # xAI's Wikipedia page has no `pageimages` lead image; Grok's does, and
+    # most xAI stories ARE about Grok. Established 2026-05-11.
+    "xai":       "Grok (chatbot)",
     "deepseek":  "DeepSeek",
     "perplexity": "Perplexity AI",
     "mistral":   "Mistral AI",

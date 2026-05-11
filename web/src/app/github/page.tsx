@@ -12,6 +12,8 @@ import type { DayData } from "@/lib/types";
 interface HFModel {
   id: string;
   owner: string;
+  owner_fullname?: string;
+  owner_avatar?: string;
   name: string;
   url: string;
   pipeline_tag: string;
@@ -23,16 +25,22 @@ interface HFModel {
   trending_score: number;
   vendor: string;
   tags: string[];
+  description?: string;
+  description_he?: string;
 }
 interface HFSpace {
   id: string;
   owner: string;
+  owner_fullname?: string;
+  owner_avatar?: string;
   name: string;
   url: string;
   sdk: string;
   likes: number;
   likes_text: string;
   vendor: string;
+  description?: string;
+  description_he?: string;
 }
 interface HotTools {
   fetched_at?: string;
@@ -220,33 +228,42 @@ function ReleaseRow({ r, isHe }: { r: ReleaseCard; isHe: boolean }) {
 }
 
 // ── HF Model / Space cards ─────────────────────────────────────────────────
-function HFAvatar({ owner, size = 40 }: { owner: string; size?: number }) {
-  // Use HF org avatar — they serve a public 200x200. If 404, fallback emoji.
-  const src = `https://huggingface.co/${encodeURIComponent(owner)}/resolve/main/avatar.png`;
+// Real HF org/user avatar with 🤗 emoji fallback when no avatarUrl is set
+// (mostly user-owned models — the fetcher leaves owner_avatar empty for them).
+function HFAvatar({ owner, avatarUrl, size = 44 }: { owner: string; avatarUrl?: string; size?: number }) {
+  const initials = owner.replace(/[-_]/g, " ").split(" ").slice(0, 2).map(s => s[0] || "").join("").toUpperCase() || "🤗";
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={owner}
+        width={size}
+        height={size}
+        style={{
+          width: size, height: size, borderRadius: 10, objectFit: "cover",
+          background: "#fef3c7", border: "1px solid #fde68a",
+        }}
+        referrerPolicy="no-referrer"
+      />
+    );
+  }
   return (
     <div
-      className="flex items-center justify-center shrink-0"
+      className="flex items-center justify-center shrink-0 font-extrabold"
       style={{
         width: size, height: size, borderRadius: 10,
         background: "linear-gradient(135deg, #fef3c7, #fde68a)",
-        color: "#92400e", fontSize: size * 0.55, fontWeight: 800,
+        color: "#92400e", fontSize: size * 0.4,
       }}
     >
-      <img
-        src={src}
-        alt=""
-        width={size}
-        height={size}
-        style={{ width: size, height: size, borderRadius: 10, objectFit: "cover" }}
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-      />
-      <span style={{ position: "absolute" }}>🤗</span>
+      {initials.length === 1 || initials === "🤗" ? "🤗" : initials}
     </div>
   );
 }
 
 function HFModelCard({ m, isHe }: { m: HFModel; isHe: boolean }) {
   const tag = isHe && m.pipeline_tag_he ? m.pipeline_tag_he : m.pipeline_tag;
+  const desc = isHe && m.description_he ? m.description_he : m.description;
   return (
     <a
       href={m.url}
@@ -264,14 +281,17 @@ function HFModelCard({ m, isHe }: { m: HFModel; isHe: boolean }) {
       }}
     >
       <div className="flex items-start gap-3">
-        <div className="relative shrink-0" style={{ width: 40, height: 40 }}>
-          <HFAvatar owner={m.owner} size={40} />
-        </div>
+        <HFAvatar owner={m.owner} avatarUrl={m.owner_avatar} size={44} />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span style={{ fontSize: "11px", color: "#9a9ab8", fontFamily: "var(--font-mono, ui-monospace)" }}>{m.owner}/</span>
             <span className="font-bold" style={{ fontSize: "14px", color: "#0f0f1a", fontFamily: "var(--font-mono, ui-monospace)" }}>{m.name}</span>
           </div>
+          {m.owner_fullname && m.owner_fullname.toLowerCase() !== m.owner.toLowerCase() && (
+            <p className="text-[10.5px] mt-0.5" style={{ color: "#9a9ab8" }}>
+              {m.owner_fullname}
+            </p>
+          )}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {tag && (
               <span
@@ -279,14 +299,6 @@ function HFModelCard({ m, isHe }: { m: HFModel; isHe: boolean }) {
                 style={{ color: "#b45309", background: "#fef3c7", border: "1px solid #fde68a", letterSpacing: "0.02em" }}
               >
                 {tag}
-              </span>
-            )}
-            {m.vendor && m.vendor !== m.owner && (
-              <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                style={{ color: "#6b6b8a", background: "#f3f3f8", border: "1px solid #e0e0ec" }}
-              >
-                {m.vendor}
               </span>
             )}
             {m.downloads_text && (
@@ -306,11 +318,28 @@ function HFModelCard({ m, isHe }: { m: HFModel; isHe: boolean }) {
           </div>
         </div>
       </div>
+      {desc && (
+        <p
+          className="mt-2.5 text-[12.5px] leading-relaxed"
+          style={{
+            color: "#4a4a6a",
+            direction: isHe ? "rtl" : "ltr",
+            textAlign: isHe ? "right" : "left",
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical" as const,
+            WebkitLineClamp: 3,
+            overflow: "hidden",
+          }}
+        >
+          {desc}
+        </p>
+      )}
     </a>
   );
 }
 
 function HFSpaceCard({ s, isHe }: { s: HFSpace; isHe: boolean }) {
+  const desc = isHe && s.description_he ? s.description_he : s.description;
   return (
     <a
       href={s.url}
@@ -327,10 +356,8 @@ function HFSpaceCard({ s, isHe }: { s: HFSpace; isHe: boolean }) {
         e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
       }}
     >
-      <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center shrink-0" style={{ width: 32, height: 32, borderRadius: 8, background: "#ede9fe", color: "#7c3aed", fontSize: 18 }}>
-          {isHe ? "▶" : "▶"}
-        </div>
+      <div className="flex items-start gap-3">
+        <HFAvatar owner={s.owner} avatarUrl={s.owner_avatar} size={36} />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span style={{ fontSize: "10.5px", color: "#9a9ab8", fontFamily: "var(--font-mono, ui-monospace)" }}>{s.owner}/</span>
@@ -348,6 +375,22 @@ function HFSpaceCard({ s, isHe }: { s: HFSpace; isHe: boolean }) {
           </div>
         </div>
       </div>
+      {desc && (
+        <p
+          className="mt-2 text-[11.5px] leading-snug"
+          style={{
+            color: "#4a4a6a",
+            direction: isHe ? "rtl" : "ltr",
+            textAlign: isHe ? "right" : "left",
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical" as const,
+            WebkitLineClamp: 2,
+            overflow: "hidden",
+          }}
+        >
+          {desc}
+        </p>
+      )}
     </a>
   );
 }

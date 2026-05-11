@@ -5,8 +5,12 @@
 Output: docs/data/hot_tools.json — frontend reads on /github/ mount.
 
 Phase 1 (2026-05-11): HF models + Spaces.
+Phase 1.1 (2026-05-11 PM): real owner avatars + README-derived descriptions
++ DeepL Hebrew translations per item (was just emoji + bare tag).
 """
 import json
+import os
+import re
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -14,6 +18,10 @@ from pathlib import Path
 
 REPO = Path("/Users/kobyalmog/vscode/projects/ai-news-briefing")
 OUT_PATH = REPO / "docs/data/hot_tools.json"
+
+# DeepL key lives in private/.env; loaded from there by local-cycle.sh. When
+# absent we ship without Hebrew descriptions (frontend falls back to EN).
+DEEPL_KEY = os.environ.get("DEEPL_API_KEY", "")
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ai-news-briefing/1.0"
 
@@ -26,6 +34,127 @@ def _http_json(url: str, timeout: int = 12) -> list | dict | None:
     except Exception as e:
         print(f"  [http error] {url[:80]}: {e}")
         return None
+
+
+def _http_text(url: str, timeout: int = 12) -> str:
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read().decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+# Simple owner→avatar cache. One HTTP call per distinct owner regardless of
+# how many of their models trend today.
+_avatar_cache: dict[str, str] = {}
+_fullname_cache: dict[str, str] = {}
+
+def fetch_owner_avatar(owner: str) -> tuple[str, str]:
+    """Return (avatar_url, fullname). HF's API has both org + user endpoints;
+    we try org first then user. Empty strings on failure (frontend falls
+    back to 🤗 emoji)."""
+    if not owner:
+        return "", ""
+    if owner in _avatar_cache:
+        return _avatar_cache[owner], _fullname_cache.get(owner, "")
+    avatar, fullname = "", ""
+    for endpoint in ("organizations", "users"):
+        d = _http_json(f"https://huggingface.co/api/{endpoint}/{urllib.parse.quote(owner)}/overview")
+        if isinstance(d, dict) and d.get("avatarUrl"):
+            avatar = d.get("avatarUrl") or ""
+            fullname = d.get("fullname") or d.get("name") or ""
+            break
+    _avatar_cache[owner] = avatar
+    _fullname_cache[owner] = fullname
+    return avatar, fullname
+
+
+def _clean_readme_intro(md: str) -> str:
+    """Extract a 2-3 sentence description from a HF README. README structure
+    varies wildly — most start with a YAML front-matter block, then HTML
+    shield badges (Twitter/HF/license), then headings, then the "## Intro"
+    or first prose paragraph. We strip everything that isn't readable
+    prose and return up to ~280 chars of the first non-empty paragraph."""
+    if not md:
+        return ""
+    # 1. Strip YAML front-matter
+    md = re.sub(r"^---\n.*?\n---\n", "", md, count=1, flags=re.DOTALL)
+    # 2. Strip HTML blocks (shields, alignment divs, etc.)
+    md = re.sub(r"<[^>]+>", "", md)
+    # 3. Strip image+link markdown
+    md = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", md)
+    md = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", md)
+    # 4. Strip code fences, table syntax, horizontal rules
+    md = re.sub(r"```[\s\S]*?```", "", md)
+    md = re.sub(r"`([^`]+)`", r"\1", md)
+    md = re.sub(r"^\s*\|.*\|\s*$", "", md, flags=re.MULTILINE)
+    md = re.sub(r"^[-*_]{3,}\s*$", "", md, flags=re.MULTILINE)
+    # 5. Walk paragraphs, find the first prose one (skip headings + bullets)
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", md)]
+    for p in paragraphs:
+        if not p:
+            continue
+        if p.startswith("#"):
+            continue
+        if p.startswith(("- ", "* ", "1. ", ">")):
+            continue
+        # Strip remaining markdown emphasis
+        p = re.sub(r"\*\*([^*]+)\*\*", r"\1", p)
+        p = re.sub(r"\*([^*]+)\*", r"\1", p)
+        p = re.sub(r"_([^_]+)_", r"\1", p)
+        p = re.sub(r"\s+", " ", p).strip()
+        # Skip paragraphs that look like badge rows or short captions
+        if len(p) < 30:
+            continue
+        if p.lower().startswith(("see ", "check ", "homepage", "[")):
+            continue
+        if len(p) > 280:
+            # Cut at sentence boundary near 280
+            cut = re.match(r"^(.{180,280}?[.!?])\s", p)
+            if cut:
+                return cut.group(1)
+            return p[:280].rsplit(" ", 1)[0] + "…"
+        return p
+    return ""
+
+
+def fetch_readme_intro(model_or_space_id: str, kind: str = "models") -> str:
+    """Pull README from the raw GitHub-style endpoint + clean it."""
+    base = "https://huggingface.co"
+    path = f"/spaces/{model_or_space_id}" if kind == "spaces" else f"/{model_or_space_id}"
+    md = _http_text(f"{base}{path}/raw/main/README.md")
+    if not md:
+        md = _http_text(f"{base}{path}/raw/master/README.md")
+    return _clean_readme_intro(md)
+
+
+def deepl_translate(text: str, target: str = "HE") -> str:
+    """Translate via DeepL Free/Pro. Returns "" on any failure — frontend
+    falls back to EN description in HE mode."""
+    if not DEEPL_KEY or not text:
+        return ""
+    body = urllib.parse.urlencode({
+        "text":        text,
+        "target_lang": target,
+        "source_lang": "EN",
+    }).encode()
+    # Free-tier endpoint subdomain. Pro tier auto-falls back via key suffix.
+    endpoint = "https://api-free.deepl.com/v2/translate"
+    if DEEPL_KEY and not DEEPL_KEY.endswith(":fx"):
+        endpoint = "https://api.deepl.com/v2/translate"
+    try:
+        req = urllib.request.Request(
+            endpoint, data=body,
+            headers={"Authorization": f"DeepL-Auth-Key {DEEPL_KEY}",
+                     "Content-Type": "application/x-www-form-urlencoded"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            d = json.loads(r.read())
+        return (d.get("translations") or [{}])[0].get("text", "") or ""
+    except Exception as e:
+        print(f"  [deepl] error: {e}")
+        return ""
 
 
 def _fmt_count(n: int | None) -> str:
@@ -107,8 +236,8 @@ def _vendor_for(owner: str) -> str:
 
 
 def fetch_hf_models(limit: int = 12) -> list[dict]:
-    """HF trending models (newest first). Filtered to those with a
-    meaningful pipeline_tag so the cards render with a tag pill."""
+    """HF trending models. Enriched per item with: real owner avatar URL,
+    README-derived description (cleaned), DeepL Hebrew translation."""
     out: list[dict] = []
     url = f"https://huggingface.co/api/models?sort=trendingScore&direction=-1&limit={limit * 2}"
     data = _http_json(url)
@@ -124,9 +253,14 @@ def fetch_hf_models(limit: int = 12) -> list[dict]:
         likes = m.get("likes") or 0
         score = m.get("trendingScore") or 0
         tags = m.get("tags") or []
+        avatar_url, fullname = fetch_owner_avatar(owner)
+        description = fetch_readme_intro(mid, kind="models")
+        description_he = deepl_translate(description) if description else ""
         out.append({
             "id":              mid,
             "owner":           owner,
+            "owner_fullname":  fullname or _vendor_for(owner) or owner,
+            "owner_avatar":    avatar_url,
             "name":            name,
             "url":             f"https://huggingface.co/{mid}",
             "pipeline_tag":    pipeline_tag,
@@ -136,8 +270,10 @@ def fetch_hf_models(limit: int = 12) -> list[dict]:
             "likes":           int(likes),
             "likes_text":      _fmt_count(likes),
             "trending_score":  float(score),
-            "vendor":          _vendor_for(owner),
+            "vendor":          _vendor_for(owner) or fullname or owner,
             "tags":            [t for t in tags if not t.startswith(("license:", "region:", "arxiv:"))][:6],
+            "description":     description,
+            "description_he":  description_he,
         })
         if len(out) >= limit:
             break
@@ -145,8 +281,7 @@ def fetch_hf_models(limit: int = 12) -> list[dict]:
 
 
 def fetch_hf_spaces(limit: int = 10) -> list[dict]:
-    """HF trending Spaces (live demos). Filter: skip duplicate clones (likes<50)
-    and require an SDK we can describe (gradio / streamlit / docker / static)."""
+    """HF trending Spaces (live demos). Enriched same as models."""
     out: list[dict] = []
     url = f"https://huggingface.co/api/spaces?sort=trendingScore&direction=-1&limit={limit * 3}"
     data = _http_json(url)
@@ -166,16 +301,23 @@ def fetch_hf_spaces(limit: int = 10) -> list[dict]:
         seen_owners[owner] = seen_owners.get(owner, 0) + 1
         sdk = s.get("sdk") or "static"
         score = s.get("trendingScore") or 0
+        avatar_url, fullname = fetch_owner_avatar(owner)
+        description = fetch_readme_intro(sid, kind="spaces")
+        description_he = deepl_translate(description) if description else ""
         out.append({
             "id":             sid,
             "owner":          owner,
+            "owner_fullname": fullname or _vendor_for(owner) or owner,
+            "owner_avatar":   avatar_url,
             "name":           name,
             "url":            f"https://huggingface.co/spaces/{sid}",
             "sdk":            sdk,
             "likes":          int(likes),
             "likes_text":     _fmt_count(likes),
             "trending_score": float(score),
-            "vendor":         _vendor_for(owner),
+            "vendor":         _vendor_for(owner) or fullname or owner,
+            "description":    description,
+            "description_he": description_he,
         })
         if len(out) >= limit:
             break

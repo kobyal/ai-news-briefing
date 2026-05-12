@@ -52,7 +52,11 @@ export async function generateMetadata(
     const headline = story.headline || "AI Briefing";
     const summary = (story.summary || "Daily AI Intelligence").slice(0, 280);
     const url = `https://aibriefing.dev/story/${id}/`;
-    const img = story.og_image || "/og.png";
+    // Rewrite CF-origin URLs to the custom domain. WhatsApp's link unfurler
+    // prefers (and sometimes requires) the og:image host to match the page
+    // host — cross-domain CloudFront URLs render as the site logo instead.
+    const img = (story.og_image || "/og.png")
+      .replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/");
     return {
       title: headline,
       description: summary,

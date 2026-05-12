@@ -8,6 +8,7 @@ unnecessary.
 
 One-shot fallback established 2026-05-11."""
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +22,44 @@ PROFILE = "koby-personal"
 sys.path.insert(0, str(REPO / "scripts"))
 from _run_log import append_run_log  # noqa: E402
 
+# Map (date, story_id) -> first-party og_image URL by listing the lambda's
+# S3 image mirrors. The ingest lambda uploads each story's og:image to
+#   s3://<bucket>/data/img/<date>/<story_id>.<ext>            (article-extracted)
+#   s3://<bucket>/data/img/<date>/fb_<story_id>.<ext>         (fallback chain)
+# Using these URLs in og:image meta tags fixes WhatsApp/Facebook unfurling —
+# third-party article URLs (techtimes etc.) are slow or geo-blocked from
+# Meta's preview crawlers, so previews fell back to the AI Briefing logo.
+def _first_party_image_map() -> dict[tuple[str, str], str]:
+    out: dict[tuple[str, str], str] = {}
+    try:
+        result = subprocess.run([
+            "aws", "s3api", "list-objects-v2",
+            "--bucket", BUCKET, "--prefix", "data/img/",
+            "--query", "Contents[].Key", "--output", "text",
+            "--profile", PROFILE, "--region", "us-east-1",
+        ], capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            print(f"S3 list failed: {result.stderr[:200]}")
+            return out
+        for key in (result.stdout or "").split():
+            # data/img/<date>/<story_id_or_fb_prefix>.<ext>
+            m = re.match(r"^data/img/(\d{4}-\d{2}-\d{2})/(fb_)?([a-f0-9]{12})\.(jpg|jpeg|png|webp|gif)$", key)
+            if not m:
+                continue
+            date, _fb, sid, _ext = m.groups()
+            # Prefer plain <id> over fb_<id> when both exist for the same story
+            # (article-extracted og:image is more relevant than vendor fallback).
+            url = f"https://aibriefing.dev/{key}"
+            cur = out.get((date, sid))
+            if cur is None or (cur.startswith("https://aibriefing.dev/data/img/") and "/fb_" in cur and "/fb_" not in url):
+                out[(date, sid)] = url
+    except Exception as e:
+        print(f"First-party image map build failed: {e}")
+    return out
+
+FIRST_PARTY_OG = _first_party_image_map()
+print(f"Loaded {len(FIRST_PARTY_OG)} first-party og:image mirrors from S3")
+
 stories: list[dict] = []
 extras: list[dict] = []
 
@@ -33,7 +72,6 @@ seen_urls: set[str] = set()
 # Search hrefs encode this as ?date=YYYY-MM-DD; the receiving page's
 # readDateParam() rejects anything that doesn't match /^\d{4}-\d{2}-\d{2}$/,
 # so non-ISO dates silently broke the deep-link useEffect.
-import re as _re
 _MONTHS = {"jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,
            "jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12}
 def _to_iso(s: str, fallback: str = "") -> str:
@@ -41,11 +79,11 @@ def _to_iso(s: str, fallback: str = "") -> str:
         return fallback
     s = s.strip()
     # Already ISO (with optional time component)
-    m = _re.match(r"^(\d{4}-\d{2}-\d{2})", s)
+    m = re.match(r"^(\d{4}-\d{2}-\d{2})", s)
     if m:
         return m.group(1)
     # "May 7, 2026" / "May 07, 2026" / "Jan 12, 2026"
-    m = _re.match(r"^(\w{3,9})\s+(\d{1,2}),\s*(\d{4})$", s)
+    m = re.match(r"^(\w{3,9})\s+(\d{1,2}),\s*(\d{4})$", s)
     if m:
         mon = _MONTHS.get(m.group(1)[:3].lower())
         if mon:
@@ -78,6 +116,9 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
         story_id = hashlib.sha256(primary.encode()).hexdigest()[:12]
         headline_he = s.get("headline_he") or (headlines_he_arr[idx] if idx < len(headlines_he_arr) else "")
         summary_he = s.get("summary_he") or (summaries_he_arr[idx] if idx < len(summaries_he_arr) else "")
+        # Prefer the lambda's first-party S3 mirror (e.g. aibriefing.dev/data/img/...)
+        # over the raw third-party article URL. See _first_party_image_map().
+        og_image = FIRST_PARTY_OG.get((date, story_id)) or s.get("og_image")
         stories.append({
             "type":         "article",
             "story_id":     story_id,
@@ -87,7 +128,7 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
             "headline_he":  headline_he,
             "summary":      s.get("summary"),
             "summary_he":   summary_he,
-            "og_image":     s.get("og_image"),
+            "og_image":     og_image,
         })
     # IMPORTANT: `date` MUST be the date of the JSON file the item is
     # surfaced in (the "archive date"), NOT the original post/published

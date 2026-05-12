@@ -58,6 +58,7 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
     tldr_he: s0.tldr_he || [],
     tldr_audio_url:    (s0 as unknown as Record<string, string>).tldr_audio_url || undefined,
     tldr_audio_url_he: (s0 as unknown as Record<string, string>).tldr_audio_url_he || undefined,
+    bullet_story_ids:  (s0 as unknown as Record<string, unknown>).bullet_story_ids as string[] | undefined,
     community_pulse: s0.community_pulse || "",
     community_pulse_he: s0.community_pulse_he || "",
     community_urls: s0.community_urls || [],

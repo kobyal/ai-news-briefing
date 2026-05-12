@@ -32,6 +32,14 @@ class CommunityPulseItem(BaseModel):
 
 class BriefingContent(BaseModel):
     tldr: List[str]
+    tldr_story_indices: List[int] = Field(
+        default_factory=list,
+        description=(
+            "Parallel to tldr: tldr_story_indices[i] is the 0-based position "
+            "in news_items of the story that tldr[i] summarizes. Same length "
+            "as tldr. Removes the frontend's brittle keyword-scoring guess."
+        ),
+    )
     news_items: List[NewsItem]
     community_pulse_items: List[CommunityPulseItem] = []
     community_pulse: str = ""       # backward compat: flat string

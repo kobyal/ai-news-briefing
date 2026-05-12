@@ -278,6 +278,29 @@ _VENDOR_KEYWORDS = {
 }
 _briefing = merger.get("briefing", {})
 
+# Bind each tldr bullet to its source story via stable story_ids BEFORE the
+# same-day union / re-rank below reorders news_items. The merger emits
+# `tldr_story_indices` (LLM-chosen, with word-overlap fallback in
+# merger-agent/merger_agent/pipeline.py). We convert positional indices →
+# content-derived story_ids here, so the binding survives any later
+# reordering. Frontend reads `bullet_story_ids` and skips its keyword
+# scorer — fixes 2026-05-12 "typosquatted OpenAI Privacy Filter" landing
+# on the OpenAI shopping-ads story.
+_tldr_indices_init = _briefing.get("tldr_story_indices") or []
+_merger_items_init = _briefing.get("news_items") or []
+if _tldr_indices_init and _merger_items_init:
+    def _sid_from_item(_it: dict) -> str:
+        _urls = _it.get("urls") or []
+        _primary = _urls[0] if _urls else (_it.get("headline") or "")
+        return hashlib.sha256(_primary.encode()).hexdigest()[:12]
+    _bullet_sids = []
+    for _i in _tldr_indices_init:
+        if isinstance(_i, int) and 0 <= _i < len(_merger_items_init):
+            _bullet_sids.append(_sid_from_item(_merger_items_init[_i]))
+        else:
+            _bullet_sids.append("")
+    _briefing["bullet_story_ids"] = _bullet_sids
+
 
 # ── A: Same-day union (cycle re-run on a date that already has published data) ──
 # When local-cycle.sh runs a second time on the same day, the merger picks

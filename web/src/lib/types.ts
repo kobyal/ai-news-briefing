@@ -126,6 +126,13 @@ export interface DayData {
   // Optional: empty/undefined when audio gen failed or wasn't run yet.
   tldr_audio_url?: string;
   tldr_audio_url_he?: string;
+  // Explicit bullet→story binding from merger pipeline. bullet_story_ids[i]
+  // is the story_id that tldr[i]/tldr_he[i] refers to. When present and valid,
+  // BriefingPage uses it directly and skips the keyword-scorer fallback (which
+  // was getting confused by vendor names appearing in someone else's product
+  // names — e.g. "typosquatted 'OpenAI Privacy Filter' on Hugging Face" was
+  // routed to OpenAI's shopping-ads story before this field existed).
+  bullet_story_ids?: string[];
   community_pulse: string;
   community_pulse_he: string;
   community_pulse_items: CommunityPulseItem[];

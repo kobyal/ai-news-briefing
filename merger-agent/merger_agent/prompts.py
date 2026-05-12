@@ -133,6 +133,15 @@ Produce ONE merged briefing as a JSON object. Rules:
 4. tldr — write 8-10 bullets summarising the most important stories from the merged set.
    Each bullet: vendor + what happened + why it matters (15-25 words).
 
+   ALSO return tldr_story_indices: a parallel array of integers where
+   tldr_story_indices[i] is the 0-based position in news_items of the story
+   that tldr[i] summarizes. Same length as tldr. Choose the SUBJECT story
+   (what the bullet is actually ABOUT) — not a vendor mentioned in passing.
+   Example: a bullet "A typosquatted 'OpenAI Privacy Filter' repo on Hugging Face..."
+   should point to the Hugging Face story about the fake repo, NOT an
+   OpenAI story that just happens to share the name. The frontend uses
+   this mapping for clicks — wrong indices send readers to wrong stories.
+
 5. community_pulse_items — THIS IS NOT A NEWS SUMMARY. The tldr already covers what happened.
    This section is about REACTIONS, DEBATES, and OPINIONS from the developer community.
 

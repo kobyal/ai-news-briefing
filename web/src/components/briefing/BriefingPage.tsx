@@ -309,6 +309,33 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
   const { tldrRanked, bulletStoryMap } = useMemo(() => {
     const tldr = data.tldr || [];
     if (!tldr.length) return { tldrRanked: rankedStories, bulletStoryMap: new Map<number, NewsItem>() };
+    const storyById = new Map(rankedStories.map((s) => [s.story_id, s] as const));
+
+    // Preferred path: explicit bullet→story binding from the merger pipeline.
+    // Skips the keyword scorer entirely. Accepted when length matches and
+    // every non-empty id resolves to a known story (orphan bullets get ""
+    // in the pipeline; those fall to scorer too as a per-bullet safety net).
+    const explicit = data.bullet_story_ids;
+    if (Array.isArray(explicit) && explicit.length === tldr.length && explicit.every((id) => !id || storyById.has(id))) {
+      const bulletMap = new Map<number, NewsItem>();
+      const ordered: NewsItem[] = [];
+      const claimed = new Set<string>();
+      explicit.forEach((sid, i) => {
+        if (!sid) return;
+        const s = storyById.get(sid);
+        if (!s || claimed.has(sid)) return;
+        bulletMap.set(i, s);
+        ordered.push(s);
+        claimed.add(sid);
+      });
+      for (const s of rankedStories) if (!claimed.has(s.story_id)) ordered.push(s);
+      return { tldrRanked: ordered, bulletStoryMap: bulletMap };
+    }
+
+    // Fallback: keyword scorer (brittle on multi-vendor bullets — e.g. on
+    // 2026-05-12 it routed "typosquatted 'OpenAI Privacy Filter' repo on
+    // Hugging Face" to OpenAI's shopping-ads story because OpenAI sits in
+    // the bullet's first 35 chars and that's a +100 boost over content overlap).
     type Pair = { bulletIdx: number; storyId: string; score: number };
     const pairs: Pair[] = [];
     tldr.forEach((bullet, bulletIdx) => {
@@ -326,7 +353,6 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
       bulletToStoryId.set(p.bulletIdx, p.storyId);
       claimedStories.add(p.storyId);
     }
-    const storyById = new Map(rankedStories.map((s) => [s.story_id, s] as const));
     const bulletMap = new Map<number, NewsItem>();
     bulletToStoryId.forEach((sid, idx) => {
       const s = storyById.get(sid);
@@ -339,7 +365,7 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
     });
     for (const s of rankedStories) if (!claimedStories.has(s.story_id)) ordered.push(s);
     return { tldrRanked: ordered, bulletStoryMap: bulletMap };
-  }, [rankedStories, data.tldr]);
+  }, [rankedStories, data.tldr, data.bullet_story_ids]);
 
   const todayFiltered = useMemo(() => {
     if (!activeVendor) return tldrRanked;

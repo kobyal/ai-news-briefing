@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { ShareButton } from "@/components/briefing/ShareButton";
@@ -30,9 +29,7 @@ function StoryImage({ src }: { src?: string }) {
   );
 }
 
-export default function StoryPage() {
-  const searchParams = useSearchParams();
-  const id = searchParams.get("id") || "";
+export default function StoryPage({ id }: { id: string }) {
   const { isHe } = useLang();
   const [story, setStory] = useState<NewsItem | null>(null);
   const [data, setData] = useState<DayData | null>(null);

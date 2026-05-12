@@ -333,7 +333,7 @@ function FeaturedCard({ story }: { story: NewsItem }) {
         boxShadow: "0 2px 12px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.04)",
         cursor: "pointer",
       }}
-      onClick={() => window.location.href = `/story?id=${story.story_id}`}
+      onClick={() => window.location.href = `/story/${story.story_id}/`}
     >
       {/* Hero image or abstract gradient fallback */}
       <OgImage src={story.og_image} vendor={story.vendor} vendorColor={vendor.color} height="220px" />
@@ -831,7 +831,7 @@ function RegularCard({ story, rank }: { story: NewsItem; rank?: number }) {
             overflow: "hidden",
             cursor: "pointer",
           }}
-          onClick={() => window.location.href = `/story?id=${story.story_id}`}
+          onClick={() => window.location.href = `/story/${story.story_id}/`}
         >
           {headline}
         </h3>
@@ -860,7 +860,7 @@ function RegularCard({ story, rank }: { story: NewsItem; rank?: number }) {
               overflow: "hidden",
             }),
           }}
-          onClick={() => window.location.href = `/story?id=${story.story_id}`}
+          onClick={() => window.location.href = `/story/${story.story_id}/`}
         >
           {summary}
         </p>
@@ -953,7 +953,7 @@ function SidebarCard({ story }: { story: NewsItem }) {
         boxShadow: "0 1px 6px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)",
         cursor: "pointer",
       }}
-      onClick={() => window.location.href = `/story?id=${story.story_id}`}
+      onClick={() => window.location.href = `/story/${story.story_id}/`}
     >
       <OgImage src={story.og_image} vendor={story.vendor} vendorColor={vendor.color} height="100%" width="150px" />
 

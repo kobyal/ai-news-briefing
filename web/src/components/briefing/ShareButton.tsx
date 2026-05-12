@@ -21,7 +21,7 @@ export function ShareButton({ storyId, headline, isHe }: ShareButtonProps) {
 
   useEffect(() => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    setUrl(`${origin}/story?id=${encodeURIComponent(storyId)}`);
+    setUrl(`${origin}/story/${encodeURIComponent(storyId)}/`);
     setCanNativeShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
   }, [storyId]);
 

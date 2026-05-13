@@ -155,6 +155,19 @@ TRACKED_HANDLES = [
     {"name": "Ethan Mollick",       "handle": "emollick",       "org": "Wharton",     "role": "AI researcher"},
     {"name": "François Chollet",    "handle": "fchollet",       "org": "Google",      "role": "Keras creator"},
     {"name": "Lex Fridman",         "handle": "lexfridman",     "org": "Independent", "role": "AI podcaster"},
+    # ── New 2026-05-13 — CEO/exec layer + frontier-lab signal ──────────────────
+    {"name": "Andy Jassy",          "handle": "ajassy",         "org": "Amazon",      "role": "CEO"},
+    {"name": "Matt Garman",         "handle": "mattgarman",     "org": "AWS",         "role": "CEO"},
+    {"name": "Satya Nadella",       "handle": "satyanadella",   "org": "Microsoft",   "role": "CEO"},
+    {"name": "Sundar Pichai",       "handle": "sundarpichai",   "org": "Google",      "role": "CEO"},
+    {"name": "Mira Murati",         "handle": "miramurati",     "org": "Thinking Machines", "role": "Founder/CEO"},
+    {"name": "Mustafa Suleyman",    "handle": "mustafasuleymn", "org": "Microsoft",   "role": "CEO of Microsoft AI"},
+    {"name": "Aravind Srinivas",    "handle": "AravSrinivas",   "org": "Perplexity",  "role": "CEO"},
+    {"name": "Aidan Gomez",         "handle": "aidangomez",     "org": "Cohere",      "role": "CEO"},
+    {"name": "Jensen Huang",        "handle": "jensenhuang",    "org": "NVIDIA",      "role": "CEO"},
+    {"name": "Brad Lightcap",       "handle": "bradlightcap",   "org": "OpenAI",      "role": "COO"},
+    {"name": "Logan Kilpatrick",    "handle": "OfficialLoganK", "org": "Google",      "role": "AI Studio lead"},
+    {"name": "Marc Andreessen",     "handle": "pmarca",         "org": "a16z",        "role": "Partner"},
 ]
 
 AI_SEARCH_QUERIES = [

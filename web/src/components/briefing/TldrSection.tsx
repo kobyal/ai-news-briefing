@@ -213,17 +213,15 @@ export function TldrSection({ tldr, tldr_he, tldrAudioUrl, tldrAudioUrlHe, stori
     else { a.pause(); setIsPlaying(false); }
   }
 
-  // Drop orphan bullets — if a bullet has no matched story, showing it is
-  // misleading (reader expects tldr[i] → story[i]). The parent's bulletStoryMap
-  // is keyed by EN-index; HE/EN bullets are authored in the same order by the
-  // merger, so the index aligns either way.
-  const items = rawItems.filter((_, i) => {
-    if (bulletStoryMap) return bulletStoryMap.has(i);
-    return matchStory(rawItems[i], stories) !== null;
-  });
-  const itemOrigIdx = rawItems
-    .map((_, i) => i)
-    .filter((i) => (bulletStoryMap ? bulletStoryMap.has(i) : matchStory(rawItems[i], stories) !== null));
+  // Show every TLDR bullet in source order. The TLDR audio MP3 is generated
+  // from the full tldr_he array (publish_data.py), so dropping bullets here
+  // breaks audio↔page alignment ("audio reads point 3 but card 3 on screen
+  // is a different bullet"). Orphan bullets (no story binding) just don't
+  // get a clickable arrow — that signals "no link" without hiding content.
+  // 2026-05-13: removed prior orphan filter, was confusing readers who heard
+  // the audio reading content they couldn't see on screen.
+  const items = rawItems;
+  const itemOrigIdx = rawItems.map((_, i) => i);
 
   if (!items || items.length === 0) return null;
 

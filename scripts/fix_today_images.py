@@ -112,7 +112,27 @@ def extract_article_images(article_url: str, max_n: int = 12,
 def vision_pick_real_photo(headline: str, vendor: str,
                             candidates: list[str], budget: int = 6) -> tuple[str, str]:
     """Vision-judge candidates in order, return (chosen_url, reason).
-    Caps at `budget` LLM calls per story to bound cost."""
+    Caps at `budget` LLM calls per story to bound cost.
+
+    Vendor-allowlist bypass: upload.wikimedia.org URLs from find_fallback's
+    tier-2 (vendor HQ photos for known AI companies) are pre-vetted and
+    intentionally bypass vision-judge IN find_fallback. The vision-judge
+    over-rejects them as "logos" (false positive). Mirror that bypass here
+    so this script doesn't undo find_fallback's correct decisions.
+    2026-05-13: this script cleared Microsoft + Alibaba + Googleplex HQ
+    photos via vision-judge despite find_fallback intentionally returning
+    them. Now we trust the allowlist.
+    """
+    try:
+        from shared.image_fallback import _WIKI_VENDOR_ALLOWLIST
+    except Exception:
+        _WIKI_VENDOR_ALLOWLIST = set()
+    vendor_lc = (vendor or "").lower()
+    if vendor_lc in _WIKI_VENDOR_ALLOWLIST:
+        for c in candidates:
+            if c and "upload.wikimedia.org/wikipedia/commons" in c:
+                return c, "vendor-allowlist wiki bypass"
+
     used = 0
     for c in candidates:
         if used >= budget:

@@ -981,6 +981,58 @@ with ThreadPoolExecutor(max_workers=8) as pool:
 print(f"  URL sanity: dropped {_mismatches} mismatched URLs | OG images fetched: {_og_fetched}")
 
 
+# ── Junk og:image detector ────────────────────────────────────────────────────
+# Catch og_images that scraped successfully but point at logos / favicons /
+# tracking pixels / placeholder SVGs. The downstream find_fallback chain
+# only fires for EMPTY og_image — without this detector, junk URLs sail
+# through and render as a tiny stamp on a blank card.
+# Established 2026-05-13 after Koby flagged 4 stories with arxiv-logo SVGs
+# (200 bytes, renders 48×48 on a 600×400 card).
+#
+# What counts as "junk":
+#   - Known logo URL patterns (arxiv.org/static/, *-logo.svg, favicon)
+#   - Tracking pixels (google-analytics, doubleclick, scorecardresearch)
+#   - SVG files under 5 KB (logos; real article SVGs are rare and bigger)
+def _is_junk_og_image(url: str) -> str | None:
+    """Return reason string if url is junk-looking, else None."""
+    if not url or not isinstance(url, str):
+        return None
+    u = url.lower()
+    # Known logo hotspots
+    LOGO_PATTERNS = (
+        "arxiv.org/static/",            # arxiv-logo*.svg
+        "/favicon",                     # favicons
+        "google-analytics.com/g/collect",  # GA tracker pixel
+        "doubleclick.net/",
+        "scorecardresearch.com/",
+        "/wp-content/themes/",          # WP theme assets (usually logos)
+        "/assets/logo",
+        "/assets/icons/",
+        "/sprites/",
+        "_logo.svg",
+        "_logo.png",
+        "wordmark",
+        "/s2/favicons",                 # Google s2 favicons
+        ".gif?",                        # 1×1 tracking GIFs
+    )
+    for p in LOGO_PATTERNS:
+        if p in u:
+            return f"matches junk-pattern '{p}'"
+    return None
+
+
+_junk_cleared = 0
+for _item in _news_items:
+    _og = _item.get("og_image") or ""
+    _reason = _is_junk_og_image(_og)
+    if _reason:
+        print(f"  ✂ Junk og_image cleared on '{(_item.get('headline') or '')[:50]}': {_reason} | was {_og[:70]}")
+        _item["og_image"] = ""
+        _junk_cleared += 1
+if _junk_cleared:
+    print(f"  Junk og:image clear: {_junk_cleared} cleared (find_fallback chain will fire below)")
+
+
 # ── Canonical vendor URL prepend ──────────────────────────────────────────────
 # After URL validation, look up each story's vendor blog feed for a
 # headline-matching post and prepend it. Trusted source (vendor's own RSS),

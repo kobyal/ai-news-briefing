@@ -278,28 +278,19 @@ _VENDOR_KEYWORDS = {
 }
 _briefing = merger.get("briefing", {})
 
-# Bind each tldr bullet to its source story via stable story_ids BEFORE the
-# same-day union / re-rank below reorders news_items. The merger emits
-# `tldr_story_indices` (LLM-chosen, with word-overlap fallback in
-# merger-agent/merger_agent/pipeline.py). We convert positional indices →
-# content-derived story_ids here, so the binding survives any later
-# reordering. Frontend reads `bullet_story_ids` and skips its keyword
-# scorer — fixes 2026-05-12 "typosquatted OpenAI Privacy Filter" landing
-# on the OpenAI shopping-ads story.
-_tldr_indices_init = _briefing.get("tldr_story_indices") or []
+# Bind each tldr bullet to its source story via stable story_ids. We can't
+# hash now because the URL filter further down may change primary URLs
+# (which derives the story_id). Strategy: tag each merger item with its
+# merger position, then resolve bullet_story_ids just before the JSON is
+# written — by which point urls[0] is final and the lambda will produce
+# the same hash. Frontend reads `bullet_story_ids` and skips its keyword
+# scorer entirely (fixes 2026-05-12 "typosquatted OpenAI Privacy Filter"
+# routing). _merger_idx is stripped before serialization.
+_pending_tldr_indices = list(_briefing.get("tldr_story_indices") or [])
 _merger_items_init = _briefing.get("news_items") or []
-if _tldr_indices_init and _merger_items_init:
-    def _sid_from_item(_it: dict) -> str:
-        _urls = _it.get("urls") or []
-        _primary = _urls[0] if _urls else (_it.get("headline") or "")
-        return hashlib.sha256(_primary.encode()).hexdigest()[:12]
-    _bullet_sids = []
-    for _i in _tldr_indices_init:
-        if isinstance(_i, int) and 0 <= _i < len(_merger_items_init):
-            _bullet_sids.append(_sid_from_item(_merger_items_init[_i]))
-        else:
-            _bullet_sids.append("")
-    _briefing["bullet_story_ids"] = _bullet_sids
+if _pending_tldr_indices and _merger_items_init:
+    for _i, _item in enumerate(_merger_items_init):
+        _item["_merger_idx"] = _i
 
 
 # ── A: Same-day union (cycle re-run on a date that already has published data) ──
@@ -1772,6 +1763,29 @@ def _audit_data_quality():
 
 
 _data_quality_issues = _audit_data_quality()
+
+
+# Resolve bullet_story_ids now that urls[] are final. We hash urls[0] for each
+# item whose _merger_idx matches a tldr_story_index; if the item was dropped
+# (e.g. by same-day union) or didn't survive, the slot becomes "" (frontend
+# falls back to scorer per-bullet). Strips _merger_idx tags after.
+if _pending_tldr_indices:
+    def _final_sid_for_bullet(_it: dict) -> str:
+        _urls = _it.get("urls") or []
+        _primary = _urls[0] if _urls else (_it.get("headline") or "")
+        return hashlib.sha256(_primary.encode()).hexdigest()[:12]
+    _idx_to_item = {}
+    for _it in _news_items:
+        _midx = _it.get("_merger_idx")
+        if isinstance(_midx, int):
+            _idx_to_item[_midx] = _it
+    _bullet_sids = []
+    for _i in _pending_tldr_indices:
+        _it = _idx_to_item.get(_i)
+        _bullet_sids.append(_final_sid_for_bullet(_it) if _it else "")
+    _briefing["bullet_story_ids"] = _bullet_sids
+    for _it in _news_items:
+        _it.pop("_merger_idx", None)
 
 
 published = {

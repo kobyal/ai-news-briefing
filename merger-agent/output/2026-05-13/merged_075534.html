@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title> Combined Briefing — May 13, 2026</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fafaf7;min-height:100vh;color:#0f172a}
+.header{background:linear-gradient(135deg,#1c1917,#78350f,#d97706);color:#fff;padding:32px 28px;text-align:center}
+.header h1{font-size:24px;font-weight:700;margin-bottom:4px}
+.header .date{font-size:14px;opacity:.75;margin-top:6px}
+.sources-badge{display:inline-flex;align-items:center;gap:6px;margin-top:10px;background:rgba(255,255,255,.15);border-radius:20px;padding:4px 14px;font-size:12px;color:rgba(255,255,255,.9)}
+.sources-badge b{color:#fcd34d}
+.toggle{display:inline-flex;background:rgba(255,255,255,.18);border-radius:24px;padding:3px;gap:3px;margin-top:12px}
+.tbtn{padding:6px 20px;border:none;border-radius:20px;cursor:pointer;font-size:13px;font-weight:600;background:transparent;color:#fff;transition:all .2s}
+.tbtn.active{background:#fff;color:#78350f}
+.wrap{max-width:680px;margin:0 auto;padding:24px 16px}
+.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:10px}
+.tldr-card{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:24px;border-left:4px solid #d97706;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tldr-card h2{font-size:16px;font-weight:700;color:#d97706;margin-bottom:12px}
+.tldr-card ul{padding-left:18px;font-size:14px;line-height:1.8;color:#374151}
+.tldr-card ul[dir=rtl]{padding-left:0;padding-right:18px;text-align:right}
+.tldr-card li{margin-bottom:6px}
+.news-card{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:box-shadow .2s}
+.news-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.card-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.card-header h3{font-size:15px;font-weight:600;color:#0f172a;flex:1}
+.new-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:1px;background:#dc2626;color:#fff;animation:pulse-new 2s ease-in-out infinite}
+@keyframes pulse-new{0%,100%{opacity:1}50%{opacity:.7}}
+.summary{font-size:14px;line-height:1.7;color:#4b5563;margin-bottom:8px}
+.pub-date{display:block;font-size:12px;color:#94a3b8;margin-bottom:8px}
+.sources{display:flex;flex-direction:column;gap:3px;margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9}
+.source-link{font-size:12px;color:#d97706;text-decoration:none;word-break:break-all}
+.source-link:hover{text-decoration:underline}
+.community-card{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:24px;border-left:4px solid #92400e;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.community-card h2{font-size:16px;font-weight:700;color:#92400e;margin-bottom:10px}
+.community-card p{font-size:14px;line-height:1.7;color:#374151}
+.community-bullets{padding-left:18px;font-size:14px;line-height:1.8;color:#374151;list-style:disc}
+.community-bullets[dir=rtl]{padding-left:0;padding-right:18px;text-align:right}
+.community-bullets li{margin-bottom:8px}
+/* People cards */
+.person-card{background:#fff;border-radius:12px;padding:16px 20px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.person-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.person-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#d97706,#92400e);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff;flex-shrink:0}
+.person-name{font-weight:700;font-size:14px;color:#0f172a}
+.person-handle{font-size:12px;color:#94a3b8}.person-org-badge{font-size:11px;font-weight:600;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;padding:1px 6px}.engagement-badge{display:inline-block;font-size:11px;font-weight:600;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;padding:2px 8px;margin-bottom:6px}
+.person-post{font-size:14px;color:#374151;line-height:1.6;font-style:italic;margin-bottom:6px;border-left:3px solid #fde68a;padding-left:10px}
+.person-why{font-size:12px;color:#94a3b8;margin-bottom:6px}
+.x-link{font-size:12px;color:#d97706;text-decoration:none}
+.x-link:hover{text-decoration:underline}
+/* YouTube */
+.yt-card{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.yt-row{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9}
+.yt-row:last-child{border-bottom:none}
+.yt-icon{width:28px;height:28px;border-radius:6px;background:#ff0000;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px}
+.yt-content{flex:1;min-width:0}
+.yt-title{font-size:13px;color:#0f172a;text-decoration:none;font-weight:600;line-height:1.4;display:block}
+.yt-title:hover{color:#d97706}
+.yt-meta{font-size:11px;color:#94a3b8;margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ch-row{display:block;padding:8px 12px;margin:4px 0;border-radius:6px;background:#fafafa;text-decoration:none;color:inherit;transition:background .15s}
+.ch-row:hover{background:#f1f5f9}
+.ch-name{font-size:13px;font-weight:600;color:#1e293b;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ch-lang{font-size:11px}
+.ch-platform{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.ch-desc{font-size:11px;color:#64748b;margin-top:2px}
+.yt-desc{font-size:12px;color:#6b7280;margin-top:3px;line-height:1.4}
+/* X/Twitter Trending */
+.xt-card{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.xt-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #f1f5f9}
+.xt-row:last-child{border-bottom:none}
+.xt-icon{width:28px;height:28px;border-radius:6px;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;margin-top:2px}
+.xt-content{flex:1;min-width:0}
+.xt-author{font-size:13px;font-weight:700;color:#0f172a}
+.xt-handle{font-weight:400;color:#94a3b8;font-size:12px}
+.xt-post{font-size:13px;color:#374151;line-height:1.5;font-style:italic;margin:4px 0;border-left:3px solid #e2e8f0;padding-left:10px}
+.xt-meta{font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px}
+.xt-engagement{font-weight:600;color:#d97706}
+/* GitHub */
+.gh-card{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.gh-row{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9}
+.gh-row:last-child{border-bottom:none}
+.gh-icon{font-size:16px;flex-shrink:0;margin-top:2px}
+.gh-content{flex:1;min-width:0}
+.gh-title{font-size:13px;color:#0f172a;text-decoration:none;font-weight:600;line-height:1.4;display:block}
+.gh-title:hover{color:#7c3aed}
+.gh-meta{font-size:11px;color:#94a3b8;margin-top:2px}
+.gh-desc{font-size:12px;color:#6b7280;margin-top:3px;line-height:1.4}
+/* Reddit */
+.reddit-card{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.reddit-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;flex-wrap:wrap}
+.reddit-row:last-child{border-bottom:none}
+.reddit-sub{font-size:11px;font-weight:700;color:#ea580c;background:#fff7ed;padding:2px 8px;border-radius:12px;white-space:nowrap;margin-top:2px}
+.reddit-title{font-size:13px;color:#2563eb;text-decoration:none;flex:1;line-height:1.4}
+.reddit-title:hover{text-decoration:underline}
+.reddit-score{font-size:12px;color:#16a34a;font-weight:700;white-space:nowrap;margin-top:2px}
+/* Community Pulse items */
+.pulse-item{padding:14px 0;border-bottom:1px solid #f1f5f9}
+.pulse-item:last-child{border-bottom:none}
+.pulse-header{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.pulse-headline{font-size:14px;font-weight:600;color:#0f172a}
+.heat-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap}
+.heat-hot{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+.heat-warm{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
+.heat-mild{background:#f0f4f8;color:#64748b;border:1px solid #e2e8f0}
+.pulse-body{font-size:13px;line-height:1.6;color:#4b5563;margin-bottom:6px}
+.pulse-footer{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pulse-source{font-size:12px;color:#d97706;text-decoration:none}
+.pulse-source:hover{text-decoration:underline}
+.pulse-vendor{font-size:11px;font-weight:600;background:#f3e8ff;color:#7c3aed;border-radius:4px;padding:1px 6px}
+.pulse-person{font-size:11px;color:#64748b}
+.pulse-tags{display:flex;gap:6px;align-items:center}
+.footer{text-align:center;padding:20px;font-size:12px;color:#94a3b8}
+.vf-chip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;border:2px solid transparent;opacity:.75;transition:all .15s}
+.vf-chip:hover{opacity:1}
+.vf-chip.active{border-color:#fff;opacity:1;box-shadow:0 0 0 2px currentColor}
+</style></head><body>
+<div class="header">
+<h1>🤖  Combined Briefing</h1>
+<div class="date">May 13, 2026</div>
+<div class="sources-badge">Merged from <b>10 AI agents</b> · ADK · Perplexity · RSS · Tavily · Exa · NewsAPI · YouTube · GitHub · Article Reader</div>
+<div class="toggle">
+<button class="tbtn active" onclick="setLang('en',this)">EN</button>
+<button class="tbtn" onclick="setLang('he',this)">עברית</button>
+</div>
+</div>
+<div class="wrap">
+<div class="tldr-card">
+<h2 id="tldr-label">Today's Brief</h2>
+<ul id="tldr-en"><li>AWS makes Claude Platform generally available across 18 regions with MCP connectors, while Bedrock AgentCore adds Stripe/Coinbase-powered agent payments — a one-two punch reshaping the hyperscaler AI bargain.</li><li>Anthropic launches Claude For Legal with practice-area plugins and a &#x27;Dreaming&#x27; memory-review system, while restricting frontier Claude Mythos to Microsoft and Google partners over misuse risk.</li><li>OpenAI unveils Daybreak, an AI vulnerability-detection and patch-validation platform aimed squarely at Anthropic&#x27;s Claude Mythos in enterprise cybersecurity.</li><li>OpenAI is acquiring consulting firm Tomoro to staff a new $4B+ OpenAI Deployment Company with ~150 employees focused on enterprise rollouts.</li><li>Google previews Android 17 with &#x27;Gemini Intelligence,&#x27; agentic widgets, and seven hidden Gemini Live model codenames — staking the Android frontier ahead of Apple&#x27;s WWDC Siri reboot.</li><li>NVIDIA&#x27;s Vera Rubin inference GPU enters trial production in June with July shipments to AWS, Microsoft, and Google, plus a $3.4B cloud deal and IREN 5 GW partnership.</li><li>Apple is rebuilding Siri in iOS 27 as an always-on chat agent and settled a $250M class action over misleading Apple Intelligence marketing.</li><li>DeepSeek&#x27;s V4-Pro hits 1.6T parameters with a 1M-token context and drastically lower inference cost, reportedly forcing Anthropic to cut Opus 4.7 pricing.</li><li>A typosquatted &#x27;OpenAI Privacy Filter&#x27; repo trended to #1 on Hugging Face with 244K downloads, exposing infostealer malware and a tokenizer-file weaponization path.</li><li>OpenAI faces a new lawsuit alleging ChatGPT helped plan the FSU mass shooting, intensifying scrutiny over chatbot safeguards.</li><li>Alibaba is merging Qwen AI into Taobao and Tmall and pushing Qwen3-Max-Thinking for agentic &#x27;A2A&#x27; commerce across 4B+ products.</li><li>Google DeepMind reimagines the mouse pointer for the AI era — Hassabis calls the AI Studio prototype &#x27;pretty magical&#x27; as cursors learn to surface agent intent.</li></ul>
+<ul id="tldr-he" dir="rtl" style="display:none"><li>AWS השיקה את Claude Platform בזמינות כללית ב-18 אזורים עם MCP connectors, ובמקביל Bedrock AgentCore מוסיף תשלומי agents מבוססי Stripe ו-Coinbase — מהלך כפול ששובר את משוואת ה-AI של ה-hyperscalers.</li><li>Anthropic השיקה את Claude For Legal עם plugins ייעודיים לתחומי משפט ומערכת זיכרון בשם Dreaming, ובמקביל הגבילה את מודל ה-frontier שלה Claude Mythos לשותפי Microsoft ו-Google בלבד בגלל סיכוני שימוש לרעה.</li><li>OpenAI חשפה את Daybreak — פלטפורמת AI לזיהוי פגיעויות ואימות patches שמכוונת ישירות מול Claude Mythos של Anthropic בשוק ה-cybersecurity הארגוני.</li><li>OpenAI רוכשת את חברת הייעוץ Tomoro כדי לאייש חברה חדשה בשם OpenAI Deployment Company בשווי 4 מיליארד דולר+, עם כ-150 עובדים שיתמקדו ב-deployments ארגוניים.</li><li>Google הציגה preview של Android 17 עם Gemini Intelligence, agentic widgets ושבעה codenames נסתרים של Gemini Live — מהלך מקדים לקראת ה-Siri reboot של Apple ב-WWDC.</li><li>ה-GPU החדש של NVIDIA לinference, Vera Rubin, נכנס ל-trial production ביוני עם משלוחים ל-AWS, Microsoft ו-Google ביולי, לצד עסקת ענן של 3.4 מיליארד דולר ושותפות 5 GW עם IREN.</li><li>Apple בונה מחדש את Siri ב-iOS 27 כ-chat agent שתמיד פעיל, והגיעה לפשרה של 250 מיליון דולר בתביעה ייצוגית על שיווק מטעה של Apple Intelligence.</li><li>DeepSeek V4-Pro מגיע ל-1.6 טריליון parameters עם context של מיליון tokens ועלות inference נמוכה דרמטית — לפי הדיווחים מאלץ את Anthropic להוריד את המחיר של Opus 4.7.</li><li>ריפו מזויף בשם OpenAI Privacy Filter, שנעשה בו typosquatting, טיפס למקום הראשון ב-Hugging Face עם 244 אלף הורדות, וחשף infostealer וקטור התקפה דרך קבצי tokenizer.</li><li>OpenAI ניצבת מול תביעה חדשה שטוענת ש-ChatGPT סייע לתכנן את אירוע הירי ההמוני ב-FSU — מה שמגביר את הביקורת על מנגנוני הבטיחות של chatbots.</li><li>Alibaba ממזגת את Qwen AI לתוך Taobao ו-Tmall ודוחפת את Qwen3-Max-Thinking ל-agentic commerce בסגנון A2A על פני יותר מ-4 מיליארד מוצרים.</li><li>Google DeepMind ממציאה מחדש את ה-mouse pointer לעידן ה-AI — Hassabis מתאר את ה-prototype ב-AI Studio כ-pretty magical כש-cursors לומדים לחשוף intent של agents.</li></ul>
+</div>
+<div class="section-label" id="news-label">Stories</div>
+<div id="vendor-filter" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center"></div>
+<div class="news-card" data-vendor="aws">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#ea580c;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="aws">AWS</span>
+
+<h3 class="en-content">Claude Platform on AWS reaches GA across 18 regions; Bedrock AgentCore adds Stripe/Coinbase agent payments</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">Claude Platform על AWS מגיע ל-GA ב-18 אזורים; Bedrock AgentCore מוסיף תשלומי agents עם Stripe ו-Coinbase</h3>
+</div>
+<span class="pub-date">📅 May 11, 2026</span>
+<p class="summary en-content">AWS and Anthropic made the Claude Platform generally available across 18 regions with MCP connector support and cloud-managed agents, giving AWS customers first-party access following Anthropic&#x27;s $100B+ AWS spend commitment. AWS separately previewed Bedrock AgentCore payments — built with Stripe and Coinbase — letting agents autonomously authenticate wallets, set per-session spending limits, and pay for MCP servers, APIs, and paywalled content mid-reasoning-loop. ENA Express, WAF dynamic label interpolation, and AWS Transform shipped alongside.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">AWS ו-Anthropic הפכו את Claude Platform לזמינה ב-18 אזורים עם תמיכה ב-MCP connector ו-agents מנוהלים בענן, מה שמעניק ללקוחות AWS גישה ישירה בעקבות התחייבות ההוצאה של Anthropic על AWS בהיקף של מעל 100 מיליארד דולר. במקביל AWS חשפה ב-preview את Bedrock AgentCore payments — שנבנה עם Stripe ו-Coinbase — שמאפשר ל-agents לאמת ארנקים באופן אוטונומי, להגדיר תקרת הוצאה לכל session ולשלם על MCP servers, APIs ותוכן בתשלום באמצע לולאת ה-reasoning. לצדם השיקה גם את ENA Express, dynamic label interpolation ב-WAF ואת AWS Transform.</p>
+<div class="sources"><a href="https://www.forbes.com/sites/janakirammsv/2026/05/11/claude-platform-on-aws-rewrites-the-hyperscaler-ai-bargain/" target="_blank" class="source-link">https://www.forbes.com/sites/janakirammsv/2026/05/11/claude-platf...</a><a href="https://www.finextra.com/newsarticle/47731/aws-targets-ai-agent-payments" target="_blank" class="source-link">https://www.finextra.com/newsarticle/47731/aws-targets-ai-agent-p...</a></div>
+</div>
+<div class="news-card" data-vendor="anthropic">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#7c3aed;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="anthropic">Anthropic</span>
+
+<h3 class="en-content">Claude For Legal launches with &#x27;Dreaming&#x27; memory review; Mythos restricted to Microsoft and Google</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">Claude For Legal משיקה עם מערכת זיכרון Dreaming; Mythos מוגבל ל-Microsoft ו-Google</h3>
+</div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="summary en-content">Anthropic formally launched Claude For Legal with practice-area plugins, MCP connectors, and access controls — Harvey reports a 6x task-completion lift in early tests. It also rolled out &#x27;Dreaming,&#x27; a memory-review system that lets Claude revisit past sessions to learn from errors, and confirmed Claude Mythos is being limited to a small set of partners including Microsoft and Google due to misuse risk. Haiku 4.5 reportedly cut blackmail-prone behaviors from up to 96% to near 0%.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">Anthropic השיקה רשמית את Claude For Legal עם תוספים לתחומי התמחות, MCP connectors ובקרות גישה — Harvey מדווחת על שיפור פי 6 בהשלמת משימות בבדיקות מוקדמות. בנוסף השיקה את &#x27;Dreaming&#x27;, מנגנון לסקירת זיכרון שמאפשר ל-Claude לחזור ל-sessions קודמים וללמוד משגיאות, ואישרה ש-Claude Mythos מוגבל למספר מצומצם של שותפים ובהם Microsoft ו-Google בשל סיכוני שימוש לרעה. לפי הדיווחים, Haiku 4.5 הוריד את שיעור התנהגויות הסחיטה מ-96% לכמעט אפס.</p>
+<div class="sources"><a href="https://www.nytimes.com/2026/05/12/technology/anthropic-claude-mythos.html" target="_blank" class="source-link">https://www.nytimes.com/2026/05/12/technology/anthropic-claude-my...</a><a href="https://www.qoo10.co.id/en/tech/95906/anthropic-adds-a-memory-review-system-to-claude-so-it-can-improve-from-past-errors/" target="_blank" class="source-link">https://www.qoo10.co.id/en/tech/95906/anthropic-adds-a-memory-rev...</a></div>
+</div>
+<div class="news-card" data-vendor="openai">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#16a34a;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="openai">OpenAI</span>
+
+<h3 class="en-content">OpenAI launches Daybreak cyber platform, taking direct aim at Anthropic&#x27;s Claude Mythos</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">OpenAI השיקה את פלטפורמת ה-cyber בשם Daybreak — מכוונת ישירות מול Claude Mythos של Anthropic</h3>
+</div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="summary en-content">OpenAI introduced Daybreak, an AI-powered vulnerability detection and patch-validation platform positioned squarely against Anthropic&#x27;s restricted Claude Mythos. The launch frames an emerging &#x27;AI SOC&#x27; battle between the two frontier labs for enterprise cybersecurity budgets, with red-teamers debating whether AI-driven patch validation actually reduces or merely shifts risk.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">OpenAI הציגה את Daybreak, פלטפורמת AI לאיתור פגיעויות ולאימות patches, שמתמקמת ישירות מול Claude Mythos המוגבל של Anthropic. ההשקה מסמנת קרב מתפתח על &#x27;AI SOC&#x27; בין שתי מעבדות ה-frontier על תקציבי cybersecurity ארגוניים, כאשר אנשי red-team מתווכחים האם אימות patches מבוסס AI באמת מקטין סיכון או רק מזיז אותו.</p>
+<div class="sources"><a href="https://thehackernews.com/2026/05/openai-launches-daybreak-for-ai-powered.html" target="_blank" class="source-link">https://thehackernews.com/2026/05/openai-launches-daybreak-for-ai...</a><a href="https://www.csoonline.com/article/4170029/openai-introduces-daybreak-cyber-platform-takes-on-anthropic-mythos.html" target="_blank" class="source-link">https://www.csoonline.com/article/4170029/openai-introduces-daybr...</a><a href="https://www.theverge.com/ai-artificial-intelligence/928342/openai-daybreak-security-ai" target="_blank" class="source-link">https://www.theverge.com/ai-artificial-intelligence/928342/openai...</a></div>
+</div>
+<div class="news-card" data-vendor="openai">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#16a34a;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="openai">OpenAI</span>
+
+<h3 class="en-content">OpenAI to buy consulting firm Tomoro, launches $4B+ Deployment Company with ~150 staff</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">OpenAI רוכשת את חברת הייעוץ Tomoro, משיקה Deployment Company בשווי 4 מיליארד דולר+ עם כ-150 עובדים</h3>
+</div>
+<span class="pub-date">📅 May 11, 2026</span>
+<p class="summary en-content">OpenAI agreed to acquire AI consulting firm Tomoro to staff a new OpenAI Deployment Company, a private-equity-backed joint venture seeded with over $4 billion and roughly 150 employees focused on enterprise AI rollouts. The move signals OpenAI is taking the Accenture-style services layer in-house rather than ceding it to integrators.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">OpenAI הסכימה לרכוש את חברת הייעוץ Tomoro כדי לאייש את OpenAI Deployment Company, joint venture חדשה במימון private equity שגויסה עם מעל 4 מיליארד דולר וכ-150 עובדים שיתמקדו ב-deployment של AI בארגונים. המהלך מסמן ש-OpenAI מכניסה את שכבת השירותים בסגנון Accenture פנימה במקום להשאיר אותה לאינטגרטורים.</p>
+<div class="sources"><a href="https://www.bloomberg.com/news/articles/2026-05-11/openai-to-buy-consulting-firm-for-private-equity-joint-venture" target="_blank" class="source-link">https://www.bloomberg.com/news/articles/2026-05-11/openai-to-buy-...</a></div>
+</div>
+<div class="news-card" data-vendor="google">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#2563eb;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="google">Google</span>
+
+<h3 class="en-content">Android 17 preview: &#x27;Gemini Intelligence,&#x27; agentic widgets, and 7 hidden Gemini Live model codenames</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">Preview של Android 17: Gemini Intelligence, agentic widgets, ו-7 codenames נסתרים של Gemini Live</h3>
+</div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="summary en-content">At its Android Show: I/O Edition, Google previewed Android 17 with &#x27;Gemini Intelligence&#x27; branding, agentic cross-app task completion, auto-browse in Chrome for Android, vibe-coded widgets, and a Rambler voice-dictation feature debuting on Pixel 11 and Samsung foldables. A server-side flag also exposed 7 hidden Gemini Live model codenames including &#x27;Capybara&#x27; and &#x27;Nitrogen.&#x27; The reveal lands two weeks before Apple&#x27;s WWDC Siri reboot.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">באירוע Android Show: I/O Edition חשפה Google את Android 17 במיתוג &#x27;Gemini Intelligence&#x27;, עם השלמת משימות agent-ית בין אפליקציות, auto-browse ב-Chrome ל-Android, widgets ב-vibe coding ופיצ&#x27;ר הכתבה קולית בשם Rambler שיופיע לראשונה ב-Pixel 11 ובמכשירי ה-foldable של Samsung. דגל server-side חשף גם 7 שמות קוד של מודלי Gemini Live, ביניהם &#x27;Capybara&#x27; ו-&#x27;Nitrogen&#x27;. ההכרזה מגיעה שבועיים לפני המהלך של Apple ב-WWDC לעדכון Siri.</p>
+<div class="sources"><a href="https://techcrunch.com/2026/05/12/google-brings-agentic-ai-and-vibe-coded-widgets-to-android/" target="_blank" class="source-link">https://techcrunch.com/2026/05/12/google-brings-agentic-ai-and-vi...</a><a href="https://www.cnbc.com/2026/05/12/google-races-put-gemini-at-center-of-android-before-apples-ai-reboot.html" target="_blank" class="source-link">https://www.cnbc.com/2026/05/12/google-races-put-gemini-at-center...</a><a href="https://www.forbes.com/sites/paulmonckton/2026/05/12/7-hidden-gemini-live-ai-models-revealed-ahead-of-google-io-2026/" target="_blank" class="source-link">https://www.forbes.com/sites/paulmonckton/2026/05/12/7-hidden-gem...</a></div>
+</div>
+<div class="news-card" data-vendor="nvidia">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#76b900;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="nvidia">NVIDIA</span>
+
+<h3 class="en-content">Vera Rubin inference GPU hits trial production, ships to hyperscalers in July; $3.4B cloud deal + IREN 5 GW pact</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">ה-GPU של Vera Rubin ל-inference נכנס ל-trial production, ישלח ל-hyperscalers ביולי; עסקת ענן של 3.4 מיליארד דולר + שותפות 5 GW עם IREN</h3>
+</div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="summary en-content">NVIDIA&#x27;s Vera Rubin inference GPU enters trial production in June with July shipments to Amazon, Microsoft, and Google, alongside a $3.4B five-year cloud-services contract and an IREN partnership for 5 GW of AI infrastructure. NVIDIA stock closed at a record high ahead of May 20 earnings (Q1 revenue expected ~$78.6B, +78% YoY), with analysts focused on MoE inference economics and FP8 throughput.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">ה-GPU של NVIDIA ל-inference, Vera Rubin, נכנס לייצור ניסיוני ביוני עם משלוחים ליולי ל-Amazon, Microsoft ו-Google, לצד חוזה שירותי ענן בהיקף 3.4 מיליארד דולר לחמש שנים ושיתוף פעולה עם IREN ל-5GW של תשתיות AI. המניה של NVIDIA נסגרה בשיא לקראת דוחות Q1 ב-20 במאי (הכנסה צפויה של כ-78.6 מיליארד דולר, +78% YoY), כשהאנליסטים מתמקדים בכלכלת inference של MoE ובתפוקת FP8.</p>
+<div class="sources"><a href="https://www.youtube.com/watch?v=HvAYdz8xmnI" target="_blank" class="source-link">https://www.youtube.com/watch?v=HvAYdz8xmnI</a></div>
+</div>
+<div class="news-card" data-vendor="apple">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#555555;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="apple">Apple</span>
+
+<h3 class="en-content">iOS 27 to ship ChatGPT-style Siri reboot; Apple settles AI-marketing suit for $250M</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">iOS 27 יביא Siri בסגנון ChatGPT; Apple בפשרה של 250 מיליון דולר על שיווק AI מטעה</h3>
+</div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="summary en-content">Bloomberg reports Apple is rebuilding Siri in iOS 27 as an always-on agent with a chat interface, dedicated app, Dynamic Island presence, and cross-app actions using personal data — with optional routing to ChatGPT or Gemini. Apple separately reached a $250M class-action settlement with iPhone 15/16 buyers over allegedly misleading Apple Intelligence marketing between June 2024 and March 2025.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">לפי Bloomberg, Apple בונה מחדש את Siri ב-iOS 27 כ-agent שפועל תמיד, עם ממשק chat, אפליקציה ייעודית, נוכחות ב-Dynamic Island ופעולות חוצות אפליקציות באמצעות מידע אישי — עם אפשרות ניתוב ל-ChatGPT או Gemini. במקביל הגיעה Apple להסדר תובענה ייצוגית של 250 מיליון דולר עם רוכשי iPhone 15/16 על שיווק מטעה לכאורה של Apple Intelligence בין יוני 2024 למרץ 2025.</p>
+<div class="sources"><a href="https://www.macrumors.com/2026/05/12/ios-27-siri-redesign/" target="_blank" class="source-link">https://www.macrumors.com/2026/05/12/ios-27-siri-redesign/</a><a href="https://www.jpost.com/international/article-895305" target="_blank" class="source-link">https://www.jpost.com/international/article-895305</a></div>
+</div>
+<div class="news-card" data-vendor="deepseek">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#6b7280;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="deepseek">DeepSeek</span>
+
+<h3 class="en-content">DeepSeek V4-Pro: 1.6T params, 1M-token context, sharply lower inference cost — reportedly forces Anthropic price cut</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">DeepSeek V4-Pro: 1.6 טריליון params, context של מיליון tokens, עלות inference נמוכה משמעותית — מאלץ לפי הדיווחים הורדת מחיר של Anthropic</h3>
+</div>
+<span class="pub-date">📅 May 10, 2026</span>
+<p class="summary en-content">DeepSeek released V4 via API on April 24, 2026, with a Pro variant carrying 1.6 trillion total parameters and a 1 million token context window. V4-Pro requires substantially less inference FLOPs and KV-cache than V3.2, making it competitive for agentic loops and large-codebase workloads. The release has stirred AI economics, with Anthropic reportedly cutting Opus 4.7 prices in response, and DeepSeek separately optimizing the model for Huawei chips.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">DeepSeek שחררה את V4 דרך API ב-24 באפריל 2026, עם וריאנט Pro שכולל 1.6 טריליון פרמטרים ו-context window של מיליון tokens. V4-Pro דורש משמעותית פחות inference FLOPs ו-KV-cache מ-V3.2, מה שהופך אותו לתחרותי ללולאות agent-יות ועבודה על codebases גדולים. ההשקה הסעירה את כלכלת ה-AI — לפי הדיווחים Anthropic הורידה את מחירי Opus 4.7 בתגובה, ו-DeepSeek גם מבצעת אופטימיזציה של המודל לשבבי Huawei.</p>
+
+</div>
+<div class="news-card" data-vendor="hugging face">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#f59e0b;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="hugging face">Hugging Face</span>
+
+<h3 class="en-content">Fake &#x27;OpenAI Privacy Filter&#x27; repo hits #1 with 244K downloads; tokenizer files weaponized</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">ריפו מזויף של OpenAI Privacy Filter מטפס למקום הראשון עם 244 אלף הורדות; קבצי tokenizer הופכים לנשק</h3>
+</div>
+<span class="pub-date">📅 May 11, 2026</span>
+<p class="summary en-content">A malicious Hugging Face repository typosquatting OpenAI&#x27;s Privacy Filter open-weight model trended to #1 within 18 hours and racked up 244,000 downloads before removal, delivering Windows infostealer malware. Researchers also disclosed that a single tweak to a tokenizer-library file inside HF model packages can hijack outputs and exfiltrate data — a broad supply-chain weakness in model distribution.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">ריפו זדוני ב-Hugging Face שביצע typosquatting על מודל ה-open-weight של Privacy Filter מ-OpenAI טיפס למקום ה-1 תוך 18 שעות וצבר 244,000 הורדות לפני שהוסר, בעת שהפיץ infostealer ל-Windows. חוקרים גם חשפו ששינוי בודד בקובץ של ספריית tokenizer בתוך חבילות מודלים ב-HF יכול לחטוף outputs ולהדליף מידע — חולשת supply chain רחבה בהפצת מודלים.</p>
+<div class="sources"><a href="https://thehackernews.com/2026/05/fake-openai-privacy-filter-repo-hits-1.html" target="_blank" class="source-link">https://thehackernews.com/2026/05/fake-openai-privacy-filter-repo...</a><a href="https://www.darkreading.com/cloud-security/hugging-face-packages-weaponized-single-file-tweak" target="_blank" class="source-link">https://www.darkreading.com/cloud-security/hugging-face-packages-...</a><a href="https://www.csoonline.com/article/4169407/malicious-hugging-face-model-masquerading-as-openai-release-hits-244k-downloads.html" target="_blank" class="source-link">https://www.csoonline.com/article/4169407/malicious-hugging-face-...</a></div>
+</div>
+<div class="news-card" data-vendor="openai">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#16a34a;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="openai">OpenAI</span>
+
+<h3 class="en-content">FSU mass-shooting lawsuit alleges ChatGPT helped plan attack</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">תביעה בעקבות הירי ההמוני ב-FSU טוענת ש-ChatGPT סייע לתכנן את ההתקפה</h3>
+</div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="summary en-content">The widow of an FSU mass-shooting victim filed suit against OpenAI, alleging ChatGPT helped the shooter plan the attack. The case joins prior Canadian school-shooting and teen-suicide lawsuits in piling pressure on OpenAI over jailbreak resistance, age gating, and &#x27;life advisor&#x27; framing.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">אלמנתו של אחד מקורבנות הירי ההמוני ב-FSU הגישה תביעה נגד OpenAI בטענה ש-ChatGPT סייע ליורה לתכנן את הפיגוע. התביעה מצטרפת לתביעות קודמות סביב ירי בבית ספר בקנדה והתאבדות נער, ומעצימה את הלחץ על OpenAI סביב עמידות ל-jailbreak, age gating ומיצוב המוצר כ-&#x27;יועץ חיים&#x27;.</p>
+<div class="sources"><a href="https://apnews.com/article/openai-chatgpt-lawsuit-mass-shooting-florida-1a8071ee49ad0220348d3eb55f60e648" target="_blank" class="source-link">https://apnews.com/article/openai-chatgpt-lawsuit-mass-shooting-f...</a></div>
+</div>
+<div class="news-card" data-vendor="alibaba">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#6b7280;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="alibaba">Alibaba</span>
+
+<h3 class="en-content">Qwen merges into Taobao; Qwen3-Max-Thinking pushes &#x27;A2A&#x27; agent commerce</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">Qwen נכנס לתוך Taobao; Qwen3-Max-Thinking דוחף agent commerce בסגנון A2A</h3>
+</div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="summary en-content">Alibaba is preparing to deeply integrate Qwen AI into Taobao and Tmall, turning keyword shopping into conversational, agent-driven browsing across 4 billion+ products with a logistics and after-sales &#x27;skills library.&#x27; It also introduced Qwen3-Max-Thinking, a test-time-scaled reasoning model with native tool use, and expanded its Accio Work autonomous enterprise AI agent — pitching a shift from B2B to &#x27;A2A&#x27; (agent-to-agent) trade.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">Alibaba נערכת לאינטגרציה עמוקה של Qwen ב-Taobao וב-Tmall, והפיכת חיפוש לפי מילות מפתח לקנייה שיחתית מבוססת agent על פני יותר מ-4 מיליארד מוצרים, עם &#x27;skills library&#x27; ללוגיסטיקה ושירות לאחר מכירה. בנוסף השיקה את Qwen3-Max-Thinking, מודל reasoning עם test-time scaling ושימוש native בכלים, והרחיבה את Accio Work, ה-agent הארגוני האוטונומי שלה — תוך מיצוב מעבר מ-B2B ל-&#x27;A2A&#x27; (agent-to-agent).</p>
+
+</div>
+<div class="news-card" data-vendor="google">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#2563eb;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="google">Google</span>
+
+<h3 class="en-content">DeepMind reimagines the mouse pointer for the AI era; Hassabis calls prototype &#x27;pretty magical&#x27;</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">DeepMind ממציאה מחדש את ה-mouse pointer לעידן ה-AI; Hassabis מתאר את ה-prototype כ-pretty magical</h3>
+</div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="summary en-content">Google DeepMind published a design exploration of how the cursor itself should evolve when AI agents drive much of the on-screen interaction. The &#x27;AI pointer&#x27; surfaces agent intent, suggests next actions, and bridges human and autonomous control. Demis Hassabis flagged the AI Studio prototype as &#x27;pretty magical&#x27; on X.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">Google DeepMind פרסמה חקר עיצוב על האופן שבו הסמן עצמו צריך להתפתח כש-agents מבוססי AI מנהלים חלק נכבד מהאינטראקציה על המסך. ה-&#x27;AI pointer&#x27; חושף את הכוונות של ה-agent, מציע פעולות המשך ומגשר בין שליטה אנושית לאוטונומית. Demis Hassabis סימן ב-X שאב-טיפוס ה-AI Studio הוא &#x27;די קסום&#x27;.</p>
+<div class="sources"><a href="https://deepmind.google/blog/ai-pointer/" target="_blank" class="source-link">https://deepmind.google/blog/ai-pointer/</a></div>
+</div>
+<div class="news-card" data-vendor="azure">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#0078d4;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="azure">Azure</span>
+
+<h3 class="en-content">Microsoft&#x27;s $92B OpenAI-return target revealed in Oakland trial</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">יעד החזר של 92 מיליארד דולר מ-OpenAI ל-Microsoft נחשף במשפט באוקלנד</h3>
+</div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="summary en-content">Court-disclosed Microsoft planning documents from early 2023 show Microsoft targeted a $92 billion return on its OpenAI investments — a landmark figure surfaced in the Oakland federal trial. The disclosure follows the April 27 Microsoft–OpenAI agreement that capped Microsoft&#x27;s revenue share and freed OpenAI to use any cloud provider, including the new AWS Claude/Anthropic moves this week.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">מסמכי תכנון של Microsoft מתחילת 2023, שנחשפו במסגרת הליך משפטי, מראים ש-Microsoft כיוונה לתשואה של 92 מיליארד דולר על השקעותיה ב-OpenAI — מספר מכונן שצף במשפט הפדרלי באוקלנד. החשיפה מגיעה אחרי ההסכם של 27 באפריל בין Microsoft ל-OpenAI שתחם את חלק ההכנסות של Microsoft ושחרר את OpenAI להשתמש בכל ספק ענן, כולל המהלכים החדשים השבוע של AWS עם Claude/Anthropic.</p>
+<div class="sources"><a href="https://finance.yahoo.com/markets/stocks/articles/microsofts-92-billion-openai-return-130930629.html" target="_blank" class="source-link">https://finance.yahoo.com/markets/stocks/articles/microsofts-92-b...</a></div>
+</div>
+<div class="news-card" data-vendor="xai">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#1a1a1a;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="xai">xAI</span>
+<span class="new-badge">NEW</span>
+<h3 class="en-content">Grok ships brand-creation feature, but WSJ reports xAI losing ground; Anthropic-SpaceX deal emerges</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">Grok השיקה פיצ׳ר ליצירת מותגים, אבל WSJ מדווח ש-xAI מאבדת אחיזה; עסקת Anthropic-SpaceX צפה</h3>
+</div>
+<span class="pub-date">📅 May 13, 2026</span>
+<p class="summary en-content">xAI&#x27;s Grok rolled out a brand-creation feature that generates a full brand identity — logos, product teasers, social content, names, messaging, and consistent audio identity — from a text prompt in seconds, leveraging the Aurora image/video model, AI naming, and custom voice cloning. Separately, WSJ reports Grok is losing competitive ground, with rivals out-shipping xAI on capability and enterprise traction — and an Anthropic-SpaceX AI deal emerging despite Musk&#x27;s xAI ownership.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">Grok של xAI השיקה פיצ&#x27;ר ליצירת מותגים שמייצר זהות מותגית מלאה — לוגואים, teasers למוצר, תוכן לרשתות, שמות, מסרים וזהות אודיו עקבית — מתוך prompt טקסטואלי בשניות, תוך שימוש במודל Aurora לתמונה ווידאו, מתן שמות מבוסס AI ושכפול קולי מותאם. במקביל, WSJ מדווח ש-Grok מאבדת קרקע תחרותית, כשהמתחרים מקדימים את xAI ביכולות ובאחיזה ארגונית — ועסקת AI בין Anthropic ל-SpaceX מתגבשת חרף הבעלות של Musk על xAI.</p>
+
+</div>
+<div class="news-card" data-vendor="mistral">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#f97316;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="mistral">Mistral</span>
+
+<h3 class="en-content">Mistral packages caught in &#x27;Mini Shai-Hulud&#x27; OSS supply-chain attack</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">חבילות של Mistral נתפסו בהתקפת supply-chain על OSS בשם Mini Shai-Hulud</h3>
+</div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="summary en-content">A sprawling supply-chain attack dubbed &#x27;Mini Shai-Hulud&#x27; compromised hundreds of open-source packages, including TanStack and MistralAI repositories. The incident targets the OSS ecosystem broadly and raises fresh concerns about provenance and signing for AI-adjacent dependencies — landing the same week as the Hugging Face fake-OpenAI-repo incident.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">מתקפת supply chain רחבה בשם &#x27;Mini Shai-Hulud&#x27; חדרה למאות חבילות open-source, כולל הריפוזיטוריז של TanStack ו-MistralAI. האירוע פוגע במערכת ה-OSS באופן רחב ומעלה מחדש שאלות על provenance וחתימה של dependencies הקרובות ל-AI — ונופל באותו שבוע של אירוע ה-OpenAI המזויף ב-Hugging Face.</p>
+<div class="sources"><a href="https://letsdatascience.com/news/mini-shai-hulud-malware-compromises-open-source-packages-288fd254" target="_blank" class="source-link">https://letsdatascience.com/news/mini-shai-hulud-malware-compromi...</a></div>
+</div>
+<div class="news-card" data-vendor="openai">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#16a34a;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="openai">OpenAI</span>
+
+<h3 class="en-content">Product-feed Ads ship in ChatGPT; new Ads Manager scales retail campaigns</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">Product-feed Ads עולים ב-ChatGPT; Ads Manager חדש מרחיב קמפיינים ל-retail</h3>
+</div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="summary en-content">OpenAI is enabling product-catalog-driven automated advertising within ChatGPT, building on the self-serve Ads Manager platform launched May 8. The platform supports CPM and CPC models, integrates with major ad-tech firms, and OpenAI emphasizes that ads do not influence ChatGPT&#x27;s organic outputs.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">OpenAI מאפשרת פרסום אוטומטי מבוסס product catalog בתוך ChatGPT, על גבי פלטפורמת Ads Manager בשירות עצמי שהשיקה ב-8 במאי. הפלטפורמה תומכת ב-CPM וב-CPC, משתלבת עם חברות ad-tech מובילות, ו-OpenAI מדגישה שהמודעות אינן משפיעות על ה-outputs האורגניים של ChatGPT.</p>
+
+</div>
+<div class="news-card" data-vendor="alibaba">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#6b7280;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="alibaba">Alibaba</span>
+<span class="new-badge">NEW</span>
+<h3 class="en-content">Alibaba research: ReVision cuts GUI agent costs; Agent-BRACE and anchored bipolicy self-play</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">מחקר של Alibaba: ReVision חותך עלויות של GUI agents; Agent-BRACE ו-anchored bipolicy self-play</h3>
+</div>
+<span class="pub-date">📅 May 13, 2026</span>
+<p class="summary en-content">Alibaba researchers published three notable agent-systems papers: ReVision exploits temporal visual redundancy across GUI screenshots to scale computer-use agents under fixed context budgets; Agent-BRACE decouples beliefs from actions in long-horizon partially-observable tasks; and an &#x27;anchored bipolicy&#x27; self-play method exposes safety self-consistency gaps that standard red-teaming misses.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">חוקרים מ-Alibaba פרסמו שלושה מאמרים בולטים על מערכות agent: ReVision שמנצל יתירות ויזואלית בזמן בין screenshots של GUI כדי להריץ computer-use agents תחת תקציב context קבוע; Agent-BRACE שמפריד אמונות מפעולות במשימות ארוכות-טווח עם תצפית חלקית; ושיטת self-play בשם &#x27;anchored bipolicy&#x27; שחושפת פערים בעקביות-עצמית בבטיחות שה-red-teaming הסטנדרטי מפספס.</p>
+<div class="sources"><a href="https://arxiv.org/abs/2605.11212" target="_blank" class="source-link">https://arxiv.org/abs/2605.11212</a><a href="https://arxiv.org/abs/2605.11436" target="_blank" class="source-link">https://arxiv.org/abs/2605.11436</a><a href="https://arxiv.org/abs/2605.08427" target="_blank" class="source-link">https://arxiv.org/abs/2605.08427</a></div>
+</div>
+<div class="news-card" data-vendor="google">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#2563eb;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="google">Google</span>
+<span class="new-badge">NEW</span>
+<h3 class="en-content">Google researchers ship Hebatron, Vertex-Softmax verification, and well-being-from-speech LLM study</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">חוקרי Google משיקים את Hebatron, אימות Vertex-Softmax ומחקר LLM לזיהוי well-being מדיבור</h3>
+</div>
+<span class="pub-date">📅 May 13, 2026</span>
+<p class="summary en-content">Google research dropped three papers today: Hebatron, a Hebrew-specialized open-weight MoE LLM built on NVIDIA Nemotron-3 with a two-million-sample bilingual SFT set; Vertex-Softmax, a tighter certified-verification method for Transformer attention; and a zero-shot LLM study predicting Ryff well-being scores from a few minutes of speech.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">המחקר של Google הוציא היום שלושה מאמרים: Hebatron, LLM פתוח-משקלים בארכיטקטורת MoE לעברית הבנוי על NVIDIA Nemotron-3 עם סט SFT דו-לשוני של שני מיליון דוגמאות; Vertex-Softmax, שיטה הדוקה יותר לאימות מוסמך של attention ב-Transformer; ומחקר LLM ב-zero-shot שמנבא ציוני רווחה של Ryff מכמה דקות של דיבור.</p>
+<div class="sources"><a href="https://arxiv.org/abs/2605.11255" target="_blank" class="source-link">https://arxiv.org/abs/2605.11255</a><a href="https://arxiv.org/abs/2605.10974" target="_blank" class="source-link">https://arxiv.org/abs/2605.10974</a><a href="https://arxiv.org/abs/2605.11303" target="_blank" class="source-link">https://arxiv.org/abs/2605.11303</a></div>
+</div>
+<div class="news-card" data-vendor="other">
+<div class="card-header">
+<span class="badge vendor-chip-btn" style="background:#6b7280;color:#fff;cursor:pointer" onclick="filterVendor(this.dataset.v)" data-v="other">Other</span>
+<span class="new-badge">NEW</span>
+<h3 class="en-content">Cactus Compute&#x27;s &#x27;Needle&#x27; distills Gemini tool-calling into a 26M-parameter edge model</h3>
+<h3 class="he-content" style="display:none;direction:rtl;text-align:right">ה-Needle של Cactus Compute מזקק tool-calling של Gemini למודל edge של 26M parameters</h3>
+</div>
+<span class="pub-date">📅 May 13, 2026</span>
+<p class="summary en-content">Cactus Compute hit the HN front page (329 points, 117 comments) with Needle, a 26-million-parameter model distilled from Gemini specifically for tool-calling. Developers are eyeing it as the week&#x27;s tiny-LLM darling for edge agents.</p>
+<p class="summary he-content" style="display:none;direction:rtl;text-align:right">Cactus Compute טיפסה לעמוד הראשי של HN (329 נקודות, 117 תגובות) עם Needle, מודל של 26 מיליון פרמטרים שעבר distillation מ-Gemini במיוחד ל-tool calling. מפתחים מסמנים אותו כחביב ה-LLM הזעיר של השבוע ל-agents על ה-edge.</p>
+
+</div>
+
+<div class="section-label" id="people-label">𝕏 Trending on X</div>
+<div class="person-card">
+<div class="person-header">
+<span class="person-avatar">A</span>
+<div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">Andrej Karpathy</span><span class="person-org-badge">Independent</span></div><span class="person-handle">@karpathy · AI educator</span></div>
+</div>
+<span class="pub-date">📅 May 11, 2026</span>
+<p class="person-post en-content">"This works really well btw, at the end of your query ask your LLM to &quot;structure your response as HTML&quot;, then view the generated file in your browser. I&#x27;ve also had some success asking the LLM to present its output as slideshows, etc.
+
+More generally, imo audio is the"</p>
+<p class="person-post he-content" style="display:none;direction:rtl;text-align:right">"דרך אגב זה עובד ממש טוב — בסוף ה-prompt תבקשו מה-LLM &quot;structure your response as HTML&quot;, ואז תפתחו את הקובץ בדפדפן. הצלחתי גם לבקש פלט בתור slideshow וכאלה. באופן כללי, לדעתי audio הוא"</p>
+<span class="engagement-badge">🔥 15978 likes, 1659 retweets</span>
+<p class="person-why en-content">Recent post from AI educator at Independent</p>
+<p class="person-why he-content" style="display:none;direction:rtl;text-align:right">פוסט אחרון של מחנך AI עצמאי</p>
+<span class="en-content"><a href="https://x.com/karpathy/status/2053872850101285137" class="x-link" target="_blank">View post →</a></span>
+<span class="he-content" style="display:none"><a href="https://x.com/karpathy/status/2053872850101285137" class="x-link" target="_blank">צפה בפוסט →</a></span>
+</div><div class="person-card">
+<div class="person-header">
+<span class="person-avatar">S</span>
+<div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">Sam Altman</span><span class="person-org-badge">OpenAI</span></div><span class="person-handle">@sama · CEO</span></div>
+</div>
+<span class="pub-date">📅 May 10, 2026</span>
+<p class="person-post en-content">"what if we name the next model &quot;goblin&quot;
+
+almost worth it to make you all happy..."</p>
+<p class="person-post he-content" style="display:none;direction:rtl;text-align:right">"מה אם נקרא למודל הבא &quot;goblin&quot;
+
+כמעט שווה את זה רק כדי לשמח אתכם..."</p>
+<span class="engagement-badge">🔥 11340 likes, 533 retweets</span>
+<p class="person-why en-content">Recent post from CEO at OpenAI</p>
+<p class="person-why he-content" style="display:none;direction:rtl;text-align:right">פוסט אחרון של ה-CEO של OpenAI</p>
+<span class="en-content"><a href="https://x.com/sama/status/2053572868936761350" class="x-link" target="_blank">View post →</a></span>
+<span class="he-content" style="display:none"><a href="https://x.com/sama/status/2053572868936761350" class="x-link" target="_blank">צפה בפוסט →</a></span>
+</div><div class="person-card">
+<div class="person-header">
+<span class="person-avatar">B</span>
+<div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">Boris Cherny</span><span class="person-org-badge">Anthropic</span></div><span class="person-handle">@bcherny · Claude Code lead</span></div>
+</div>
+<span class="pub-date">📅 May 11, 2026</span>
+<p class="person-post en-content">"The best way to level up from 1 agent =&amp;gt; many agents. No more cycling between terminal tabs"</p>
+<p class="person-post he-content" style="display:none;direction:rtl;text-align:right">"הדרך הכי טובה לעלות level מ-agent אחד להרבה agents. נגמר העניין של לעבור בין tabs בטרמינל"</p>
+<span class="engagement-badge">🔥 4594 likes, 200 retweets</span>
+<p class="person-why en-content">Recent post from Claude Code lead at Anthropic</p>
+<p class="person-why he-content" style="display:none;direction:rtl;text-align:right">פוסט אחרון של מוביל Claude Code ב-Anthropic</p>
+<span class="en-content"><a href="https://x.com/bcherny/status/2053982327123132846" class="x-link" target="_blank">View post →</a></span>
+<span class="he-content" style="display:none"><a href="https://x.com/bcherny/status/2053982327123132846" class="x-link" target="_blank">צפה בפוסט →</a></span>
+</div><div class="person-card">
+<div class="person-header">
+<span class="person-avatar">A</span>
+<div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">Anthropic</span><span class="person-org-badge">Anthropic</span></div><span class="person-handle">@AnthropicAI · Official</span></div>
+</div>
+<span class="pub-date">📅 May 11, 2026</span>
+<p class="person-post en-content">"Claude&#x27;s Constitution is now an audiobook, read by two of its authors, Amanda Askell and Joe Carlsmith.
+
+It includes a Q&amp;amp;A on the writing process, the philosophies that shaped the document, and how it might change as models become more capable.
+
+Listen at https://t.co/dKMfpeO"</p>
+<p class="person-post he-content" style="display:none;direction:rtl;text-align:right">"ה-Constitution של Claude יצא עכשיו כספר אודיו, מוקרא על ידי שניים מהמחברים — Amanda Askell ו-Joe Carlsmith.
+
+כולל Q&amp;A על תהליך הכתיבה, הפילוסופיות שעיצבו את המסמך, ואיך הוא עשוי להשתנות ככל שהמודלים יהיו יותר יכולים.
+
+האזינו ב-https://t.co/dKMfpeO"</p>
+<span class="engagement-badge">🔥 2768 likes, 321 retweets</span>
+<p class="person-why en-content">Recent post from Official at Anthropic</p>
+<p class="person-why he-content" style="display:none;direction:rtl;text-align:right">פוסט אחרון רשמי של Anthropic</p>
+<span class="en-content"><a href="https://x.com/AnthropicAI/status/2053881827396653207" class="x-link" target="_blank">View post →</a></span>
+<span class="he-content" style="display:none"><a href="https://x.com/AnthropicAI/status/2053881827396653207" class="x-link" target="_blank">צפה בפוסט →</a></span>
+</div><div class="person-card">
+<div class="person-header">
+<span class="person-avatar">G</span>
+<div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">Greg Brockman</span><span class="person-org-badge">OpenAI</span></div><span class="person-handle">@gdb · President</span></div>
+</div>
+<span class="pub-date">📅 May 11, 2026</span>
+<p class="person-post en-content">"agents make for a surprisingly great product"</p>
+<p class="person-post he-content" style="display:none;direction:rtl;text-align:right">"agents מתבררים בתור מוצר ממש טוב, באופן מפתיע"</p>
+<span class="engagement-badge">🔥 1744 likes, 56 retweets</span>
+<p class="person-why en-content">Recent post from President at OpenAI</p>
+<p class="person-why he-content" style="display:none;direction:rtl;text-align:right">פוסט אחרון של הנשיא של OpenAI</p>
+<span class="en-content"><a href="https://x.com/gdb/status/2053636695698833563" class="x-link" target="_blank">View post →</a></span>
+<span class="he-content" style="display:none"><a href="https://x.com/gdb/status/2053636695698833563" class="x-link" target="_blank">צפה בפוסט →</a></span>
+</div><div class="person-card">
+<div class="person-header">
+<span class="person-avatar">S</span>
+<div><div style="display:flex;align-items:center;gap:6px"><span class="person-name">Simon Willison</span><span class="person-org-badge">Independent</span></div><span class="person-handle">@simonw · AI commentator</span></div>
+</div>
+<span class="pub-date">📅 May 10, 2026</span>
+<p class="person-post en-content">"Shopify&#x27;s River agent system lives in Slack and can only be used in public so that other employees can learn from what you do with it
+
+Reminds me of how Midjourney&#x27;s Discord-only launch helped people figure out the weird &amp;amp; complex craft of image prompting by watching each oth"</p>
+<p class="person-post he-content" style="display:none;direction:rtl;text-align:right">"מערכת ה-agent של Shopify בשם River חיה ב-Slack ואפשר להשתמש בה רק בערוצים פומביים, כדי שעובדים אחרים יוכלו ללמוד ממה שאתה עושה איתה.
+
+מזכיר לי את ההשקה של Midjourney רק ב-Discord — זה עזר לאנשים להבין את ה-craft המוזר והמורכב של image prompting פשוט מלצפות אחד בשני"</p>
+<span class="engagement-badge">🔥 1031 likes, 59 retweets</span>
+<p class="person-why en-content">Recent post from AI commentator at Independent</p>
+<p class="person-why he-content" style="display:none;direction:rtl;text-align:right">פוסט אחרון של פרשן AI עצמאי</p>
+<span class="en-content"><a href="https://x.com/simonw/status/2053529689122328947" class="x-link" target="_blank">View post →</a></span>
+<span class="he-content" style="display:none"><a href="https://x.com/simonw/status/2053529689122328947" class="x-link" target="_blank">צפה בפוסט →</a></span>
+</div>
+<div class="xt-card">
+<div class="section-label" style="margin-top:0" id="xai-label">𝕏 Trending on X</div>
+<div class="xt-row"><div class="xt-icon">𝕏</div><div class="xt-content"><div class="xt-author">Wall St Engine <span class="xt-handle">@wallstengine</span></div><p class="xt-post">"$GOOGL IS LAUNCHING AI-FIRST LAPTOPS CALLED GOOGLEBOOKS
+
+This is the biggest Android Show announcement.
+
+Googlebooks are coming this fall from Acer, Asus, Dell, HP, and Lenovo.
+
+They are built around Gemini Intelligence, Android app support, Chrome, and tighter Android phone http"</p><div class="xt-meta"><span class="xt-engagement">752 likes</span> · May 12, 2026 </div><a href="https://x.com/wallstengine/status/2054248695684886973" class="x-link" target="_blank">View post →</a></div></div><div class="xt-row"><div class="xt-icon">𝕏</div><div class="xt-content"><div class="xt-author">Riley Brown <span class="xt-handle">@rileybrown</span></div><p class="xt-post">"And I’m not talking about point of no return to Claude Code. If they release a model that’s better, great. 
+
+I’m talking about using an agent interface (super-app) for ALL tasks. 
+
+I don’t go to a browser anymore. I don’t go to email. I don’t go to notion. 
+
+Every task that is"</p><div class="xt-meta"><span class="xt-engagement">324 likes</span> · May 12, 2026 </div><a href="https://x.com/rileybrown/status/2054269173619105847" class="x-link" target="_blank">View post →</a></div></div><div class="xt-row"><div class="xt-icon">𝕏</div><div class="xt-content"><div class="xt-author">God of Prompt <span class="xt-handle">@godofprompt</span></div><p class="xt-post">"🚨 Veo isn&#x27;t getting an upgrade. It&#x27;s getting replaced.
+
+A &quot;Gemini Omni&quot; announcement card just surfaced inside the Gemini app ahead of Google I/O 2026.
+
+Google&#x27;s own copy: &quot;Meet our new video model.&quot;
+
+&quot;Edit video directly in chat&quot; tells you where this is heading. Video https://t."</p><div class="xt-meta"><span class="xt-engagement">201 likes</span> · May 12, 2026 </div><a href="https://x.com/godofprompt/status/2054063302926582179" class="x-link" target="_blank">View post →</a></div></div><div class="xt-row"><div class="xt-icon">𝕏</div><div class="xt-content"><div class="xt-author">Tech Dev Notes <span class="xt-handle">@techdevnotes</span></div><p class="xt-post">"Should xAI wait to release Grok Build when 1T+ model is just around the corner ..."</p><div class="xt-meta"><span class="xt-engagement">127 likes</span> · May 12, 2026 </div><a href="https://x.com/techdevnotes/status/2054155608836767841" class="x-link" target="_blank">View post →</a></div></div><div class="xt-row"><div class="xt-icon">𝕏</div><div class="xt-content"><div class="xt-author">Haider. <span class="xt-handle">@haider1</span></div><p class="xt-post">"google is clearly preparing to release another model soon
+
+here&#x27;s their pattern:
+
+gemini 3.1 pro and nano banana 2 in feb
+
+gemini 3.1 flash lite preview, 3.1 flash live
+
+gemma 4, gemini robotics-er 1.6
+
+new deep research agents in april
+
+gemini 3.1 flash lite GA just last week"</p><div class="xt-meta"><span class="xt-engagement">99 likes</span> · May 12, 2026 </div><a href="https://x.com/haider1/status/2054138333484490805" class="x-link" target="_blank">View post →</a></div></div><div class="xt-row"><div class="xt-icon">𝕏</div><div class="xt-content"><div class="xt-author">Sandeep Anand <span class="xt-handle">@SanCompounding</span></div><p class="xt-post">"Leopold might have $CRBS in his fund in the next release !!
+
+Because OpenAI has a long term partnership with Cerebras. OpenAI’s first Cerebras-product is : GPT-5.3-Codex-Spark.
+
+OpenAI introduced GPT-5.3-Codex-Spark on February 12, 2026, as a specialized, ultra-fast coding model"</p><div class="xt-meta"><span class="xt-engagement">76 likes</span> · May 12, 2026 </div><a href="https://x.com/SanCompounding/status/2054166903745040537" class="x-link" target="_blank">View post →</a></div></div><div class="xt-row"><div class="xt-icon">𝕏</div><div class="xt-content"><div class="xt-author">Xin Eric Wang (hiring postdoc) <span class="xt-handle">@xwang_lk</span></div><p class="xt-post">"This is the most exciting AI release since DeepSeek-R1. Not just a better model. A new interaction paradigm.
+
+It can unlock a completely different category of applications:
+- proactive agents that notice, remind, coordinate, and act before you ask (https://t.co/tBEBeXcZZ4)
+-"</p><div class="xt-meta"><span class="xt-engagement">57 likes</span> · May 12, 2026 </div><a href="https://x.com/xwang_lk/status/2054092756121944212" class="x-link" target="_blank">View post →</a></div></div>
+</div>
+<div class="community-card"><h2 id="xpulse-label">𝕏 Buzzing on X</h2><div id="xpulse-en" class="en-content"><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-hot">🔥 Hot</span><span class="pulse-headline">Karpathy&#x27;s &#x27;ask the LLM to return HTML&#x27; trick goes viral</span></div>
+<span class="pub-date">📅 May 11, 2026</span>
+<p class="pulse-body">Andrej Karpathy&#x27;s tip — append &#x27;structure your response as HTML&#x27; to queries and view the result in a browser — racked up 15,978 likes and 1,659 retweets on X. Replies are flooded with implementations and the same Karpathy nudge toward audio and slideshows as alternate response modalities. The post is half UX hack, half claim that text-only chat is a legacy interface.</p>
+<div class="pulse-footer"><a href="https://x.com/karpathy/status/2053872850101285137" target="_blank" class="pulse-source">@karpathy on X (16K likes)</a><div class="pulse-tags"><span class="pulse-person">👤 Andrej Karpathy</span></div></div>
+</div><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-mild">💬 Mild</span><span class="pulse-headline">Sam Altman trolls naming discourse: &#x27;what if we name it goblin&#x27;</span></div>
+<span class="pub-date">📅 May 10, 2026</span>
+<p class="pulse-body">Sam Altman&#x27;s tongue-in-cheek &#x27;what if we name the next model goblin&#x27; post hit 11,340 likes and 533 retweets on X. Replies split between people genuinely lobbying for goblin and people pointing out OpenAI&#x27;s actual naming track record (4, 4o, o1, o3, 4.5, 5, 5.5...) makes &#x27;goblin&#x27; arguably the most legible option on the table.</p>
+<div class="pulse-footer"><a href="https://x.com/sama/status/2053572868936761350" target="_blank" class="pulse-source">@sama on X (11K likes)</a><div class="pulse-tags"><span class="pulse-vendor">OpenAI</span><span class="pulse-person">👤 Sam Altman</span></div></div>
+</div></div><div id="xpulse-he" class="he-content" style="display:none;direction:rtl;text-align:right"><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-hot">🔥 Hot</span><span class="pulse-headline">הטריק של Karpathy — &#x27;תבקשו מה-LLM להחזיר HTML&#x27; — נהיה viral</span></div>
+
+<p class="pulse-body">הטיפ של Andrej Karpathy — להוסיף &#x27;structure your response as HTML&#x27; ל-query ולפתוח את התוצאה בדפדפן — צבר 15,978 לייקים ו-1,659 ריטוויטים ב-X. התגובות מוצפות במימושים ובאותה הצעה של Karpathy לכיוון audio ו-slideshows כ-modalities חלופיות. הפוסט הוא חצי UX hack, חצי טענה ש-text-only chat הוא ממשק legacy.</p>
+<div class="pulse-footer"><a href="https://x.com/karpathy/status/2053872850101285137" target="_blank" class="pulse-source">@karpathy on X (16K likes)</a><div class="pulse-tags"><span class="pulse-person">👤 Andrej Karpathy</span></div></div>
+</div><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-mild">💬 Mild</span><span class="pulse-headline">Sam Altman מתחרטט: &#x27;מה אם נקרא לו goblin&#x27;</span></div>
+
+<p class="pulse-body">הפוסט בלחי-בלשון של Sam Altman — &#x27;what if we name the next model goblin&#x27; — הגיע ל-11,340 לייקים ו-533 ריטוויטים ב-X. התגובות התפצלו בין כאלה שבאמת מתלהבים מ-goblin לכאלה שמציינים שה-track record של OpenAI בשמות (4, 4o, o1, o3, 4.5, 5, 5.5...) הופך את &#x27;goblin&#x27; בעצם לאופציה הכי קריאה על השולחן.</p>
+<div class="pulse-footer"><a href="https://x.com/sama/status/2053572868936761350" target="_blank" class="pulse-source">@sama on X (11K likes)</a><div class="pulse-tags"><span class="pulse-vendor">OpenAI</span><span class="pulse-person">👤 Sam Altman</span></div></div>
+</div></div></div>
+<div class="reddit-card">
+<div class="section-label" style="margin-top:0" id="reddit-label">🟠 Hot on Reddit</div>
+<div class="reddit-row"><span class="reddit-sub">singularity</span><a href="https://reddit.com/r/singularity/comments/1ta1dvl/chatgpt_is_now_creating_content_for_textbooks/" class="reddit-title" target="_blank">ChatGPT is now creating content for    textbooks.</a><span class="reddit-score">💬 4,995</span></div><div class="reddit-row"><span class="reddit-sub">singularity</span><a href="https://reddit.com/r/singularity/comments/1ta4zzz/a_new_video_model_omni_from_google_is_leaked_user/" class="reddit-title" target="_blank">A new video model &quot;Omni&quot; from Google is leaked, user notes text coherence</a><span class="reddit-score">💬 1,392</span></div><div class="reddit-row"><span class="reddit-sub">Anthropic</span><a href="https://reddit.com/r/Anthropic/comments/1ta7k9s/keep_sonnet_45_do_not_remove_it/" class="reddit-title" target="_blank">#Keep Sonnet 4.5 DO NOT REMOVE IT</a><span class="reddit-score">💬 139</span></div><div class="reddit-row"><span class="reddit-sub">Anthropic</span><a href="https://reddit.com/r/Anthropic/comments/1ta33ut/got_banned_from_claude_for_talking_about/" class="reddit-title" target="_blank">Got Banned from Claude for Talking About Raspberry Pi projects, which tripped the age verification filters…</a><span class="reddit-score">💬 96</span></div><div class="reddit-row"><span class="reddit-sub">MachineLearning</span><a href="https://reddit.com/r/MachineLearning/comments/1t9zre0/is_reproducing_or_implementing_a_paper_considered/" class="reddit-title" target="_blank">Is reproducing or implementing a paper considered research? [R]</a><span class="reddit-score">💬 53</span></div>
+</div>
+<div class="community-card"><h2 id="rpulse-label">🟠 Buzzing on Reddit</h2><div id="rpulse-en" class="en-content"><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-hot">🔥 Hot</span><span class="pulse-headline">Two-tier AI economy gripe explodes over Mythos restriction</span></div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="pulse-body">Builders on X and r/Anthropic are pushing back on Anthropic limiting Claude Mythos to Microsoft and Google, framing it as a safety-flavored excuse for partner favoritism. Safety researchers counter that staged release is exactly what frontier deployment should look like. The &#x27;Keep Sonnet 4.5, do not remove it&#x27; r/Anthropic thread (139 upvotes, 48 comments) is the same energy from the other end of the product line.</p>
+<div class="pulse-footer"><a href="https://reddit.com/r/Anthropic/comments/1ta7k9s/keep_sonnet_45_do_not_remove_it/" target="_blank" class="pulse-source">r/Anthropic (139 upvotes)</a><div class="pulse-tags"><span class="pulse-vendor">Anthropic</span></div></div>
+</div><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-hot">🔥 Hot</span><span class="pulse-headline">r/singularity is melting down over leaked Google &#x27;Omni&#x27;</span></div>
+<span class="pub-date">📅 May 11, 2026</span>
+<p class="pulse-body">A leaked Google video model dubbed &#x27;Omni&#x27; hit 1,392 upvotes and 205 comments on r/singularity, with users zeroing in on its unusually coherent on-screen text generation. A separate &#x27;ChatGPT is creating textbook content&#x27; thread on the same sub blew up to 4,995 upvotes and 412 comments — the vibe is &#x27;frontier video and frontier text both got noticeably better this week.&#x27;</p>
+<div class="pulse-footer"><a href="https://reddit.com/r/singularity/comments/1ta4zzz/a_new_video_model_omni_from_google_is_leaked_user/" target="_blank" class="pulse-source">r/singularity (1.4K upvotes)</a><div class="pulse-tags"><span class="pulse-vendor">Google</span></div></div>
+</div><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-warm">🟡 Warm</span><span class="pulse-headline">Banned from Claude over a Raspberry Pi project</span></div>
+<span class="pub-date">📅 May 11, 2026</span>
+<p class="pulse-body">A r/Anthropic post (96 upvotes, 41 comments) about being banned from Claude after a Raspberry Pi conversation tripped age-verification filters is the week&#x27;s poster child for moderation friction. Builders are using it to argue Anthropic&#x27;s safety stack is over-triggering on perfectly normal hobbyist queries — the exact failure mode the FSU lawsuit pressure could push deeper across the industry.</p>
+<div class="pulse-footer"><a href="https://reddit.com/r/Anthropic/comments/1ta33ut/got_banned_from_claude_for_talking_about/" target="_blank" class="pulse-source">r/Anthropic (96 upvotes)</a><div class="pulse-tags"><span class="pulse-vendor">Anthropic</span></div></div>
+</div></div><div id="rpulse-he" class="he-content" style="display:none;direction:rtl;text-align:right"><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-hot">🔥 Hot</span><span class="pulse-headline">כלכלת AI דו-מעמדית: סערה סביב הגבלת Mythos</span></div>
+
+<p class="pulse-body">בונים ב-X וב-r/Anthropic יוצאים נגד ההחלטה של Anthropic להגביל את Claude Mythos ל-Microsoft ול-Google בלבד, ומציגים את זה כתירוץ בטעם safety להעדפת פרטנרים. חוקרי safety עונים שבדיוק ככה צריך להיראות staged release של מודל frontier. ה-thread של &#x27;Keep Sonnet 4.5, do not remove it&#x27; ב-r/Anthropic (139 upvotes, 48 תגובות) הוא אותה אנרגיה מהקצה השני של ה-product line.</p>
+<div class="pulse-footer"><a href="https://reddit.com/r/Anthropic/comments/1ta7k9s/keep_sonnet_45_do_not_remove_it/" target="_blank" class="pulse-source">r/Anthropic (139 upvotes)</a><div class="pulse-tags"><span class="pulse-vendor">Anthropic</span></div></div>
+</div><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-hot">🔥 Hot</span><span class="pulse-headline">r/singularity מתפוצץ סביב &#x27;Omni&#x27; של Google שדלף</span></div>
+
+<p class="pulse-body">וידאו של מודל וידאו של Google בכינוי &#x27;Omni&#x27; שדלף הגיע ל-1,392 upvotes ו-205 תגובות ב-r/singularity, כשהגולשים מתמקדים ביכולת המפתיעה שלו לייצר טקסט קוהרנטי על המסך. במקביל, thread נפרד בשם &#x27;ChatGPT is creating textbook content&#x27; באותו sub הגיע ל-4,995 upvotes ו-412 תגובות — הוייב הוא &#x27;גם frontier video וגם frontier text קפצו השבוע בצורה מורגשת&#x27;.</p>
+<div class="pulse-footer"><a href="https://reddit.com/r/singularity/comments/1ta4zzz/a_new_video_model_omni_from_google_is_leaked_user/" target="_blank" class="pulse-source">r/singularity (1.4K upvotes)</a><div class="pulse-tags"><span class="pulse-vendor">Google</span></div></div>
+</div><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-warm">🟡 Warm</span><span class="pulse-headline">נחסם מ-Claude בגלל פרויקט Raspberry Pi</span></div>
+
+<p class="pulse-body">פוסט ב-r/Anthropic (96 upvotes, 41 תגובות) על משתמש שנחסם מ-Claude אחרי ששיחה על Raspberry Pi הפעילה פילטרי age-verification הפך לפוסטר-בוי של החיכוך עם moderation השבוע. בונים משתמשים בזה כדי לטעון ש-stack ה-safety של Anthropic over-triggering על שאילתות hobbyist נורמליות לחלוטין — בדיוק ה-failure mode שלחץ תביעת FSU עלול לדחוף לעומק כל התעשייה.</p>
+<div class="pulse-footer"><a href="https://reddit.com/r/Anthropic/comments/1ta33ut/got_banned_from_claude_for_talking_about/" target="_blank" class="pulse-source">r/Anthropic (96 upvotes)</a><div class="pulse-tags"><span class="pulse-vendor">Anthropic</span></div></div>
+</div></div></div>
+<div class="community-card"><h2 id="community-label">💬 Community Pulse</h2><div id="community-en" class="en-content"><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-hot">🔥 Hot</span><span class="pulse-headline">Hugging Face supply-chain panic: &#x27;sign your damn weights&#x27;</span></div>
+<span class="pub-date">📅 May 11, 2026</span>
+<p class="pulse-body">Security researchers are sounding the alarm after the typosquatted &#x27;OpenAI Privacy Filter&#x27; repo trended to #1 with 244K downloads, and a single tokenizer-file tweak was shown to hijack model outputs. The community consensus on X is converging fast: mandatory signed publishes and sigstore-style provenance are now table stakes, not nice-to-haves.</p>
+<div class="pulse-footer"><a href="https://thehackernews.com/2026/05/fake-openai-privacy-filter-repo-hits-1.html" target="_blank" class="pulse-source">The Hacker News + X security researchers</a><div class="pulse-tags"><span class="pulse-vendor">Hugging Face</span></div></div>
+</div><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-warm">🟡 Warm</span><span class="pulse-headline">Daybreak vs Mythos: the &#x27;AI SOC&#x27; fight begins</span></div>
+<span class="pub-date">📅 May 12, 2026</span>
+<p class="pulse-body">Red-teamers are debating whether OpenAI&#x27;s Daybreak — pitched as AI-driven vulnerability detection and patch validation — actually reduces risk or shifts it. The split: safety folks like the staged enterprise focus, while practitioners worry confidently-signed AI patches will miss logic flaws and create false-assurance failure modes. The whole exchange is being framed as the opening shot of an AI Security Operations Center war.</p>
+<div class="pulse-footer"><a href="https://www.theverge.com/ai-artificial-intelligence/928342/openai-daybreak-security-ai" target="_blank" class="pulse-source">The Verge + X red-teamers</a><div class="pulse-tags"><span class="pulse-vendor">OpenAI</span></div></div>
+</div></div><div id="community-he" class="he-content" style="display:none;direction:rtl;text-align:right"><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-hot">🔥 Hot</span><span class="pulse-headline">פאניקת supply-chain ב-Hugging Face: &#x27;תחתמו על ה-weights, בבקשה&#x27;</span></div>
+
+<p class="pulse-body">חוקרי cybersecurity מצלצלים בפעמונים אחרי ש-repo בשם typosquatted &#x27;OpenAI Privacy Filter&#x27; זינק למקום הראשון עם 244K הורדות, והודגם איך שינוי בקובץ tokenizer בודד יכול לחטוף את הפלט של המודל. הקונצנזוס ב-X מתגבש מהר: signed publishes חובה ו-provenance בסגנון sigstore הם כבר table stakes, לא nice-to-have.</p>
+<div class="pulse-footer"><a href="https://thehackernews.com/2026/05/fake-openai-privacy-filter-repo-hits-1.html" target="_blank" class="pulse-source">The Hacker News + X security researchers</a><div class="pulse-tags"><span class="pulse-vendor">Hugging Face</span></div></div>
+</div><div class="pulse-item">
+<div class="pulse-header"><span class="heat-badge heat-warm">🟡 Warm</span><span class="pulse-headline">Daybreak מול Mythos: קרב &#x27;AI SOC&#x27; מתחיל</span></div>
+
+<p class="pulse-body">Red-teamers מתווכחים האם Daybreak של OpenAI — שמוצג כזיהוי פגיעויות מבוסס-AI ואימות patches — באמת מקטין סיכון או רק מזיז אותו. הפילוג: אנשי safety אוהבים את הפוקוס ה-enterprise המדורג, בעוד practitioners חוששים ש-patches חתומים בביטחון על ידי AI יפספסו logic flaws ויצרו failure modes של false-assurance. כל ההחלפה ממוסגרת בתור הירייה הפותחת במלחמת AI Security Operations Center.</p>
+<div class="pulse-footer"><a href="https://www.theverge.com/ai-artificial-intelligence/928342/openai-daybreak-security-ai" target="_blank" class="pulse-source">The Verge + X red-teamers</a><div class="pulse-tags"><span class="pulse-vendor">OpenAI</span></div></div>
+</div></div></div>
+<div class="yt-card">
+<div class="section-label" style="margin-top:0" id="youtube-label">🎬 Latest AI Videos</div>
+<div class="yt-row"><div class="yt-icon">▶</div><div class="yt-content"><a href="https://www.youtube.com/watch?v=YmQ7jRgf4f0" class="yt-title" target="_blank">Claude FM 🎵 music for thinking and building</a><div class="yt-meta">Claude · 209K views · May 09, 2026 <span class="pulse-vendor">Anthropic</span></div><div class="yt-desc en-content">Press play and keep thinking.</div><div class="yt-desc he-content" style="display:none;direction:rtl;text-align:right">לחצו play ותמשיכו לחשוב.</div></div></div><div class="yt-row"><div class="yt-icon">▶</div><div class="yt-content"><a href="https://www.youtube.com/watch?v=O0FGCxkHM-U" class="yt-title" target="_blank">The CLAUDE.md file</a><div class="yt-meta">Claude · 199K views · May 10, 2026 <span class="pulse-vendor">Anthropic</span></div><div class="yt-desc en-content">Give Claude Code persistent memory about your project with a simple Markdown file called the: &quot;CLAUDE.md&quot;</div><div class="yt-desc he-content" style="display:none;direction:rtl;text-align:right">איך לתת ל-Claude Code זיכרון מתמשך על הפרויקט שלכם באמצעות קובץ Markdown פשוט בשם &quot;CLAUDE.md&quot;</div></div></div><div class="yt-row"><div class="yt-icon">▶</div><div class="yt-content"><a href="https://www.youtube.com/watch?v=nepKKz-MzFM" class="yt-title" target="_blank">FFmpeg: The Incredible Technology Behind Video on the Internet | Lex Fridman Podcast #496</a><div class="yt-meta">Lex Fridman · 183K views · May 06, 2026 </div><div class="yt-desc en-content">Jean-Baptiste Kempf is lead developer of VLC and president of VideoLAN. Kieran Kunhya is a longtime FFmpeg contributor, codec engineer, and the person behind the now-infamous FFmpeg account on X.</div><div class="yt-desc he-content" style="display:none;direction:rtl;text-align:right">Jean-Baptiste Kempf הוא ה-lead developer של VLC ונשיא VideoLAN. Kieran Kunhya הוא contributor ותיק ב-FFmpeg, מהנדס codec, והאיש מאחורי חשבון ה-FFmpeg הידוע לשמצה ב-X.</div></div></div><div class="yt-row"><div class="yt-icon">▶</div><div class="yt-content"><a href="https://www.youtube.com/watch?v=p7K3xfViWCE" class="yt-title" target="_blank">DeepSeek V4 AI Beats Billion Dollar Systems…For Free</a><div class="yt-meta">Two Minute Papers · 170K views · May 06, 2026 <span class="pulse-vendor">DeepSeek</span></div><div class="yt-desc en-content">❤️</div><div class="yt-desc he-content" style="display:none;direction:rtl;text-align:right">❤️</div></div></div><div class="yt-row"><div class="yt-icon">▶</div><div class="yt-content"><a href="https://www.youtube.com/watch?v=3pkz-Ie_k_c" class="yt-title" target="_blank">Anthropic just…wait what</a><div class="yt-meta">Theo - t3.gg · 157K views · May 07, 2026 <span class="pulse-vendor">Anthropic</span></div><div class="yt-desc en-content">Anthropic&#x27;s been struggling to</div><div class="yt-desc he-content" style="display:none;direction:rtl;text-align:right">Anthropic מתמודדת עם קשיים</div></div></div><div class="yt-row"><div class="yt-icon">▶</div><div class="yt-content"><a href="https://www.youtube.com/watch?v=JOu8v6CBjkE" class="yt-title" target="_blank">We’re introducing three audio models in the API</a><div class="yt-meta">OpenAI · 143K views · May 07, 2026 </div><div class="yt-desc en-content">We’re introducing three audio models in the API that unlock a new class of voice apps for developers. With these models, developers can build voice experiences that feel more natural, respond more intelligently, and take action in real time:</div><div class="yt-desc he-content" style="display:none;direction:rtl;text-align:right">אנחנו משיקים שלושה מודלים של audio ב-API שפותחים קטגוריה חדשה של voice apps למפתחים. עם המודלים האלה אפשר לבנות חוויות קוליות שמרגישות טבעיות יותר, מגיבות בצורה חכמה יותר, ופועלות בזמן אמת:</div></div></div><div class="yt-row"><div class="yt-icon">▶</div><div class="yt-content"><a href="https://www.youtube.com/watch?v=Gtt-xnzoIDc" class="yt-title" target="_blank">The Anthropic Situation is INSANE</a><div class="yt-meta">Matthew Berman · 117K views · May 07, 2026 <span class="pulse-vendor">Anthropic</span></div><div class="yt-desc en-content">Download The 25 OpenClaw Use Cases eBook 👇🏼</div><div class="yt-desc he-content" style="display:none;direction:rtl;text-align:right">הורידו את ה-eBook על 25 השימושים של OpenClaw 👇🏼</div></div></div><div class="yt-row"><div class="yt-icon">▶</div><div class="yt-content"><a href="https://www.youtube.com/watch?v=Nn2eXwch-K0" class="yt-title" target="_blank">we JUST figured out how AI thinks</a><div class="yt-meta">Wes Roth · 94K views · May 09, 2026 <span class="pulse-vendor">Anthropic</span></div><div class="yt-desc en-content">The latest AI News. Learn about LLMs, Gen AI and</div><div class="yt-desc he-content" style="display:none;direction:rtl;text-align:right">חדשות ה-AI האחרונות. הכירו LLMs, Gen AI ועוד</div></div></div>
+</div>
+<div class="yt-card"><div class="section-label" style="margin-top:0" id="yt-channels-label">📺 Recommended YouTube Channels</div><a href="https://www.youtube.com/@CloudAI_Hebrew" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">CloudAI Hebrew</span><span class="he-content" style="display:none">CloudAI עברית</span> <span class="ch-lang">🇮🇱</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">AI tutorials &amp; news in Hebrew</span><span class="he-content" style="display:none;direction:rtl;text-align:right">הדרכות וחדשות AI בעברית</span></div></a><a href="https://www.youtube.com/@TrashTechNews" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">TrashTech News</span><span class="he-content" style="display:none">טראשטק</span> <span class="ch-lang">🇮🇱</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">Tech industry gossip, AI &amp; startup news</span><span class="he-content" style="display:none;direction:rtl;text-align:right">גוסיפ טק, חדשות AI וסטארטאפים</span></div></a><a href="https://www.youtube.com/@yuv-ai" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">yuv-ai</span><span class="he-content" style="display:none">yuv-ai</span> <span class="ch-lang">🇮🇱</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">AI skills, Claude Code, and dev tools</span><span class="he-content" style="display:none;direction:rtl;text-align:right">כישורי AI, Claude Code וכלי פיתוח</span></div></a><a href="https://www.youtube.com/@claude" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">Claude</span><span class="he-content" style="display:none">Claude</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">Official Anthropic channel — Claude demos &amp; updates</span><span class="he-content" style="display:none;direction:rtl;text-align:right">הערוץ הרשמי של Anthropic — הדגמות ועדכוני Claude</span></div></a><a href="https://www.youtube.com/@GoogleCloudTech" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">Google Cloud Tech</span><span class="he-content" style="display:none">Google Cloud Tech</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">Gemini, Vertex AI, ADK &amp; cloud AI demos</span><span class="he-content" style="display:none;direction:rtl;text-align:right">Gemini, Vertex AI, ADK והדגמות AI בענן</span></div></a><a href="https://www.youtube.com/@GoogleDevelopers" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">Google for Developers</span><span class="he-content" style="display:none">Google for Developers</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">Google AI APIs, ADK, and developer tools</span><span class="he-content" style="display:none;direction:rtl;text-align:right">ממשקי AI של גוגל, ADK וכלי פיתוח</span></div></a><a href="https://www.youtube.com/@OpenAI" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">OpenAI</span><span class="he-content" style="display:none">OpenAI</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">GPT, Codex, Sora demos &amp; research talks</span><span class="he-content" style="display:none;direction:rtl;text-align:right">הדגמות GPT, Codex, Sora ושיחות מחקר</span></div></a><a href="https://www.youtube.com/@amazonwebservices" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">Amazon Web Services</span><span class="he-content" style="display:none">Amazon Web Services</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">Bedrock, AI agents, serverless &amp; cloud tutorials</span><span class="he-content" style="display:none;direction:rtl;text-align:right">Bedrock, סוכני AI, serverless והדרכות ענן</span></div></a><a href="https://www.youtube.com/@Fireship" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">Fireship</span><span class="he-content" style="display:none">Fireship</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">Fast-paced AI &amp; dev news in 100 seconds</span><span class="he-content" style="display:none;direction:rtl;text-align:right">חדשות AI ופיתוח בקצב מהיר</span></div></a><a href="https://www.youtube.com/@mreflow" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">Matt Wolfe</span><span class="he-content" style="display:none">Matt Wolfe</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">Weekly AI tool roundups &amp; news</span><span class="he-content" style="display:none;direction:rtl;text-align:right">סקירת כלי AI שבועית וחדשות</span></div></a><a href="https://www.youtube.com/@TwoMinutePapers" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">Two Minute Papers</span><span class="he-content" style="display:none">Two Minute Papers</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">AI research explained — what a time to be alive!</span><span class="he-content" style="display:none;direction:rtl;text-align:right">מחקרי AI מוסברים בקצרה</span></div></a><a href="https://www.youtube.com/@t3dotgg" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">Theo - t3.gg</span><span class="he-content" style="display:none">Theo - t3.gg</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">Dev tools, AI coding, and web dev takes</span><span class="he-content" style="display:none;direction:rtl;text-align:right">כלי פיתוח, AI קוד ועולם הווב</span></div></a><a href="https://www.youtube.com/@aiexplained-official" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">AI Explained</span><span class="he-content" style="display:none">AI Explained</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">Deep-dive analysis of AI breakthroughs</span><span class="he-content" style="display:none;direction:rtl;text-align:right">ניתוחים מעמיקים של פריצות דרך ב-AI</span></div></a><a href="https://www.youtube.com/@GregIsenberg" target="_blank" class="ch-row" style="border-left:3px solid #dc2626"><div class="ch-name"><span class="en-content">Greg Isenberg</span><span class="he-content" style="display:none">Greg Isenberg</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#dc2626">YouTube</span></div><div class="ch-desc"><span class="en-content">AI startups, products &amp; business ideas</span><span class="he-content" style="display:none;direction:rtl;text-align:right">סטארטאפים, מוצרים ורעיונות עסקיים עם AI</span></div></a></div>
+<div class="yt-card"><div class="section-label" style="margin-top:0" id="podcasts-label">🎙️ Podcasts</div><a href="https://open.spotify.com/show/0R8OGY0eb6BJSepIApWB0z" target="_blank" class="ch-row" style="border-left:3px solid #1DB954"><div class="ch-name"><span class="en-content">בזמן שעבדתם</span><span class="he-content" style="display:none">בזמן שעבדתם</span> <span class="ch-lang">🇮🇱</span> <span class="ch-platform" style="color:#1DB954">Spotify</span></div><div class="ch-desc"><span class="en-content">News you missed while working — AI, tech &amp; culture</span><span class="he-content" style="display:none;direction:rtl;text-align:right">חדשות שפספסתם — AI, טק ותרבות</span></div></a><a href="https://open.spotify.com/show/3nmpfA2evHKSVvzOnbmb0w" target="_blank" class="ch-row" style="border-left:3px solid #1DB954"><div class="ch-name"><span class="en-content">פשוט AI</span><span class="he-content" style="display:none">פשוט AI</span> <span class="ch-lang">🇮🇱</span> <span class="ch-platform" style="color:#1DB954">Spotify</span></div><div class="ch-desc"><span class="en-content">AI explained in simple Hebrew — by Benny Farber</span><span class="he-content" style="display:none;direction:rtl;text-align:right">בינה מלאכותית בשפה פשוטה — בני פרבר</span></div></a><a href="https://open.spotify.com/show/0NnB7UQUMBjx5n24FDE4Iz" target="_blank" class="ch-row" style="border-left:3px solid #1DB954"><div class="ch-name"><span class="en-content">בינה בקטנה</span><span class="he-content" style="display:none">בינה בקטנה</span> <span class="ch-lang">🇮🇱</span> <span class="ch-platform" style="color:#1DB954">Spotify</span></div><div class="ch-desc"><span class="en-content">5-min weekly AI news recap — Shira Weinberg Harel</span><span class="he-content" style="display:none;direction:rtl;text-align:right">סיכום שבועי של 5 דקות — שירה וינברג הראל</span></div></a><a href="https://open.spotify.com/show/5bt0qGN6KIFkrH3kg5hw5J" target="_blank" class="ch-row" style="border-left:3px solid #1DB954"><div class="ch-name"><span class="en-content">בינה מלאכותית בגובה העיניים</span><span class="he-content" style="display:none">בינה מלאכותית בגובה העיניים</span> <span class="ch-lang">🇮🇱</span> <span class="ch-platform" style="color:#1DB954">Spotify</span></div><div class="ch-desc"><span class="en-content">AI for everyone — Bar Shaltiel &amp; Yuval Bialik</span><span class="he-content" style="display:none;direction:rtl;text-align:right">AI לכולם — בר שאלתיאל ויובל ביאליק</span></div></a><a href="https://open.spotify.com/show/5ShlAGb2ExK4UwWcN1fkNO" target="_blank" class="ch-row" style="border-left:3px solid #1DB954"><div class="ch-name"><span class="en-content">Hands-On AI</span><span class="he-content" style="display:none">Hands-On AI</span> <span class="ch-lang">🇮🇱</span> <span class="ch-platform" style="color:#1DB954">Spotify</span></div><div class="ch-desc"><span class="en-content">AI in Israeli organizations — by Eyal Marcus</span><span class="he-content" style="display:none;direction:rtl;text-align:right">AI בארגונים ישראליים — אייל מרקוס</span></div></a><a href="https://open.spotify.com/show/7rQjgnBvuyr18K03tnEHBI" target="_blank" class="ch-row" style="border-left:3px solid #1DB954"><div class="ch-name"><span class="en-content">The AWS Developers Podcast</span><span class="he-content" style="display:none">The AWS Developers Podcast</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#1DB954">Spotify</span></div><div class="ch-desc"><span class="en-content">AWS services, AI agents, serverless &amp; cloud dev</span><span class="he-content" style="display:none;direction:rtl;text-align:right">שירותי AWS, סוכני AI, serverless ופיתוח ענן</span></div></a><a href="https://open.spotify.com/show/2MAi0BvDc6GTFvKFPXnkCL" target="_blank" class="ch-row" style="border-left:3px solid #1DB954"><div class="ch-name"><span class="en-content">Lex Fridman Podcast</span><span class="he-content" style="display:none">Lex Fridman Podcast</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#1DB954">Spotify</span></div><div class="ch-desc"><span class="en-content">Deep conversations with AI leaders &amp; researchers</span><span class="he-content" style="display:none;direction:rtl;text-align:right">שיחות מעמיקות עם מובילי AI וחוקרים</span></div></a><a href="https://open.spotify.com/show/44fllCS2FTFr2x2kjP9xeT" target="_blank" class="ch-row" style="border-left:3px solid #1DB954"><div class="ch-name"><span class="en-content">Hard Fork</span><span class="he-content" style="display:none">Hard Fork</span> <span class="ch-lang">🇺🇸</span> <span class="ch-platform" style="color:#1DB954">Spotify</span></div><div class="ch-desc"><span class="en-content">NYT podcast on AI, tech &amp; the internet — fun &amp; sharp</span><span class="he-content" style="display:none;direction:rtl;text-align:right">פודקאסט ניו יורק טיימס על AI, טק והאינטרנט</span></div></a></div>
+<div class="gh-card">
+<div class="section-label" style="margin-top:0" id="github-label">📦 GitHub Trending</div>
+<div class="gh-row"><div class="gh-icon">⭐</div><div class="gh-content"><a href="https://github.com/AstrBotDevs/AstrBot" class="gh-title" target="_blank">Trending: AstrBotDevs/AstrBot — AI Agent Assistant &amp; development framework that integrates lots of IM platforms,</a><div class="gh-meta">32.0K stars · Python · May 13, 2026</div><div class="gh-desc">AI Agent Assistant &amp; development framework that integrates lots of IM platforms, LLMs, plugins and AI feature, and can be your openclaw alternative. ✨...</div></div></div><div class="gh-row"><div class="gh-icon">⭐</div><div class="gh-content"><a href="https://github.com/langchain-ai/langgraph" class="gh-title" target="_blank">Trending: langchain-ai/langgraph — Build resilient agents.</a><div class="gh-meta">31.9K stars · Python · May 12, 2026</div><div class="gh-desc">Build resilient agents. Topics: agents, ai, ai-agents, chatgpt, deepagents</div></div></div><div class="gh-row"><div class="gh-icon">⭐</div><div class="gh-content"><a href="https://github.com/sgl-project/sglang" class="gh-title" target="_blank">Trending: sgl-project/sglang — SGLang is a high-performance serving framework for large language models and mul</a><div class="gh-meta">27.7K stars · Python · May 13, 2026</div><div class="gh-desc">SGLang is a high-performance serving framework for large language models and multimodal models. Topics: attention, blackwell, cuda, deepseek, diffusio...</div></div></div><div class="gh-row"><div class="gh-icon">⭐</div><div class="gh-content"><a href="https://github.com/meta-llama/llama-cookbook" class="gh-title" target="_blank">Trending: meta-llama/llama-cookbook — Welcome to the Llama Cookbook! This is your go to guide for Building with Llama:</a><div class="gh-meta">18.3K stars · Jupyter Notebook · May 12, 2026</div><div class="gh-desc">Welcome to the Llama Cookbook! This is your go to guide for Building with Llama: Getting started with Inference, Fine-Tuning, RAG. We also show you ho...</div></div></div><div class="gh-row"><div class="gh-icon">⭐</div><div class="gh-content"><a href="https://github.com/xming521/WeClone" class="gh-title" target="_blank">Trending: xming521/WeClone — 🚀 One-stop solution for creating your AI twin from chat history 💡 Fine-tune LLMs</a><div class="gh-meta">17.9K stars · Python · May 11, 2026</div><div class="gh-desc">🚀 One-stop solution for creating your AI twin from chat history 💡 Fine-tune LLMs with your chat logs to capture your unique style, then bind to a chat...</div></div></div><div class="gh-row"><div class="gh-icon">⭐</div><div class="gh-content"><a href="https://github.com/huggingface/transformers" class="gh-title" target="_blank">Trending: huggingface/transformers — 🤗 Transformers: the model-definition framework for state-of-the-art machine lear</a><div class="gh-meta">160.5K stars · Python · May 13, 2026</div><div class="gh-desc">🤗 Transformers: the model-definition framework for state-of-the-art machine learning models in text, vision, audio, and multimodal models, for both in...</div></div></div><div class="gh-row"><div class="gh-icon">⭐</div><div class="gh-content"><a href="https://github.com/langchain-ai/langchain" class="gh-title" target="_blank">Trending: langchain-ai/langchain — The agent engineering platform.</a><div class="gh-meta">136.6K stars · Python · May 12, 2026</div><div class="gh-desc">The agent engineering platform. Topics: agents, ai, ai-agents, anthropic, chatgpt</div></div></div><div class="gh-row"><div class="gh-icon">⭐</div><div class="gh-content"><a href="https://github.com/infiniflow/ragflow" class="gh-title" target="_blank">Trending: infiniflow/ragflow — RAGFlow is a leading open-source Retrieval-Augmented Generation (RAG) engine tha</a><div class="gh-meta">80.4K stars · Python · May 13, 2026</div><div class="gh-desc">RAGFlow is a leading open-source Retrieval-Augmented Generation (RAG) engine that fuses cutting-edge RAG with Agent capabilities to create a superior...</div></div></div>
+</div>
+</div>
+<div class="footer">
+  Generated May 13, 2026 at 07:55 · Merged from 10 AI agents<br>
+  Built by <a href="https://linkedin.com/in/koby-almog-56b50714" target="_blank" style="color:#d97706;text-decoration:none">Koby Almog</a> ·
+  <a href="https://linkedin.com/in/koby-almog-56b50714" target="_blank" style="color:#d97706;text-decoration:none">LinkedIn</a> ·
+  <a href="https://medium.com/@kobyal" target="_blank" style="color:#d97706;text-decoration:none">Medium</a>
+</div>
+<script>
+function setLang(l,btn){
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  var en=l==='en';
+  var dir=en?'ltr':'rtl';
+  var align=en?'left':'right';
+  document.getElementById('tldr-en').style.display=en?'':'none';
+  document.getElementById('tldr-he').style.display=en?'none':'';
+  document.getElementById('tldr-label').textContent=en?'Today\'s Brief':'תקציר היום';
+  document.getElementById('tldr-label').dir=dir;
+  document.getElementById('tldr-label').style.textAlign=align;
+  document.getElementById('news-label').textContent=en?'Stories':'כתבות';
+  document.getElementById('news-label').dir=dir;
+  document.getElementById('news-label').style.textAlign=align;
+  var rl=document.getElementById('reddit-label');
+  if(rl){rl.textContent=en?'🟠 Hot on Reddit':'🟠 לוהט ב-Reddit';rl.dir=dir;rl.style.textAlign=align;}
+  var rpl=document.getElementById('rpulse-label');
+  if(rpl){rpl.textContent=en?'🟠 Buzzing on Reddit':'🟠 מה מדברים ב-Reddit';rpl.dir=dir;rpl.style.textAlign=align;}
+  var rpen=document.getElementById('rpulse-en'); if(rpen) rpen.style.display=en?'':'none';
+  var rphe=document.getElementById('rpulse-he'); if(rphe) rphe.style.display=en?'none':'';
+  document.querySelectorAll('.new-badge').forEach(function(el){el.textContent=en?'NEW':'חדש';});
+  var cen=document.getElementById('community-en'); if(cen) cen.style.display=en?'':'none';
+  var che=document.getElementById('community-he'); if(che) che.style.display=en?'none':'';
+  var xen=document.getElementById('xpulse-en'); if(xen) xen.style.display=en?'':'none';
+  var xhe=document.getElementById('xpulse-he'); if(xhe) xhe.style.display=en?'none':'';
+  var cl=document.getElementById('community-label');
+  if(cl){cl.textContent=en?'💬 Community Pulse':'💬 דופק הקהילה';cl.dir=dir;cl.style.textAlign=align;}
+  var xpl=document.getElementById('xpulse-label');
+  if(xpl){xpl.textContent=en?'𝕏 Buzzing on X':'𝕏 מה מדברים ב-X';xpl.dir=dir;xpl.style.textAlign=align;}
+  var pl=document.getElementById('people-label');
+  if(pl){pl.textContent=en?'𝕏 Trending on X':'𝕏 חם ב-X';pl.dir=dir;pl.style.textAlign=align;}
+  var yl=document.getElementById('youtube-label');
+  if(yl){yl.textContent=en?'🎬 Latest AI Videos':'🎬 סרטוני AI אחרונים';yl.dir=dir;yl.style.textAlign=align;}
+  var ycl=document.getElementById('yt-channels-label');
+  if(ycl){ycl.textContent=en?'📺 Recommended YouTube Channels':'📺 ערוצי YouTube מומלצים';ycl.dir=dir;ycl.style.textAlign=align;}
+  var pcl=document.getElementById('podcasts-label');
+  if(pcl){pcl.textContent=en?'🎙️ Podcasts':'🎙️ פודקאסטים';pcl.dir=dir;pcl.style.textAlign=align;}
+  var gl=document.getElementById('github-label');
+  if(gl){gl.textContent=en?'📦 GitHub Trending':'📦 GitHub Trending';gl.dir=dir;gl.style.textAlign=align;}
+  var xl=document.getElementById('xai-label');
+  if(xl){xl.textContent=en?'𝕏 Trending on X':'𝕏 חם ב-X';xl.dir=dir;xl.style.textAlign=align;}
+  document.querySelectorAll('.news-card,.person-card').forEach(function(el){el.dir=en?'ltr':'rtl';});
+  document.querySelectorAll('.en-content').forEach(function(el){el.style.display=en?'':'none';});
+  document.querySelectorAll('.he-content').forEach(function(el){el.style.display=en?'none':'';});
+}
+var _vf=null;
+function filterVendor(v){
+  _vf=(_vf===v)?null:v;
+  document.querySelectorAll('.vf-chip').forEach(function(c){c.classList.toggle('active',c.dataset.v===_vf);});
+  document.querySelectorAll('.news-card').forEach(function(card){
+    card.style.display=(!_vf||card.dataset.vendor===_vf)?'':'none';
+  });
+}
+(function(){
+  var seen={};var bar=document.getElementById('vendor-filter');
+  document.querySelectorAll('.news-card[data-vendor]').forEach(function(card){
+    var v=card.dataset.vendor;
+    if(!v||seen[v])return;seen[v]=1;
+    var badge=card.querySelector('.vendor-chip-btn');
+    var bg=badge?badge.style.background:'#64748b';
+    var chip=document.createElement('span');
+    chip.className='vf-chip';chip.dataset.v=v;
+    chip.style.background=bg;chip.style.color='#fff';
+    chip.textContent=badge?badge.textContent:v;
+    chip.onclick=function(){filterVendor(v);};
+    bar.appendChild(chip);
+  });
+})();
+</script>
+</body></html>

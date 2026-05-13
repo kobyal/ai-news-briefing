@@ -1816,17 +1816,23 @@ _tldr_he_text = "\n\n".join(published.get("briefing_he", {}).get("tldr_he") or [
 
 # Cache-buster: GitHub Pages MP3s have no CDN invalidation, and browsers
 # cache them aggressively (same URL within a date = same cached file even
-# when the underlying tldr text has changed in a same-day re-run). Hashing
-# the input text into the URL forces a fresh fetch on every content change.
+# when the underlying tldr text has changed in a same-day re-run). Hash
+# the MP3 FILE bytes (not just the text) so a regen of the same text but
+# different voice / edge-tts output still busts the cache.
 import hashlib as _hashlib_cb
-_tldr_en_cb = _hashlib_cb.sha1(_tldr_en_text.encode()).hexdigest()[:8] if _tldr_en_text else "0"
-_tldr_he_cb = _hashlib_cb.sha1(_tldr_he_text.encode()).hexdigest()[:8] if _tldr_he_text else "0"
+def _mp3_cb(_p):
+    try:
+        return _hashlib_cb.sha1(_p.read_bytes()).hexdigest()[:8]
+    except Exception:
+        return "0"
 
 if _generate_tldr_audio(_tldr_en_text, _TLDR_VOICE_EN, _audio_dir / "tldr_en.mp3"):
-    published["briefing"]["tldr_audio_url"] = f"{_GH_PAGES_BASE}/audio/{date_str}/tldr_en.mp3?v={_tldr_en_cb}"
+    _en_cb = _mp3_cb(_audio_dir / "tldr_en.mp3")
+    published["briefing"]["tldr_audio_url"] = f"{_GH_PAGES_BASE}/audio/{date_str}/tldr_en.mp3?v={_en_cb}"
 if _generate_tldr_audio(_tldr_he_text, _TLDR_VOICE_HE, _audio_dir / "tldr_he.mp3"):
+    _he_cb = _mp3_cb(_audio_dir / "tldr_he.mp3")
     published.setdefault("briefing_he", {})["tldr_audio_url"] = (
-        f"{_GH_PAGES_BASE}/audio/{date_str}/tldr_he.mp3?v={_tldr_he_cb}"
+        f"{_GH_PAGES_BASE}/audio/{date_str}/tldr_he.mp3?v={_he_cb}"
     )
 
 # ── Per-story audio (Listen button on every card) ───────────────────────────

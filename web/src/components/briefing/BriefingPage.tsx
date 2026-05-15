@@ -315,8 +315,17 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
     // Skips the keyword scorer entirely. Accepted when length matches and
     // every non-empty id resolves to a known story (orphan bullets get ""
     // in the pipeline; those fall to scorer too as a per-bullet safety net).
-    const explicit = data.bullet_story_ids;
-    if (Array.isArray(explicit) && explicit.length === tldr.length && explicit.every((id) => !id || storyById.has(id))) {
+    // Normalise bullet_story_ids to exactly tldr.length entries (pad "" or
+    // truncate). A dedup or QA patch that removes/adds a story can leave
+    // explicit.length !== tldr.length — previously that caused the entire
+    // explicit path to be skipped and ALL Hebrew bullets lost navigation.
+    // Now: truncate extra trailing IDs; pad missing ones with "" (those
+    // individual bullets fall back to keyword scorer).
+    const rawExplicit = data.bullet_story_ids;
+    const explicit = Array.isArray(rawExplicit)
+      ? Array.from({ length: tldr.length }, (_, i) => rawExplicit[i] || "")
+      : null;
+    if (explicit && explicit.every((id) => !id || storyById.has(id))) {
       const bulletMap = new Map<number, NewsItem>();
       const ordered: NewsItem[] = [];
       const claimed = new Set<string>();

@@ -60,6 +60,61 @@ def _first_party_image_map() -> dict[tuple[str, str], str]:
 FIRST_PARTY_OG = _first_party_image_map()
 print(f"Loaded {len(FIRST_PARTY_OG)} first-party og:image mirrors from S3")
 
+
+def _s3_story_id_maps() -> tuple[dict[tuple[str, str], str], dict[tuple[str, str], str]]:
+    """Download S3 briefing JSONs for the 14 most-recent dates and build two
+    complementary (date, key) → story_id lookups:
+
+      by_url:      (date, url)                → story_id   (any URL in the story)
+      by_headline: (date, normalised_headline) → story_id  (first occurrence wins)
+
+    The ingest lambda assigns story_id once at ingest time (hash of the
+    original primary URL).  QA fixes that later swap a story's URLs in
+    docs/data/*.json cause build_search_index to re-hash the *new* URL and
+    produce a different id — breaking every story-card link that points to
+    the original id still stored in S3.
+
+    URL-based matching is tried first (most precise); headline is a fallback
+    for cases where the URL changed between the original ingest and a QA fix
+    but the headline stayed the same.
+    """
+    by_url: dict[tuple[str, str], str] = {}
+    by_headline: dict[tuple[str, str], str] = {}
+    date_files = sorted(DATA_DIR.glob("2026-*.json"), reverse=True)[:14]
+    for f in date_files:
+        date = f.stem
+        try:
+            result = subprocess.run(
+                ["aws", "s3", "cp",
+                 f"s3://{BUCKET}/data/{date}.json", "-",
+                 "--profile", PROFILE, "--region", "us-east-1"],
+                capture_output=True, text=True, timeout=20,
+            )
+            if result.returncode != 0:
+                continue
+            s3_data = json.loads(result.stdout)
+            for s in s3_data.get("stories", []):
+                sid = s.get("story_id", "")
+                if not sid:
+                    continue
+                # URL index — all URLs → same story_id.  First occurrence wins
+                # so duplicate stories (same headline, no URLs) don't shadow
+                # the canonical one that has URLs.
+                for url in (s.get("urls") or []):
+                    by_url.setdefault((date, url), sid)
+                # Headline index — normalised lowercase, first occurrence wins.
+                headline = (s.get("headline") or "").strip().lower()
+                if headline:
+                    by_headline.setdefault((date, headline), sid)
+        except Exception as e:
+            print(f"  [s3_story_id_maps] {date}: {e}", file=sys.stderr)
+    print(f"Loaded {len(by_url)} URL + {len(by_headline)} headline S3-canonical story_id entries"
+          f" (covers last {len(date_files)} dates)")
+    return by_url, by_headline
+
+
+S3_BY_URL, S3_BY_HEADLINE = _s3_story_id_maps()
+
 stories: list[dict] = []
 extras: list[dict] = []
 
@@ -109,11 +164,22 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
     summaries_he_arr = briefing_he.get("summaries_he") or []
     # ── Articles ─────────────────────────────────────────────
     for idx, s in enumerate(briefing.get("news_items") or []):
-        # Story ID derivation matches publish_data._story_id_hash + ingest lambda
         import hashlib
         urls = s.get("urls") or []
         primary = urls[0] if urls else s.get("headline", "")
-        story_id = hashlib.sha256(primary.encode()).hexdigest()[:12]
+        headline_norm = (s.get("headline") or "").strip().lower()
+        # Prefer the S3-canonical story_id so the search index stays consistent
+        # with the live briefing data the frontend fetches.  QA URL fixes in
+        # docs/data/ would otherwise cause a re-hash to a different id, breaking
+        # every card link that points to the original S3 id.
+        # 1. URL match (most precise — survives headline edits)
+        # 2. Headline match (fallback when URL changed but headline stayed)
+        # 3. Hash of primary URL (original behaviour, kept as last resort)
+        story_id = (
+            S3_BY_URL.get((date, primary))
+            or S3_BY_HEADLINE.get((date, headline_norm))
+            or hashlib.sha256(primary.encode()).hexdigest()[:12]
+        )
         headline_he = s.get("headline_he") or (headlines_he_arr[idx] if idx < len(headlines_he_arr) else "")
         summary_he = s.get("summary_he") or (summaries_he_arr[idx] if idx < len(summaries_he_arr) else "")
         # Prefer the lambda's first-party S3 mirror (e.g. aibriefing.dev/data/img/...)

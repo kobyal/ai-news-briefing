@@ -292,16 +292,20 @@ export function TldrSection({ tldr, tldr_he, tldrAudioUrl, tldrAudioUrlHe, stori
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {items.map((bullet, i) => {
             const origIdx = itemOrigIdx[i];
-            const matched = bulletStoryMap?.get(origIdx) ?? matchStory(bullet, stories);
+            const explicitMatch = bulletStoryMap?.get(origIdx);
+            const matched = explicitMatch ?? matchStory(bullet, stories);
             // Use vendor detected from bullet text, not matched story's vendor
             const detectedVendorName = detectVendor(bullet);
             const vendor = detectedVendorName ? getVendor(detectedVendorName) : null;
             const accentColor = vendor?.color || "#b45309";
             const vendorLabel = detectedVendorName || (matched?.vendor);
-            // Only link to story if the match is confident (detected vendor matches story vendor)
-            const goodMatch = matched && (!detectedVendorName
+            // Explicit bullet_story_ids binding is always trusted (works even when
+            // Hebrew bullets name vendors in Hebrew — detectVendor only knows Latin
+            // script, so it may detect a mid-sentence English brand name instead
+            // of the actual subject vendor, causing goodMatch to flip false).
+            const goodMatch = matched && (explicitMatch != null || (!detectedVendorName
               || matched.vendor === detectedVendorName
-              || matched.headline.toLowerCase().includes((detectedVendorName || "").toLowerCase()));
+              || matched.headline.toLowerCase().includes((detectedVendorName || "").toLowerCase())));
 
             return (
               <div

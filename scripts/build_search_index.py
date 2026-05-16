@@ -174,10 +174,12 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
         # every card link that points to the original S3 id.
         # 1. URL match (most precise — survives headline edits)
         # 2. Headline match (fallback when URL changed but headline stayed)
-        # 3. Hash of primary URL (original behaviour, kept as last resort)
+        # 3. Local briefing story_id (covers same-day new stories not yet in S3)
+        # 4. Hash of primary URL (original behaviour, kept as last resort)
         story_id = (
             S3_BY_URL.get((date, primary))
             or S3_BY_HEADLINE.get((date, headline_norm))
+            or s.get("story_id")
             or hashlib.sha256(primary.encode()).hexdigest()[:12]
         )
         headline_he = s.get("headline_he") or (headlines_he_arr[idx] if idx < len(headlines_he_arr) else "")

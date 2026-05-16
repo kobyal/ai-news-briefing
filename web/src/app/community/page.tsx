@@ -495,6 +495,7 @@ function CommunityDayBlock({ data, hideEmptyTwitterMessage }: { data: DayData; h
         <TwitterSection
           data={data.twitter}
           descsHe={data.twitter_descs_he}
+          peopleDescsHe={data.people_highlights_he}
           pulseItems={xPulsePairs}
         />
       ) : !hideEmptyTwitterMessage ? (

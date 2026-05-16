@@ -54,6 +54,8 @@ interface TwitterSectionProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any;
   descsHe?: string[];
+  /** Hebrew translations for people_highlights (twitter.people), 1-to-1 by index. */
+  peopleDescsHe?: { post_he?: string; why_he?: string }[];
   /** X-source community_pulse_items merged in as "trending" entries.
    *  Adapted into the TwitterSection item shape so they sort + render
    *  alongside people_highlights instead of in a duplicate card. */
@@ -207,7 +209,7 @@ function XIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-export function TwitterSection({ data, descsHe = [], pulseItems = [] }: TwitterSectionProps) {
+export function TwitterSection({ data, descsHe = [], peopleDescsHe = [], pulseItems = [] }: TwitterSectionProps) {
   const { isHe } = useLang();
 
   const trending = Array.isArray(data) ? data : (data?.trending || []);
@@ -231,12 +233,19 @@ export function TwitterSection({ data, descsHe = [], pulseItems = [] }: TwitterS
     if (t.url) seenUrls.add(dedupUrl(t.url));
     allItems.push({ ...t, _type: "trending", _eng: parseEngagement(t.engagement || "") });
   }
-  for (const p of people) {
+  for (let idx = 0; idx < people.length; idx++) {
+    const p = people[idx];
     const key = dedupKey(p.post || p.text || "");
     if (seen.has(key)) continue;
     seen.add(key);
     if (p.url) seenUrls.add(dedupUrl(p.url));
-    allItems.push({ ...p, _type: "following", _eng: parseEngagement(p.engagement || "") });
+    const heEntry = peopleDescsHe[idx];
+    allItems.push({
+      ...p,
+      post_he: p.post_he || heEntry?.post_he || "",
+      _type: "following",
+      _eng: parseEngagement(p.engagement || ""),
+    });
   }
 
   // Adapt curated X-pulse items into the same shape. Heat → engagement weight

@@ -23,9 +23,7 @@ OUT_PATH = REPO / "docs/data/hot_tools.json"
 sys.path.insert(0, str(REPO / "scripts"))
 from _run_log import append_run_log  # noqa: E402
 
-# DeepL key lives in private/.env; loaded from there by local-cycle.sh. When
-# absent we ship without Hebrew descriptions (frontend falls back to EN).
-DEEPL_KEY = os.environ.get("DEEPL_API_KEY", "")
+_ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("IMAGE_VISION_API_KEY", "")
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ai-news-briefing/1.0"
 
@@ -214,30 +212,26 @@ def fetch_readme_intro(model_or_space_id: str, kind: str = "models") -> str:
 
 
 def deepl_translate(text: str, target: str = "HE") -> str:
-    """Translate via DeepL Free/Pro. Returns "" on any failure — frontend
-    falls back to EN description in HE mode."""
-    if not DEEPL_KEY or not text:
+    """Translate a single text to Hebrew via Claude Haiku."""
+    if not _ANTHROPIC_KEY or not text:
         return ""
-    body = urllib.parse.urlencode({
-        "text":        text,
-        "target_lang": target,
-        "source_lang": "EN",
-    }).encode()
-    # Free-tier endpoint subdomain. Pro tier auto-falls back via key suffix.
-    endpoint = "https://api-free.deepl.com/v2/translate"
-    if DEEPL_KEY and not DEEPL_KEY.endswith(":fx"):
-        endpoint = "https://api.deepl.com/v2/translate"
     try:
+        payload = json.dumps({
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 512,
+            "messages": [{"role": "user", "content":
+                f"Translate to Hebrew. Return ONLY the translation, no explanations:\n\n{text[:500]}"}],
+        }).encode()
         req = urllib.request.Request(
-            endpoint, data=body,
-            headers={"Authorization": f"DeepL-Auth-Key {DEEPL_KEY}",
-                     "Content-Type": "application/x-www-form-urlencoded"},
+            "https://api.anthropic.com/v1/messages", data=payload,
+            headers={"x-api-key": _ANTHROPIC_KEY, "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=15) as r:
+        with urllib.request.urlopen(req, timeout=30) as r:
             d = json.loads(r.read())
-        return (d.get("translations") or [{}])[0].get("text", "") or ""
+        return d["content"][0]["text"].strip() or ""
     except Exception as e:
-        print(f"  [deepl] error: {e}")
+        print(f"  [claude-translate] error: {e}")
         return ""
 
 

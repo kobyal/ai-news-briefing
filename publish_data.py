@@ -124,24 +124,43 @@ def _generate_per_story_audio(
     return {"generated": generated, "skipped": skipped, "failed": failed, "expected": expected}
 
 
-def _translate_deepl(texts: list, api_key: str) -> list:
-    """Translate a batch of texts to Hebrew via DeepL free API."""
-    if not texts or not api_key:
+def _translate_he(texts: list) -> list:
+    """Translate a batch of texts to Hebrew via Claude Haiku."""
+    if not texts:
+        return []
+    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("IMAGE_VISION_API_KEY", "")
+    if not api_key:
         return [""] * len(texts)
-    url = "https://api-free.deepl.com/v2/translate"
-    params = [("target_lang", "HE")]
-    for text in texts:
-        params.append(("text", (text or "")[:500]))
-    data = urllib.parse.urlencode(params).encode("utf-8")
+    numbered = "\n".join(f"{i+1}. {(t or '')[:500]}" for i, t in enumerate(texts))
+    prompt = (f"Translate these {len(texts)} items to Hebrew. "
+              "Return ONLY the translations, numbered the same way, no explanations:\n\n" + numbered)
     try:
-        req = urllib.request.Request(url, data=data, method="POST")
-        req.add_header("Content-Type", "application/x-www-form-urlencoded")
-        req.add_header("Authorization", f"DeepL-Auth-Key {api_key}")
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-        return [t["text"] for t in result.get("translations", [])]
+        payload = json.dumps({
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 4096,
+            "messages": [{"role": "user", "content": prompt}],
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages", data=payload,
+            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            result = json.loads(resp.read())
+        text = result["content"][0]["text"]
+        lines = []
+        for line in text.strip().split("\n"):
+            line = line.strip()
+            if line and line[0].isdigit():
+                m = __import__("re").match(r"^\d+\.\s*(.+)$", line)
+                if m:
+                    lines.append(m.group(1))
+        if len(lines) == len(texts):
+            return lines
+        print(f"  Claude translate: got {len(lines)} lines for {len(texts)} texts — padding")
+        return lines + [""] * (len(texts) - len(lines))
     except Exception as e:
-        print(f"  DeepL error: {e}")
+        print(f"  Claude translate error: {e}")
         return [""] * len(texts)
 
 date_str = datetime.utcnow().strftime("%Y-%m-%d")
@@ -207,26 +226,18 @@ _raw_reddit = [p for p in _raw_reddit
                and len(p.get("title", "")) > 15]                 # skip trivially short titles
 reddit_posts = sorted(_raw_reddit, key=lambda p: p.get("score", 0), reverse=True)[:20]
 
-# DeepL translations (Reddit titles + X posts → Hebrew)
-_deepl_key = os.environ.get("DEEPL_API_KEY", "")
-# Loud warning so a missing key isn't a silent Hebrew regression — two
-# incidents on 2026-05-05 shipped English Reddit/X titles because this
-# block silently skipped translation.
-if not _deepl_key:
-    print("WARNING: DEEPL_API_KEY not set — Reddit/X Hebrew translations will be SKIPPED")
-if _deepl_key and reddit_posts:
-    print("Translating Reddit titles to Hebrew via DeepL...")
+# Hebrew translations (Reddit titles + X posts → Hebrew via Claude Haiku)
+if reddit_posts:
+    print("Translating Reddit titles to Hebrew via Claude Haiku...")
     _titles = [p.get("title", "") for p in reddit_posts]
-    _titles_he = _translate_deepl(_titles, _deepl_key)
+    _titles_he = _translate_he(_titles)
     for p, t_he in zip(reddit_posts, _titles_he):
         p["title_he"] = t_he
     print(f"  Translated {len(_titles_he)} Reddit titles")
-    # Translate body snippets
     _bodies = [p.get("body", "")[:200] for p in reddit_posts]
-    _has_body = any(b for b in _bodies)
-    if _has_body:
-        print("Translating Reddit body snippets to Hebrew via DeepL...")
-        _bodies_he = _translate_deepl(_bodies, _deepl_key)
+    if any(_bodies):
+        print("Translating Reddit body snippets to Hebrew via Claude Haiku...")
+        _bodies_he = _translate_he(_bodies)
         for p, b_he in zip(reddit_posts, _bodies_he):
             if b_he:
                 p["body_he"] = b_he
@@ -243,15 +254,14 @@ twitter_data = {
     "community": twitter_briefing.get("community_pulse", ""),
 }
 
-if _deepl_key:
-    _tw_items = twitter_data["trending"] + twitter_data["people"]
-    _tw_posts = [(i.get("post") or i.get("text") or "") for i in _tw_items]
-    if _tw_posts:
-        print(f"Translating {len(_tw_posts)} X posts to Hebrew via DeepL...")
-        _tw_he = _translate_deepl(_tw_posts, _deepl_key)
-        for item, t_he in zip(_tw_items, _tw_he):
-            item["post_he"] = t_he
-        print(f"  Translated {len(_tw_he)} X posts")
+_tw_items = twitter_data["trending"] + twitter_data["people"]
+_tw_posts = [(i.get("post") or i.get("text") or "") for i in _tw_items]
+if _tw_posts:
+    print(f"Translating {len(_tw_posts)} X posts to Hebrew via Claude Haiku...")
+    _tw_he = _translate_he(_tw_posts)
+    for item, t_he in zip(_tw_items, _tw_he):
+        item["post_he"] = t_he
+    print(f"  Translated {len(_tw_he)} X posts")
 
 # Auto-correct vendor for "Other" items when headline/summary clearly names a vendor
 _VENDOR_KEYWORDS = {
@@ -472,13 +482,7 @@ def _regen_tldr_over_union(_merger: dict) -> bool:
         print(f"  TLDR regen got {len(_bullets)} bullets (expected 10), keeping original")
         return False
 
-    # Translate to HE via DeepL (same key as elsewhere in script)
-    _deepl = os.environ.get("DEEPL_API_KEY", "")
-    if _deepl:
-        _bullets_he = _translate_deepl(_bullets, _deepl)
-    else:
-        print("  TLDR regen: no DEEPL_API_KEY — keeping previous HE TLDR (will be misaligned)")
-        _bullets_he = (_merger.get("briefing_he") or {}).get("tldr_he") or [""] * len(_bullets)
+    _bullets_he = _translate_he(_bullets)
 
     _briefing_local["tldr"] = _bullets
     if "briefing_he" not in _merger:

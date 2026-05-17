@@ -191,7 +191,7 @@ interface TldrSectionProps {
 
 export function TldrSection({ tldr, tldr_he, tldrAudioUrl, tldrAudioUrlHe, stories = [], bulletStoryMap }: TldrSectionProps) {
   const { isHe } = useLang();
-  const rawItems = isHe && tldr_he.length > 0 ? tldr_he : tldr;
+  const rawItems = isHe && tldr_he.some(s => s.trim()) ? tldr_he : tldr;
   const [expanded, setExpanded] = useState(false);
 
   // ── TTS playback (the "Listen" button) ────────────────────────────────

@@ -547,13 +547,9 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
   // Match all 3 community pools against the story. Used for today's data first;
   // re-used for yesterday's data when today yields nothing.
   const matchPools = (d: DayData) => {
-    const pulseAll = (d.community_pulse_items || [])
-      .map((item, i) => ({ item, he: (d.community_pulse_items_he || [])[i] }));
-    const pulse = pulseAll.filter((entry) =>
-      vendorOK(entry)
-      && !storyUrlSet.has(stripQuery((entry.item as { source_url?: string }).source_url || ""))
-      && strongMatch(`${entry.item.headline} ${entry.item.body || ""}`)
-    );
+    // Build x posts first so we can cross-dedup pulse items against them.
+    // A pulse item that re-headlines the same tweet as a twitter.people entry
+    // would otherwise appear twice: once as 💬 (pulse) and once as 𝕏 (X post).
     const x: Record<string, string>[] = [];
     if (d.twitter) {
       const all = [
@@ -567,6 +563,16 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
         if (strongMatch(text)) x.push(p);
       }
     }
+    const xUrlSet = new Set(x.map(p => stripQuery(p.url || "")));
+
+    const pulseAll = (d.community_pulse_items || [])
+      .map((item, i) => ({ item, he: (d.community_pulse_items_he || [])[i] }));
+    const pulse = pulseAll.filter((entry) =>
+      vendorOK(entry)
+      && !storyUrlSet.has(stripQuery((entry.item as { source_url?: string }).source_url || ""))
+      && !xUrlSet.has(stripQuery((entry.item as { source_url?: string }).source_url || ""))
+      && strongMatch(`${entry.item.headline} ${entry.item.body || ""}`)
+    );
     const reddit = (d.top_reddit || []).filter((p: { title?: string }) => strongMatch(p.title || ""));
     return { pulseItems: pulse, xPosts: x, redditPosts: reddit };
   };

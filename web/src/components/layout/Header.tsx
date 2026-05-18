@@ -132,7 +132,7 @@ export function Header({ date }: HeaderProps) {
                   lineHeight: 1,
                 }}
               >
-                AI Briefing
+                Briefing
               </span>
             </a>
 

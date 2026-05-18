@@ -278,154 +278,6 @@ function ChannelPill({ name, color = "#dc2626", bg = "rgba(220,38,38,0.08)", bor
   );
 }
 
-// ── Hero card (one of 4 in the top picks 2×2 grid) ──────────────────────────
-function HeroCard({ video, isHe, descHe, featured = false }: { video: YouTubeVideo; isHe: boolean; descHe?: string; featured?: boolean }) {
-  const url = videoUrl(video);
-  const title = videoTitle(video);
-  const channel = videoChannel(video);
-  const views = videoViewsText(video);
-  const date = videoDate(video);
-  const duration = videoDuration(video);
-  const thumb = videoThumbnail(video);
-  const enDesc = String(video.description || video.summary || "").replace(/^\[[^\]]+\]\s*/, "").slice(0, 160);
-  const desc = isHe && descHe ? descHe : enDesc;
-
-  // Anchor for /search → /media/#video-{vid_id} deep links.
-  const vidMatch = url.match(/[?&]v=([\w-]{11})/);
-  const videoAnchor = vidMatch ? `video-${vidMatch[1]}` : undefined;
-
-  return (
-    <a
-      id={videoAnchor}
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block group transition-transform"
-      style={{
-        background: "#fff",
-        border: "1px solid #ededf5",
-        borderRadius: "14px",
-        overflow: "hidden",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.04)",
-        textDecoration: "none",
-        color: "inherit",
-        scrollMarginTop: "80px",
-      }}
-    >
-      <div className="relative" style={{ aspectRatio: "16 / 9", background: "#0f0f1a" }}>
-        {thumb && (
-          <img src={thumb} alt={title} className="w-full h-full object-cover block" />
-        )}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 pointer-events-none"
-          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 50%)" }}
-        />
-        {featured && (
-          <span
-            className="absolute font-extrabold"
-            style={{
-              top: "10px",
-              insetInlineStart: "10px",
-              background: "#dc2626",
-              color: "#fff",
-              fontSize: "10px",
-              letterSpacing: "0.04em",
-              padding: "4px 9px",
-              borderRadius: "999px",
-              boxShadow: "0 2px 6px rgba(220,38,38,0.35)",
-            }}
-          >
-            {isHe ? "★ מומלץ" : "★ TOP PICK"}
-          </span>
-        )}
-        <div
-          className="absolute flex items-center justify-center transition-transform group-hover:scale-105"
-          style={{
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: "48px",
-            height: "48px",
-            borderRadius: "50%",
-            background: "rgba(220,38,38,0.95)",
-            color: "#fff",
-            fontSize: "20px",
-            boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
-          }}
-        >
-          ▶
-        </div>
-        {duration && (
-          <span
-            className="absolute font-bold"
-            style={{
-              bottom: "8px",
-              insetInlineEnd: "8px",
-              background: "rgba(0,0,0,0.85)",
-              color: "#fff",
-              fontSize: "10.5px",
-              padding: "2px 6px",
-              borderRadius: "4px",
-              fontFamily: "ui-monospace, monospace",
-            }}
-          >
-            {duration}
-          </span>
-        )}
-      </div>
-
-      <div className="px-3.5 py-3" style={{ direction: isHe ? "rtl" : "ltr", textAlign: isHe ? "right" : "left" }}>
-        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-          {channel && <ChannelPill name={channel} />}
-          {views && (
-            <span style={{ color: "#9a9ab8", fontSize: "11px", fontFamily: "ui-monospace, monospace" }}>
-              {views}
-            </span>
-          )}
-          {date && (
-            <span style={{ color: "#9a9ab8", fontSize: "11px", fontFamily: "ui-monospace, monospace" }}>
-              · {date}
-            </span>
-          )}
-        </div>
-        <h3
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "14.5px",
-            fontWeight: 700,
-            lineHeight: 1.35,
-            margin: "0 0 5px",
-            color: "#0f0f1a",
-            display: "-webkit-box",
-            WebkitBoxOrient: "vertical" as const,
-            WebkitLineClamp: 2,
-            overflow: "hidden",
-          }}
-        >
-          {title}
-        </h3>
-        {desc && (
-          <p
-            style={{
-              fontSize: "11.5px",
-              lineHeight: 1.5,
-              color: "#3d3d5a",
-              margin: 0,
-              display: "-webkit-box",
-              WebkitBoxOrient: "vertical" as const,
-              WebkitLineClamp: 2,
-              overflow: "hidden",
-            }}
-          >
-            {desc}
-          </p>
-        )}
-      </div>
-    </a>
-  );
-}
-
 // ── Story-explainer pair card ───────────────────────────────────────────────
 function PairCard({ story, video, isHe }: { story: NewsItem; video: YouTubeVideo; isHe: boolean }) {
   const url = videoUrl(video);
@@ -916,64 +768,12 @@ function DayMediaBlock({ data, isHe, includeTopVideos = false }: { data: DayData
   const pairedUrls = new Set(pairs.map(({ video }) => videoUrl(video)));
   const unpairedVideos = allVideos.filter((v) => !pairedUrls.has(videoUrl(v)));
 
-  const heDescByUrl: Record<string, string> = {};
-  const descsHe = data.youtube_descs_he || [];
-  for (let i = 0; i < allVideos.length && i < descsHe.length; i++) {
-    const u = videoUrl(allVideos[i]);
-    if (u && descsHe[i]) heDescByUrl[u] = descsHe[i];
-  }
-
-  // Top picks (paired first, vendor cap=2, up to 6)
-  const HERO_TARGET = 6;
-  const HERO_VENDOR_CAP = 2;
   const numericViews = (v: YouTubeVideo) => (typeof v.views === "number" ? v.views : 0);
-  const pairedByViews = pairs.map(({ video }) => video).sort((a, b) => numericViews(b) - numericViews(a));
-  const unpairedByViews = [...unpairedVideos].sort((a, b) => numericViews(b) - numericViews(a));
-  const candidates = [...pairedByViews, ...unpairedByViews];
-  const vendorCount: Record<string, number> = {};
-  const heroPicks: YouTubeVideo[] = [];
-  for (const v of candidates) {
-    if (heroPicks.length >= HERO_TARGET) break;
-    const vendor = (v.vendor || "Other").trim();
-    if (vendorCount[vendor] >= HERO_VENDOR_CAP && vendor !== "Other") continue;
-    heroPicks.push(v);
-    vendorCount[vendor] = (vendorCount[vendor] || 0) + 1;
-  }
-  if (heroPicks.length < HERO_TARGET) {
-    const picked = new Set(heroPicks.map(videoUrl));
-    for (const v of candidates) {
-      if (heroPicks.length >= HERO_TARGET) break;
-      if (picked.has(videoUrl(v))) continue;
-      heroPicks.push(v);
-    }
-  }
-  const heroUrls = new Set(heroPicks.map(videoUrl));
-  const pairsBelow = pairs.filter(({ video }) => !heroUrls.has(videoUrl(video)));
-  const restVideosBelow = unpairedVideos.filter((v) => !heroUrls.has(videoUrl(v)));
+  const pairsBelow = pairs;
+  const restVideosBelow = [...unpairedVideos].sort((a, b) => numericViews(b) - numericViews(a));
 
   return (
     <>
-      {heroPicks.length > 0 && (
-        <>
-          <SectionHead
-            title={isHe ? "מומלצים השבוע" : "Top Picks This Week"}
-            sub={isHe ? "סרטוני הסבר לסיפורי היום קודם, אחר כך הנצפים ביותר" : "Story explainers first, then the most-watched"}
-            iconChar="★"
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {heroPicks.map((v, i) => (
-              <HeroCard
-                key={videoUrl(v)}
-                video={v}
-                isHe={isHe}
-                descHe={heDescByUrl[videoUrl(v)]}
-                featured={i === 0}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
       {pairsBelow.length > 0 && (
         <>
           <SectionHead
@@ -1135,60 +935,12 @@ function MediaPageInner() {
   const pairedUrls = new Set(pairs.map(({ video }) => videoUrl(video)));
   const unpairedVideos = allVideos.filter((v) => !pairedUrls.has(videoUrl(v)));
 
-  // HE description lookup by video URL — publish_data.py realigns
-  // youtube_descs_he to youtube[i] after the per-channel cap, so the index
-  // mapping is reliable. Pre-cap data (before tomorrow's first run) is
-  // index-aligned to merger's pre-enrichment view, so a URL-keyed map is
-  // tolerant either way. Falls back to EN where no translation exists.
-  const heDescByUrl: Record<string, string> = {};
-  const descsHe = data.youtube_descs_he || [];
-  for (let i = 0; i < allVideos.length && i < descsHe.length; i++) {
-    const u = videoUrl(allVideos[i]);
-    if (u && descsHe[i]) heDescByUrl[u] = descsHe[i];
-  }
-
-  // ── Top 6 picks (2×3 grid on desktop, 2×3 stacked on mobile) ──
-  // Selection: paired-with-story videos first (editorial signal — the LLM
-  // judged them as explainers for today's news), sorted by views; then
-  // top unpaired by views to fill. Vendor cap = 2 per vendor so no single
-  // company (e.g. 3 OpenAI videos on a busy OpenAI day) dominates the
-  // shelf. Picks are excluded from sections below to avoid duplication.
-  const HERO_TARGET = 6;
-  const HERO_VENDOR_CAP = 2;
   const numericViews = (v: YouTubeVideo): number =>
     typeof v.views === "number" ? v.views : 0;
-  const pairedByViews = pairs
-    .map(({ video }) => video)
-    .sort((a, b) => numericViews(b) - numericViews(a));
-  const unpairedByViews = [...unpairedVideos].sort(
+  const pairsBelow = pairs;
+  const restVideosBelow = [...unpairedVideos].sort(
     (a, b) => numericViews(b) - numericViews(a)
   );
-  const candidates = [...pairedByViews, ...unpairedByViews];
-
-  // Pass 1: respect vendor cap. Pass 2: backfill ignoring the cap so we
-  // hit HERO_TARGET when a vendor-dominated day means cap-1 is too tight.
-  const vendorCount: Record<string, number> = {};
-  const heroPicks: YouTubeVideo[] = [];
-  for (const v of candidates) {
-    if (heroPicks.length >= HERO_TARGET) break;
-    const vendor = (v.vendor || "Other").trim();
-    if (vendorCount[vendor] >= HERO_VENDOR_CAP && vendor !== "Other") continue;
-    heroPicks.push(v);
-    vendorCount[vendor] = (vendorCount[vendor] || 0) + 1;
-  }
-  if (heroPicks.length < HERO_TARGET) {
-    const picked = new Set(heroPicks.map(videoUrl));
-    for (const v of candidates) {
-      if (heroPicks.length >= HERO_TARGET) break;
-      if (picked.has(videoUrl(v))) continue;
-      heroPicks.push(v);
-    }
-  }
-  const heroUrls = new Set(heroPicks.map(videoUrl));
-
-  // Pairs and unpaired list with hero picks removed (avoid duplication).
-  const pairsBelow = pairs.filter(({ video }) => !heroUrls.has(videoUrl(video)));
-  const restVideosBelow = unpairedVideos.filter((v) => !heroUrls.has(videoUrl(v)));
 
   // Per-channel latest map (keyed by channel URL from CHANNELS table)
   const channelLatest: Record<string, ChannelLatestVideo> = {};
@@ -1222,30 +974,8 @@ function MediaPageInner() {
           {isHe ? "מדיה" : "Media"}
         </h1>
         <p className="mb-6 text-[13px]" style={{ color: "#9a9ab8" }}>
-          {isHe ? "מומלצים, הסברים לכתבות, ערוצי AI ופודקאסטים" : "Top picks, story explainers, AI channels & podcasts worth following"}
+          {isHe ? "הסברים לכתבות, ערוצי AI ופודקאסטים" : "Story explainers, AI channels & podcasts worth following"}
         </p>
-        {heroPicks.length > 0 && (
-          <>
-            <SectionHead
-              title={isHe ? "מומלצים השבוע" : "Top Picks This Week"}
-              sub={isHe ? "סרטוני הסבר לסיפורי היום קודם, אחר כך הנצפים ביותר" : "Story explainers first, then the most-watched"}
-              iconChar="★"
-            />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {heroPicks.map((v, i) => (
-                <HeroCard
-                  key={videoUrl(v)}
-                  video={v}
-                  isHe={isHe}
-                  descHe={heDescByUrl[videoUrl(v)]}
-                  featured={i === 0}
-                />
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* ── PAIRED STORY EXPLAINERS (excluding picks already shown above) ── */}
         {pairsBelow.length > 0 && (
           <>
             <SectionHead

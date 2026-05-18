@@ -42,6 +42,9 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
   // Lambda response nests aggregates per-story.
   const staticBriefing = ((res as unknown as Record<string, unknown>)?.briefing as Record<string, unknown>) || {};
   const staticCpi = staticBriefing.community_pulse_items as DayData["community_pulse_items"] || [];
+  // Prefer static JSON's twitter over Lambda per-story twitter. The static JSON
+  // may have twitter at the top level (res.twitter) rather than under briefing.
+  const staticTwitter = (staticBriefing.twitter || (res as unknown as Record<string, unknown>).twitter) as DayData["twitter"] | undefined;
   // Fall back to Lambda API if static file not yet available
   if (!res || !res.stories || !res.stories.length) {
     res = await safeFetch<{ date: string; stories: NewsItem[] }>(`${API}/api/stories?date=${d}`);
@@ -91,7 +94,9 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
     youtube: filterYoutubeByLanguage((s0 as unknown as Record<string, unknown>).youtube) as DayData["youtube"] || [],
     youtube_channel_latest: ((s0 as unknown as Record<string, unknown>).youtube_channel_latest as DayData["youtube_channel_latest"]) || [],
     github: (s0 as unknown as Record<string, unknown>).github as DayData["github"] || [],
-    twitter: (s0 as unknown as Record<string, unknown>).twitter as DayData["twitter"] || [],
+    twitter: (staticTwitter !== undefined
+      ? staticTwitter
+      : (s0 as unknown as Record<string, unknown>).twitter) as DayData["twitter"] || [],
     twitter_descs_he: (s0 as unknown as Record<string, unknown>).twitter_descs_he as DayData["twitter_descs_he"],
     youtube_descs_he: (s0 as unknown as Record<string, unknown>).youtube_descs_he as DayData["youtube_descs_he"],
   };

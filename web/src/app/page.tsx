@@ -13,19 +13,23 @@ export default function Home() {
 
   useEffect(() => {
     async function load() {
-      // If served as CloudFront fallback for a date URL, extract date from path
-      const pathMatch = window.location.pathname.match(/^\/(\d{4}-\d{2}-\d{2})/);
-      const dateStr = pathMatch ? pathMatch[1] : new Date().toISOString().split("T")[0];
-      const archiveDates = await fetchArchive();
-      let dayData = await fetchDayData(dateStr);
-      // If no data for requested date (e.g. today's pipeline hasn't run),
-      // fall back to the latest available date from archive
-      if (!dayData && !pathMatch && archiveDates.length > 0) {
-        dayData = await fetchDayData(archiveDates[0]);
+      try {
+        const pathMatch = window.location.pathname.match(/^\/(\d{4}-\d{2}-\d{2})/);
+        const dateStr = pathMatch ? pathMatch[1] : new Date().toISOString().split("T")[0];
+        const archiveDates = await fetchArchive();
+        let dayData = await fetchDayData(dateStr);
+        if (!dayData && !pathMatch && archiveDates.length > 0) {
+          dayData = await fetchDayData(archiveDates[0]);
+        }
+        setData(dayData || mockData);
+        setArchive(archiveDates.length > 0 ? archiveDates : ["2026-04-06"]);
+      } catch (e) {
+        console.error("[load] failed:", e);
+        setData(mockData);
+        setArchive(["2026-04-06"]);
+      } finally {
+        setLoading(false);
       }
-      setData(dayData || mockData);
-      setArchive(archiveDates.length > 0 ? archiveDates : ["2026-04-06"]);
-      setLoading(false);
     }
     load();
   }, []);

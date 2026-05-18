@@ -66,7 +66,14 @@ function SourceCard({ src, isHe, today }: { src: LensSource; isHe: boolean; toda
   const resolvedUrl = (() => {
     if (!src.url) return src.url;
     if (src.type === "story")     return inSiteHref("story", src.url, src.date || today, today, src.story_id);
-    if (src.type === "community") return inSiteHref("pulse", src.url, src.date || today, today);
+    if (src.type === "community") {
+      const u = src.url;
+      if ((u.includes("x.com/") || u.includes("twitter.com/")) && u.includes("/status/"))
+        return inSiteHref("tweet", u, src.date || today, today);
+      if (u.includes("reddit.com/"))
+        return inSiteHref("reddit", u, src.date || today, today);
+      return inSiteHref("pulse", u, src.date || today, today);
+    }
     if (src.type === "video")     return inSiteHref("video", src.url, src.date || today, today);
     if (src.type === "tool" && src.source_type === "github") return inSiteHref("repo", src.url, today, today);
     if (src.type === "tool")      return "/tools/";

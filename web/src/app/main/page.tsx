@@ -136,7 +136,14 @@ function LensCard({ lens, isHe }: { lens: Lens; isHe: boolean }) {
 function CommunityCard({ item, isHe, today }: { item: CommunityItem; isHe: boolean; today: string }) {
   const heatColor = HEAT_COLOR[item.heat] || "#6b7280";
   const href = item.source_url
-    ? inSiteHref("pulse", item.source_url, item.date || today, today)
+    ? (() => {
+        const u = item.source_url;
+        if ((u.includes("x.com/") || u.includes("twitter.com/")) && u.includes("/status/"))
+          return inSiteHref("tweet", u, item.date || today, today);
+        if (u.includes("reddit.com/"))
+          return inSiteHref("reddit", u, item.date || today, today);
+        return inSiteHref("pulse", u, item.date || today, today);
+      })()
     : "/community/";
 
   return (

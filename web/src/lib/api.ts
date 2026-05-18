@@ -37,9 +37,19 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
   const d = date || new Date().toISOString().split("T")[0];
   // Try static S3 JSON first (fast path — no Lambda cold start)
   let res = await safeFetch<{ date: string; stories: NewsItem[] }>(`${API}/data/${d}.json`);
+  // Extract static JSON aggregates before res may be overwritten by Lambda response.
+  // Static JSON uses briefing.{community_pulse_items,news_items,tldr,...};
+  // Lambda response nests aggregates per-story.
+  const staticBriefing = ((res as unknown as Record<string, unknown>)?.briefing as Record<string, unknown>) || {};
+  const staticCpi = staticBriefing.community_pulse_items as DayData["community_pulse_items"] || [];
   // Fall back to Lambda API if static file not yet available
   if (!res || !res.stories || !res.stories.length) {
     res = await safeFetch<{ date: string; stories: NewsItem[] }>(`${API}/api/stories?date=${d}`);
+  }
+  // Second fallback: Lambda failed but static JSON has news_items — synthesize stories
+  // so community_pulse_items from staticCpi can still be served (e.g. yesterday's data).
+  if ((!res || !res.stories || !res.stories.length) && (staticBriefing.news_items as unknown[])?.length) {
+    res = { date: d, stories: staticBriefing.news_items as NewsItem[] };
   }
   if (!res || !res.stories || !res.stories.length) return null;
   const stories = res.stories;
@@ -65,7 +75,9 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
     trending_topics: s0.trending_topics || [],
     people_highlights: s0.people_highlights || [],
     people_highlights_he: (s0 as unknown as Record<string, unknown>).people_highlights_he as DayData["people_highlights_he"] || [],
-    community_pulse_items: (s0 as unknown as Record<string, unknown>).community_pulse_items as DayData["community_pulse_items"] || [],
+    community_pulse_items: staticCpi.length > 0
+      ? staticCpi
+      : ((s0 as unknown as Record<string, unknown>).community_pulse_items as DayData["community_pulse_items"]) || [],
     community_pulse_items_he: (s0 as unknown as Record<string, unknown>).community_pulse_items_he as DayData["community_pulse_items_he"] || [],
     top_reddit: s0.top_reddit || [],
     youtube: filterYoutubeByLanguage((s0 as unknown as Record<string, unknown>).youtube) as DayData["youtube"] || [],

@@ -36,15 +36,19 @@ interface Lens {
 
 interface FeaturedStory {
   headline: string;
+  headline_he?: string;
   url: string;
   story_id: string;
   vendor: string;
   date: string;
   og_image: string;
   summary: string;
+  summary_he?: string;
   editorial_note: string;
   editorial_note_he: string;
 }
+
+const safeImg = (url: string) => (url && !url.endsWith(".svg") ? url : null);
 
 interface CommunityItem {
   headline: string;
@@ -117,13 +121,15 @@ const DIVIDER = { borderBottom: "1px solid #e5e7eb", paddingBottom: 28, marginBo
 
 function LeadStory({ story, isHe }: { story: FeaturedStory; isHe: boolean }) {
   const note = isHe ? story.editorial_note_he : story.editorial_note;
+  const headline = isHe ? (story.headline_he || story.headline) : story.headline;
+  const img = safeImg(story.og_image);
   return (
     <div style={DIVIDER}>
       <a href={story.url} style={{ textDecoration: "none", display: "block" }}>
-        {story.og_image && (
+        {img && (
           <div style={{ borderRadius: 6, overflow: "hidden", marginBottom: 14, background: "#f3f4f6" }}>
             <img
-              src={story.og_image} alt=""
+              src={img} alt=""
               style={{ width: "100%", height: 320, objectFit: "cover", display: "block" }}
             />
           </div>
@@ -138,14 +144,16 @@ function LeadStory({ story, isHe }: { story: FeaturedStory; isHe: boolean }) {
           <h2 style={{
             margin: "6px 0 10px", fontSize: 26, fontWeight: 800,
             color: "#0f172a", lineHeight: 1.25, letterSpacing: "-.02em",
-          }}>{story.headline}</h2>
+          }}>{headline}</h2>
           {note && (
             <p style={{ margin: "0 0 10px", fontSize: 14, color: "#4b5563", lineHeight: 1.65, fontStyle: "italic" }}>
               {note}
             </p>
           )}
           <span style={{ fontSize: 12, fontWeight: 700, color: "#6366f1" }}>
-            {isHe ? "קרא את הכתבה ←" : "Read story →"}
+            {story.url.startsWith("/main/lens")
+              ? (isHe ? "לניתוח המלא ←" : "Read analysis →")
+              : (isHe ? "קרא את הכתבה ←" : "Read story →")}
           </span>
         </div>
       </a>
@@ -157,12 +165,14 @@ function LeadStory({ story, isHe }: { story: FeaturedStory; isHe: boolean }) {
 
 function Story({ story, isHe, showPhoto = true }: { story: FeaturedStory; isHe: boolean; showPhoto?: boolean }) {
   const note = isHe ? story.editorial_note_he : story.editorial_note;
+  const headline = isHe ? (story.headline_he || story.headline) : story.headline;
+  const img = safeImg(story.og_image);
   return (
     <a href={story.url} style={{ textDecoration: "none", display: "block" }}>
       <div dir={isHe ? "rtl" : "ltr"}>
-        {showPhoto && story.og_image && (
+        {showPhoto && img && (
           <div style={{ borderRadius: 5, overflow: "hidden", marginBottom: 10, background: "#f3f4f6" }}>
-            <img src={story.og_image} alt="" style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }} />
+            <img src={img} alt="" style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }} />
           </div>
         )}
         {story.vendor && (
@@ -171,7 +181,7 @@ function Story({ story, isHe, showPhoto = true }: { story: FeaturedStory; isHe: 
           </span>
         )}
         <h3 style={{ margin: "5px 0 8px", fontSize: 16, fontWeight: 700, color: "#0f172a", lineHeight: 1.35 }}>
-          {story.headline}
+          {headline}
         </h3>
         {note && (
           <p style={{ margin: "0 0 6px", fontSize: 12, color: "#6b7280", lineHeight: 1.6, fontStyle: "italic" }}>
@@ -179,7 +189,9 @@ function Story({ story, isHe, showPhoto = true }: { story: FeaturedStory; isHe: 
           </p>
         )}
         <span style={{ fontSize: 11, fontWeight: 600, color: "#6366f1" }}>
-          {isHe ? "קרא ←" : "Read →"}
+          {story.url.startsWith("/main/lens")
+            ? (isHe ? "לניתוח ←" : "Analysis →")
+            : (isHe ? "קרא ←" : "Read →")}
         </span>
       </div>
     </a>
@@ -327,7 +339,7 @@ function SidebarLenses({ lenses, isHe }: { lenses: Lens[]; isHe: boolean }) {
           const label = isHe ? lens.label_he : lens.label;
           const body  = isHe ? lens.body_he  : lens.body;
           return (
-            <a key={lens.id} href={`/home/lens?id=${lens.id}`} style={{ textDecoration: "none", display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <a key={lens.id} href={`/main/lens?id=${lens.id}`} style={{ textDecoration: "none", display: "flex", gap: 10, alignItems: "flex-start" }}>
               <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0, marginTop: 2 }}>{lens.icon}</span>
               <div>
                 <p style={{ margin: "0 0 2px", fontSize: 14, fontWeight: 700, color: "#0f172a", lineHeight: 1.3 }}>{label}</p>

@@ -198,6 +198,7 @@ def _build_community_catalog(days: list) -> dict:
                 "heat":     item.get("heat") or "",
                 "og_image": item.get("og_image") or "",
                 "body":     (item.get("body") or "")[:300],
+                "date":     day["_file_date"],
             }
         # Twitter trending (last 2 days only)
         if day["_file_date"] >= sorted([d["_file_date"] for d in days])[-2]:
@@ -216,6 +217,7 @@ def _build_community_catalog(days: list) -> dict:
                     "heat":     item.get("engagement") or "",
                     "og_image": "",
                     "body":     "",
+                    "date":     day["_file_date"],
                 }
     return catalog
 
@@ -430,18 +432,13 @@ def _validate_synthesis(synthesis: dict, story_cat: dict, community_cat: dict,
             "body":      lens.get("body", ""),
             "post_body": lens.get("post_body", ""),
         }
-        for field, cat, label in [
-            ("link_story_id",     story_cat,     "story"),
-            ("link_community_id", community_cat, "community"),
-            ("link_video_id",     video_cat,     "video"),
-            ("link_tool_id",      tool_cat,      "tool"),
-        ]:
-            val = lens.get(field, "")
-            if val:
-                if val in cat:
-                    clean[field] = val
-                else:
-                    warnings.append(f"  ⚠ Lens '{clean['id']}': {field}={val!r} not in catalog — dropped")
+        valid_source_ids = []
+        for src_id in (lens.get("source_ids") or []):
+            if src_id in story_cat or src_id in community_cat or src_id in video_cat or src_id in tool_cat:
+                valid_source_ids.append(src_id)
+            else:
+                warnings.append(f"  ⚠ Lens '{clean['id']}': source_id={src_id!r} not in any catalog — dropped")
+        clean["source_ids"] = valid_source_ids
         clean_lenses.append(clean)
     synthesis["lenses"] = clean_lenses
 
@@ -525,54 +522,60 @@ def _resolve_lens_links(lenses: list, story_cat: dict, community_cat: dict,
                          video_cat: dict, tool_cat: dict) -> list:
     resolved = []
     for lens in lenses:
-        links = []
-
-        sid = lens.get("link_story_id")
-        if sid and sid in story_cat:
-            v = story_cat[sid]
-            links.append({
-                "type":     "story",
-                "story_id": v["real_id"],
-                "url":      v["url"],
-                "label":    "Article",
-                "label_he": "כתבה",
-            })
-
-        cid = lens.get("link_community_id")
-        if cid and cid in community_cat:
-            v = community_cat[cid]
-            links.append({
-                "type":     "community",
-                "url":      v["url"],
-                "label":    v["source"] or "Community",
-                "label_he": "קהילה",
-            })
-
-        vid = lens.get("link_video_id")
-        if vid and vid in video_cat:
-            v = video_cat[vid]
-            links.append({
-                "type":     "video",
-                "url":      v["url"],
-                "label":    "Video",
-                "label_he": "וידאו",
-            })
-
-        tid = lens.get("link_tool_id")
-        if tid and tid in tool_cat:
-            v = tool_cat[tid]
-            links.append({
-                "type":     "tool",
-                "url":      v["url"] or f"/tools#{v['name'].lower().replace('/', '-')}",
-                "label":    f"⭐ {v['name']}",
-                "label_he": f"⭐ {v['name']}",
-            })
-
-        # Pull OG image from the linked story for visual richness
+        sources = []
         og_image = ""
-        sid = lens.get("link_story_id")
-        if sid and sid in story_cat:
-            og_image = story_cat[sid].get("og_image", "")
+
+        for src_id in (lens.get("source_ids") or []):
+            if src_id in story_cat:
+                v = story_cat[src_id]
+                if not og_image:
+                    og_image = v.get("og_image", "")
+                sources.append({
+                    "type":     "story",
+                    "story_id": v["real_id"],
+                    "url":      v["url"],
+                    "headline": v["headline"],
+                    "vendor":   v["vendor"],
+                    "date":     v["date"],
+                    "og_image": v["og_image"],
+                    "label":    v["headline"],
+                    "label_he": v["headline"],
+                })
+            elif src_id in community_cat:
+                v = community_cat[src_id]
+                sources.append({
+                    "type":         "community",
+                    "url":          v["url"],
+                    "headline":     v["headline"],
+                    "source_label": v["source"],
+                    "heat":         v["heat"],
+                    "date":         v.get("date", ""),
+                    "label":        v["source"] or "Community",
+                    "label_he":     "קהילה",
+                })
+            elif src_id in video_cat:
+                v = video_cat[src_id]
+                sources.append({
+                    "type":          "video",
+                    "url":           v["url"],
+                    "headline":      v["headline"],
+                    "channel":       v["channel"],
+                    "thumbnail":     v["thumbnail"],
+                    "duration_text": v["duration_text"],
+                    "label":         v["headline"],
+                    "label_he":      v["headline"],
+                })
+            elif src_id in tool_cat:
+                v = tool_cat[src_id]
+                sources.append({
+                    "type":        "tool",
+                    "url":         v["url"],
+                    "name":        v["name"],
+                    "source_type": v["source_type"],
+                    "stats":       v["stats"],
+                    "label":       v["name"],
+                    "label_he":    v["name"],
+                })
 
         resolved.append({
             "id":        lens.get("id", ""),
@@ -581,7 +584,7 @@ def _resolve_lens_links(lenses: list, story_cat: dict, community_cat: dict,
             "body":      lens.get("body", ""),
             "post_body": lens.get("post_body", ""),
             "og_image":  og_image,
-            "links":     links,
+            "sources":   sources,
         })
     return resolved
 
@@ -641,6 +644,7 @@ def _resolve_community_spotlight(spotlight: list, community_cat: dict) -> list:
             "source_url":   v["url"],
             "heat":         v["heat"],
             "og_image":     v["og_image"],
+            "date":         v.get("date", ""),
         })
     return resolved
 

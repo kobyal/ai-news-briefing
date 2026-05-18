@@ -23,7 +23,7 @@ EDITORIAL PRINCIPLES:
 
 6. JUICY. Would a smart, curious non-technical person forward this to a friend? If not, dig for the real angle.
 
-7. NEVER MISS THESE — scan explicitly for: funding rounds and valuations (a $30B raise changes the whole competitive picture), pricing wars (one lab cutting 67% forces every other lab's hand), legal rulings (copyright, antitrust, safety liability), direct head-to-head competition between labs (Anthropic vs OpenAI Codex on agent coding, Google vs everyone on search AI), and government bets (sovereign funds, national AI initiatives, grid bills). These are the stories readers will forward.
+7. NEVER MISS THESE — scan explicitly for: funding rounds and valuations (a $30B raise changes the whole competitive picture), pricing wars (one lab cutting 67% forces every other lab's hand), legal rulings (copyright, antitrust, safety liability), direct head-to-head competition between labs (Anthropic vs OpenAI Codex on agent coding, Google vs everyone on search AI), government bets (sovereign funds, national AI initiatives, grid bills), and SECURITY/SAFETY INCIDENTS across ALL labs — if one lab has a jailbreak or model exploit story AND another lab has a separate security incident in the same week, cover BOTH. Never let one lab's security story crowd out another's.
 
 OUTPUT: Return valid JSON only. No markdown fences. No preamble."""
 
@@ -49,7 +49,7 @@ Synthesize the above into a rich editorial package. Rules:
 - theme.body: 3 paragraphs, editorial prose, NO bullets, references only items in this catalog
 - lenses[*].body: 2-sentence teaser only
 - lenses[*].post_body: 4-5 paragraph BLOG POST for this lens. Journalistic, opinionated, specific. Opens with a hook, develops the argument across paragraphs, ends with implication. Longer and richer than body. Every fact must trace to the catalog.
-- lenses[*].link_*_id: use ONLY IDs from the catalog above, or omit
+- lenses[*].source_ids: list ALL catalog items that are relevant to this lens. Aim for 5-15 items. Stories first (S-IDs), then community (C-IDs), then videos (V-IDs), then tools (T-IDs). More is better — include every item that genuinely supports the analysis. Use ONLY IDs from the catalog above.
 - featured_stories: pick 5-6 story S-IDs that best illustrate the week's theme. Write 1 compelling editorial_note per story (15-25 words) — why THIS story stands out this specific week. MUST include: any major funding round, valuation milestone, market move, or competitive threat (e.g. a $30B raise, a pricing cut forcing a competitor's hand). These are the stories readers will regret missing.
 - theme_refs: pick 5-8 story or community IDs that are directly cited or implied in your theme body text. These become clickable inline references. Include: at least 1 finance/business story if one exists, at least 1 community reaction (HN/Reddit/Twitter), and the most important technical story.
 - community_spotlight: pick 3-4 community C-IDs with the highest reader engagement / heat. These are the items real humans are actually reacting to.
@@ -75,12 +75,9 @@ Return a single JSON object:
       "label": "2-4 word angle name",
       "body": "2 sentences. Sentence 1: what is happening in this angle. Sentence 2: what is at stake.",
       "post_body": "4-5 paragraphs of blog-post prose for this lens angle. Open with a hook. Build the argument. Close with implication. 400-600 words. Only reference events from the catalog.",
-      "link_story_id": "S-ID of the most relevant story, or omit if none fits",
-      "link_community_id": "C-ID of the most relevant community item, or omit",
-      "link_video_id": "V-ID of the most relevant video, or omit",
-      "link_tool_id": "T-ID of the most relevant tool, or omit"
+      "source_ids": ["S-ID", "S-ID", "C-ID", "V-ID", "T-ID"]
     }},
-    ... (exactly 3 lenses, each covering a genuinely different angle)
+    ... (3 to 6 lenses total. Use 3 when the week has one dominant theme. Use 4-6 when distinct patterns emerge across different domains — e.g., a pricing story, a security story, a geopolitical story, and an infrastructure story each deserve their own lens. Never force-combine genuinely different patterns into one lens just to hit a low count.)
   ],
   "featured_stories": [
     {{
@@ -123,6 +120,7 @@ Rules:
 - Headlines: short, punchy, Israeli news style — not academic. "מלחמת הקיבולת" not "מלחמות הקיבולת משרטטות מחדש כל ברית"
 - Body text: journalistic prose, present tense where appropriate, active voice
 - Preserve editorial sharpness: opinions, specific claims, irreverent tone
+- CRITICAL — do NOT translate technical metaphors literally. "Lock-in" → "נעילה לספק" (not "נעילה לענן יחיד"). "Stack" → "מחסנית" is OK but "designed so customers never have to leave" → "שלא נותנת ללקוחות סיבה לעזוב" (natural Hebrew logic, not calque). When in doubt, rewrite the sentence in Hebrew from scratch rather than translate word-by-word.
 - RTL flow is assumed; English terms stay LTR inline
 
 Return ONLY a JSON object with the translated fields. No markdown. No explanation."""

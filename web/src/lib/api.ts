@@ -161,3 +161,11 @@ export function searchIndex(items: SearchResult[], q: string, isHe = false, limi
   }
   return matches;
 }
+
+export async function fetchEditorial(): Promise<Record<string, unknown> | null> {
+  // Try local-relative path first (dev server + local-only editorial),
+  // fall back to CDN if not available (future: once editorial.json is on S3).
+  const local = await safeFetch<Record<string, unknown>>(`/data/editorial.json`);
+  if (local) return local;
+  return safeFetch<Record<string, unknown>>(`${API}/data/editorial.json`);
+}

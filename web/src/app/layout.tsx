@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { LangProvider } from "@/context/LangContext";
 import { SwipeNavigator } from "@/components/SwipeNavigator";
+
+const GA_ID = "G-9XQE5GN7FT";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const spaceGrotesk = Space_Grotesk({
@@ -19,7 +22,14 @@ export const metadata: Metadata = {
   // showing the CloudFront origin (d2p40aowelo4td.cloudfront.net) when the
   // user shared an aibriefing.dev/story?id=… link — they fall back to the
   // origin URL when no og:url / canonical is present.
-  alternates: { canonical: "/" },
+  alternates: {
+    canonical: "/",
+    languages: {
+      "en": "https://aibriefing.dev/",
+      "he": "https://aibriefing.dev/",
+      "x-default": "https://aibriefing.dev/",
+    },
+  },
   openGraph: {
     title: "AI Briefing — Daily AI Intelligence",
     description: "Your daily digest of AI news from Anthropic, OpenAI, Google, and more",
@@ -43,6 +53,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+        <Script id="ga4-init" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', '${GA_ID}');
+        `}</Script>
+      </head>
       <body className={`${inter.variable} ${spaceGrotesk.variable} ${inter.className} min-h-screen flex flex-col`}>
         <LangProvider>
           <SwipeNavigator />

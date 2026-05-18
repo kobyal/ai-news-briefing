@@ -60,7 +60,14 @@ export async function generateMetadata(
     return {
       title: headline,
       description: summary,
-      alternates: { canonical: url },
+      alternates: {
+        canonical: url,
+        languages: {
+          "en": url,
+          "he": url,
+          "x-default": url,
+        },
+      },
       openGraph: {
         title: headline,
         description: summary,
@@ -85,5 +92,38 @@ export default async function StoryPage(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  return <StoryClient id={id} />;
+  const story = (() => {
+    try {
+      const idx = loadIndex();
+      return (idx.stories || []).find((s) => s.story_id === id) ?? null;
+    } catch { return null; }
+  })();
+
+  const jsonLd = story ? {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    "headline": story.headline ?? "AI Briefing",
+    "description": (story.summary ?? "").slice(0, 280),
+    "url": `https://aibriefing.dev/story/${id}/`,
+    "datePublished": story.date ? `${story.date}T00:00:00Z` : undefined,
+    "image": (story.og_image || "https://aibriefing.dev/og.png")
+      .replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/"),
+    "publisher": {
+      "@type": "Organization",
+      "name": "AI Briefing",
+      "url": "https://aibriefing.dev",
+    },
+  } : null;
+
+  return (
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      <StoryClient id={id} />
+    </>
+  );
 }

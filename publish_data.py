@@ -1844,6 +1844,10 @@ if _pending_tldr_indices:
         _it.pop("_merger_idx", None)
 
 
+for _it in _news_items:
+    if not _it.get("story_id"):
+        _it["story_id"] = _story_id_hash(_it)
+
 published = {
     "date":        date_str,
     "briefing":    _briefing,

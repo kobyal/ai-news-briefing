@@ -52,7 +52,15 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
     res = { date: d, stories: staticBriefing.news_items as NewsItem[] };
   }
   if (!res || !res.stories || !res.stories.length) return null;
-  const stories = res.stories;
+  // Derive story_id from audio URL for static-JSON items that lack it
+  // (static JSON didn't include story_id until 2026-05-18; Lambda path always has it)
+  const stories = res.stories.map((s) => {
+    if (s.story_id) return s;
+    const raw = s as unknown as Record<string, string>;
+    const audioUrl = raw.summary_audio_url || raw.detail_audio_url || "";
+    const m = audioUrl.match(/story_([a-f0-9]{12})_/);
+    return m ? { ...s, story_id: m[1] } : s;
+  });
   // Aggregates (tldr, community_pulse_items, top_reddit, twitter, …) are frozen
   // per-story at ingest time; stories[0] can be from an earlier preserved run
   // with stale aggregates, so pick the freshest by ingested_at instead.

@@ -562,6 +562,7 @@ def _resolve_lens_links(lenses: list, story_cat: dict, community_cat: dict,
                     "channel":       v["channel"],
                     "thumbnail":     v["thumbnail"],
                     "duration_text": v["duration_text"],
+                    "date":          v.get("date", ""),
                     "label":         v["headline"],
                     "label_he":      v["headline"],
                 })

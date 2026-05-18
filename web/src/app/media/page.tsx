@@ -798,7 +798,7 @@ function DayMediaBlock({ data, isHe, includeTopVideos = false }: { data: DayData
             count={isHe ? `${restVideosBelow.length} סרטונים` : `${restVideosBelow.length} videos`}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {restVideosBelow.slice(0, 6).map((v) => (
+            {restVideosBelow.map((v) => (
               <VideoCard key={videoUrl(v)} video={v} />
             ))}
           </div>
@@ -1077,7 +1077,7 @@ function MediaPageInner() {
               label={formatOlderDayLabel(day.date, data.date, isHe)}
               sublabel={day.date}
             />
-            <DayMediaBlock data={day.data} isHe={isHe} />
+            <DayMediaBlock data={day.data} isHe={isHe} includeTopVideos />
           </section>
         ))}
 

@@ -823,6 +823,7 @@ function MediaPageInner() {
   const [loading, setLoading] = useState(true);
   const [showAllChannels, setShowAllChannels] = useState(false);
   const [showAllVideos, setShowAllVideos] = useState(false);
+  const [showAllPodcasts, setShowAllPodcasts] = useState(false);
   const [olderDays, setOlderDays] = useState<OlderMediaDay[]>([]);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [podcastMeta, setPodcastMeta] = useState<Record<string, PodcastMeta>>({});
@@ -960,6 +961,7 @@ function MediaPageInner() {
   const podChannels = CHANNELS.filter((c) => c.platform === "spotify");
   const visibleChannels = showAllChannels ? ytChannels : ytChannels.slice(0, 6);
   const visibleVideos = showAllVideos ? restVideosBelow : restVideosBelow.slice(0, 6);
+  const visiblePodcasts = showAllPodcasts ? podChannels : podChannels.slice(0, 6);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-base)" }}>
@@ -1052,9 +1054,20 @@ function MediaPageInner() {
           iconChar="🎙"
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {podChannels.map((c) => (
+          {visiblePodcasts.map((c) => (
             <PodCard key={c.url} channel={c} isHe={isHe} meta={podcastMeta[c.url]} />
           ))}
+          {podChannels.length > 6 && (
+            <ShowMoreButton
+              open={showAllPodcasts}
+              onClick={() => setShowAllPodcasts(!showAllPodcasts)}
+              label={
+                showAllPodcasts
+                  ? (isHe ? "הצג פחות" : "Show less")
+                  : (isHe ? `הצג את כל ${podChannels.length} הפודקאסטים` : `Show all ${podChannels.length} podcasts`)
+              }
+            />
+          )}
         </div>
 
         {/* ── INFINITE SCROLL: OLDER DAYS' PICKS ──────────── */}

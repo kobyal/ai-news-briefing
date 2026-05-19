@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { Logo } from "@/components/layout/Logo";
 import { Header } from "@/components/layout/Header";
 import { useLang } from "@/context/LangContext";
 
@@ -36,30 +34,30 @@ const EN = {
 
 const HE = {
   title: "אודות",
-  intro: "AI Briefing הוא שירות מודיעין יומי למפתחים, מייסדים, משקיעים ומנהלי טכנולוגיה שעוקבים אחר תעשיית ה-AI.",
-  coverageTitle: "מה אנחנו מכסים",
-  coverageBody: "כל המערכת האקולוגית של ה-AI — לא רק המעבדות הגדולות. שחרורי מודלים ובנצ'מארקים, סבבי גיוס והערכות שווי, התפתחויות רגולטוריות ומשפטיות, שחרורי קוד פתוח, תגובות הקהילה, תשתיות ושבבים, פריסות ארגוניות ואירועי אבטחה. אם זה מניע את תעשיית ה-AI קדימה (או אחורה) — זה בבריפינג.",
+  intro: "AI Briefing הוא הבריפינג היומי לאנשי AI — מפתחים, מייסדים, משקיעים ומנהלים שרוצים להישאר בחזית.",
+  coverageTitle: "מה מכסים",
+  coverageBody: "את כל תעשיית ה-AI, לא רק הנפשות הגדולות. שחרורי מודלים ובנצ'מרקים, סבבי גיוס, רגולציה ומשפט, קוד פתוח, מה שהקהילה מדברת עליו, חומרה ותשתיות, פריסות ארגוניות ואירועי אבטחה. אם זה זז בתעשייה — זה אצלנו.",
   principlesTitle: "עקרונות עריכה",
   principles: [
-    { bold: "לא קשור לספק אחד.", text: " אנו מכסים את כל המערכת האקולוגית — מעבדות, תשתיות, מדיניות והתעשיות שנמצאות בשיבוש." },
-    { bold: "לא מונחה הודעות לעיתונות.", text: " אנחנו מסתכלים מעבר להכרזה לדינמיקה הבסיסית." },
-    { bold: "משוקלל קהילה.", text: " נקודות HN גבוהות, upvotes ב-Reddit ומעורבות ויראלית הם אותות חזקים שמשהו באמת חשוב." },
-    { bold: "מבוסס.", text: " כל טענה חוזרת למקור אמיתי. אין ספקולציות בדמות עובדות." },
-    { bold: "דו-לשוני.", text: " מהדורות מלאות באנגלית ועברית, כל יום." },
+    { bold: "לא נעולים על ספק אחד.", text: " מכסים את כל התמונה — מעבדות, תשתיות, מדיניות והתעשיות שה-AI משנה." },
+    { bold: "לא הודעות לעיתונות.", text: " מסתכלים על מה שמאחורי ההכרזה." },
+    { bold: "מונחים על ידי הקהילה.", text: " כשמשהו מתפוצץ ב-HN או Reddit — זה לרוב הסיפור האמיתי." },
+    { bold: "מבוסס על עובדות.", text: " כל טענה חוזרת למקור. אין ספקולציות." },
+    { bold: "דו-לשוני.", text: " עברית ואנגלית, כל יום." },
   ],
-  contentsTitle: "מה כולל כל בריפינג",
+  contentsTitle: "מה תמצאו בכל בריפינג",
   contents: [
-    { bold: "כתבות", text: " — חדשות ה-AI החשובות ביותר של היום עם תקצירים עריכתיים" },
-    { bold: "דופק הקהילה", text: " — תגובות מובילות ב-HN, Reddit וטוויטר" },
+    { bold: "כתבות", text: " — הכתבות החשובות של היום עם תקציר עריכתי" },
+    { bold: "קהילה", text: " — מה שבוער ב-HN, Reddit וטוויטר" },
     { bold: "מדיה", text: " — סרטונים נבחרים ממעבדות, חוקרים ויוצרים" },
-    { bold: "כלים פופולריים", text: " — ספריות AI ו-repos ב-GitHub עם הכי הרבה כוכבים" },
-    { bold: "מאמר מערכת שבועי", text: " — ניתוח מעמיק של הנושא המגדיר של השבוע" },
+    { bold: "כלים", text: " — ספריות ו-repos שצוברים כוכבים" },
+    { bold: "מאמר שבועי", text: " — ניתוח מעמיק של הנושא שהגדיר את השבוע" },
   ],
   creatorTitle: "יוצר",
   creatorName: "קובי אלמוג",
-  creatorBio: "מוביל טכנולוגי AI מישראל. בנה את AI Briefing כדי לחתוך את הרעש של מחזור חדשות ה-AI היומי ולחשוף את מה שבאמת חשוב — לבונים, לא לצופים מן הצד.",
+  creatorBio: "מוביל טכנולוגי AI מישראל. בנה את AI Briefing כדי לסנן את הרעש מחדשות ה-AI ולהגיע רק למה שבאמת חשוב.",
   machineTitle: "למערכות AI",
-  machineIndex: "אינדקס אתר קריא-מכונה:",
+  machineIndex: "אינדקס קריא-מכונה:",
   machineSitemap: "מפת אתר:",
 };
 
@@ -75,12 +73,9 @@ export default function AboutPage() {
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "48px 24px 96px" }}>
 
         {/* Hero */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 40 }}>
-          <Logo size={32} />
-          <h1 style={{ fontSize: 32, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1.1, color: "#0f0f1a", margin: 0 }}>
-            {t.title}
-          </h1>
-        </div>
+        <h1 style={{ fontSize: 32, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1.1, color: "#0f0f1a", margin: "0 0 20px" }}>
+          {t.title}
+        </h1>
 
         <p style={{ fontSize: 17, color: "#3d3d5a", lineHeight: 1.75, margin: "0 0 48px", borderBottom: "1px solid var(--border-default)", paddingBottom: 40 }}>
           {t.intro}
@@ -95,7 +90,6 @@ export default function AboutPage() {
             borderRadius: 16, padding: "20px 24px",
             flexDirection: isHe ? "row-reverse" : "row",
           }}>
-            {/* Avatar */}
             <div style={{
               width: 64, height: 64, borderRadius: "50%", flexShrink: 0,
               background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",

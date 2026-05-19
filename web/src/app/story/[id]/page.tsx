@@ -109,6 +109,7 @@ export default async function StoryPage(
         "description": (story.summary ?? "").slice(0, 280),
         "url": storyUrl,
         "datePublished": story.date ? `${story.date}T00:00:00Z` : undefined,
+        "dateModified": story.date ? `${story.date}T00:00:00Z` : undefined,
         "image": (story.og_image || "https://aibriefing.dev/og.png")
           .replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/"),
         "author": {

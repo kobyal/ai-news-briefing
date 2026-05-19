@@ -18,11 +18,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const allStories = [...(index.stories ?? []), ...(index.extras ?? [])];
 
   const staticPages: MetadataRoute.Sitemap = [
-    { url: base, changeFrequency: "daily", priority: 1.0 },
-    { url: `${base}/stories`, changeFrequency: "daily", priority: 0.9 },
-    { url: `${base}/media`, changeFrequency: "weekly", priority: 0.7 },
-    { url: `${base}/archive`, changeFrequency: "weekly", priority: 0.6 },
-    { url: `${base}/search`, changeFrequency: "monthly", priority: 0.5 },
+    { url: base,                         changeFrequency: "daily",   priority: 1.0 },
+    { url: `${base}/stories`,            changeFrequency: "daily",   priority: 0.9 },
+    { url: `${base}/main`,               changeFrequency: "daily",   priority: 0.9 },
+    { url: `${base}/community`,          changeFrequency: "daily",   priority: 0.8 },
+    { url: `${base}/tools`,              changeFrequency: "daily",   priority: 0.7 },
+    { url: `${base}/media`,              changeFrequency: "weekly",  priority: 0.7 },
+    { url: `${base}/archive`,            changeFrequency: "weekly",  priority: 0.6 },
+    { url: `${base}/search`,             changeFrequency: "monthly", priority: 0.5 },
   ];
 
   const storyPages: MetadataRoute.Sitemap = allStories.map((s) => ({

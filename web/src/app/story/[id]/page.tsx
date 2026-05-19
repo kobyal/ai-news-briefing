@@ -111,6 +111,11 @@ export default async function StoryPage(
         "datePublished": story.date ? `${story.date}T00:00:00Z` : undefined,
         "image": (story.og_image || "https://aibriefing.dev/og.png")
           .replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/"),
+        "author": {
+          "@type": "Organization",
+          "name": "AI Briefing",
+          "url": "https://aibriefing.dev",
+        },
         "publisher": {
           "@type": "Organization",
           "name": "AI Briefing",

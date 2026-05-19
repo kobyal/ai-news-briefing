@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useLang } from "@/context/LangContext";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
@@ -114,7 +115,7 @@ export function Header({ date }: HeaderProps) {
             </div>
 
             {/* Center: logo + wordmark */}
-            <a
+            <Link
               href="/"
               className="flex items-center gap-2.5 shrink-0 group"
               dir="ltr"
@@ -134,7 +135,7 @@ export function Header({ date }: HeaderProps) {
               >
                 Briefing
               </span>
-            </a>
+            </Link>
 
             {/* Right: language toggle */}
             <div className="flex items-center justify-end shrink-0" style={{ flexBasis: 0, flexGrow: 1 }}>
@@ -182,7 +183,7 @@ export function Header({ date }: HeaderProps) {
             {navItems.map((item) => {
               const active = isActive(item.href);
               return (
-                <a
+                <Link
                   key={item.href}
                   href={item.href}
                   className="relative px-3 py-1 transition-all"
@@ -208,7 +209,7 @@ export function Header({ date }: HeaderProps) {
                       }}
                     />
                   )}
-                </a>
+                </Link>
               );
             })}
           </nav>
@@ -232,7 +233,7 @@ export function Header({ date }: HeaderProps) {
               {navItems.map((item) => {
                 const active = isActive(item.href);
                 return (
-                  <a
+                  <Link
                     key={item.href}
                     href={item.href}
                     className="px-2 py-1 whitespace-nowrap"
@@ -246,7 +247,7 @@ export function Header({ date }: HeaderProps) {
                     }}
                   >
                     {item.label}
-                  </a>
+                  </Link>
                 );
               })}
             </nav>

@@ -35,6 +35,7 @@ async function safeFetch<T>(url: string): Promise<T | null> {
 
 export async function fetchDayData(date?: string): Promise<DayData | null> {
   const d = date || new Date().toISOString().split("T")[0];
+  if (_dayDataCache[d]) return _dayDataCache[d];
   // Try static S3 JSON first (fast path — no Lambda cold start)
   let res = await safeFetch<{ date: string; stories: NewsItem[] }>(`${API}/data/${d}.json`);
   // Extract static JSON aggregates BEFORE res is overwritten by Lambda response.
@@ -80,7 +81,7 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
   const sbhe = (staticDoc.briefing_he as Record<string, unknown>) || {};
   const sd   = staticDoc;
   const s0r  = s0 as unknown as Record<string, unknown>;
-  return {
+  const result: DayData = {
     date: d,
     stories,
     tldr: ((sb.tldr as string[])?.length ? sb.tldr as string[] : null) ?? s0.tldr ?? [],
@@ -109,6 +110,8 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
     twitter_descs_he: (sbhe.twitter_descs_he as DayData["twitter_descs_he"]) || (s0r.twitter_descs_he as DayData["twitter_descs_he"]),
     youtube_descs_he: (sbhe.youtube_descs_he as DayData["youtube_descs_he"]) || (s0r.youtube_descs_he as DayData["youtube_descs_he"]),
   };
+  _dayDataCache[d] = result;
+  return result;
 }
 
 export async function fetchArchive(): Promise<string[]> {
@@ -158,6 +161,7 @@ interface SearchIndexPayload {
 }
 
 let _searchIndexCache: SearchResult[] | null = null;
+const _dayDataCache: Record<string, DayData> = {};
 
 /** Fetch the pre-built search index from S3 (CDN-cached). One-time download
  *  per session; cached in module scope so the search page can filter

@@ -66,14 +66,18 @@ def agent(
         "--effort", _cc_effort(),
     ]
 
-    # Strip Claude Code parent-session env vars before spawning. When the
-    # parent process is a Claude Code session, CLAUDECODE=1 and CLAUDE_CODE_*
-    # are inherited and cause the child `claude -p` to switch to API-key auth
-    # instead of OAuth/subscription auth, which then fails with "credit balance
-    # too low" even though the subscription is valid.
-    _STRIP_PREFIX = ("CLAUDE_CODE_", "CLAUDECODE", "ANTHROPIC_API_KEY")
-    child_env = {k: v for k, v in os.environ.items()
-                 if not any(k == p or k.startswith(p) for p in _STRIP_PREFIX)}
+    # Strip session-specific Claude Code env vars before spawning so the child
+    # `claude -p` uses OAuth/subscription auth instead of being confused by
+    # the parent session's context (which causes "credit balance too low").
+    # CLAUDE_CODE_USE_BEDROCK / CLAUDE_CODE_USE_VERTEX are intentionally kept
+    # so Bedrock/Vertex deployments still work in the child process.
+    _STRIP_EXACT = {
+        "CLAUDECODE",           # marks process as inside a CC session
+        "CLAUDE_CODE_SSE_PORT", # parent session's SSE server port
+        "CLAUDE_CODE_ENTRYPOINT",
+        "ANTHROPIC_API_KEY",    # zero-credit key overrides subscription auth
+    }
+    child_env = {k: v for k, v in os.environ.items() if k not in _STRIP_EXACT}
 
     t0 = time.time()
     try:

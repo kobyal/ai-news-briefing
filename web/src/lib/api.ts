@@ -44,7 +44,7 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
   const staticCpi = staticBriefing.community_pulse_items as DayData["community_pulse_items"] || [];
   // Prefer static JSON's twitter over Lambda per-story twitter. The static JSON
   // may have twitter at the top level (res.twitter) rather than under briefing.
-  const staticTwitter = (staticBriefing.twitter || (res as unknown as Record<string, unknown>).twitter) as DayData["twitter"] | undefined;
+  const staticTwitter = (staticBriefing.twitter || (res as unknown as Record<string, unknown>)?.twitter) as DayData["twitter"] | undefined;
   // Fall back to Lambda API if static file not yet available
   if (!res || !res.stories || !res.stories.length) {
     res = await safeFetch<{ date: string; stories: NewsItem[] }>(`${API}/api/stories?date=${d}`);

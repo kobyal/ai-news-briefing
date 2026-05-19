@@ -120,8 +120,28 @@ Rules:
 - Headlines: short, punchy, Israeli news style — not academic. "מלחמת הקיבולת" not "מלחמות הקיבולת משרטטות מחדש כל ברית"
 - Body text: journalistic prose, present tense where appropriate, active voice
 - Preserve editorial sharpness: opinions, specific claims, irreverent tone
-- CRITICAL — do NOT translate technical metaphors literally. "Lock-in" → "נעילה לספק" (not "נעילה לענן יחיד"). "Stack" → "מחסנית" is OK but "designed so customers never have to leave" → "שלא נותנת ללקוחות סיבה לעזוב" (natural Hebrew logic, not calque). When in doubt, rewrite the sentence in Hebrew from scratch rather than translate word-by-word.
-- RTL flow is assumed; English terms stay LTR inline
+- CRITICAL — do NOT translate technical metaphors literally. "Lock-in" → "נעילה לספק". "Stack" → "מחסנית" is OK. When in doubt, rewrite the sentence in Hebrew from scratch rather than translate word-by-word.
+- NEVER write "קומפיוט" — write "כוח מחשוב" or "מחשוב" instead.
+- RTL flow is assumed; English terms stay LTR inline.
+
+CRITICAL RULE FOR SHORT LABELS (theme headline, lens labels — 2–6 word phrases):
+These are editorial BRAND NAMES, not sentences to translate. For each short label, ask yourself: "what is the underlying drama, tension, or conflict here?" then write a punchy Israeli news phrase that captures THAT — not the English words.
+
+BAD vs GOOD examples (learn from these):
+✗ "The Compute Realignment"  →  "היערכות מחדש של הקומפיוט"   ← literal + ugly
+✓ "The Compute Realignment"  →  "מי ישלוט בכוח המחשוב?"  or  "מחשוב מסדר שורות מחדש"
+
+✗ "The Security Storm"  →  "סופת האבטחה"   ← direct calque, no punch
+✓ "The Security Storm"  →  "גל המתקפות" or "האינטרנט תחת מצור"
+
+✗ "The Labor Shock Arrives"  →  "זעזוע התעסוקה מגיע"   ← stilted and academic
+✓ "The Labor Shock Arrives"  →  "שוק העבודה בפני מהפכה"  or  "AI דופק על דלת העובדים"
+
+✗ "Capital Eats Capability"  →  "ההון בולע את היכולת"   ← acceptable but flat
+✓ "Capital Eats Capability"  →  "כשכסף מנצח טכנולוגיה"  or  "ההון קובע מי מוביל"
+
+✗ "Exclusivity is dead"  →  "הבלעדיות מתה"   ← too literal, no urgency
+✓ "Exclusivity is dead"  →  "שוק מחשוב פתוח לכולם"  or  "נפל חומת הבלעדיות"
 
 Return ONLY a JSON object with the translated fields. No markdown. No explanation."""
 

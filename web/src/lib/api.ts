@@ -37,14 +37,15 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
   const d = date || new Date().toISOString().split("T")[0];
   // Try static S3 JSON first (fast path — no Lambda cold start)
   let res = await safeFetch<{ date: string; stories: NewsItem[] }>(`${API}/data/${d}.json`);
-  // Extract static JSON aggregates before res may be overwritten by Lambda response.
-  // Static JSON uses briefing.{community_pulse_items,news_items,tldr,...};
-  // Lambda response nests aggregates per-story.
+  // Extract static JSON aggregates BEFORE res is overwritten by Lambda response.
+  // Static JSON: briefing.{tldr,community_pulse,news_items,...} + top-level {twitter,youtube,github,...}
+  // Lambda: per-story embedding of all aggregates. When Lambda returns null we
+  // synthesise stories from news_items — those bare items carry no aggregates,
+  // so we must read aggregates from the static JSON instead.
   const staticBriefing = ((res as unknown as Record<string, unknown>)?.briefing as Record<string, unknown>) || {};
+  const staticDoc     = (res as unknown as Record<string, unknown>) || {};
   const staticCpi = staticBriefing.community_pulse_items as DayData["community_pulse_items"] || [];
-  // Prefer static JSON's twitter over Lambda per-story twitter. The static JSON
-  // may have twitter at the top level (res.twitter) rather than under briefing.
-  const staticTwitter = (staticBriefing.twitter || (res as unknown as Record<string, unknown>)?.twitter) as DayData["twitter"] | undefined;
+  const staticTwitter = (staticBriefing.twitter || staticDoc.twitter) as DayData["twitter"] | undefined;
   // Fall back to Lambda API if static file not yet available
   if (!res || !res.stories || !res.stories.length) {
     res = await safeFetch<{ date: string; stories: NewsItem[] }>(`${API}/api/stories?date=${d}`);
@@ -72,33 +73,35 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
     const b = (s as unknown as Record<string, string>).ingested_at || "";
     return b > a ? s : acc;
   }, stories[0]);
+  // Prefer static JSON aggregates over Lambda per-story; fall back to s0 when absent.
+  const sb = staticBriefing;
+  const sd = staticDoc;
+  const s0r = s0 as unknown as Record<string, unknown>;
   return {
     date: d,
     stories,
-    tldr: s0.tldr || [],
-    tldr_he: s0.tldr_he || [],
-    tldr_audio_url:    (s0 as unknown as Record<string, string>).tldr_audio_url || undefined,
-    tldr_audio_url_he: (s0 as unknown as Record<string, string>).tldr_audio_url_he || undefined,
-    bullet_story_ids:  (s0 as unknown as Record<string, unknown>).bullet_story_ids as string[] | undefined,
-    community_pulse: s0.community_pulse || "",
-    community_pulse_he: s0.community_pulse_he || "",
-    community_urls: s0.community_urls || [],
+    tldr: ((sb.tldr as string[])?.length ? sb.tldr as string[] : null) ?? s0.tldr ?? [],
+    tldr_he: ((sb.tldr_he as string[])?.length ? sb.tldr_he as string[] : null) ?? s0.tldr_he ?? [],
+    tldr_audio_url:    (sb.tldr_audio_url as string) || (s0r.tldr_audio_url as string) || undefined,
+    tldr_audio_url_he: (sb.tldr_audio_url_he as string) || (s0r.tldr_audio_url_he as string) || undefined,
+    bullet_story_ids:  (sb.bullet_story_ids as string[]) ?? (s0r.bullet_story_ids as string[] | undefined),
+    community_pulse: (sb.community_pulse as string) || s0.community_pulse || "",
+    community_pulse_he: (sb.community_pulse_he as string) || s0.community_pulse_he || "",
+    community_urls: (sb.community_urls as DayData["community_urls"]) || s0.community_urls || [],
     trending_topics: s0.trending_topics || [],
     people_highlights: s0.people_highlights || [],
-    people_highlights_he: (s0 as unknown as Record<string, unknown>).people_highlights_he as DayData["people_highlights_he"] || [],
+    people_highlights_he: (s0r.people_highlights_he as DayData["people_highlights_he"]) || [],
     community_pulse_items: staticCpi.length > 0
       ? staticCpi
-      : ((s0 as unknown as Record<string, unknown>).community_pulse_items as DayData["community_pulse_items"]) || [],
-    community_pulse_items_he: (s0 as unknown as Record<string, unknown>).community_pulse_items_he as DayData["community_pulse_items_he"] || [],
+      : (s0r.community_pulse_items as DayData["community_pulse_items"]) || [],
+    community_pulse_items_he: (s0r.community_pulse_items_he as DayData["community_pulse_items_he"]) || [],
     top_reddit: s0.top_reddit || [],
-    youtube: filterYoutubeByLanguage((s0 as unknown as Record<string, unknown>).youtube) as DayData["youtube"] || [],
-    youtube_channel_latest: ((s0 as unknown as Record<string, unknown>).youtube_channel_latest as DayData["youtube_channel_latest"]) || [],
-    github: (s0 as unknown as Record<string, unknown>).github as DayData["github"] || [],
-    twitter: (staticTwitter !== undefined
-      ? staticTwitter
-      : (s0 as unknown as Record<string, unknown>).twitter) as DayData["twitter"] || [],
-    twitter_descs_he: (s0 as unknown as Record<string, unknown>).twitter_descs_he as DayData["twitter_descs_he"],
-    youtube_descs_he: (s0 as unknown as Record<string, unknown>).youtube_descs_he as DayData["youtube_descs_he"],
+    youtube: filterYoutubeByLanguage((sd.youtube || s0r.youtube) as unknown) as DayData["youtube"] || [],
+    youtube_channel_latest: ((sd.youtube_channel_latest || s0r.youtube_channel_latest) as DayData["youtube_channel_latest"]) || [],
+    github: ((sd.github || s0r.github) as DayData["github"]) || [],
+    twitter: (staticTwitter !== undefined ? staticTwitter : s0r.twitter) as DayData["twitter"] || [],
+    twitter_descs_he: (s0r.twitter_descs_he as DayData["twitter_descs_he"]),
+    youtube_descs_he: (s0r.youtube_descs_he as DayData["youtube_descs_he"]),
   };
 }
 

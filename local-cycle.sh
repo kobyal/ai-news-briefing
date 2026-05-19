@@ -240,18 +240,41 @@ echo "[3/6] Building docs/data/${DATE}.json (publish_data.py)..."
 "$PYTHON_BIN" publish_data.py
 
 # Refresh static side-data the ingest lambda doesn't (yet) build:
+#   - docs/data/${DATE}.json    (daily briefing — must be on S3 so frontend can
+#     serve it without Lambda; also ensures static aggregates override Lambda's
+#     per-story copies which may omit fields like tldr, twitter, etc.)
+#   - docs/data/archive.json   (date list for the archive page)
 #   - docs/data/podcasts.json   (iTunes Search + RSS, scripts/fetch_podcasts.py)
 #   - docs/data/search-index.json (handler.py code lives in this repo but
 #     until CDK redeploys, the deployed lambda still emits stories-only.
 #     /tmp/build_search_index.py expands to videos/repos/community/reddit/X.)
-# Both are uploaded directly to S3 + a targeted CF invalidation because the
+# All are uploaded directly to S3 + a targeted CF invalidation because the
 # S3 sync excludes data/* (see reference_frontend_deploy.md DANGER warning).
 # Established 2026-05-11. fail-soft: never blocks the email path.
 echo
-echo "[3b/6] Refreshing podcasts.json + search-index.json on S3..."
+echo "[3b/6] Uploading daily data JSON + refreshing side-data on S3..."
 S3_BUCKET="ai-news-briefing-web2"
 S3_PROFILE="koby-personal"
 CF_DIST="E1TSW76SSEILK4"
+# Upload today's briefing JSON — critical: must happen before editorial/frontend
+# so the live site serves fresh data even if later steps fail.
+aws s3 cp "docs/data/${DATE}.json" "s3://${S3_BUCKET}/data/${DATE}.json" \
+  --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
+  --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
+  && echo "  ✓ ${DATE}.json uploaded to S3" \
+  || echo "  ⚠ ${DATE}.json S3 upload failed"
+# Upload archive.json so the archive page date list stays current
+if [ -f docs/data/archive.json ]; then
+  aws s3 cp docs/data/archive.json "s3://${S3_BUCKET}/data/archive.json" \
+    --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
+    --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
+    && echo "  ✓ archive.json uploaded to S3" \
+    || echo "  ⚠ archive.json S3 upload failed"
+fi
+aws cloudfront create-invalidation --distribution-id "$CF_DIST" \
+  --paths "/data/${DATE}.json" "/data/archive.json" \
+  --profile "$S3_PROFILE" >/dev/null 2>&1 \
+  && echo "  ✓ CloudFront invalidated for daily data files"
 if "$PYTHON_BIN" scripts/fetch_podcasts.py >/dev/null 2>&1; then
   aws s3 cp docs/data/podcasts.json "s3://${S3_BUCKET}/data/podcasts.json" \
     --content-type "application/json" --cache-control "no-cache, public, max-age=300" \
@@ -322,14 +345,12 @@ if [ "$DO_PUSH" -eq 1 ]; then
       sleep 5  # brief wait for invalidation to start propagating
       health_fail=0
       check_urls=("https://aibriefing.dev/")
-      # Pick 5 random story IDs from search-index
-      mapfile -t sample_ids < <(
-        python3 -c "
-import json,random,sys
+      # Pick 5 random story IDs from search-index (zsh-compatible, no mapfile)
+      sample_ids=( ${(f)"$(python3 -c "
+import json,random
 d=json.load(open('docs/data/search-index.json'))
 ids=[s['story_id'] for s in d.get('stories',[]) if s.get('story_id')]
-print('\n'.join(random.sample(ids, min(5,len(ids)))))" 2>/dev/null
-      )
+print('\n'.join(random.sample(ids, min(5,len(ids)))))" 2>/dev/null)"} )
       for sid in "${sample_ids[@]}"; do
         check_urls+=("https://aibriefing.dev/story/${sid}/")
       done

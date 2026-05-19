@@ -66,14 +66,32 @@ def agent(
         "--effort", _cc_effort(),
     ]
 
+    # Strip Claude Code parent-session env vars before spawning. When the
+    # parent process is a Claude Code session, CLAUDECODE=1 and CLAUDE_CODE_*
+    # are inherited and cause the child `claude -p` to switch to API-key auth
+    # instead of OAuth/subscription auth, which then fails with "credit balance
+    # too low" even though the subscription is valid.
+    _STRIP_PREFIX = ("CLAUDE_CODE_", "CLAUDECODE", "ANTHROPIC_API_KEY")
+    child_env = {k: v for k, v in os.environ.items()
+                 if not any(k == p or k.startswith(p) for p in _STRIP_PREFIX)}
+
     t0 = time.time()
     try:
         r = subprocess.run(cmd, input=input_text, capture_output=True,
-                           text=True, timeout=1800)
+                           text=True, timeout=1800, env=child_env)
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"[{label}] claude -p timed out after 1800s")
     if r.returncode != 0:
-        raise RuntimeError(f"[{label}] claude -p failed (rc={r.returncode}): {r.stderr[:500]}")
+        # Find error/result events in stdout for diagnosis
+        err_events = []
+        for _line in r.stdout.splitlines():
+            try:
+                _obj = json.loads(_line)
+                if _obj.get("type") in ("error", "result") or "error" in str(_obj.get("subtype", "")):
+                    err_events.append(json.dumps(_obj)[:400])
+            except Exception:
+                pass
+        raise RuntimeError(f"[{label}] claude -p failed (rc={r.returncode}): {'; '.join(err_events) or r.stderr[:300] or r.stdout[-300:]}")
 
     assistant_texts: list[str] = []
     result_event: dict | None = None

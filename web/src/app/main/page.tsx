@@ -302,8 +302,8 @@ export default function MainPage() {
               {editorial.date} · {t.days_analyzed}d · {t.story_count} {isHe ? "כתבות" : "stories"}
             </span>
           </div>
-          <h1 style={{
-            margin: "0 0 4px", fontSize: 34, fontWeight: 900,
+          <h1 className="editorial-h1" style={{
+            margin: "0 0 4px", fontWeight: 900,
             color: "#0f172a", letterSpacing: "-.03em", lineHeight: 1.15,
           }}>{headline}</h1>
           {subhead && (
@@ -316,7 +316,7 @@ export default function MainPage() {
 
       {/* Two-column layout */}
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px 80px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 56, alignItems: "start" }}>
+        <div className="editorial-grid">
 
           {/* LEFT — main content */}
           <div>
@@ -358,7 +358,7 @@ export default function MainPage() {
           </div>
 
           {/* RIGHT — theme sidebar */}
-          <div style={{ position: "sticky", top: 24 }} dir={isHe ? "rtl" : "ltr"}>
+          <div className="editorial-sidebar" dir={isHe ? "rtl" : "ltr"}>
             <p style={{
               margin: "0 0 2px", fontSize: 10, fontWeight: 800,
               letterSpacing: ".14em", textTransform: "uppercase" as const, color: "#6366f1",

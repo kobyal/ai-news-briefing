@@ -74,34 +74,40 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
     return b > a ? s : acc;
   }, stories[0]);
   // Prefer static JSON aggregates over Lambda per-story; fall back to s0 when absent.
-  const sb = staticBriefing;
-  const sd = staticDoc;
-  const s0r = s0 as unknown as Record<string, unknown>;
+  // publish_data.py stores Hebrew fields under a separate top-level "briefing_he" key
+  // (not nested inside "briefing"), so we need a second alias for that subtree.
+  const sb   = staticBriefing;
+  const sbhe = (staticDoc.briefing_he as Record<string, unknown>) || {};
+  const sd   = staticDoc;
+  const s0r  = s0 as unknown as Record<string, unknown>;
   return {
     date: d,
     stories,
     tldr: ((sb.tldr as string[])?.length ? sb.tldr as string[] : null) ?? s0.tldr ?? [],
-    tldr_he: ((sb.tldr_he as string[])?.length ? sb.tldr_he as string[] : null) ?? s0.tldr_he ?? [],
+    tldr_he: ((sbhe.tldr_he as string[])?.length ? sbhe.tldr_he as string[] : null) ?? s0.tldr_he ?? [],
     tldr_audio_url:    (sb.tldr_audio_url as string) || (s0r.tldr_audio_url as string) || undefined,
-    tldr_audio_url_he: (sb.tldr_audio_url_he as string) || (s0r.tldr_audio_url_he as string) || undefined,
+    // HE audio URL is at briefing_he.tldr_audio_url (not briefing.tldr_audio_url_he)
+    tldr_audio_url_he: (sbhe.tldr_audio_url as string) || (s0r.tldr_audio_url_he as string) || undefined,
     bullet_story_ids:  (sb.bullet_story_ids as string[]) ?? (s0r.bullet_story_ids as string[] | undefined),
     community_pulse: (sb.community_pulse as string) || s0.community_pulse || "",
-    community_pulse_he: (sb.community_pulse_he as string) || s0.community_pulse_he || "",
+    community_pulse_he: (sbhe.community_pulse_he as string) || (sb.community_pulse_he as string) || s0.community_pulse_he || "",
     community_urls: (sb.community_urls as DayData["community_urls"]) || s0.community_urls || [],
     trending_topics: s0.trending_topics || [],
     people_highlights: s0.people_highlights || [],
-    people_highlights_he: (s0r.people_highlights_he as DayData["people_highlights_he"]) || [],
+    // briefing_he stores as "people_he", Lambda stores as "people_highlights_he"
+    people_highlights_he: (sbhe.people_he as DayData["people_highlights_he"]) || (s0r.people_highlights_he as DayData["people_highlights_he"]) || [],
     community_pulse_items: staticCpi.length > 0
       ? staticCpi
       : (s0r.community_pulse_items as DayData["community_pulse_items"]) || [],
-    community_pulse_items_he: (s0r.community_pulse_items_he as DayData["community_pulse_items_he"]) || [],
+    // briefing_he stores as "pulse_items_he", Lambda stores as "community_pulse_items_he"
+    community_pulse_items_he: (sbhe.pulse_items_he as DayData["community_pulse_items_he"]) || (s0r.community_pulse_items_he as DayData["community_pulse_items_he"]) || [],
     top_reddit: s0.top_reddit || [],
     youtube: filterYoutubeByLanguage((sd.youtube || s0r.youtube) as unknown) as DayData["youtube"] || [],
     youtube_channel_latest: ((sd.youtube_channel_latest || s0r.youtube_channel_latest) as DayData["youtube_channel_latest"]) || [],
     github: ((sd.github || s0r.github) as DayData["github"]) || [],
     twitter: (staticTwitter !== undefined ? staticTwitter : s0r.twitter) as DayData["twitter"] || [],
-    twitter_descs_he: (s0r.twitter_descs_he as DayData["twitter_descs_he"]),
-    youtube_descs_he: (s0r.youtube_descs_he as DayData["youtube_descs_he"]),
+    twitter_descs_he: (sbhe.twitter_descs_he as DayData["twitter_descs_he"]) || (s0r.twitter_descs_he as DayData["twitter_descs_he"]),
+    youtube_descs_he: (sbhe.youtube_descs_he as DayData["youtube_descs_he"]) || (s0r.youtube_descs_he as DayData["youtube_descs_he"]),
   };
 }
 

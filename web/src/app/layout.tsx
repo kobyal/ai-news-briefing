@@ -54,6 +54,31 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": "WebSite",
+                "name": "AI Briefing",
+                "url": "https://aibriefing.dev",
+                "description": "Your daily digest of AI news from Anthropic, OpenAI, Google, and more",
+              },
+              {
+                "@type": "Organization",
+                "name": "AI Briefing",
+                "url": "https://aibriefing.dev",
+                "logo": {
+                  "@type": "ImageObject",
+                  "url": "https://aibriefing.dev/og.png",
+                  "width": 1200,
+                  "height": 630,
+                },
+              },
+            ],
+          }) }}
+        />
         <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
         <Script id="ga4-init" strategy="afterInteractive">{`
           window.dataLayer = window.dataLayer || [];

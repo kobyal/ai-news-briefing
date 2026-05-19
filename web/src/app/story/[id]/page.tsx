@@ -99,20 +99,32 @@ export default async function StoryPage(
     } catch { return null; }
   })();
 
+  const storyUrl = `https://aibriefing.dev/story/${id}/`;
   const jsonLd = story ? {
     "@context": "https://schema.org",
-    "@type": "NewsArticle",
-    "headline": story.headline ?? "AI Briefing",
-    "description": (story.summary ?? "").slice(0, 280),
-    "url": `https://aibriefing.dev/story/${id}/`,
-    "datePublished": story.date ? `${story.date}T00:00:00Z` : undefined,
-    "image": (story.og_image || "https://aibriefing.dev/og.png")
-      .replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/"),
-    "publisher": {
-      "@type": "Organization",
-      "name": "AI Briefing",
-      "url": "https://aibriefing.dev",
-    },
+    "@graph": [
+      {
+        "@type": "NewsArticle",
+        "headline": story.headline ?? "AI Briefing",
+        "description": (story.summary ?? "").slice(0, 280),
+        "url": storyUrl,
+        "datePublished": story.date ? `${story.date}T00:00:00Z` : undefined,
+        "image": (story.og_image || "https://aibriefing.dev/og.png")
+          .replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/"),
+        "publisher": {
+          "@type": "Organization",
+          "name": "AI Briefing",
+          "url": "https://aibriefing.dev",
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "AI Briefing", "item": "https://aibriefing.dev/" },
+          { "@type": "ListItem", "position": 2, "name": story.headline ?? "Story", "item": storyUrl },
+        ],
+      },
+    ],
   } : null;
 
   return (

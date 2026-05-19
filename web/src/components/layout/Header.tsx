@@ -55,6 +55,7 @@ export function Header({ date }: HeaderProps) {
     { href: "/media/", label: isHe ? "מדיה" : "Media" },
     { href: "/tools/", label: isHe ? "כלים" : "Tools" },
     { href: "/search/", label: isHe ? "חיפוש" : "Search" },
+    { href: "/about/", label: isHe ? "אודות" : "About" },
   ];
 
   const isActive = (href: string) => {

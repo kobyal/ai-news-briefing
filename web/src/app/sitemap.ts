@@ -26,6 +26,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/media`,              changeFrequency: "weekly",  priority: 0.7 },
     { url: `${base}/archive`,            changeFrequency: "weekly",  priority: 0.6 },
     { url: `${base}/search`,             changeFrequency: "monthly", priority: 0.5 },
+    { url: `${base}/about`,              changeFrequency: "monthly", priority: 0.4 },
   ];
 
   const storyPages: MetadataRoute.Sitemap = allStories.map((s) => ({

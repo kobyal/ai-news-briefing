@@ -27,15 +27,56 @@ from pathlib import Path
 # limits us, the fallback is Google Cloud TTS free tier (1M Neural2
 # chars/month free, enough for ~11x our daily TLDR volume).
 _TLDR_VOICE_EN = os.environ.get("TLDR_TTS_VOICE_EN", "en-US-GuyNeural")
-_TLDR_VOICE_HE = os.environ.get("TLDR_TTS_VOICE_HE", "he-IL-AvriNeural")
+# Hebrew audio split by length:
+#   short (tldr + story summaries) → Google Cloud TTS Chirp3-HD (better quality, ~390K chars/month → free tier)
+#   long  (story details)          → edge-tts AvriNeural (free, quality matters less for long-form)
+_GOOGLE_TTS_VOICE_HE = os.environ.get("GOOGLE_TTS_VOICE_HE", "he-IL-Chirp3-HD-Orus")
+_EDGE_TTS_VOICE_HE   = os.environ.get("TLDR_TTS_VOICE_HE",   "he-IL-AvriNeural")
 _GH_PAGES_BASE = "https://kobyal.github.io/ai-news-briefing"
 
 
-def _generate_tldr_audio(text: str, voice: str, out_path: Path) -> bool:
-    """Synthesize one MP3 via edge-tts. True on success, False on missing
-    lib / empty text / network failure (caller decides whether to surface)."""
+def _normalize_he_for_tts(text: str) -> str:
+    # he-IL voices handle mixed Hebrew/English natively — no substitution needed.
+    return text
+
+
+def _generate_google_tts_audio(text: str, voice: str, out_path: Path) -> bool:
+    """Synthesize one MP3 via Google Cloud TTS (Chirp3-HD). Reads GOOGLE_TTS_API_KEY
+    from env. Falls back silently on missing key or network error."""
+    api_key = os.environ.get("GOOGLE_TTS_API_KEY", "")
+    if not api_key:
+        return False
+    text = (text or "").strip()
+    if not text:
+        return False
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        import edge_tts  # noqa: F401  — imported lazily so a missing dep doesn't kill the publish step
+        import urllib.request as _req
+        import json as _json
+        import base64 as _b64
+        payload = _json.dumps({
+            "input": {"text": text},
+            "voice": {"languageCode": "he-IL", "name": voice},
+            "audioConfig": {"audioEncoding": "MP3", "speakingRate": 0.95},
+        }).encode()
+        url = f"https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}"
+        req = _req.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        with _req.urlopen(req, timeout=30) as resp:
+            data = _json.loads(resp.read())
+        out_path.write_bytes(_b64.b64decode(data["audioContent"]))
+        size_kb = out_path.stat().st_size / 1024
+        print(f"  TLDR audio: wrote {out_path.name} ({size_kb:.0f} KB, voice={voice})")
+        return True
+    except Exception as e:
+        print(f"  Google TTS failed for {out_path.name}: {e}")
+        return False
+
+
+def _generate_tldr_audio(text: str, voice: str, out_path: Path) -> bool:
+    """Synthesize one MP3 via edge-tts (English + Hebrew detail audio).
+    True on success, False on missing lib / empty text / network failure."""
+    try:
+        import edge_tts  # noqa: F401
         import asyncio
     except ImportError:
         print("  TLDR audio: edge-tts not installed — `pip install edge-tts`. Skipping.")
@@ -67,28 +108,19 @@ def _generate_per_story_audio(
     base_url: str,
     story_id_fn,
     synth_fn=None,
+    synth_he_short_fn=None,
 ) -> dict:
     """Generate 4 MP3s per story (summary+detail × EN+HE) and stamp the
     audio_url fields on each item. Idempotent — skips MP3s that already
     exist with non-zero bytes.
 
-    Args:
-        news_items: list of merger story dicts; mutated in place to add
-            summary_audio_url, summary_audio_url_he, detail_audio_url,
-            detail_audio_url_he.
-        audio_dir: filesystem dir to write MP3s to.
-        date_str: YYYY-MM-DD; only used to build the public URL.
-        voice_en: edge-tts voice id for English.
-        voice_he: edge-tts voice id for Hebrew.
-        base_url: e.g. "https://kobyal.github.io/ai-news-briefing".
-        story_id_fn: callable(item) -> str (12-char story_id).
-        synth_fn: optional callable(text, voice, out_path) -> bool, defaults
-            to _generate_tldr_audio. Pass a stub for tests.
-
-    Returns: {"generated": int, "skipped": int, "failed": int, "expected": int}
+    synth_fn          — used for EN audio + HE detail (edge-tts)
+    synth_he_short_fn — used for HE summary only (Google TTS Chirp3-HD)
     """
     if synth_fn is None:
         synth_fn = _generate_tldr_audio
+    if synth_he_short_fn is None:
+        synth_he_short_fn = synth_fn
     expected = len(news_items) * 4
     generated = skipped = failed = 0
     for item in news_items:
@@ -99,14 +131,17 @@ def _generate_per_story_audio(
         summary_he  = (item.get("summary_he") or "").strip()
         detail_en   = (item.get("detail") or "").strip()
         detail_he   = (item.get("detail_he") or "").strip()
-        # (URL field on item, filename, voice, headline-for-prefix, body)
+        headline_he_tts = _normalize_he_for_tts(headline_he)
+        summary_he_tts  = _normalize_he_for_tts(summary_he)
+        detail_he_tts   = _normalize_he_for_tts(detail_he)
+        # (field, filename, voice, headline, body, synth)
         specs = [
-            ("summary_audio_url",    f"story_{sid}_summary_en.mp3", voice_en, headline_en, summary_en),
-            ("summary_audio_url_he", f"story_{sid}_summary_he.mp3", voice_he, headline_he, summary_he),
-            ("detail_audio_url",     f"story_{sid}_detail_en.mp3",  voice_en, headline_en, detail_en),
-            ("detail_audio_url_he",  f"story_{sid}_detail_he.mp3",  voice_he, headline_he, detail_he),
+            ("summary_audio_url",    f"story_{sid}_summary_en.mp3", voice_en, headline_en,     summary_en,    synth_fn),
+            ("summary_audio_url_he", f"story_{sid}_summary_he.mp3", voice_he, headline_he_tts, summary_he_tts, synth_he_short_fn),
+            ("detail_audio_url",     f"story_{sid}_detail_en.mp3",  voice_en, headline_en,     detail_en,     synth_fn),
+            ("detail_audio_url_he",  f"story_{sid}_detail_he.mp3",  voice_he, headline_he_tts, detail_he_tts, synth_fn),
         ]
-        for field, fname, voice, hl, body in specs:
+        for field, fname, voice, hl, body, sfn in specs:
             if not body:
                 continue
             out = audio_dir / fname
@@ -116,7 +151,7 @@ def _generate_per_story_audio(
                 skipped += 1
                 continue
             text = f"{hl}.\n\n{body}".strip() if hl else body
-            if synth_fn(text, voice, out):
+            if sfn(text, voice, out):
                 item[field] = url
                 generated += 1
             else:
@@ -1889,7 +1924,7 @@ def _mp3_cb(_p):
 if _generate_tldr_audio(_tldr_en_text, _TLDR_VOICE_EN, _audio_dir / "tldr_en.mp3"):
     _en_cb = _mp3_cb(_audio_dir / "tldr_en.mp3")
     published["briefing"]["tldr_audio_url"] = f"{_GH_PAGES_BASE}/audio/{date_str}/tldr_en.mp3?v={_en_cb}"
-if _generate_tldr_audio(_tldr_he_text, _TLDR_VOICE_HE, _audio_dir / "tldr_he.mp3"):
+if _generate_google_tts_audio(_tldr_he_text, _GOOGLE_TTS_VOICE_HE, _audio_dir / "tldr_he.mp3"):
     _he_cb = _mp3_cb(_audio_dir / "tldr_he.mp3")
     published.setdefault("briefing_he", {})["tldr_audio_url"] = (
         f"{_GH_PAGES_BASE}/audio/{date_str}/tldr_he.mp3?v={_he_cb}"
@@ -1921,7 +1956,8 @@ for _i, _item in enumerate(_news_items):
 
 _audio_stats = _generate_per_story_audio(
     _news_items, _audio_dir, date_str,
-    _TLDR_VOICE_EN, _TLDR_VOICE_HE, _GH_PAGES_BASE, _story_id_hash,
+    _TLDR_VOICE_EN, _EDGE_TTS_VOICE_HE, _GH_PAGES_BASE, _story_id_hash,
+    synth_he_short_fn=lambda t, v, p: _generate_google_tts_audio(t, _GOOGLE_TTS_VOICE_HE, p),
 )
 print(
     f"Per-story audio: {_audio_stats['generated']} generated, "

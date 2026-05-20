@@ -154,8 +154,8 @@ const PULSE_VARIANTS: Record<PulseVariant, {
     countColor: "#1d4ed8", countBg: "rgba(37,99,235,0.08)", countBorder: "rgba(37,99,235,0.2)",
     sourceHover: "#1d4ed8", icon: "💬", iconSize: "14px",
     labelEn: "Community Pulse", labelHe: "דופק הקהילה",
-    subtitleEn: "Discussions from Hacker News, arXiv, blogs, conferences · validated links",
-    subtitleHe: "דיונים מ-Hacker News, arXiv, בלוגים וכנסים · קישורים מאומתים",
+    subtitleEn: "HN, Reddit, arXiv, Lobsters, Dev.to, blogs · validated links",
+    subtitleHe: "HN, Reddit, arXiv, Lobsters, Dev.to, בלוגים · קישורים מאומתים",
   },
 };
 
@@ -552,17 +552,18 @@ function CommunityDayBlock({ data, hideEmptyTwitterMessage, vendorFilter }: { da
     .map((_, i) => allPulseHe[i])
     .filter((_, i) => !isFromX(allPulse[i]) && !isFromReddit(allPulse[i]));
 
-  const showTwitterCard = (hasTwitter && !vendorFilter) || xPulsePairs.length > 0;
+  const showTwitterCard = hasTwitter || xPulsePairs.length > 0;
   const showRedditCard = redditPosts.length > 0 || redditPulsePairs.length > 0;
 
   return (
     <>
       {showTwitterCard ? (
         <TwitterSection
-          data={vendorFilter ? null : data.twitter}
+          data={data.twitter}
           descsHe={vendorFilter ? undefined : data.twitter_descs_he}
           peopleDescsHe={vendorFilter ? undefined : data.people_highlights_he}
           pulseItems={xPulsePairs}
+          vendorFilter={vendorFilter}
         />
       ) : !hideEmptyTwitterMessage ? (
         <div className="text-center py-8 text-sm rounded-2xl" style={{ color: "#9a9ab8", background: "#fff", border: "1px solid #ededf5" }}>
@@ -769,8 +770,8 @@ function CommunityPageInner() {
         </h1>
         <p className="mb-4 text-[13px]" style={{ color: "#9a9ab8" }}>
           {isHe
-            ? "פוסטים מ-X · דיונים ב-Reddit · דופק הקהילה (HN, arXiv, בלוגים, כנסים)"
-            : "Posts from X · Reddit threads · Community pulse (HN, arXiv, blogs, conferences)"}
+            ? "פוסטים מ-X · דיונים ב-Reddit · דופק הקהילה (HN, arXiv, Lobsters, Dev.to)"
+            : "Posts from X · Reddit threads · Community pulse (HN, arXiv, Lobsters, Dev.to)"}
         </p>
 
         {/* Vendor filter ribbon */}

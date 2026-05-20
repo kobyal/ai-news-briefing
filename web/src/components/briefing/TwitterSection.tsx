@@ -60,6 +60,8 @@ interface TwitterSectionProps {
    *  Adapted into the TwitterSection item shape so they sort + render
    *  alongside people_highlights instead of in a duplicate card. */
   pulseItems?: Array<{ item: CommunityPulseItem; he?: { headline_he?: string; body_he?: string } }>;
+  /** When set, only groups whose vendor key matches are shown. */
+  vendorFilter?: string | null;
 }
 
 /** Twitter status IDs are snowflakes that encode the post timestamp.
@@ -209,7 +211,7 @@ function XIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-export function TwitterSection({ data, descsHe = [], peopleDescsHe = [], pulseItems = [] }: TwitterSectionProps) {
+export function TwitterSection({ data, descsHe = [], peopleDescsHe = [], pulseItems = [], vendorFilter }: TwitterSectionProps) {
   const { isHe } = useLang();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -298,9 +300,12 @@ export function TwitterSection({ data, descsHe = [], peopleDescsHe = [], pulseIt
   for (const arr of groups.values()) {
     arr.sort((a, b) => engagementWeight(b._eng) - engagementWeight(a._eng));
   }
-  const orderedGroups = Array.from(groups.entries()).sort(
+  const allOrderedGroups = Array.from(groups.entries()).sort(
     (a, b) => engagementWeight(b[1][0]._eng) - engagementWeight(a[1][0]._eng)
   );
+  const orderedGroups = vendorFilter
+    ? allOrderedGroups.filter(([vendor]) => vendor === vendorFilter)
+    : allOrderedGroups;
   const totalCount = orderedGroups.reduce((s, [, arr]) => s + arr.length, 0);
 
   return (

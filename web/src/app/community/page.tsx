@@ -495,7 +495,15 @@ function formatPulseDate(date: string, isHe: boolean): string {
 const SUBREDDIT_VENDOR: Record<string, string> = {
   ClaudeAI: "Anthropic", Anthropic: "Anthropic",
   OpenAI: "OpenAI", ChatGPT: "OpenAI",
-  GoogleGemini: "Google",
+  GoogleGemini: "Google", GoogleCloud: "Google",
+  aws: "AWS", aws_ai: "AWS",
+  azure: "Azure",
+  MetaAI: "Meta", LocalLLaMA: "Meta",
+  nvidia: "NVIDIA",
+  xai: "xAI",
+  DeepSeek: "DeepSeek",
+  Mistral_AI: "Mistral",
+  HuggingFace: "Hugging Face",
 };
 
 // ── Per-day block: 3 cards (X · Reddit · Pulse) ───────────────────────

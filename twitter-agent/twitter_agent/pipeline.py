@@ -146,8 +146,23 @@ TRACKED_HANDLES = [
     {"name": "AWS",                 "handle": "awscloud",       "org": "AWS",         "role": "Official"},
     {"name": "Swami Sivasubramanian","handle": "SwamiSivasubram","org": "AWS",         "role": "VP Agentic AI"},
     # ── Meta ──────────────────────────────────────────────────────────────────
+    {"name": "Meta AI",             "handle": "AIatMeta",       "org": "Meta",        "role": "Official"},
     {"name": "Yann LeCun",          "handle": "ylecun",         "org": "Meta",        "role": "Chief AI Scientist"},
+    # ── xAI ───────────────────────────────────────────────────────────────────
+    {"name": "xAI",                 "handle": "xai",            "org": "xAI",         "role": "Official"},
+    {"name": "Elon Musk",           "handle": "elonmusk",       "org": "xAI",         "role": "CEO"},
+    # ── Mistral ───────────────────────────────────────────────────────────────
+    {"name": "Mistral AI",          "handle": "MistralAI",      "org": "Mistral",     "role": "Official"},
+    {"name": "Arthur Mensch",       "handle": "arthurmensch",   "org": "Mistral",     "role": "CEO"},
+    # ── Hugging Face ──────────────────────────────────────────────────────────
+    {"name": "Hugging Face",        "handle": "huggingface",    "org": "Hugging Face","role": "Official"},
+    {"name": "Clement Delangue",    "handle": "ClementDelangue","org": "Hugging Face","role": "CEO"},
+    # ── DeepSeek ──────────────────────────────────────────────────────────────
+    {"name": "DeepSeek",            "handle": "deepseek_ai",    "org": "DeepSeek",    "role": "Official"},
+    # ── Alibaba / Qwen ────────────────────────────────────────────────────────
+    {"name": "Alibaba Qwen",        "handle": "Alibaba_Qwen",   "org": "Alibaba",     "role": "Official"},
     # ── NVIDIA / others ───────────────────────────────────────────────────────
+    {"name": "NVIDIA AI",           "handle": "NVIDIAAI",       "org": "NVIDIA",      "role": "Official"},
     {"name": "Jim Fan",             "handle": "drjimfan",       "org": "NVIDIA",      "role": "Senior Research Manager"},
     # ── Independent researchers / influencers ─────────────────────────────────
     {"name": "Andrej Karpathy",     "handle": "karpathy",       "org": "Independent", "role": "AI educator"},
@@ -266,7 +281,7 @@ def _parse_tweets(data: dict, cutoff_ts: float, handle: str, allow_rt: bool = Fa
             .get("timeline", {})
             .get("instructions", [])
     )
-    is_org = any(kw in handle.lower() for kw in ["openai", "anthropic", "google", "deepmind", "aws", "nvidia", "meta"])
+    is_org = any(kw in handle.lower() for kw in ["openai", "anthropic", "google", "deepmind", "aws", "nvidia", "meta", "xai", "mistral", "hugging", "deepseek", "alibaba", "aiatmeta", "nvidiaai"])
     for instruction in instructions:
         for entry in instruction.get("entries", []):
             tweet = (

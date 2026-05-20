@@ -138,16 +138,29 @@ FEEDS = [
     ("https://hacker-news.firebaseio.com/v0/topstories.json",              "Other",         "hn"),
     ("https://huggingface.co/api/daily_papers",                            "Hugging Face",  "hf_papers"),
     # Reddit via Arctic Shift archive (no auth required; hot.json 403s without OAuth).
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=MachineLearning", "Other",     "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=LocalLLaMA",      "Other",     "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=artificial",      "Other",     "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=singularity",     "Other",     "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ChatGPT",         "Other",     "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ClaudeAI",        "Anthropic", "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=OpenAI",          "OpenAI",    "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=GoogleGemini",    "Google",    "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=Anthropic",       "Anthropic", "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=AINews",          "Other",     "reddit_arctic"),
+    # ── General AI communities ─────────────────────────────────────────────────
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=MachineLearning", "Other",        "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=LocalLLaMA",      "Meta",         "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=artificial",      "Other",        "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=singularity",     "Other",        "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=AINews",          "Other",        "reddit_arctic"),
+    # ── Vendor-specific communities ────────────────────────────────────────────
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ClaudeAI",        "Anthropic",    "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=Anthropic",       "Anthropic",    "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=OpenAI",          "OpenAI",       "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ChatGPT",         "OpenAI",       "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=GoogleGemini",    "Google",       "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=GoogleCloud",     "Google",       "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=aws",             "AWS",          "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=aws_ai",          "AWS",          "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=azure",           "Azure",        "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=MetaAI",          "Meta",         "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=nvidia",          "NVIDIA",       "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=xai",             "xAI",          "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=DeepSeek",        "DeepSeek",     "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=Mistral_AI",      "Mistral",      "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=HuggingFace",     "Hugging Face", "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=StableDiffusion", "Other",        "reddit_arctic"),
 ]
 
 import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
@@ -340,13 +353,24 @@ def fetch_subreddit_icon(sub_name: str) -> Optional[str]:
 # r/MachineLearning threads competing with legitimate 1k+ discussions) don't
 # pollute the feed. Tune here without code changes elsewhere.
 SUBREDDIT_SCORE_FLOORS = {
-    "singularity":     300,   # high-traffic, low-signal — needs higher bar
-    "OpenAI":          300,
-    "ChatGPT":         300,
-    "MachineLearning": 50,    # niche/research — slower but high signal
-    "Anthropic":       50,
-    "ClaudeAI":        50,
-    "LocalLLaMA":      50,
+    "singularity":      300,   # high-traffic, low-signal
+    "OpenAI":           300,
+    "ChatGPT":          300,
+    "MachineLearning":  50,    # niche/research — slower but high signal
+    "Anthropic":        50,
+    "ClaudeAI":         50,
+    "LocalLLaMA":       50,
+    "aws":              50,    # broad AWS community — want substantive posts
+    "aws_ai":           20,
+    "azure":            50,
+    "nvidia":           150,   # mixed gaming/tech — raise bar for AI relevance
+    "MetaAI":           20,
+    "xai":              20,
+    "DeepSeek":         30,
+    "Mistral_AI":       20,
+    "HuggingFace":      20,
+    "GoogleCloud":      50,
+    "StableDiffusion":  100,
     # artificial, GoogleGemini, AINews → DEFAULT_SUBREDDIT_SCORE_FLOOR
 }
 DEFAULT_SUBREDDIT_SCORE_FLOOR = 100

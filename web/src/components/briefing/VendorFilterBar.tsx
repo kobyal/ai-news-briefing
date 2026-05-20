@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getVendor, getVendorLogo } from "@/lib/vendors";
 
+
+
 interface VendorFilterBarProps {
   activeVendor: string | null;
   onSelect: (vendor: string | null) => void;
@@ -116,6 +118,7 @@ export function VendorFilterBar({ activeVendor, onSelect, vendors, todayVendors 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState(0);
   const [visibleCount, setVisibleCount] = useState(8);
+  const touchStartX = useRef(0);
 
   // Recompute how many cards fit
   useEffect(() => {
@@ -182,16 +185,29 @@ export function VendorFilterBar({ activeVendor, onSelect, vendors, todayVendors 
     );
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(delta) > 40) shift(delta < 0 ? "right" : "left");
+  };
+
   return (
     <div
       ref={wrapperRef}
+      dir="ltr"
       className="mb-7"
       style={{ display: "flex", alignItems: "center", gap: "8px", userSelect: "none" }}
     >
       <ArrowBtn dir="left" />
 
       {/* Clipping viewport */}
-      <div style={{ flex: 1, overflow: "hidden", paddingTop: "6px", paddingBottom: "6px" }}>
+      <div
+        style={{ flex: 1, overflow: "hidden", paddingTop: "6px", paddingBottom: "6px" }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <div
           style={{
             display: "flex",

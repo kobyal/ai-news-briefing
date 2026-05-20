@@ -141,6 +141,8 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
   const [activeVendor, setActiveVendor] = useState<string | null>(null);
   const [multiDateStories, setMultiDateStories] = useState<NewsItem[]>([]);
   const [loadingMulti, setLoadingMulti] = useState(false);
+  // Track which vendor's fetch is "current" so stale responses don't overwrite
+  const fetchVendorRef = useRef<string | null>(null);
 
   // Infinite scroll: progressively load older days as the reader nears the
   // bottom. `olderDays` accumulates one day per fetch, in archive order
@@ -187,12 +189,15 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
 
   // Fetch stories from all archive dates when a vendor is selected
   const fetchMultiDate = useCallback(async (vendor: string) => {
+    fetchVendorRef.current = vendor;
     setLoadingMulti(true);
     try {
       const otherDates = archive.filter((d) => d !== data.date).slice(0, 6); // up to 6 extra days
       const results = await Promise.all(
         otherDates.map((d) => fetchDayData(d).catch(() => null))
       );
+      // Ignore result if the user switched to a different vendor while fetching
+      if (fetchVendorRef.current !== vendor) return;
       const allStories: NewsItem[] = [];
       for (const dayData of results) {
         if (dayData?.stories) {
@@ -220,16 +225,19 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
       });
       setMultiDateStories(unique);
     } catch {
-      setMultiDateStories([]);
+      if (fetchVendorRef.current === vendor) setMultiDateStories([]);
+    } finally {
+      if (fetchVendorRef.current === vendor) setLoadingMulti(false);
     }
-    setLoadingMulti(false);
   }, [archive, data.date, data.stories]);
 
   useEffect(() => {
     if (activeVendor) {
       fetchMultiDate(activeVendor);
     } else {
+      fetchVendorRef.current = null;
       setMultiDateStories([]);
+      setLoadingMulti(false);
     }
   }, [activeVendor, fetchMultiDate]);
 

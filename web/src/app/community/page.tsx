@@ -551,9 +551,9 @@ function CommunityDayBlock({ data, hideEmptyTwitterMessage, vendorFilter }: { da
     <>
       {showTwitterCard ? (
         <TwitterSection
-          data={data.twitter}
-          descsHe={data.twitter_descs_he}
-          peopleDescsHe={data.people_highlights_he}
+          data={vendorFilter ? null : data.twitter}
+          descsHe={vendorFilter ? undefined : data.twitter_descs_he}
+          peopleDescsHe={vendorFilter ? undefined : data.people_highlights_he}
           pulseItems={xPulsePairs}
         />
       ) : !hideEmptyTwitterMessage ? (
@@ -717,6 +717,20 @@ function CommunityPageInner() {
     return () => observer.disconnect();
   }, [hasMoreOlderDays, loadingOlder, loadNextOlderDay]);
 
+  // Must be before conditional returns — hooks must be called unconditionally
+  const todayVendors = useMemo(
+    () => new Set((data?.community_pulse_items || []).map((i) => i.related_vendor).filter(Boolean) as string[]),
+    [data]
+  );
+
+  const vendors = useMemo(() => {
+    const list = [...VENDOR_LIST];
+    for (const v of todayVendors) {
+      if (!list.includes(v) && v !== "Other") list.push(v);
+    }
+    return list;
+  }, [todayVendors]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-base)" }}>
@@ -734,20 +748,6 @@ function CommunityPageInner() {
       </div>
     );
   }
-
-  // Vendors present in today's community pulse items (for VendorFilterBar highlight)
-  const todayVendors = useMemo(
-    () => new Set((data.community_pulse_items || []).map((i) => i.related_vendor).filter(Boolean)),
-    [data.community_pulse_items]
-  );
-
-  const vendors = useMemo(() => {
-    const list = [...VENDOR_LIST];
-    for (const v of todayVendors) {
-      if (!list.includes(v) && v !== "Other") list.push(v);
-    }
-    return list;
-  }, [todayVendors]);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-base)" }}>

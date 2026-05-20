@@ -9,7 +9,8 @@ import { RedditSection } from "@/components/briefing/RedditSection";
 import { fetchDayData, fetchArchive } from "@/lib/api";
 import { useLang } from "@/context/LangContext";
 import type { DayData, CommunityPulseItem } from "@/lib/types";
-import { getVendorLogo, getVendor } from "@/lib/vendors";
+import { getVendorLogo, getVendor, VENDOR_LIST } from "@/lib/vendors";
+import { VendorFilterBar } from "@/components/briefing/VendorFilterBar";
 import { LoadingSpinner, DaySeparator, INFINITE_SCROLL_ROOT_MARGIN, withMinDelay } from "@/components/ui/InfiniteScroll";
 import { BackToTopButton } from "@/components/ui/BackToTopButton";
 import { readDateParam, scrollToHash } from "@/lib/anchors";
@@ -169,6 +170,15 @@ function CommunityPulseSection({
   variant?: PulseVariant;
 }) {
   const { isHe } = useLang();
+  const [collapsed, setCollapsed] = useState(false);
+  const [collapsedVendors, setCollapsedVendors] = useState<Set<string>>(new Set());
+
+  const toggleVendor = (key: string) =>
+    setCollapsedVendors(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
   if (!items || items.length === 0) return null;
 
@@ -220,10 +230,22 @@ function CommunityPulseSection({
         >
           {items.length} {isHe ? "נושאים" : "topics"}
         </span>
+        <button
+          onClick={() => setCollapsed(c => !c)}
+          aria-label={collapsed ? "Expand" : "Collapse"}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            color: "#9a9ab8", fontSize: "16px", lineHeight: 1, padding: "2px 4px",
+            transition: "transform 0.2s",
+            transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+          }}
+        >
+          ⌄
+        </button>
       </div>
 
       {/* Items */}
-      {(() => {
+      {!collapsed && (() => {
         // Cluster by related_vendor so all Anthropic items group together, all
         // OpenAI together, etc. Heat (hot=3, warm=2, mild=1) determines order
         // within and between clusters. Pair each item with its Hebrew sibling
@@ -243,10 +265,12 @@ function CommunityPulseSection({
           .sort((a, b) => (HEAT_RANK[b[1][0].item.heat] || 0) - (HEAT_RANK[a[1][0].item.heat] || 0));
         return (
       <div className="px-3 py-3 space-y-3">
-        {orderedGroups.map(([vendorKey, vendorPairs]) => (
+        {orderedGroups.map(([vendorKey, vendorPairs]) => {
+          const isVendorCollapsed = collapsedVendors.has(vendorKey);
+          return (
           <div key={vendorKey} className="rounded-xl overflow-hidden" style={{ border: "1px solid #ededf5", background: "#ffffff" }}>
-            <PulseVendorHeader label={vendorKey} count={vendorPairs.length} accent={v.accent} />
-            {vendorPairs.map(({ item, he }, i) => {
+            <PulseVendorHeader label={vendorKey} count={vendorPairs.length} accent={v.accent} collapsed={isVendorCollapsed} onToggle={() => toggleVendor(vendorKey)} />
+            {!isVendorCollapsed && vendorPairs.map(({ item, he }, i) => {
           const heat = HEAT_META[item.heat] || HEAT_META.mild;
           const headline = isHe && he?.headline_he ? he.headline_he : item.headline;
           const body = isHe && he?.body_he ? he.body_he : item.body;
@@ -387,7 +411,8 @@ function CommunityPulseSection({
           );
             })}
           </div>
-        ))}
+          );
+        })}
       </div>
         );
       })()}
@@ -395,14 +420,15 @@ function CommunityPulseSection({
   );
 }
 
-// ── Vendor group header inside Pulse cards (vendor logo + label + count) ──
-function PulseVendorHeader({ label, count, accent }: { label: string; count: number; accent: string }) {
+// ── Vendor group header inside Pulse cards (vendor logo + label + count + collapse) ──
+function PulseVendorHeader({ label, count, accent, collapsed, onToggle }: { label: string; count: number; accent: string; collapsed?: boolean; onToggle?: () => void }) {
   const v = getVendor(label);
   const logo = getVendorLogo(label, 32);
   return (
     <div
       className="flex items-center gap-2.5 px-4 py-2.5"
-      style={{ background: v.bg || "#fafafa", borderBottom: "1px solid #ededf5" }}
+      style={{ background: v.bg || "#fafafa", borderBottom: collapsed ? "none" : "1px solid #ededf5", cursor: onToggle ? "pointer" : "default" }}
+      onClick={onToggle}
     >
       {logo ? (
         <img
@@ -420,6 +446,16 @@ function PulseVendorHeader({ label, count, accent }: { label: string; count: num
       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ color: v.color || "#6b6b8a", background: "rgba(255,255,255,0.6)", border: `1px solid ${v.color || "#e0e0ec"}33` }}>
         {count}
       </span>
+      {onToggle && (
+        <span style={{
+          marginLeft: "auto", color: "#9a9ab8", fontSize: "14px", lineHeight: 1,
+          transition: "transform 0.2s",
+          transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+          display: "inline-block",
+        }}>
+          ⌄
+        </span>
+      )}
     </div>
   );
 }
@@ -455,11 +491,18 @@ function formatPulseDate(date: string, isHe: boolean): string {
   return date;
 }
 
+// Map subreddit name → canonical vendor (for Reddit vendor filtering)
+const SUBREDDIT_VENDOR: Record<string, string> = {
+  ClaudeAI: "Anthropic", Anthropic: "Anthropic",
+  OpenAI: "OpenAI", ChatGPT: "OpenAI",
+  GoogleGemini: "Google",
+};
+
 // ── Per-day block: 3 cards (X · Reddit · Pulse) ───────────────────────
 // X-pulse + Reddit-pulse are merged INTO TwitterSection / RedditSection so
 // the page is exactly one card per platform. Pulse stays separate for HN /
 // arXiv / blogs / conferences (the "everything else" bucket).
-function CommunityDayBlock({ data, hideEmptyTwitterMessage }: { data: DayData; hideEmptyTwitterMessage?: boolean }) {
+function CommunityDayBlock({ data, hideEmptyTwitterMessage, vendorFilter }: { data: DayData; hideEmptyTwitterMessage?: boolean; vendorFilter?: string | null }) {
   const { isHe } = useLang();
 
   const hasTwitter = data.twitter && (
@@ -468,12 +511,27 @@ function CommunityDayBlock({ data, hideEmptyTwitterMessage }: { data: DayData; h
   );
   const hasReddit = (data.top_reddit && data.top_reddit.length > 0) || false;
 
-  const allPulse = data.community_pulse_items || [];
-  const allPulseHe = data.community_pulse_items_he || [];
+  const allPulseRaw = data.community_pulse_items || [];
+  const allPulseHeRaw = data.community_pulse_items_he || [];
+
+  // Apply vendor filter to pulse items
+  const [allPulse, allPulseHe] = vendorFilter
+    ? (() => {
+        const filtered = allPulseRaw.map((item, i) => ({ item, he: allPulseHeRaw[i] }))
+          .filter(({ item }) => item.related_vendor === vendorFilter);
+        return [filtered.map(({ item }) => item), filtered.map(({ he }) => he)];
+      })()
+    : [allPulseRaw, allPulseHeRaw];
+
   const isFromX = (item: CommunityPulseItem) =>
     item.source_url?.includes("x.com") || item.source_url?.includes("twitter.com");
   const isFromReddit = (item: CommunityPulseItem) =>
     item.source_url?.includes("reddit.com");
+
+  // Apply vendor filter to Reddit posts (by subreddit→vendor mapping)
+  const redditPosts = vendorFilter
+    ? (data.top_reddit || []).filter((p) => SUBREDDIT_VENDOR[p.subreddit] === vendorFilter)
+    : data.top_reddit || [];
 
   const xPulsePairs = allPulse
     .map((item, i) => ({ item, he: allPulseHe[i] }))
@@ -486,8 +544,8 @@ function CommunityDayBlock({ data, hideEmptyTwitterMessage }: { data: DayData; h
     .map((_, i) => allPulseHe[i])
     .filter((_, i) => !isFromX(allPulse[i]) && !isFromReddit(allPulse[i]));
 
-  const showTwitterCard = hasTwitter || xPulsePairs.length > 0;
-  const showRedditCard = hasReddit || redditPulsePairs.length > 0;
+  const showTwitterCard = (hasTwitter && !vendorFilter) || xPulsePairs.length > 0;
+  const showRedditCard = redditPosts.length > 0 || redditPulsePairs.length > 0;
 
   return (
     <>
@@ -505,7 +563,7 @@ function CommunityDayBlock({ data, hideEmptyTwitterMessage }: { data: DayData; h
       ) : null}
       {showRedditCard && (
         <div className="mt-6">
-          <RedditSection posts={data.top_reddit || []} pulseItems={redditPulsePairs} />
+          <RedditSection posts={redditPosts} pulseItems={redditPulsePairs} />
         </div>
       )}
       {otherPulse.length > 0 && (
@@ -545,6 +603,7 @@ function CommunityPageInner() {
   const [data, setData] = useState<DayData | null>(null);
   const [archive, setArchive] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeVendor, setActiveVendor] = useState<string | null>(null);
 
   // Infinite scroll: progressively load older days as the reader nears the bottom.
   // Mirrors the BriefingPage pattern (sentinel + IntersectionObserver). Replaces
@@ -555,6 +614,24 @@ function CommunityPageInner() {
   const inFlightDates = useRef<Set<string>>(new Set());
   const searchParams = useSearchParams();
   const deepLinkDate = readDateParam(searchParams);
+
+  // Read ?vendor= param on mount and initialize filter
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get("vendor");
+    if (v) setActiveVendor(v);
+  }, []);
+
+  // Sync activeVendor to URL ?vendor= param
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (activeVendor) {
+      url.searchParams.set("vendor", activeVendor);
+    } else {
+      url.searchParams.delete("vendor");
+    }
+    window.history.replaceState(null, "", url.toString());
+  }, [activeVendor]);
 
   useEffect(() => {
     async function load() {
@@ -658,6 +735,20 @@ function CommunityPageInner() {
     );
   }
 
+  // Vendors present in today's community pulse items (for VendorFilterBar highlight)
+  const todayVendors = useMemo(
+    () => new Set((data.community_pulse_items || []).map((i) => i.related_vendor).filter(Boolean)),
+    [data.community_pulse_items]
+  );
+
+  const vendors = useMemo(() => {
+    const list = [...VENDOR_LIST];
+    for (const v of todayVendors) {
+      if (!list.includes(v) && v !== "Other") list.push(v);
+    }
+    return list;
+  }, [todayVendors]);
+
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-base)" }}>
       <Header date={data.date} archive={archive} />
@@ -668,14 +759,22 @@ function CommunityPageInner() {
         >
           {isHe ? "מה חם ב-AI" : "What's Buzzing in AI"}
         </h1>
-        <p className="mb-8 text-[13px]" style={{ color: "#9a9ab8" }}>
+        <p className="mb-4 text-[13px]" style={{ color: "#9a9ab8" }}>
           {isHe
             ? "פוסטים מ-X · דיונים ב-Reddit · דופק הקהילה (HN, arXiv, בלוגים, כנסים)"
             : "Posts from X · Reddit threads · Community pulse (HN, arXiv, blogs, conferences)"}
         </p>
 
+        {/* Vendor filter ribbon */}
+        <VendorFilterBar
+          activeVendor={activeVendor}
+          onSelect={setActiveVendor}
+          vendors={vendors}
+          todayVendors={todayVendors}
+        />
+
         {/* Today's block */}
-        <CommunityDayBlock data={data} />
+        <CommunityDayBlock data={data} vendorFilter={activeVendor} />
 
         {/* Historical days (infinite scroll) */}
         {olderDays.map((day) => (
@@ -684,7 +783,7 @@ function CommunityPageInner() {
               label={formatOlderDayLabel(day.date, data.date, isHe)}
               sublabel={day.date}
             />
-            <CommunityDayBlock data={day.data} hideEmptyTwitterMessage />
+            <CommunityDayBlock data={day.data} hideEmptyTwitterMessage vendorFilter={activeVendor} />
           </section>
         ))}
 

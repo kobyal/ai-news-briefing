@@ -211,6 +211,7 @@ function XIcon({ size = 14 }: { size?: number }) {
 
 export function TwitterSection({ data, descsHe = [], peopleDescsHe = [], pulseItems = [] }: TwitterSectionProps) {
   const { isHe } = useLang();
+  const [collapsed, setCollapsed] = useState(false);
 
   const trending = Array.isArray(data) ? data : (data?.trending || []);
   const people = Array.isArray(data) ? [] : (data?.people || []);
@@ -335,19 +336,33 @@ export function TwitterSection({ data, descsHe = [], peopleDescsHe = [], pulseIt
             </p>
           </div>
         </div>
-        <span
-          className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
-          style={{
-            color: "#1a1a1a",
-            background: "rgba(0,0,0,0.06)",
-            border: "1px solid rgba(0,0,0,0.1)",
-          }}
-        >
-          {totalCount}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
+            style={{
+              color: "#1a1a1a",
+              background: "rgba(0,0,0,0.06)",
+              border: "1px solid rgba(0,0,0,0.1)",
+            }}
+          >
+            {totalCount}
+          </span>
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            aria-label={collapsed ? "Expand" : "Collapse"}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "#9a9ab8", fontSize: "16px", lineHeight: 1, padding: "2px 4px",
+              transition: "transform 0.2s",
+              transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+            }}
+          >
+            ⌄
+          </button>
+        </div>
       </div>
 
-      <div className="px-3 py-3 space-y-3">
+      {!collapsed && <div className="px-3 py-3 space-y-3">
         {orderedGroups.map(([vendor, vendorItems]) => (
           <div key={vendor} className="rounded-xl overflow-hidden" style={{ border: "1px solid #ededf5", background: "#ffffff" }}>
             <VendorHeader label={vendor} count={vendorItems.length} accent="#000000" />
@@ -476,7 +491,7 @@ export function TwitterSection({ data, descsHe = [], peopleDescsHe = [], pulseIt
             })}
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }

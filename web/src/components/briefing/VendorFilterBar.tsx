@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getVendor } from "@/lib/vendors";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getVendor, getVendorLogo } from "@/lib/vendors";
 
 interface VendorFilterBarProps {
   activeVendor: string | null;
@@ -10,135 +10,209 @@ interface VendorFilterBarProps {
   todayVendors: Set<string>;
 }
 
-export function VendorFilterBar({ activeVendor, onSelect, vendors, todayVendors }: VendorFilterBarProps) {
-  // Disable mouse-hover handlers on touch devices. iOS Safari fires synthetic
-  // onMouseEnter on first touch which mutates the button's style mid-gesture
-  // and makes the browser commit to "tap" before the swipe is detected — so
-  // the rail couldn't be scrolled by dragging across the buttons.
-  const [hoverable, setHoverable] = useState(false);
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.matchMedia) {
-      setHoverable(window.matchMedia("(hover: hover) and (pointer: fine)").matches);
-    }
-  }, []);
-  const onEnter = (fn: (e: React.MouseEvent<HTMLElement>) => void) =>
-    hoverable ? fn : undefined;
+const CARD_W = 82;
+const CARD_H = 72;
+const CARD_GAP = 8;
+const STEP = CARD_W + CARD_GAP;
+
+function VendorCard({
+  vendor, isActive, hasToday, onClick,
+}: {
+  vendor: string | null;
+  isActive: boolean;
+  hasToday: boolean;
+  onClick: () => void;
+}) {
+  const isAll = vendor === null;
+  const meta = vendor ? getVendor(vendor) : null;
+  const logo = vendor ? getVendorLogo(vendor, 40) : null;
+  const [imgOk, setImgOk] = useState(true);
 
   return (
-    <div className="mb-6">
-      <div
-        className="flex gap-2 overflow-x-auto scrollbar-hide pb-1"
-        // Inline touch-action belt-and-suspenders — the .scrollbar-hide class
-        // already sets it, but iOS Safari can fail to apply touch-action from
-        // a class when the button children have JS hover handlers. Inline wins.
-        style={{ touchAction: "pan-x", WebkitOverflowScrolling: "touch" }}
-      >
-        {/* All button */}
-        <button
-          onClick={() => onSelect(null)}
-          className="shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border"
-          style={{
-            // touch-action on the buttons is critical: iOS evaluates the
-            // touch's intent based on the touched element's touch-action.
-            // A button defaults to "auto" — browser is free to choose pan
-            // vs. tap, and the onMouseEnter handler below makes iOS pick
-            // tap. Forcing pan-x here tells iOS: this button is a swipe
-            // surface, the click handler still works for real taps.
-            touchAction: "pan-x",
-            ...(activeVendor === null
-              ? {
-                  background: "#b45309",
-                  color: "#ffffff",
-                  borderColor: "transparent",
-                  boxShadow: "0 2px 8px rgba(79,70,229,0.35)",
-                  letterSpacing: "0.16em",
-                }
-              : {
-                  background: "#f4f4f8",
-                  color: "#6b6b8a",
-                  borderColor: "#e0e0ec",
-                  letterSpacing: "0.16em",
-                }),
-          }}
-          onMouseEnter={onEnter((e) => {
-            if (activeVendor !== null) {
-              (e.currentTarget as HTMLElement).style.color = "#b45309";
-              (e.currentTarget as HTMLElement).style.borderColor = "#c0c0f0";
-              (e.currentTarget as HTMLElement).style.background = "#eeeeff";
-            }
-          })}
-          onMouseLeave={onEnter((e) => {
-            if (activeVendor !== null) {
-              (e.currentTarget as HTMLElement).style.color = "#6b6b8a";
-              (e.currentTarget as HTMLElement).style.borderColor = "#e0e0ec";
-              (e.currentTarget as HTMLElement).style.background = "#f4f4f8";
-            }
-          })}
-        >
-          All
-        </button>
-
-        {vendors.map((vendor) => {
-          const meta = getVendor(vendor);
-          const isActive = activeVendor === vendor;
-          const hasToday = todayVendors.has(vendor);
-          return (
-            <button
-              key={vendor}
-              onClick={() => onSelect(isActive ? null : vendor)}
-              className="shrink-0 flex items-center gap-1.5 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border"
-              style={{
-                // touchAction first so it merges with the per-vendor styles below
-                touchAction: "pan-x",
-                ...(isActive
-                  ? {
-                      backgroundColor: meta.color,
-                      color: "#ffffff",
-                      borderColor: "transparent",
-                      boxShadow: `0 2px 8px ${meta.color}40`,
-                      letterSpacing: "0.14em",
-                    }
-                  : {
-                      backgroundColor: "#ffffff",
-                      color: hasToday ? "#6b6b8a" : "#b8b8cc",
-                      borderColor: hasToday ? "#e0e0ec" : "#efefef",
-                      letterSpacing: "0.14em",
-                      opacity: hasToday ? 1 : 0.6,
-                    }),
-              }}
-              onMouseEnter={onEnter((e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLElement).style.color = meta.color;
-                  (e.currentTarget as HTMLElement).style.borderColor = `${meta.color}40`;
-                  (e.currentTarget as HTMLElement).style.background = meta.bg;
-                  (e.currentTarget as HTMLElement).style.opacity = "1";
-                }
-              })}
-              onMouseLeave={onEnter((e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLElement).style.color = hasToday ? "#6b6b8a" : "#b8b8cc";
-                  (e.currentTarget as HTMLElement).style.borderColor = hasToday ? "#e0e0ec" : "#efefef";
-                  (e.currentTarget as HTMLElement).style.background = "#ffffff";
-                  (e.currentTarget as HTMLElement).style.opacity = hasToday ? "1" : "0.6";
-                }
-              })}
-            >
-              {/* Colored dot indicator */}
-              <span
-                style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  backgroundColor: isActive ? "rgba(255,255,255,0.7)" : meta.color,
-                  flexShrink: 0,
-                  opacity: hasToday ? 1 : 0.5,
-                }}
-              />
-              {meta.label}
-            </button>
-          );
-        })}
+    <button
+      onClick={onClick}
+      style={{
+        flexShrink: 0,
+        width: `${CARD_W}px`,
+        height: `${CARD_H}px`,
+        borderRadius: "16px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "7px",
+        border: isActive ? "2px solid transparent" : "1.5px solid #e4e4f0",
+        cursor: "pointer",
+        transition: "transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease",
+        transform: isActive ? "scale(1.1)" : "scale(1)",
+        zIndex: isActive ? 2 : 1,
+        position: "relative",
+        ...(isActive
+          ? isAll
+            ? {
+                background: "linear-gradient(145deg, #b45309, #7c3aed)",
+                boxShadow: "0 8px 24px rgba(124,58,237,0.38), 0 2px 6px rgba(0,0,0,0.12)",
+              }
+            : {
+                background: `linear-gradient(145deg, ${meta!.color}f0, ${meta!.color}90)`,
+                boxShadow: `0 8px 24px ${meta!.color}50, 0 2px 6px rgba(0,0,0,0.10)`,
+              }
+          : {
+              background: "#ffffff",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              opacity: isAll || hasToday ? 1 : 0.42,
+            }),
+      }}
+    >
+      {/* Icon / logo — frosted bubble on active so logo stays visible on any gradient */}
+      <div style={{
+        width: "36px", height: "36px",
+        borderRadius: "10px",
+        background: isActive ? "rgba(255,255,255,0.22)" : "transparent",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        transition: "background 0.18s ease",
+      }}>
+        {isAll ? (
+          <span style={{ fontSize: "22px", lineHeight: 1, color: isActive ? "#fff" : "#7c3aed" }}>✦</span>
+        ) : logo && imgOk ? (
+          <img
+            src={logo}
+            alt=""
+            width={24}
+            height={24}
+            style={{ borderRadius: "4px", display: "block" }}
+            onError={() => setImgOk(false)}
+          />
+        ) : (
+          <span style={{
+            display: "block",
+            width: "22px", height: "22px", borderRadius: "50%",
+            background: isActive ? "rgba(255,255,255,0.7)" : meta!.color,
+          }} />
+        )}
       </div>
+
+      {/* Label */}
+      <span style={{
+        fontSize: "9px",
+        fontWeight: 800,
+        letterSpacing: "0.09em",
+        textTransform: "uppercase",
+        color: isActive ? "#fff" : hasToday || isAll ? "#3a3a5c" : "#9090b0",
+        lineHeight: 1,
+        whiteSpace: "nowrap",
+        maxWidth: `${CARD_W - 8}px`,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}>
+        {isAll ? "All" : meta!.label}
+      </span>
+    </button>
+  );
+}
+
+export function VendorFilterBar({ activeVendor, onSelect, vendors, todayVendors }: VendorFilterBarProps) {
+  const allItems: (string | null)[] = [null, ...vendors];
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [offset, setOffset] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(8);
+
+  // Recompute how many cards fit
+  useEffect(() => {
+    const measure = () => {
+      const w = wrapperRef.current?.clientWidth ?? 900;
+      const arrows = 88; // 2 × 40px + gaps
+      setVisibleCount(Math.max(3, Math.floor((w - arrows) / STEP)));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (wrapperRef.current) ro.observe(wrapperRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const maxOffset = Math.max(0, allItems.length - visibleCount);
+  const canLeft = offset > 0;
+  const canRight = offset < maxOffset;
+
+  const shift = useCallback((dir: "left" | "right") => {
+    const step = Math.max(1, Math.floor(visibleCount / 2));
+    setOffset(o => dir === "right"
+      ? Math.min(maxOffset, o + step)
+      : Math.max(0, o - step)
+    );
+  }, [maxOffset, visibleCount]);
+
+  // Keep active vendor in view when it changes
+  useEffect(() => {
+    if (activeVendor === null) { setOffset(0); return; }
+    const idx = allItems.indexOf(activeVendor);
+    if (idx < 0) return;
+    setOffset(o => {
+      if (idx < o) return idx;
+      if (idx >= o + visibleCount) return Math.min(maxOffset, idx - visibleCount + 1);
+      return o;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeVendor]);
+
+  const ArrowBtn = ({ dir }: { dir: "left" | "right" }) => {
+    const enabled = dir === "left" ? canLeft : canRight;
+    return (
+      <button
+        onClick={() => shift(dir)}
+        disabled={!enabled}
+        aria-label={dir === "left" ? "Previous vendors" : "Next vendors"}
+        style={{
+          flexShrink: 0,
+          width: "38px", height: "38px",
+          borderRadius: "50%",
+          background: enabled ? "#fff" : "#f0f0f6",
+          border: `1.5px solid ${enabled ? "#d0d0ea" : "#e8e8f0"}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: enabled ? "pointer" : "default",
+          fontSize: "18px", fontWeight: 700,
+          color: enabled ? "#3a3a5c" : "#c0c0d8",
+          boxShadow: enabled ? "0 2px 8px rgba(0,0,0,0.10)" : "none",
+          transition: "all 0.18s",
+          lineHeight: 1,
+        }}
+      >
+        {dir === "left" ? "‹" : "›"}
+      </button>
+    );
+  };
+
+  return (
+    <div
+      ref={wrapperRef}
+      className="mb-7"
+      style={{ display: "flex", alignItems: "center", gap: "8px", userSelect: "none" }}
+    >
+      <ArrowBtn dir="left" />
+
+      {/* Clipping viewport */}
+      <div style={{ flex: 1, overflow: "hidden", paddingTop: "6px", paddingBottom: "6px" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: `${CARD_GAP}px`,
+            transform: `translateX(-${offset * STEP}px)`,
+            transition: "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+        >
+          {allItems.map((vendor) => (
+            <VendorCard
+              key={vendor ?? "__all__"}
+              vendor={vendor}
+              isActive={vendor === activeVendor}
+              hasToday={vendor === null || todayVendors.has(vendor ?? "")}
+              onClick={() => onSelect(vendor === activeVendor ? null : vendor)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <ArrowBtn dir="right" />
     </div>
   );
 }

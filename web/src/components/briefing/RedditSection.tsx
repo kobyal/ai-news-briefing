@@ -155,6 +155,7 @@ const HEAT_TO_SCORE: Record<string, number> = { hot: 800, warm: 300, mild: 100 }
 
 export function RedditSection({ posts, pulseItems = [] }: RedditSectionProps) {
   const { isHe } = useLang();
+  const [collapsed, setCollapsed] = useState(false);
 
   // Adapt Reddit-source pulse items into RedditPost shape so they merge with
   // raw posts. Dedup against raw posts by URL. Score parsed from body, falling
@@ -244,20 +245,34 @@ export function RedditSection({ posts, pulseItems = [] }: RedditSectionProps) {
             </p>
           </div>
         </div>
-        <span
-          className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
-          style={{
-            color: "#b91c1c",
-            background: "rgba(255,69,0,0.08)",
-            border: "1px solid rgba(255,69,0,0.2)",
-          }}
-        >
-          {totalCount}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
+            style={{
+              color: "#b91c1c",
+              background: "rgba(255,69,0,0.08)",
+              border: "1px solid rgba(255,69,0,0.2)",
+            }}
+          >
+            {totalCount}
+          </span>
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            aria-label={collapsed ? "Expand" : "Collapse"}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "#9a9ab8", fontSize: "16px", lineHeight: 1, padding: "2px 4px",
+              transition: "transform 0.2s",
+              transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+            }}
+          >
+            ⌄
+          </button>
+        </div>
       </div>
 
       {/* Posts (grouped by subreddit, each in its own bordered rectangle) */}
-      <div className="px-3 py-3 space-y-3">
+      {!collapsed && <div className="px-3 py-3 space-y-3">
         {orderedGroups.map(([sub, subPosts]) => (
           <div key={sub} className="rounded-xl overflow-hidden" style={{ border: "1px solid #ededf5", background: "#ffffff" }}>
             <SubredditGroupHeader subreddit={sub} count={subPosts.length} iconUrl={subPosts[0]?.subreddit_icon_url} />
@@ -364,7 +379,7 @@ export function RedditSection({ posts, pulseItems = [] }: RedditSectionProps) {
             })}
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }

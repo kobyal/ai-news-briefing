@@ -233,9 +233,27 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
     }
   }, [activeVendor, fetchMultiDate]);
 
+  // Read ?vendor= param on mount and initialize filter
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get("vendor");
+    if (v) setActiveVendor(v);
+  }, []);
+
   const handleVendorSelect = useCallback((vendor: string | null) => {
     setActiveVendor(vendor);
   }, []);
+
+  // Sync activeVendor to URL ?vendor= param
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (activeVendor) {
+      url.searchParams.set("vendor", activeVendor);
+    } else {
+      url.searchParams.delete("vendor");
+    }
+    window.history.replaceState(null, "", url.toString());
+  }, [activeVendor]);
 
   // Listen for vendor clicks from inside StoryCard badges
   useEffect(() => {

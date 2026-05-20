@@ -263,8 +263,27 @@ aws s3 cp "docs/data/${DATE}.json" "s3://${S3_BUCKET}/data/${DATE}.json" \
   --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
   && echo "  ✓ ${DATE}.json uploaded to S3" \
   || echo "  ⚠ ${DATE}.json S3 upload failed"
-# Upload archive.json so the archive page date list stays current
-if [ -f docs/data/archive.json ]; then
+# Regenerate archive.json: fetch current from S3, add today's date, re-upload.
+# This keeps the date list current for the local pipeline (Lambda does this
+# automatically on ingest, but local runs bypass Lambda).
+_ARCHIVE_UPDATED=$(aws s3 cp "s3://${S3_BUCKET}/data/archive.json" - \
+  --profile "$S3_PROFILE" --region us-east-1 2>/dev/null | \
+  python3 -c "
+import json,sys
+try:
+    a = json.load(sys.stdin)
+    dates = sorted(set(a.get('dates',[]) + ['${DATE}']), reverse=True)[:90]
+    print(json.dumps({'dates': dates}))
+except Exception:
+    pass
+" 2>/dev/null || true)
+if [ -n "$_ARCHIVE_UPDATED" ]; then
+  echo "$_ARCHIVE_UPDATED" | aws s3 cp - "s3://${S3_BUCKET}/data/archive.json" \
+    --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
+    --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
+    && echo "  ✓ archive.json updated + uploaded to S3" \
+    || echo "  ⚠ archive.json S3 upload failed"
+elif [ -f docs/data/archive.json ]; then
   aws s3 cp docs/data/archive.json "s3://${S3_BUCKET}/data/archive.json" \
     --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
     --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \

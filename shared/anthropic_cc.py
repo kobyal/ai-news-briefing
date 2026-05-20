@@ -69,22 +69,35 @@ def agent(
     # Strip session-specific Claude Code env vars before spawning so the child
     # `claude -p` uses OAuth/subscription auth instead of being confused by
     # the parent session's context (which causes "credit balance too low").
+    # Strip ALL CLAUDE_CODE_* prefixed vars (not just a fixed list) — new vars
+    # added in future CC releases would otherwise cause silent auth failures.
     # CLAUDE_CODE_USE_BEDROCK / CLAUDE_CODE_USE_VERTEX are intentionally kept
     # so Bedrock/Vertex deployments still work in the child process.
-    _STRIP_EXACT = {
-        "CLAUDECODE",           # marks process as inside a CC session
-        "CLAUDE_CODE_SSE_PORT", # parent session's SSE server port
-        "CLAUDE_CODE_ENTRYPOINT",
-        "ANTHROPIC_API_KEY",    # zero-credit key overrides subscription auth
+    _STRIP_PREFIX = "CLAUDE_CODE_"
+    _KEEP = {"CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX"}
+    _STRIP_EXACT = {"CLAUDECODE", "ANTHROPIC_API_KEY"}
+    child_env = {
+        k: v for k, v in os.environ.items()
+        if k not in _STRIP_EXACT
+        and (k not in _KEEP and not k.startswith(_STRIP_PREFIX) or k in _KEEP)
     }
-    child_env = {k: v for k, v in os.environ.items() if k not in _STRIP_EXACT}
 
     t0 = time.time()
-    try:
-        r = subprocess.run(cmd, input=input_text, capture_output=True,
-                           text=True, timeout=1800, env=child_env)
-    except subprocess.TimeoutExpired:
-        raise RuntimeError(f"[{label}] claude -p timed out after 1800s")
+    last_err: Exception | None = None
+    for attempt in range(2):  # 1 retry on transient rc=1 with empty output
+        try:
+            r = subprocess.run(cmd, input=input_text, capture_output=True,
+                               text=True, timeout=1800, env=child_env)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"[{label}] claude -p timed out after 1800s")
+        if r.returncode == 0:
+            break
+        # Only retry when there's no useful error to surface (transient crash)
+        if r.stderr.strip() or r.stdout.strip():
+            break
+        last_err = RuntimeError(f"[{label}] claude -p failed silently (rc={r.returncode}), attempt {attempt+1}")
+        if attempt == 0:
+            import time as _time; _time.sleep(5)
     if r.returncode != 0:
         # Find error/result events in stdout for diagnosis
         err_events = []

@@ -149,17 +149,23 @@ Produce ONE merged briefing as a JSON object. Rules:
 
    Think: "What are developers arguing about? What's controversial? What took off virally? What's the mood?"
 
-   REQUIRED: Return a JSON array "community_pulse_items" with 5-7 items. Each item:
+   REQUIRED: Return a JSON array "community_pulse_items" with 8-12 items. Each item:
    {
      "headline": "punchy reaction title (5-10 words) — frame as debate/opinion, NOT as news",
      "body": "1-2 sentences. Be SPECIFIC: name the person, subreddit, or thread. Include quotes, engagement numbers, or concrete opinions. NOT a restatement of the news.",
      "heat": "hot" | "warm" | "mild",
      "date": "exact date of the discussion/post (e.g. 'April 10, 2026'). Extract from the source data.",
      "source_url": "direct URL to the discussion/post/thread. MUST NOT be empty.",
-     "source_label": "e.g. 'r/LocalLLaMA (2.3K upvotes)', '@karpathy on X', 'HN (890 pts)', 'Simon Willison's blog'",
+     "source_label": "e.g. 'r/LocalLLaMA (2.3K upvotes)', '@karpathy on X', 'HN (890 pts)', 'lobste.rs', 'dev.to'",
      "related_vendor": "vendor name if related to a news_item, or empty string",
      "related_person": "person name if referencing someone from people_highlights, or empty string"
    }
+
+   AIM FOR VENDOR COVERAGE: try to include at least one item per major active vendor (Anthropic,
+   OpenAI, Google, AWS, Meta, xAI, NVIDIA, Mistral, HuggingFace, DeepSeek). Source items from
+   X posts, Reddit threads, HN comments, Lobsters, Dev.to — whichever platform had the hottest
+   reaction. Lobsters and Dev.to signal developer-practitioner sentiment; HN captures researcher
+   + startup community; Reddit captures end-user + power-user perspective.
 
    GOOD examples of community_pulse_items:
    - headline: "Developers revolt over Meta's open-source U-turn" / body: "r/LocalLLaMA erupted after Muse Spark launch, with top post (2.3K upvotes) calling it 'the biggest betrayal in open-source AI history'. Many vow to switch to Mistral."
@@ -269,6 +275,26 @@ TRANSLATOR_PROMPT = """\
 - ❌ "מואצת דרמטית את לוחות הזמנים" → ✅ "מקצרת משמעותית את זמני הפיתוח"
 - ❌ "שומרי שער ביטחוניים" → ✅ "מנגנוני בטיחות"
 - ❌ "צבר חיובי" → ✅ "קיבל תגובות חיוביות" או "זכה להתלהבות"
+
+כותרות (headlines_he) — כללים ספציפיים:
+כותרת טובה = מגנטית + מדויקת. לא clickbait, לא ויקיפדיה. שלוש שניות לגרום לקורא לרצות לקרוא.
+
+עקרונות לכותרת:
+1. שים את המפתיע/המתח קודם — לא "חברה X עושה Y" אלא ההשלכה/הדרמה
+2. מספרים גדולים נוחתים חזק בהתחלה: "8,000 פיטורים ב-Meta" ולא "Meta מפטרת 8,000"
+3. פעלים ישראליים חיים: "שוברת", "בולעת", "כובשת", "מסתבכת", "זורקת", "הולכת ל"
+4. שאלה רטורית לכותרות של שינוי תעשייתי: "מי יחליף את Google בחיפוש?"
+5. כותרות ארוכות עם נקודה-פסיק — בחר את הזווית המעניינת ביותר בלבד
+
+דוגמאות כותרות:
+- ❌ "OpenAI מסיימת בלעדיות מול Microsoft, מתרחבת ל-AWS ו-Google Cloud; Dell הופכת לערוץ on-prem"
+  ✅ "OpenAI שוברת את הבלעדיות: AWS ו-Google Cloud נכנסים — Microsoft כבר לא לבד בחדר"
+- ❌ "Anthropic מגייסת את Andrej Karpathy ורוכשת את Stainless ביותר מ-300 מיליון דולר"
+  ✅ "Anthropic בולעת: קרפתי מגיע מ-OpenAI ו-300 מיליון דולר ביום אחד"
+- ❌ "Meta מעבירה 7,000 עובדים לארבע יחידות AI חדשות לפני 8,000 פיטורים"
+  ✅ "8,000 פיטורים ב-Meta — ו-7,000 עובדים עוברים ל-AI ביום אחד"
+- ❌ "Google מציגה מערכת חיפוש חדשה עם AI agents בכנס I/O"
+  ✅ "Google הורגת את תיבת החיפוש: I/O 2026 מוביל לעידן ה-agent"
 
 מבחן: קרא את מה שכתבת בקול רם. אם זה נשמע כמו Google Translate — תכתוב מחדש. אם מפתח ישראלי היה מגלגל עיניים — תכתוב מחדש.
 

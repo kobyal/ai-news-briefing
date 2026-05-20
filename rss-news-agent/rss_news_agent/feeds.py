@@ -137,13 +137,21 @@ FEEDS = [
     # ---- Community / research signal -------------------------------------
     ("https://hacker-news.firebaseio.com/v0/topstories.json",              "Other",         "hn"),
     ("https://huggingface.co/api/daily_papers",                            "Hugging Face",  "hf_papers"),
+    # ---- Developer community aggregators (high-quality discussion signal) --
+    ("https://lobste.rs/t/ai.rss",                                         "Other",         "rss"),
+    ("https://lobste.rs/t/machinelearning.rss",                            "Other",         "rss"),
+    ("https://dev.to/feed/tag/ai",                                         "Other",         "rss"),
+    ("https://dev.to/feed/tag/llm",                                        "Other",         "rss"),
+    ("https://dev.to/feed/tag/machinelearning",                            "Other",         "rss"),
     # Reddit via Arctic Shift archive (no auth required; hot.json 403s without OAuth).
     # ── General AI communities ─────────────────────────────────────────────────
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=MachineLearning", "Other",        "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=LocalLLaMA",      "Meta",         "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=artificial",      "Other",        "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=singularity",     "Other",        "reddit_arctic"),
-    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=AINews",          "Other",        "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=MachineLearning",       "Other",        "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=LocalLLaMA",            "Meta",         "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=artificial",            "Other",        "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=singularity",           "Other",        "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=AINews",                "Other",        "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=learnmachinelearning",  "Other",        "reddit_arctic"),
+    ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=MLOps",                 "Other",        "reddit_arctic"),
     # ── Vendor-specific communities ────────────────────────────────────────────
     ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ClaudeAI",        "Anthropic",    "reddit_arctic"),
     ("https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=Anthropic",       "Anthropic",    "reddit_arctic"),
@@ -353,79 +361,84 @@ def fetch_subreddit_icon(sub_name: str) -> Optional[str]:
 # r/MachineLearning threads competing with legitimate 1k+ discussions) don't
 # pollute the feed. Tune here without code changes elsewhere.
 SUBREDDIT_SCORE_FLOORS = {
-    "singularity":      300,   # high-traffic, low-signal
-    "OpenAI":           300,
-    "ChatGPT":          300,
-    "MachineLearning":  50,    # niche/research — slower but high signal
-    "Anthropic":        50,
-    "ClaudeAI":         50,
-    "LocalLLaMA":       50,
-    "aws":              50,    # broad AWS community — want substantive posts
-    "aws_ai":           20,
-    "azure":            50,
-    "nvidia":           150,   # mixed gaming/tech — raise bar for AI relevance
-    "MetaAI":           20,
-    "xai":              20,
-    "DeepSeek":         30,
-    "Mistral_AI":       20,
-    "HuggingFace":      20,
-    "GoogleCloud":      50,
-    "StableDiffusion":  100,
+    "singularity":           150,   # high-traffic — lowered 300→150 to let more through
+    "OpenAI":                75,    # was 300 — blocked everything; 75 = substantive thread
+    "ChatGPT":               75,    # was 300 — same fix
+    "MachineLearning":       50,    # niche/research — slower but high signal
+    "Anthropic":             30,    # smaller community — 50 was too high
+    "ClaudeAI":              30,
+    "LocalLLaMA":            25,    # was 50 — smaller community, 25 = real discussion
+    "aws":                   50,
+    "aws_ai":                15,
+    "azure":                 30,
+    "nvidia":                75,    # was 150 — still filters gaming noise
+    "MetaAI":                15,
+    "xai":                   15,
+    "DeepSeek":              20,
+    "Mistral_AI":            15,
+    "HuggingFace":           15,
+    "GoogleCloud":           30,
+    "StableDiffusion":       75,
+    "learnmachinelearning":  20,    # learner community — lower bar
+    "MLOps":                 15,    # production ML practitioners
+    "AIAssistants":          10,    # end-user perspective
     # artificial, GoogleGemini, AINews → DEFAULT_SUBREDDIT_SCORE_FLOOR
 }
-DEFAULT_SUBREDDIT_SCORE_FLOOR = 100
+DEFAULT_SUBREDDIT_SCORE_FLOOR = 75
 
 
-def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[dict]:
-    """Fetch Reddit posts via Arctic Shift archive API (no auth required).
+_REDDIT_HEADERS = {"User-Agent": "ai-briefing-bot/2.0 (by /u/kobyalmog)"}
 
-    url already contains the subreddit param, e.g.:
-      https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=MachineLearning
 
-    Uses a 7-day lookback (regardless of pipeline lookback_days) so posts have had
-    time to accumulate upvotes — gives the "Hot on Reddit" section meaningful scores.
-    Posts below the per-subreddit upvote floor (SUBREDDIT_SCORE_FLOORS) are dropped.
+def _fetch_reddit_hot(url: str, since: datetime, max_items: int = 15) -> List[dict]:
+    """Fetch Reddit posts via the public hot.json API (no auth required).
+
+    Replaces the Arctic Shift archive which stored scores at crawl time (score=1
+    for posts just submitted) — useless for filtering. Reddit's public hot.json
+    returns live upvote counts so SUBREDDIT_SCORE_FLOORS can actually work.
+
+    url is an Arctic-Shift-style URL; sub_name is extracted from `subreddit=` param.
     """
-
     sub_name = url.split("subreddit=")[-1].split("&")[0]
     floor = SUBREDDIT_SCORE_FLOORS.get(sub_name, DEFAULT_SUBREDDIT_SCORE_FLOOR)
 
-    # Use at least 7-day window for Reddit so posts have time to accumulate comments
+    # 7-day lookback floor so posts have time to accumulate votes
     min_since = datetime.now(tz=timezone.utc) - timedelta(days=7)
-    reddit_since = min(since, min_since)  # take the earlier date
-    after_ts = int(reddit_since.timestamp())
-    # ArcticShift caps limit at 100 (returns 400 above that). Fetch the max and
-    # let the downstream sort-by-comments pick the most engaged posts.
-    params = {
-        "limit": 100,
-        "after": after_ts,
-    }
+    reddit_since = min(since, min_since)
 
     try:
-        headers = {"User-Agent": "ai-briefing-bot/1.0"}
-        resp = _requests.get(url, params=params, headers=headers, timeout=15)
+        api_url = f"https://www.reddit.com/r/{sub_name}/hot.json"
+        resp = _requests.get(api_url, params={"limit": 50},
+                             headers=_REDDIT_HEADERS, timeout=15)
         resp.raise_for_status()
-        posts = resp.json().get("data") or []
+        posts_raw = resp.json().get("data", {}).get("children", [])
     except Exception as e:
-        print(f"  [ArcticShift] r/{sub_name} error: {e}")
+        print(f"  [Reddit] r/{sub_name} error: {e}")
         return []
 
     dropped_below_floor = 0
     articles = []
-    for post in posts:
-        ts    = post.get("created_utc", 0)
+    for item in posts_raw:
+        post = item.get("data", {})
         title = post.get("title", "")
-        sub   = post.get("subreddit", "")
         score = post.get("score", 0)
         permalink = post.get("permalink", "")
         ext_url = post.get("url", "")
+        ts = post.get("created_utc", 0)
+        sub = post.get("subreddit", sub_name)
+        num_comments = post.get("num_comments", 0)
 
         if not title or not permalink:
             continue
-        # Skip removed/deleted posts
-        if title.startswith("[") or not post.get("author") or post.get("removed_by_category"):
+        if post.get("stickied"):
             continue
-        # Apply per-subreddit upvote floor
+        if not post.get("author") or post.get("removed_by_category"):
+            continue
+
+        pub = datetime.fromtimestamp(int(ts), tz=timezone.utc) if ts else None
+        if pub and pub < reddit_since:
+            continue
+
         if score < floor:
             dropped_below_floor += 1
             continue
@@ -435,32 +448,24 @@ def _fetch_arctic_shift(url: str, since: datetime, max_items: int = 15) -> List[
         if ext_url and not ext_url.startswith("https://www.reddit.com"):
             urls.append(ext_url)
 
-        pub = datetime.fromtimestamp(int(ts), tz=timezone.utc) if ts else None
-        vendor = _infer_vendor(title, post.get("selftext", ""), "Other")
-        num_comments = post.get("num_comments", 0)
+        vendor = _infer_vendor(title, post.get("selftext", "")[:500], "Other")
         articles.append({
             "vendor":         vendor,
             "headline":       title,
             "published_date": pub.strftime("%B %d, %Y") if pub else "Date unknown",
-            "summary":        f"r/{sub} — {score} upvotes, {num_comments} comments.",
+            "summary":        f"r/{sub} — {score:,} upvotes, {num_comments:,} comments.",
             "urls":           urls,
             "_pub_dt":        pub,
-            # _score (sort key) stays as comments count — comments correlate with
-            # engagement better than fuzzed upvotes for sorting.
-            "_score":         num_comments,
-            # _upvotes + _num_comments preserved separately so the downstream
-            # pipeline can render BOTH "1.4k upvotes · 367 comments" instead of
-            # mis-labelling the comments count as upvotes (incident 2026-05-10:
-            # user saw "39 הצבעות" on a post with 378 actual upvotes).
+            "_score":         num_comments,   # sort by engagement
             "_upvotes":       score,
             "_num_comments":  num_comments,
             "_is_community":  True,
+            "subreddit":      sub_name,
         })
 
     if dropped_below_floor > 0:
-        print(f"  [ArcticShift] r/{sub_name} dropped {dropped_below_floor} posts below {floor}-upvote floor (kept {len(articles)})")
+        print(f"  [Reddit] r/{sub_name} dropped {dropped_below_floor} posts below {floor}-upvote floor (kept {len(articles)})")
 
-    # Sort by comment count (most engaged posts first), then take top max_items
     articles.sort(key=lambda a: a.get("_score", 0), reverse=True)
     return articles[:max_items]
 
@@ -498,7 +503,7 @@ def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
             elif feed_type == "hf_papers":
                 futures.append(pool.submit(_fetch_hf_papers, url, since))
             elif feed_type == "reddit_arctic":
-                futures.append(pool.submit(_fetch_arctic_shift, url, since))
+                futures.append(pool.submit(_fetch_reddit_hot, url, since))
 
         for f in concurrent.futures.as_completed(futures):
             try:

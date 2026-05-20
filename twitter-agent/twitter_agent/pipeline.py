@@ -176,7 +176,7 @@ TRACKED_HANDLES = [
     {"name": "Satya Nadella",       "handle": "satyanadella",   "org": "Microsoft",   "role": "CEO"},
     {"name": "Sundar Pichai",       "handle": "sundarpichai",   "org": "Google",      "role": "CEO"},
     {"name": "Mira Murati",         "handle": "miramurati",     "org": "Thinking Machines", "role": "Founder/CEO"},
-    {"name": "Mustafa Suleyman",    "handle": "mustafasuleymn", "org": "Microsoft",   "role": "CEO of Microsoft AI"},
+    {"name": "Mustafa Suleyman",    "handle": "mustafasuleyman","org": "Microsoft",   "role": "CEO of Microsoft AI"},
     {"name": "Aravind Srinivas",    "handle": "AravSrinivas",   "org": "Perplexity",  "role": "CEO"},
     {"name": "Aidan Gomez",         "handle": "aidangomez",     "org": "Cohere",      "role": "CEO"},
     {"name": "Jensen Huang",        "handle": "jensenhuang",    "org": "NVIDIA",      "role": "CEO"},

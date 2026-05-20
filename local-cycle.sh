@@ -354,7 +354,8 @@ d=json.load(open('docs/data/search-index.json'))
 ids=[s['story_id'] for s in d.get('stories',[]) if s.get('story_id')]
 print('\n'.join(random.sample(ids, min(5,len(ids)))))" 2>/dev/null || true)
       for url in "${check_urls[@]}"; do
-        status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
+        # || echo "000" prevents curl timeout/DNS failures from triggering set -e
+        status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" || echo "000")
         if [ "$status" != "200" ]; then
           echo "  ⚠ health check FAIL: $url → HTTP $status"
           health_fail=1

@@ -345,15 +345,14 @@ if [ "$DO_PUSH" -eq 1 ]; then
       sleep 5  # brief wait for invalidation to start propagating
       health_fail=0
       check_urls=("https://aibriefing.dev/")
-      # Pick 5 random story IDs from search-index (zsh-compatible, no mapfile)
-      sample_ids=( ${(f)"$(python3 -c "
+      # Pick 5 random story IDs from search-index
+      while IFS= read -r sid; do
+        [ -n "$sid" ] && check_urls+=("https://aibriefing.dev/story/${sid}/")
+      done < <(python3 -c "
 import json,random
 d=json.load(open('docs/data/search-index.json'))
 ids=[s['story_id'] for s in d.get('stories',[]) if s.get('story_id')]
-print('\n'.join(random.sample(ids, min(5,len(ids)))))" 2>/dev/null)"} )
-      for sid in "${sample_ids[@]}"; do
-        check_urls+=("https://aibriefing.dev/story/${sid}/")
-      done
+print('\n'.join(random.sample(ids, min(5,len(ids)))))" 2>/dev/null || true)
       for url in "${check_urls[@]}"; do
         status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
         if [ "$status" != "200" ]; then
@@ -361,7 +360,9 @@ print('\n'.join(random.sample(ids, min(5,len(ids)))))" 2>/dev/null)"} )
           health_fail=1
         fi
       done
-      [ "$health_fail" -eq 0 ] && echo "  ✓ health check passed (${#check_urls[@]} URLs → 200)"
+      if [ "$health_fail" -eq 0 ]; then
+        echo "  ✓ health check passed (${#check_urls[@]} URLs → 200)"
+      fi
     else
       echo "  ⚠ S3 sync failed (frontend not deployed — story pages may 404)"
     fi

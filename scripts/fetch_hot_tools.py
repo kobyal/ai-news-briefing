@@ -213,9 +213,15 @@ def fetch_readme_intro(model_or_space_id: str, kind: str = "models") -> str:
 
 
 def _translate_via_cli(text: str) -> str:
-    """Fallback: translate via `claude -p` CLI (uses subscription auth, not API key)."""
+    """Fallback: translate via `claude -p` CLI (works with subscription or Bedrock/Vertex)."""
     try:
-        clean_env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE_CODE_")}
+        # Strip session-specific CLAUDE_CODE_* vars (causes subscription auth conflict)
+        # but keep CLAUDE_CODE_USE_BEDROCK / CLAUDE_CODE_USE_VERTEX so cloud deployments work.
+        _keep = {"CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX"}
+        clean_env = {
+            k: v for k, v in os.environ.items()
+            if k in _keep or not k.startswith("CLAUDE_CODE_")
+        }
         prompt = f"Translate to Hebrew. Return ONLY the translation, no explanations:\n\n{text[:500]}"
         r = subprocess.run(["claude", "-p", prompt], capture_output=True, text=True,
                            env=clean_env, timeout=60)

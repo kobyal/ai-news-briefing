@@ -1743,7 +1743,7 @@ def _pair_explainer_videos(news_items: list, videos: list) -> int:
     return paired
 
 
-_yt_api_key = os.environ.get("YOUTUBE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+_yt_api_key = os.environ.get("YOUTUBE_API_KEY") or os.environ.get("YOUTUBE_API_KEY2")
 if _yt_api_key:
     _added_p1 = _enrich_youtube_per_story(_news_items, youtube_items, _yt_api_key)
     print(f"  Phase 1 enrichment: +{_added_p1} videos from per-story YouTube searches "

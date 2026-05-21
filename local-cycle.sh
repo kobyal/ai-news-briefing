@@ -222,6 +222,20 @@ echo
 echo "[1/6] Running pipeline via subscription (claude -p / Opus 4.7)..."
 "$PYTHON_BIN" run_all.py --skip xai
 
+# Check if YouTube agent hit quota exhaustion (quota resets midnight PT = ~10:00 AM Israel)
+_YT_OUT=$(ls -t "youtube-news-agent/output/${DATE}/"*.json 2>/dev/null | head -1)
+if [ -n "$_YT_OUT" ]; then
+  _YT_VIDEOS=$("$PYTHON_BIN" -c "import json; d=json.load(open('$_YT_OUT')); print(len((d.get('briefing') or {}).get('news_items', [])))" 2>/dev/null || echo 0)
+  _YT_QUOTA=$("$PYTHON_BIN" -c "import json; d=json.load(open('$_YT_OUT')); print(d.get('quota_exhausted','false'))" 2>/dev/null || echo false)
+  if [ "$_YT_VIDEOS" = "0" ]; then
+    echo "  ⚠ WARNING: YouTube agent returned 0 videos (quota_exhausted=${_YT_QUOTA})."
+    echo "  ⚠ YouTube quota resets at midnight PT (~10:00 AM Israel)."
+    echo "  ⚠ Re-run after reset: MERGER_VIA_CLAUDE_CODE=1 python3 youtube-news-agent/youtube_news_agent/pipeline.py"
+  else
+    echo "  ✓ YouTube agent: ${_YT_VIDEOS} videos"
+  fi
+fi
+
 echo
 echo "[2/6] Copying merged HTML to docs/index.html + docs/report/..."
 LATEST=$(ls -t "merger-agent/output/${DATE}/"merged_*.html 2>/dev/null | head -1)

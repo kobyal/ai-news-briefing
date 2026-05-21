@@ -147,6 +147,7 @@ def _yt_get(url: str, params: dict, timeout: int = 15):
     if not keys:
         return None
     last = None
+    quota_failures = 0
     for i, key in enumerate(keys):
         p = dict(params, key=key)
         try:
@@ -169,10 +170,18 @@ def _yt_get(url: str, params: dict, timeout: int = 15):
                     pass
             return r
         if r.status_code in (403, 429):
+            quota_failures += 1
             print(f"  YT key #{i+1} got HTTP {r.status_code} — trying next key")
             continue
         # Other status (4xx, 5xx, etc.) — don't burn another key
         return r
+    if quota_failures == len(keys) and keys:
+        print(f"  ⚠ ALL {len(keys)} YouTube API key(s) quota-exhausted (HTTP 403/429). "
+              f"Quota resets at midnight PT (~10:00 AM Israel). "
+              f"Re-run after reset or add more keys.")
+        # Set a process-level flag so run_pipeline() can record it in output JSON
+        import builtins
+        builtins._yt_quota_exhausted = True
     return last
 
 
@@ -601,8 +610,15 @@ def run_pipeline() -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%H%M%S")
     path = out_dir / f"youtube_{ts}.json"
+    import builtins
+    quota_exhausted = getattr(builtins, "_yt_quota_exhausted", False)
+    output = {"source": "youtube", "briefing": briefing, "channel_latest": channel_latest}
+    if quota_exhausted or (not news_items and not channel_latest):
+        output["quota_exhausted"] = True
+        if quota_exhausted:
+            output["quota_note"] = "All YOUTUBE_API_KEY* keys returned 403/429. Quota resets midnight PT (~10:00 AM Israel)."
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({"source": "youtube", "briefing": briefing, "channel_latest": channel_latest}, f, ensure_ascii=False)
+        json.dump(output, f, ensure_ascii=False)
 
     elapsed = time.time() - t_start
     print(f"\n{'=' * 60}")

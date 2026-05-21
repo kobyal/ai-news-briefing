@@ -243,6 +243,20 @@ twitter_raw = _latest("twitter-agent/output/**/*.json") or _latest("xai-twitter-
 # Extract news_items from standard agent format
 youtube_items = (youtube_raw.get("briefing", {}) if isinstance(youtube_raw, dict) else {}).get("news_items", [])
 youtube_channel_latest = youtube_raw.get("channel_latest", []) if isinstance(youtube_raw, dict) else []
+# Fallback: if today's agent returned 0 channel_latest (quota/fail), use previous day's data.
+if not youtube_channel_latest:
+    import glob as _glob
+    _prev_files = sorted(_glob.glob("youtube-news-agent/output/**/*.json", recursive=True))
+    _today_prefix = f"youtube-news-agent/output/{date_str}/"
+    _prev_files = [f for f in _prev_files if not f.startswith(_today_prefix)]
+    if _prev_files:
+        try:
+            _prev = json.load(open(_prev_files[-1]))
+            youtube_channel_latest = _prev.get("channel_latest", [])
+            if youtube_channel_latest:
+                print(f"  [publish_data] youtube channel_latest empty today — using {_prev_files[-1]} ({len(youtube_channel_latest)} entries)")
+        except Exception:
+            pass
 # Snapshot URLs of videos the merger saw — used post-cap to realign
 # briefing_he.youtube_descs_he by URL (since the cap reorders the list).
 _youtube_initial_urls = []

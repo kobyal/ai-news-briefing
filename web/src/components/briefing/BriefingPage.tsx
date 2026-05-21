@@ -139,7 +139,7 @@ function formatOlderDayLabel(dateStr: string, todayStr: string, isHe: boolean): 
 export function BriefingPage({ data, archive }: BriefingPageProps) {
   const { isHe } = useLang();
   const [activeVendor, setActiveVendor] = useState<string | null>(null);
-  const [multiDateStories, setMultiDateStories] = useState<NewsItem[]>([]);
+  const [multiDateStoriesByDate, setMultiDateStoriesByDate] = useState<OlderDay[]>([]);
   const [loadingMulti, setLoadingMulti] = useState(false);
   // Track which vendor's fetch is "current" so stale responses don't overwrite
   const fetchVendorRef = useRef<string | null>(null);
@@ -198,34 +198,32 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
       );
       // Ignore result if the user switched to a different vendor while fetching
       if (fetchVendorRef.current !== vendor) return;
-      const allStories: NewsItem[] = [];
-      for (const dayData of results) {
-        if (dayData?.stories) {
-          for (const s of dayData.stories) {
-            if (s.vendor === vendor) {
-              allStories.push(s);
-            }
-          }
-        }
-      }
-      // Deduplicate by story_id AND fuzzy headline match
+      // Deduplicate by story_id AND fuzzy headline match, grouped by date
       const seenIds = new Set(data.stories.filter((s) => s.vendor === vendor).map((s) => s.story_id));
       const seenHeadlines = new Set(
         data.stories.filter((s) => s.vendor === vendor)
           .map((s) => s.headline.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 40))
       );
-      const unique = allStories.filter((s) => {
-        if (seenIds.has(s.story_id)) return false;
-        // Fuzzy: check if first 40 chars of normalized headline already seen
-        const norm = s.headline.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 40);
-        if (seenHeadlines.has(norm)) return false;
-        seenIds.add(s.story_id);
-        seenHeadlines.add(norm);
-        return true;
-      });
-      setMultiDateStories(unique);
+      const grouped: OlderDay[] = [];
+      for (let i = 0; i < results.length; i++) {
+        const dayData = results[i];
+        const date = otherDates[i];
+        if (!dayData?.stories) continue;
+        const dayUnique = dayData.stories
+          .filter((s) => s.vendor === vendor)
+          .filter((s) => {
+            if (seenIds.has(s.story_id)) return false;
+            const norm = s.headline.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 40);
+            if (seenHeadlines.has(norm)) return false;
+            seenIds.add(s.story_id);
+            seenHeadlines.add(norm);
+            return true;
+          });
+        if (dayUnique.length > 0) grouped.push({ date, stories: dayUnique });
+      }
+      setMultiDateStoriesByDate(grouped);
     } catch {
-      if (fetchVendorRef.current === vendor) setMultiDateStories([]);
+      if (fetchVendorRef.current === vendor) setMultiDateStoriesByDate([]);
     } finally {
       if (fetchVendorRef.current === vendor) setLoadingMulti(false);
     }
@@ -236,7 +234,7 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
       fetchMultiDate(activeVendor);
     } else {
       fetchVendorRef.current = null;
-      setMultiDateStories([]);
+      setMultiDateStoriesByDate([]);
       setLoadingMulti(false);
     }
   }, [activeVendor, fetchMultiDate]);
@@ -443,7 +441,7 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
 
         {/* ── STORIES ─────────────────────────────────────── */}
         {todayFiltered.length > 0 && (
-          <section className={activeVendor && multiDateStories.length > 0 ? "mb-8" : "mb-16"}>
+          <section className={activeVendor && multiDateStoriesByDate.length > 0 ? "mb-8" : "mb-16"}>
             <SectionDivider
               label={activeVendor ? `${activeVendor} — ${isHe ? "היום" : "Today"}` : (isHe ? "כתבות" : "Stories")}
               count={todayFiltered.length}
@@ -531,17 +529,27 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
                 </span>
               </div>
             )}
-            {!loadingMulti && multiDateStories.length > 0 && (
-              <section className="mb-16">
-                <SectionDivider label={`${activeVendor} — ${isHe ? "ימים קודמים" : "Previous Days"}`} count={multiDateStories.length} />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {multiDateStories.map((story, i) => (
-                    <StoryCard key={story.story_id} story={story} rank={todayFiltered.length + i + 1} />
-                  ))}
-                </div>
-              </section>
-            )}
-            {!loadingMulti && todayFiltered.length === 0 && multiDateStories.length === 0 && (
+            {!loadingMulti && multiDateStoriesByDate.length > 0 && (() => {
+              let rank = todayFiltered.length;
+              return multiDateStoriesByDate.map((day) => {
+                const dayRankStart = rank;
+                rank += day.stories.length;
+                return (
+                  <section key={day.date} className="mb-12">
+                    <DaySeparator
+                      label={formatOlderDayLabel(day.date, data.date, isHe)}
+                      sublabel={`${day.date} · ${day.stories.length} ${isHe ? "כתבות" : "stories"}`}
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {day.stories.map((story, i) => (
+                        <StoryCard key={story.story_id} story={story} rank={dayRankStart + i + 1} />
+                      ))}
+                    </div>
+                  </section>
+                );
+              });
+            })()}
+            {!loadingMulti && todayFiltered.length === 0 && multiDateStoriesByDate.length === 0 && (
               <div
                 className="flex items-center justify-center py-24 rounded-2xl mb-16"
                 style={{ border: "1px dashed #e0e0ec" }}

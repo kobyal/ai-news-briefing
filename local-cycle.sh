@@ -498,6 +498,19 @@ if [ "$DO_INGEST" -eq 1 ] && [ "$push_ok" -eq 1 ]; then
         echo "  ⚠ post-ingest search-index rebuild failed"
       fi
     fi
+    # ── Re-upload full briefing JSON after ingest ──────────────────────────
+    # The ingest lambda uploads a stories-only data/${DATE}.json to S3,
+    # clobbering the rich local format (briefing, twitter, youtube_channel_latest
+    # etc.) uploaded in [3/6]. Re-upload the local format so the frontend
+    # gets all aggregates (fixes media page "No video available" regression).
+    # Established 2026-05-21 after youtube_channel_latest went missing.
+    if [ -f "docs/data/${DATE}.json" ]; then
+      aws s3 cp "docs/data/${DATE}.json" "s3://${S3_BUCKET}/data/${DATE}.json" \
+        --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
+        --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
+        && echo "  ✓ docs/data/${DATE}.json re-uploaded to S3 (overrides lambda stories-only format)" \
+        || echo "  ⚠ post-ingest data/${DATE}.json re-upload failed"
+    fi
   fi
 else
   echo

@@ -11,6 +11,7 @@ Phase 1.1 (2026-05-11 PM): real owner avatars + README-derived descriptions
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.parse
 import urllib.request
@@ -211,28 +212,43 @@ def fetch_readme_intro(model_or_space_id: str, kind: str = "models") -> str:
     return _clean_readme_intro(md, kind=kind)
 
 
-def deepl_translate(text: str, target: str = "HE") -> str:
-    """Translate a single text to Hebrew via Claude Haiku."""
-    if not _ANTHROPIC_KEY or not text:
-        return ""
+def _translate_via_cli(text: str) -> str:
+    """Fallback: translate via `claude -p` CLI (uses subscription auth, not API key)."""
     try:
-        payload = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 512,
-            "messages": [{"role": "user", "content":
-                f"Translate to Hebrew. Return ONLY the translation, no explanations:\n\n{text[:500]}"}],
-        }).encode()
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages", data=payload,
-            headers={"x-api-key": _ANTHROPIC_KEY, "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            d = json.loads(r.read())
-        return d["content"][0]["text"].strip() or ""
-    except Exception as e:
-        print(f"  [claude-translate] error: {e}")
+        clean_env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE_CODE_")}
+        prompt = f"Translate to Hebrew. Return ONLY the translation, no explanations:\n\n{text[:500]}"
+        r = subprocess.run(["claude", "-p", prompt], capture_output=True, text=True,
+                           env=clean_env, timeout=60)
+        return r.stdout.strip() if r.returncode == 0 else ""
+    except Exception:
         return ""
+
+
+def deepl_translate(text: str, target: str = "HE") -> str:
+    """Translate a single text to Hebrew via Claude Haiku API, with CLI fallback."""
+    if not text:
+        return ""
+    if _ANTHROPIC_KEY:
+        try:
+            payload = json.dumps({
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 512,
+                "messages": [{"role": "user", "content":
+                    f"Translate to Hebrew. Return ONLY the translation, no explanations:\n\n{text[:500]}"}],
+            }).encode()
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/messages", data=payload,
+                headers={"x-api-key": _ANTHROPIC_KEY, "anthropic-version": "2023-06-01",
+                         "content-type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=30) as r:
+                d = json.loads(r.read())
+            result = d["content"][0]["text"].strip()
+            if result:
+                return result
+        except Exception as e:
+            print(f"  [claude-translate] api error: {e}, falling back to CLI")
+    return _translate_via_cli(text)
 
 
 def _fmt_count(n: int | None) -> str:

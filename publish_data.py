@@ -243,8 +243,8 @@ twitter_raw = _latest("twitter-agent/output/**/*.json") or _latest("xai-twitter-
 # Extract news_items from standard agent format
 youtube_items = (youtube_raw.get("briefing", {}) if isinstance(youtube_raw, dict) else {}).get("news_items", [])
 youtube_channel_latest = youtube_raw.get("channel_latest", []) if isinstance(youtube_raw, dict) else []
-# Fallback: if today's agent returned 0 channel_latest (quota/fail), use previous day's data.
-if not youtube_channel_latest:
+# Fallback: if today's agent returned 0 videos/channel_latest (quota/fail), use previous day's data.
+if not youtube_items or not youtube_channel_latest:
     import glob as _glob
     _prev_files = sorted(_glob.glob("youtube-news-agent/output/**/*.json", recursive=True))
     _today_prefix = f"youtube-news-agent/output/{date_str}/"
@@ -252,9 +252,15 @@ if not youtube_channel_latest:
     if _prev_files:
         try:
             _prev = json.load(open(_prev_files[-1]))
-            youtube_channel_latest = _prev.get("channel_latest", [])
-            if youtube_channel_latest:
-                print(f"  [publish_data] youtube channel_latest empty today — using {_prev_files[-1]} ({len(youtube_channel_latest)} entries)")
+            if not youtube_items:
+                _prev_items = (_prev.get("briefing", {}) or {}).get("news_items", [])
+                if _prev_items:
+                    youtube_items = _prev_items
+                    print(f"  [publish_data] youtube videos empty today — using {_prev_files[-1]} ({len(youtube_items)} videos)")
+            if not youtube_channel_latest:
+                youtube_channel_latest = _prev.get("channel_latest", [])
+                if youtube_channel_latest:
+                    print(f"  [publish_data] youtube channel_latest empty today — using {_prev_files[-1]} ({len(youtube_channel_latest)} entries)")
         except Exception:
             pass
 # Snapshot URLs of videos the merger saw — used post-cap to realign

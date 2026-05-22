@@ -1,0 +1,379 @@
+"""LinkedIn Agent — scrapes posts from vendor company pages and AI leaders.
+
+Uses Playwright (headless Chromium) with li_at session cookie. The old Voyager
+API endpoints (/voyager/api/feed/updatesV2) were deprecated by LinkedIn ~2024
+and return 400/404. This version drives a headless browser instead.
+
+⚠️  ACCOUNT SAFETY: ALWAYS use the kobytest100@gmail.com LinkedIn account.
+    NEVER use kobyal@gmail.com — LinkedIn will ban your personal account.
+
+Env vars (in private/.env):
+    KOBYTEST_LI_AT      — li_at cookie from kobytest100's linkedin.com session
+    KOBYTEST_JSESSIONID — JSESSIONID cookie (ajax:NNNN, no surrounding quotes)
+
+Cookie refresh (run when expired, ~every few weeks):
+    1. Log into linkedin.com in Chrome as kobytest100@gmail.com
+    2. Run:  python3 scripts/extract_linkedin_cookies.py
+    3. Paste the printed values into private/.env
+"""
+import json
+import os
+import re
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+
+_TODAY     = lambda: datetime.now().strftime("%B %d, %Y")
+_TODAY_ISO = lambda: datetime.now().strftime("%Y-%m-%d")
+# Wider lookback for "top posts" mode — we want quality posts from the past week+
+_LOOKBACK  = lambda: int(os.environ.get("LOOKBACK_DAYS", "14"))
+
+BASE = "https://www.linkedin.com"
+
+# ---------------------------------------------------------------------------
+# Company pages — fetched sorted by TOP engagement (sortBy=TOP in URL)
+# slug from linkedin.com/company/{slug}/
+# ---------------------------------------------------------------------------
+TRACKED_COMPANIES = [
+    {"name": "Anthropic",      "slug": "anthropic",           "org": "Anthropic"},
+    {"name": "OpenAI",         "slug": "openai",              "org": "OpenAI"},
+    {"name": "Google DeepMind","slug": "googledeepmind",      "org": "Google"},
+    {"name": "AWS",            "slug": "amazon-web-services", "org": "AWS"},
+    {"name": "Microsoft",      "slug": "microsoft",           "org": "Azure"},
+    {"name": "Meta",           "slug": "meta",                "org": "Meta"},
+    {"name": "NVIDIA",         "slug": "nvidia",              "org": "NVIDIA"},
+    {"name": "Mistral AI",     "slug": "mistralai",           "org": "Mistral"},
+    {"name": "Hugging Face",   "slug": "huggingface",         "org": "Hugging Face"},
+    {"name": "Cohere",         "slug": "cohere-ai",           "org": "Cohere"},
+    {"name": "DeepSeek",       "slug": "deepseek-ai",         "org": "DeepSeek"},
+    {"name": "xAI",            "slug": "x-ai",                "org": "xAI"},
+    {"name": "Perplexity AI",  "slug": "perplexity-ai",       "org": "Perplexity"},
+    {"name": "Scale AI",       "slug": "scale-ai",            "org": "Scale AI"},
+    {"name": "Runway",         "slug": "runwayml",            "org": "Runway"},
+    {"name": "Together AI",    "slug": "togetherai",          "org": "Together AI"},
+    {"name": "Apple",          "slug": "apple",               "org": "Apple"},
+    {"name": "Samsung",        "slug": "samsung-semiconductor","org": "Samsung"},
+]
+
+# ---------------------------------------------------------------------------
+# Individual voices — mix of lab execs, researchers, critics, builders, VCs
+# slug from linkedin.com/in/{slug}/
+# ---------------------------------------------------------------------------
+TRACKED_PEOPLE = [
+    # Lab executives
+    {"name": "Sam Altman",       "slug": "sama",                     "org": "OpenAI",      "role": "CEO"},
+    {"name": "Dario Amodei",     "slug": "dario-amodei",             "org": "Anthropic",   "role": "CEO"},
+    {"name": "Demis Hassabis",   "slug": "demishassabis",            "org": "Google",      "role": "CEO, DeepMind"},
+    {"name": "Mustafa Suleyman", "slug": "mustafasuleyman",          "org": "Microsoft",   "role": "CEO, Microsoft AI"},
+    {"name": "Jensen Huang",     "slug": "jensen-huang",             "org": "NVIDIA",      "role": "CEO"},
+    {"name": "Satya Nadella",    "slug": "satyanadella",             "org": "Azure",       "role": "CEO, Microsoft"},
+    {"name": "Sundar Pichai",    "slug": "sundarpichai",             "org": "Google",      "role": "CEO, Google"},
+    {"name": "Arthur Mensch",    "slug": "arthurmensch",             "org": "Mistral",     "role": "CEO"},
+    {"name": "Aidan Gomez",      "slug": "aidangomez",               "org": "Cohere",      "role": "CEO"},
+    {"name": "Greg Brockman",    "slug": "gregbrockman",             "org": "OpenAI",      "role": "Co-founder"},
+    # Researchers & scientists
+    {"name": "Andrew Ng",        "slug": "andrewyng",                "org": "Independent", "role": "AI educator"},
+    {"name": "Yann LeCun",       "slug": "yann-lecun",               "org": "Meta",        "role": "Chief AI Scientist"},
+    {"name": "Fei-Fei Li",       "slug": "fei-fei-li-6b021318",      "org": "Independent", "role": "AI researcher"},
+    {"name": "Andrej Karpathy",  "slug": "andreykarpathy",           "org": "Independent", "role": "AI researcher"},
+    {"name": "Ilya Sutskever",   "slug": "ilyasutskever",            "org": "SSI",         "role": "Co-founder"},
+    # Builders & practitioners
+    {"name": "Harrison Chase",   "slug": "harrison-chase-961561187", "org": "LangChain",   "role": "CEO"},
+    {"name": "Chip Huyen",       "slug": "chiphuyen",                "org": "Independent", "role": "ML engineer & author"},
+    {"name": "Simon Willison",   "slug": "simonw",                   "org": "Independent", "role": "AI builder"},
+    {"name": "Ethan Mollick",    "slug": "ethanmollick",             "org": "Wharton",     "role": "Professor & AI educator"},
+    # Critics & balanced voices
+    {"name": "Gary Marcus",      "slug": "gary-marcus",              "org": "Independent", "role": "AI critic & professor"},
+    # Investors
+    {"name": "Elad Gil",         "slug": "elad-gil",                 "org": "Independent", "role": "Investor"},
+]
+
+_AI_RELEVANCE_RE = re.compile(
+    r"\b(openai|anthropic|claude|chatgpt|gpt|gemini|llm|llms|agi|"
+    r"artificial intelligence|machine learning|deep learning|"
+    r"ai agent|foundation model|frontier model|large language|"
+    r"nvidia|grok|mistral|cohere|deepseek|hugging.?face|"
+    r"transformer|neural network|fine.?tun|embedding|"
+    r"generative ai|gen ai|agentic|cursor|copilot|vibe.?cod|"
+    r"benchmark|evals|reasoning model|multimodal|inference|"
+    r"open.?source.*model|model.*release|context.?window)\b",
+    re.IGNORECASE,
+)
+
+_VENDOR_PATTERNS = [
+    ("Anthropic",    re.compile(r"\b(anthropic|claude)\b", re.IGNORECASE)),
+    ("OpenAI",       re.compile(r"\b(openai|chatgpt|gpt|codex)\b", re.IGNORECASE)),
+    ("Google",       re.compile(r"\b(gemini|google ai|deepmind|google io|google cloud)\b", re.IGNORECASE)),
+    ("Meta",         re.compile(r"\b(llama|meta ai)\b", re.IGNORECASE)),
+    ("NVIDIA",       re.compile(r"\bnvidia\b", re.IGNORECASE)),
+    ("Mistral",      re.compile(r"\bmistral\b", re.IGNORECASE)),
+    ("Cohere",       re.compile(r"\bcohere\b", re.IGNORECASE)),
+    ("Hugging Face", re.compile(r"\bhugging.?face\b", re.IGNORECASE)),
+    ("DeepSeek",     re.compile(r"\bdeepseek\b", re.IGNORECASE)),
+    ("xAI",          re.compile(r"\b(grok|xai)\b", re.IGNORECASE)),
+    ("Perplexity",   re.compile(r"\bperplexity\b", re.IGNORECASE)),
+    ("AWS",          re.compile(r"\b(aws|bedrock|amazon web)\b", re.IGNORECASE)),
+    ("Azure",        re.compile(r"\b(azure|microsoft ai|copilot)\b", re.IGNORECASE)),
+    ("LangChain",    re.compile(r"\blangchain\b", re.IGNORECASE)),
+]
+
+# JavaScript injected into each page to extract post data from the rendered DOM.
+_EXTRACT_JS = """
+() => {
+    const results = [];
+    for (const container of document.querySelectorAll('[data-urn*="activity"]')) {
+        const urn = container.getAttribute('data-urn') || '';
+        const url = urn
+            ? 'https://www.linkedin.com/feed/update/' + encodeURIComponent(urn) + '/'
+            : '';
+        const textEl = container.querySelector(
+            '.update-components-text .break-words span[dir],' +
+            '.update-components-text .break-words,' +
+            '.feed-shared-text span[dir],' +
+            '.feed-shared-inline-show-more-text'
+        );
+        const text = textEl ? textEl.innerText.trim() : '';
+        if (!text || text.length < 30) continue;
+        const authorEl = container.querySelector(
+            '.update-components-actor__name span[aria-hidden="true"]'
+        );
+        const scraped_author = authorEl ? authorEl.innerText.trim() : '';
+        let likes = 0, comments = 0;
+        for (const el of container.querySelectorAll('[aria-label]')) {
+            const lb = el.getAttribute('aria-label') || '';
+            const m = lb.match(/([\\d,]+)/);
+            const n = m ? parseInt(m[1].replace(/,/g, '')) : 0;
+            if (/reaction|like/i.test(lb)) likes = Math.max(likes, n);
+            else if (/\\d+ comment/i.test(lb)) comments = n;
+        }
+        results.push({
+            post: text.slice(0, 600).trim(),
+            url,
+            likes,
+            comments,
+            scraped_author,
+        });
+    }
+    return results;
+}
+"""
+
+
+def _make_browser_context(playwright, li_at: str, jsessionid: str):
+    browser = playwright.chromium.launch(headless=True)
+    ctx = browser.new_context(
+        user_agent=(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        viewport={"width": 1280, "height": 800},
+        locale="en-US",
+        extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
+    )
+    quoted = f'"{jsessionid}"' if not jsessionid.startswith('"') else jsessionid
+    ctx.add_cookies([
+        {
+            "name": "li_at", "value": li_at,
+            "domain": ".linkedin.com", "path": "/",
+            "secure": True, "httpOnly": True, "sameSite": "None",
+        },
+        {
+            "name": "JSESSIONID", "value": quoted,
+            "domain": ".linkedin.com", "path": "/",
+            "secure": True, "httpOnly": False, "sameSite": "None",
+        },
+        {
+            "name": "lang", "value": "v=2&lang=en-us",
+            "domain": ".linkedin.com", "path": "/",
+            "secure": False,
+        },
+    ])
+    return browser, ctx
+
+
+def _scrape_page(page, url: str, label: str) -> list[dict]:
+    """Navigate to url, wait for posts, extract via JS. Returns [] on failure."""
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=20_000)
+    except Exception as e:
+        print(f"    ✗ error ({label}): {str(e)[:80]}")
+        return []
+    # Redirect to login = cookies expired
+    if "linkedin.com/login" in page.url or "linkedin.com/uas/login" in page.url:
+        print(f"    ✗ auth redirect — KOBYTEST cookies expired!")
+        print(f"      Fix: log into linkedin.com as kobytest100@gmail.com, then run:")
+        print(f"        python3 scripts/extract_linkedin_cookies.py")
+        return []
+    if "linkedin.com/signup" in page.url or "Sign Up" in (page.title() or ""):
+        print(f"    ✗ sign-up redirect — profile may be private ({label})")
+        return []
+    try:
+        page.wait_for_selector('[data-urn*="activity"]', timeout=12_000)
+    except PWTimeout:
+        print(f"    ✗ timeout: {label}")
+        return []
+    try:
+        posts = page.evaluate(_EXTRACT_JS)
+    except Exception as e:
+        print(f"    ✗ JS eval error ({label}): {str(e)[:80]}")
+        return []
+    return posts or []
+
+
+def _fetch_company_posts(page, company: dict) -> list[dict]:
+    # sortBy=TOP returns highest-engagement posts of recent weeks, not just today
+    url = f"{BASE}/company/{company['slug']}/posts/?feedView=all&sortBy=TOP"
+    raw = _scrape_page(page, url, company["name"])
+    results = []
+    for p in raw:
+        if not _AI_RELEVANCE_RE.search(p["post"]):
+            continue
+        results.append({
+            "post":          p["post"],
+            "url":           p["url"],
+            "likes":         p["likes"],
+            "comments":      p["comments"],
+            "author":        company["name"],
+            "author_handle": company["slug"],
+            "title":         f"Official · {company['org']}",
+            "is_company":    True,
+            "vendor":        company["org"],
+        })
+    return results
+
+
+def _fetch_person_posts(page, person: dict) -> list[dict]:
+    url = f"{BASE}/in/{person['slug']}/recent-activity/posts/"
+    raw = _scrape_page(page, url, person["name"])
+    results = []
+    for p in raw:
+        if not _AI_RELEVANCE_RE.search(p["post"]):
+            continue
+        vendor = _derive_vendor(p["post"]) or person["org"]
+        results.append({
+            "post":          p["post"],
+            "url":           p["url"],
+            "likes":         p["likes"],
+            "comments":      p["comments"],
+            "author":        person["name"],
+            "author_handle": person["slug"],
+            "title":         f"{person['role']} · {person['org']}",
+            "is_company":    False,
+            "vendor":        vendor,
+        })
+    return results
+
+
+def _derive_vendor(text: str) -> str:
+    for vendor, pattern in _VENDOR_PATTERNS:
+        if pattern.search(text):
+            return vendor
+    return ""
+
+
+def run_pipeline() -> dict:
+    print("=" * 60)
+    print(" LinkedIn Agent (Playwright DOM scraper)")
+    print(f" {_TODAY()}  |  lookback={_LOOKBACK()}d  |  sortBy=TOP for companies")
+    print("=" * 60)
+
+    li_at      = os.environ.get("KOBYTEST_LI_AT", "")
+    jsessionid = os.environ.get("KOBYTEST_JSESSIONID", "")
+
+    # Backward-compat: accept old var names but warn loudly
+    if not li_at:
+        li_at = os.environ.get("LINKEDIN_LI_AT", "")
+        if li_at:
+            print("  ⚠ Using deprecated LINKEDIN_LI_AT — rename to KOBYTEST_LI_AT in private/.env")
+    if not jsessionid:
+        jsessionid = os.environ.get("LINKEDIN_JSESSIONID", "")
+        if jsessionid:
+            print("  ⚠ Using deprecated LINKEDIN_JSESSIONID — rename to KOBYTEST_JSESSIONID in private/.env")
+
+    if not li_at or not jsessionid:
+        print("  ⚠  KOBYTEST_LI_AT / KOBYTEST_JSESSIONID not set — skipping LinkedIn")
+        print()
+        print("  Cookies expired or never set. To refresh:")
+        print("    1. Open Chrome and log into linkedin.com as kobytest100@gmail.com")
+        print("    2. Run:  python3 scripts/extract_linkedin_cookies.py")
+        print("    3. Paste the printed values into private/.env")
+        print()
+        print("  ⚠  NEVER use kobyal@gmail.com — risk of personal account ban")
+        return {"saved_to": "", "success": True}
+
+    t_start = time.time()
+    all_posts: list[dict] = []
+
+    with sync_playwright() as pw:
+        browser, ctx = _make_browser_context(pw, li_at, jsessionid)
+        page = ctx.new_page()
+        # Suppress noisy browser console output
+        page.on("console", lambda _: None)
+
+        # ── Company pages ────────────────────────────────────────────────
+        print(f"\n[1/2] Fetching {len(TRACKED_COMPANIES)} company pages (sorted by top engagement)...")
+        for company in TRACKED_COMPANIES:
+            posts = _fetch_company_posts(page, company)
+            all_posts.extend(posts)
+            best = max((p["likes"] + p["comments"] * 2 for p in posts), default=0)
+            marker = f"{len(posts)} AI posts, top_score={best}" if posts else "no AI posts"
+            print(f"    {'✓' if posts else '·'} {company['name']:<24} {marker}")
+            time.sleep(1.2)
+
+        # ── Individual profiles ──────────────────────────────────────────
+        print(f"\n[2/2] Fetching {len(TRACKED_PEOPLE)} individual profiles...")
+        for person in TRACKED_PEOPLE:
+            posts = _fetch_person_posts(page, person)
+            all_posts.extend(posts)
+            best = max((p["likes"] + p["comments"] * 2 for p in posts), default=0)
+            marker = f"{len(posts)} AI posts, top_score={best}" if posts else "no AI posts"
+            print(f"    {'✓' if posts else '·'} {person['name']:<24} {marker}")
+            time.sleep(1.2)
+
+        browser.close()
+
+    # ── Dedup by URL ─────────────────────────────────────────────────────
+    seen_urls: set[str] = set()
+    unique: list[dict] = []
+    for p in sorted(all_posts, key=lambda x: x["likes"] + x["comments"] * 2, reverse=True):
+        url = p.get("url", "")
+        if url and url in seen_urls:
+            continue
+        if url:
+            seen_urls.add(url)
+        unique.append(p)
+
+    # ── Cap 3 posts per vendor so no single company dominates ─────────────
+    vendor_counts: dict[str, int] = {}
+    capped: list[dict] = []
+    for p in unique:
+        v = p.get("vendor", "Other")
+        if vendor_counts.get(v, 0) < 3:
+            capped.append(p)
+            vendor_counts[v] = vendor_counts.get(v, 0) + 1
+
+    elapsed = time.time() - t_start
+    print(f"\n  → {len(capped)} posts kept ({len(all_posts)} raw, {elapsed:.0f}s)")
+    print(f"    Vendors represented: {sorted(vendor_counts.keys())}")
+
+    output = {
+        "source": "linkedin",
+        "briefing": {
+            "linkedin_posts": capped,
+        },
+    }
+
+    date_str = _TODAY_ISO()
+    out_dir = Path(__file__).parent.parent / "output" / date_str
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ts_str = datetime.now().strftime("%H%M%S")
+    path = out_dir / f"linkedin_{ts_str}.json"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(output, f, ensure_ascii=False, indent=2)
+
+    print(f"  Output: {path}")
+    print("=" * 60)
+    return {"saved_to": str(path), "success": True}

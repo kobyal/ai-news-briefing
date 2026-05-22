@@ -239,6 +239,7 @@ github_raw = _latest("github-trending-agent/output/**/*.json")
 rss_raw = _best_rss("rss-news-agent/output/**/*.json")
 # twitter-agent is the active social source; fall back to xai-twitter-agent
 twitter_raw = _latest("twitter-agent/output/**/*.json") or _latest("xai-twitter-agent/output/**/*.json")
+linkedin_raw = _latest("linkedin-agent/output/**/*.json")
 
 # Extract news_items from standard agent format
 youtube_items = (youtube_raw.get("briefing", {}) if isinstance(youtube_raw, dict) else {}).get("news_items", [])
@@ -308,6 +309,10 @@ twitter_data = {
     "trending": twitter_briefing.get("trending_posts", twitter_briefing.get("trending_topics", [])),
     "community": twitter_briefing.get("community_pulse", ""),
 }
+linkedin_briefing = (linkedin_raw.get("briefing", {}) if isinstance(linkedin_raw, dict) else {}) if linkedin_raw else {}
+linkedin_posts = linkedin_briefing.get("linkedin_posts", [])
+if linkedin_posts:
+    print(f"  LinkedIn posts: {len(linkedin_posts)}")
 
 _tw_items = twitter_data["trending"] + twitter_data["people"]
 _tw_posts = [(i.get("post") or i.get("text") or "") for i in _tw_items]
@@ -1913,6 +1918,7 @@ published = {
     "youtube_channel_latest": youtube_channel_latest,
     "github":      github_items,
     "twitter":     twitter_data,
+    "linkedin_posts": linkedin_posts,
     # Data-quality audit results — surfaced in send_email.py PROBLEMS banner so
     # silent issues (orphan translations, mistagged stories, source diversity
     # collapses) don't slip past the user.

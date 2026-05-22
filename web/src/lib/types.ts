@@ -117,6 +117,20 @@ export interface GitHubRepo {
   date?: string;
 }
 
+export interface LinkedInPost {
+  author: string;
+  author_handle?: string;
+  title?: string;
+  post: string;
+  post_he?: string;
+  url?: string;
+  likes?: number;
+  comments?: number;
+  vendor: string;
+  date?: string;
+  is_company?: boolean;
+}
+
 export interface DayData {
   date: string;
   stories: NewsItem[];
@@ -152,4 +166,5 @@ export interface DayData {
   // pre-2026-05-10 display ceiling of 12 by the merger; aligned by URL to
   // `youtube[i]` after publish_data.py's per-channel cap remap.
   youtube_descs_he?: string[];
+  linkedin_posts?: LinkedInPost[];
 }

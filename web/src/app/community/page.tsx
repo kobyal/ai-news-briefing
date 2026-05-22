@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { TwitterSection } from "@/components/briefing/TwitterSection";
 import { RedditSection } from "@/components/briefing/RedditSection";
+import { LinkedInSection } from "@/components/briefing/LinkedInSection";
 import { fetchDayData, fetchArchive } from "@/lib/api";
 import { useLang } from "@/context/LangContext";
 import type { DayData, CommunityPulseItem } from "@/lib/types";
@@ -518,6 +519,9 @@ function CommunityDayBlock({ data, hideEmptyTwitterMessage, vendorFilter }: { da
     (data.twitter?.people?.length > 0 || data.twitter?.trending?.length > 0)
   );
   const hasReddit = (data.top_reddit && data.top_reddit.length > 0) || false;
+  const linkedInPosts = vendorFilter
+    ? (data.linkedin_posts || []).filter((p) => p.vendor === vendorFilter)
+    : (data.linkedin_posts || []);
 
   const allPulseRaw = data.community_pulse_items || [];
   const allPulseHeRaw = data.community_pulse_items_he || [];
@@ -570,6 +574,11 @@ function CommunityDayBlock({ data, hideEmptyTwitterMessage, vendorFilter }: { da
           {isHe ? "אין פוסטים מ-X להיום" : "No X posts available for today"}
         </div>
       ) : null}
+      {linkedInPosts.length > 0 && (
+        <div className="mt-6">
+          <LinkedInSection posts={linkedInPosts} vendorFilter={vendorFilter} />
+        </div>
+      )}
       {showRedditCard && (
         <div className="mt-6">
           <RedditSection posts={redditPosts} pulseItems={redditPulsePairs} />
@@ -770,8 +779,8 @@ function CommunityPageInner() {
         </h1>
         <p className="mb-4 text-[13px]" style={{ color: "#9a9ab8" }}>
           {isHe
-            ? "פוסטים מ-X · דיונים ב-Reddit · דופק הקהילה (HN, arXiv, Lobsters, Dev.to)"
-            : "Posts from X · Reddit threads · Community pulse (HN, arXiv, Lobsters, Dev.to)"}
+            ? "פוסטים מ-X · LinkedIn · דיונים ב-Reddit · דופק הקהילה (HN, arXiv, Lobsters, Dev.to)"
+            : "Posts from X · LinkedIn · Reddit threads · Community pulse (HN, arXiv, Lobsters, Dev.to)"}
         </p>
 
         {/* Vendor filter ribbon */}

@@ -161,6 +161,136 @@ _EXTRACT_JS = """
 """
 
 
+# ---------------------------------------------------------------------------
+# Cookie helpers — auto-extract from Chrome + persist back to .env
+# ---------------------------------------------------------------------------
+
+_ENV_PATH = Path(__file__).parent.parent.parent / "private" / ".env"
+
+
+def _try_extract_cookies_from_chrome() -> tuple[str, str]:
+    """Scan all Chrome profiles for a LinkedIn li_at cookie.
+
+    Copies each profile's Cookies DB to /tmp first to avoid SQLite lock
+    errors when Chrome is open. Returns (li_at, jsessionid) or ("", "").
+    """
+    try:
+        import browser_cookie3
+        import shutil
+        import tempfile
+        import glob as _glob
+    except ImportError:
+        print("    browser_cookie3 not installed — run: pip install browser_cookie3")
+        return "", ""
+
+    chrome_base = os.path.expanduser("~/Library/Application Support/Google/Chrome")
+    profiles = sorted(
+        _glob.glob(os.path.join(chrome_base, "Profile *")) +
+        [os.path.join(chrome_base, "Default")]
+    )
+
+    for profile in profiles:
+        cookie_file = os.path.join(profile, "Cookies")
+        if not os.path.exists(cookie_file):
+            continue
+        tmp = tempfile.mktemp(suffix=".db")
+        try:
+            shutil.copy2(cookie_file, tmp)
+            cookies = browser_cookie3.chrome(
+                domain_name=".linkedin.com",
+                cookie_file=tmp,
+            )
+            li_at = ""
+            jsessionid = ""
+            for c in cookies:
+                if c.name == "li_at":
+                    li_at = c.value
+                elif c.name == "JSESSIONID":
+                    jsessionid = c.value.strip('"')
+            if li_at:
+                print(f"    ✓ Cookies found in Chrome ({os.path.basename(profile)})")
+                return li_at, jsessionid
+        except Exception as e:
+            pass
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+    return "", ""
+
+
+def _save_cookies_to_env(li_at: str, jsessionid: str) -> None:
+    """Write refreshed KOBYTEST_* cookies back to private/.env."""
+    if not _ENV_PATH.exists():
+        return
+    text = _ENV_PATH.read_text()
+    if re.search(r"^KOBYTEST_LI_AT=", text, re.M):
+        text = re.sub(r"^KOBYTEST_LI_AT=.*$", f"KOBYTEST_LI_AT={li_at}", text, re.M)
+    else:
+        text += f"\nKOBYTEST_LI_AT={li_at}"
+    if re.search(r"^KOBYTEST_JSESSIONID=", text, re.M):
+        text = re.sub(r"^KOBYTEST_JSESSIONID=.*$", f"KOBYTEST_JSESSIONID={jsessionid}", text, re.M)
+    else:
+        text += f"\nKOBYTEST_JSESSIONID={jsessionid}"
+    _ENV_PATH.write_text(text)
+    print("    ✓ Cookies saved to private/.env")
+
+
+def _load_fallback_posts() -> list[dict]:
+    """Return linkedin_posts from the most recent previous run (up to 7 days back)."""
+    import glob as _glob
+    today = _TODAY_ISO()
+    pattern = str(Path(__file__).parent.parent / "output" / "**" / "linkedin_*.json")
+    files = sorted(
+        [f for f in _glob.glob(pattern, recursive=True)
+         if os.path.basename(os.path.dirname(f)) < today],
+        reverse=True,
+    )
+    for fpath in files[:7]:
+        try:
+            data = json.loads(Path(fpath).read_text())
+            posts = data.get("briefing", {}).get("linkedin_posts", [])
+            if posts:
+                day = os.path.basename(os.path.dirname(fpath))
+                print(f"  ↩  Fallback: using {len(posts)} posts from {day}")
+                return posts
+        except Exception:
+            pass
+    return []
+
+
+def _write_output(posts: list[dict], fallback: bool = False) -> dict:
+    date_str = _TODAY_ISO()
+    out_dir = Path(__file__).parent.parent / "output" / date_str
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ts_str = datetime.now().strftime("%H%M%S")
+    path = out_dir / f"linkedin_{ts_str}.json"
+    output = {
+        "source": "linkedin",
+        "fallback": fallback,
+        "briefing": {"linkedin_posts": posts},
+    }
+    path.write_text(json.dumps(output, ensure_ascii=False, indent=2))
+    print(f"  Output: {path}")
+    return {"saved_to": str(path), "success": True}
+
+
+# ---------------------------------------------------------------------------
+# Auth check — fast single request before committing to full scrape
+# ---------------------------------------------------------------------------
+
+def _check_auth(page) -> bool:
+    """Return True if the session cookie is valid (feed loads without login redirect)."""
+    try:
+        page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=15_000)
+    except Exception:
+        return False
+    url = page.url
+    return "login" not in url and "uas/login" not in url and "signup" not in url
+
+
 def _make_browser_context(playwright, li_at: str, jsessionid: str):
     browser = playwright.chromium.launch(headless=True)
     ctx = browser.new_context(
@@ -274,35 +404,32 @@ def _derive_vendor(text: str) -> str:
     return ""
 
 
+def _get_cookies() -> tuple[str, str]:
+    """Return (li_at, jsessionid) from env, falling back to Chrome auto-extract."""
+    li_at      = os.environ.get("KOBYTEST_LI_AT", "") or os.environ.get("LINKEDIN_LI_AT", "")
+    jsessionid = os.environ.get("KOBYTEST_JSESSIONID", "") or os.environ.get("LINKEDIN_JSESSIONID", "")
+    if li_at:
+        return li_at, jsessionid
+    print("  KOBYTEST_LI_AT not in env — trying Chrome auto-extract...")
+    li_at, jsessionid = _try_extract_cookies_from_chrome()
+    if li_at:
+        _save_cookies_to_env(li_at, jsessionid)
+    return li_at, jsessionid
+
+
 def run_pipeline() -> dict:
     print("=" * 60)
     print(" LinkedIn Agent (Playwright DOM scraper)")
     print(f" {_TODAY()}  |  lookback={_LOOKBACK()}d  |  sortBy=TOP for companies")
     print("=" * 60)
 
-    li_at      = os.environ.get("KOBYTEST_LI_AT", "")
-    jsessionid = os.environ.get("KOBYTEST_JSESSIONID", "")
+    li_at, jsessionid = _get_cookies()
 
-    # Backward-compat: accept old var names but warn loudly
     if not li_at:
-        li_at = os.environ.get("LINKEDIN_LI_AT", "")
-        if li_at:
-            print("  ⚠ Using deprecated LINKEDIN_LI_AT — rename to KOBYTEST_LI_AT in private/.env")
-    if not jsessionid:
-        jsessionid = os.environ.get("LINKEDIN_JSESSIONID", "")
-        if jsessionid:
-            print("  ⚠ Using deprecated LINKEDIN_JSESSIONID — rename to KOBYTEST_JSESSIONID in private/.env")
-
-    if not li_at or not jsessionid:
-        print("  ⚠  KOBYTEST_LI_AT / KOBYTEST_JSESSIONID not set — skipping LinkedIn")
-        print()
-        print("  Cookies expired or never set. To refresh:")
-        print("    1. Open Chrome and log into linkedin.com as kobytest100@gmail.com")
-        print("    2. Run:  python3 scripts/extract_linkedin_cookies.py")
-        print("    3. Paste the printed values into private/.env")
-        print()
-        print("  ⚠  NEVER use kobyal@gmail.com — risk of personal account ban")
-        return {"saved_to": "", "success": True}
+        print("  ✗ No cookies available (env unset + Chrome extract failed)")
+        print("    Fix: log into linkedin.com as kobytest100@gmail.com, then re-run")
+        print("    ↩  Using fallback data from previous run")
+        return _write_output(_load_fallback_posts(), fallback=True)
 
     t_start = time.time()
     all_posts: list[dict] = []
@@ -310,8 +437,30 @@ def run_pipeline() -> dict:
     with sync_playwright() as pw:
         browser, ctx = _make_browser_context(pw, li_at, jsessionid)
         page = ctx.new_page()
-        # Suppress noisy browser console output
         page.on("console", lambda _: None)
+
+        # ── Auth check — fast fail before full scrape ────────────────────
+        print("\n  Checking auth...")
+        if not _check_auth(page):
+            print("  ✗ Cookies expired — trying Chrome auto-extract...")
+            browser.close()
+            li_at, jsessionid = _try_extract_cookies_from_chrome()
+            if li_at:
+                _save_cookies_to_env(li_at, jsessionid)
+                # Reinit with fresh cookies
+                browser, ctx = _make_browser_context(pw, li_at, jsessionid)
+                page = ctx.new_page()
+                page.on("console", lambda _: None)
+                if not _check_auth(page):
+                    print("  ✗ Still failing after refresh — using fallback data")
+                    browser.close()
+                    return _write_output(_load_fallback_posts(), fallback=True)
+                print("  ✓ Auth OK with refreshed cookies")
+            else:
+                print("  ✗ Chrome extract failed — using fallback data")
+                return _write_output(_load_fallback_posts(), fallback=True)
+        else:
+            print("  ✓ Auth OK")
 
         # ── Company pages ────────────────────────────────────────────────
         print(f"\n[1/2] Fetching {len(TRACKED_COMPANIES)} company pages (sorted by top engagement)...")
@@ -355,25 +504,14 @@ def run_pipeline() -> dict:
             capped.append(p)
             vendor_counts[v] = vendor_counts.get(v, 0) + 1
 
+    # If we scraped zero posts despite successful auth, fall back rather than
+    # leaving the section empty (e.g. LinkedIn changed their DOM selectors).
+    if not capped:
+        print("  ⚠  Scrape returned 0 posts — using fallback data")
+        return _write_output(_load_fallback_posts(), fallback=True)
+
     elapsed = time.time() - t_start
     print(f"\n  → {len(capped)} posts kept ({len(all_posts)} raw, {elapsed:.0f}s)")
-    print(f"    Vendors represented: {sorted(vendor_counts.keys())}")
-
-    output = {
-        "source": "linkedin",
-        "briefing": {
-            "linkedin_posts": capped,
-        },
-    }
-
-    date_str = _TODAY_ISO()
-    out_dir = Path(__file__).parent.parent / "output" / date_str
-    out_dir.mkdir(parents=True, exist_ok=True)
-    ts_str = datetime.now().strftime("%H%M%S")
-    path = out_dir / f"linkedin_{ts_str}.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(output, f, ensure_ascii=False, indent=2)
-
-    print(f"  Output: {path}")
+    print(f"    Vendors: {sorted(vendor_counts.keys())}")
     print("=" * 60)
-    return {"saved_to": str(path), "success": True}
+    return _write_output(capped)

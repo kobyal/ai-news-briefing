@@ -27,6 +27,7 @@ AGENTS = {
     "github":     ("github-trending-agent/run.py",    "free",  "GitHub API (free)"),
     "xai":        ("xai-twitter-agent/run.py",        "paid",  "xAI Grok-4 (~$0.35/run) — disabled"),
     "twitter":    ("twitter-agent/run.py",             "free",  "X GraphQL direct (no API key)"),
+    "linkedin":   ("linkedin-agent/run.py",            "free",  "LinkedIn Voyager API (li_at cookie)"),
     # Merger (always runs last)
     "merger":     ("merger-agent/run.py",             "paid",  "Anthropic Claude"),
 }
@@ -36,7 +37,8 @@ AGENT_DISPLAY = {
     "rss": "RSS News Agent", "tavily": "Tavily News Agent",
     "article": "Article Reader Agent",
     "youtube": "YouTube News Agent", "github": "GitHub Trending Agent",
-    "xai": "xAI Twitter Agent", "twitter": "Twitter Agent", "merger": "Merger Agent",
+    "xai": "xAI Twitter Agent", "twitter": "Twitter Agent",
+    "linkedin": "LinkedIn Agent", "merger": "Merger Agent",
 }
 
 

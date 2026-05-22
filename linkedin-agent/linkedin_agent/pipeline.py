@@ -63,8 +63,7 @@ TRACKED_COMPANIES = [
 # ---------------------------------------------------------------------------
 TRACKED_PEOPLE = [
     # Lab executives
-    {"name": "Sam Altman",       "slug": "sama",                     "org": "OpenAI",      "role": "CEO"},
-    {"name": "Dario Amodei",     "slug": "dario-amodei",             "org": "Anthropic",   "role": "CEO"},
+    {"name": "Sam Altman",       "slug": "samaltman",                "org": "OpenAI",      "role": "CEO"},
     {"name": "Demis Hassabis",   "slug": "demishassabis",            "org": "Google",      "role": "CEO, DeepMind"},
     {"name": "Mustafa Suleyman", "slug": "mustafasuleyman",          "org": "Microsoft",   "role": "CEO, Microsoft AI"},
     {"name": "Jensen Huang",     "slug": "jensen-huang",             "org": "NVIDIA",      "role": "CEO"},
@@ -172,7 +171,9 @@ def _try_extract_cookies_from_chrome() -> tuple[str, str]:
     """Scan all Chrome profiles for a LinkedIn li_at cookie.
 
     Copies each profile's Cookies DB to /tmp first to avoid SQLite lock
-    errors when Chrome is open. Returns (li_at, jsessionid) or ("", "").
+    errors when Chrome is open. Returns the LAST profile's cookies so that
+    the highest-numbered profile wins (kobytest100 lives in Profile 7,
+    kobyal in Profile 1 — last-found always picks kobytest100).
     """
     try:
         import browser_cookie3
@@ -188,6 +189,10 @@ def _try_extract_cookies_from_chrome() -> tuple[str, str]:
         _glob.glob(os.path.join(chrome_base, "Profile *")) +
         [os.path.join(chrome_base, "Default")]
     )
+
+    found_li_at = ""
+    found_jsessionid = ""
+    found_profile = ""
 
     for profile in profiles:
         cookie_file = os.path.join(profile, "Cookies")
@@ -208,9 +213,10 @@ def _try_extract_cookies_from_chrome() -> tuple[str, str]:
                 elif c.name == "JSESSIONID":
                     jsessionid = c.value.strip('"')
             if li_at:
-                print(f"    ✓ Cookies found in Chrome ({os.path.basename(profile)})")
-                return li_at, jsessionid
-        except Exception as e:
+                found_li_at = li_at
+                found_jsessionid = jsessionid
+                found_profile = os.path.basename(profile)
+        except Exception:
             pass
         finally:
             try:
@@ -218,7 +224,9 @@ def _try_extract_cookies_from_chrome() -> tuple[str, str]:
             except OSError:
                 pass
 
-    return "", ""
+    if found_li_at:
+        print(f"    ✓ Cookies found in Chrome ({found_profile})")
+    return found_li_at, found_jsessionid
 
 
 def _save_cookies_to_env(li_at: str, jsessionid: str) -> None:
@@ -292,7 +300,10 @@ def _check_auth(page) -> bool:
 
 
 def _make_browser_context(playwright, li_at: str, jsessionid: str):
-    browser = playwright.chromium.launch(headless=True)
+    browser = playwright.chromium.launch(
+        headless=True,
+        args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+    )
     ctx = browser.new_context(
         user_agent=(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -303,6 +314,8 @@ def _make_browser_context(playwright, li_at: str, jsessionid: str):
         locale="en-US",
         extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
     )
+    # Prevent LinkedIn from detecting headless Playwright via navigator.webdriver
+    ctx.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     quoted = f'"{jsessionid}"' if not jsessionid.startswith('"') else jsessionid
     ctx.add_cookies([
         {
@@ -325,7 +338,7 @@ def _make_browser_context(playwright, li_at: str, jsessionid: str):
 
 
 def _scrape_page(page, url: str, label: str) -> list[dict]:
-    """Navigate to url, wait for posts, extract via JS. Returns [] on failure."""
+    """Navigate to url, slow-scroll to trigger lazy loading, extract via JS."""
     try:
         page.goto(url, wait_until="domcontentloaded", timeout=20_000)
     except Exception as e:
@@ -340,11 +353,11 @@ def _scrape_page(page, url: str, label: str) -> list[dict]:
     if "linkedin.com/signup" in page.url or "Sign Up" in (page.title() or ""):
         print(f"    ✗ sign-up redirect — profile may be private ({label})")
         return []
-    try:
-        page.wait_for_selector('[data-urn*="activity"]', timeout=12_000)
-    except PWTimeout:
-        print(f"    ✗ timeout: {label}")
-        return []
+    # Slow scroll to trigger lazy-loaded post content (LinkedIn uses occludable hints
+    # that only populate with real DOM when they scroll into the viewport)
+    for _ in range(5):
+        page.mouse.wheel(0, 800)
+        time.sleep(1.0)
     try:
         posts = page.evaluate(_EXTRACT_JS)
     except Exception as e:
@@ -376,7 +389,7 @@ def _fetch_company_posts(page, company: dict) -> list[dict]:
 
 
 def _fetch_person_posts(page, person: dict) -> list[dict]:
-    url = f"{BASE}/in/{person['slug']}/recent-activity/posts/"
+    url = f"{BASE}/in/{person['slug']}/recent-activity/all/"
     raw = _scrape_page(page, url, person["name"])
     results = []
     for p in raw:
@@ -420,7 +433,7 @@ def _get_cookies() -> tuple[str, str]:
 def run_pipeline() -> dict:
     print("=" * 60)
     print(" LinkedIn Agent (Playwright DOM scraper)")
-    print(f" {_TODAY()}  |  lookback={_LOOKBACK()}d  |  sortBy=TOP for companies")
+    print(f" {_TODAY()}  |  {len(TRACKED_PEOPLE)} individual profiles")
     print("=" * 60)
 
     li_at, jsessionid = _get_cookies()
@@ -462,18 +475,10 @@ def run_pipeline() -> dict:
         else:
             print("  ✓ Auth OK")
 
-        # ── Company pages ────────────────────────────────────────────────
-        print(f"\n[1/2] Fetching {len(TRACKED_COMPANIES)} company pages (sorted by top engagement)...")
-        for company in TRACKED_COMPANIES:
-            posts = _fetch_company_posts(page, company)
-            all_posts.extend(posts)
-            best = max((p["likes"] + p["comments"] * 2 for p in posts), default=0)
-            marker = f"{len(posts)} AI posts, top_score={best}" if posts else "no AI posts"
-            print(f"    {'✓' if posts else '·'} {company['name']:<24} {marker}")
-            time.sleep(1.2)
-
         # ── Individual profiles ──────────────────────────────────────────
-        print(f"\n[2/2] Fetching {len(TRACKED_PEOPLE)} individual profiles...")
+        # Company pages are not scraped: fresh LinkedIn accounts see wrong entities
+        # or "No posts yet" due to account restrictions. Person profiles work well.
+        print(f"\nFetching {len(TRACKED_PEOPLE)} individual profiles...")
         for person in TRACKED_PEOPLE:
             posts = _fetch_person_posts(page, person)
             all_posts.extend(posts)

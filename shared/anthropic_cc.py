@@ -84,7 +84,7 @@ def agent(
 
     t0 = time.time()
     last_err: Exception | None = None
-    for attempt in range(2):  # 1 retry on transient rc=1 with empty output
+    for attempt in range(4):  # up to 3 retries for transient/overload errors
         try:
             r = subprocess.run(cmd, input=input_text, capture_output=True,
                                text=True, timeout=1800, env=child_env)
@@ -92,12 +92,19 @@ def agent(
             raise RuntimeError(f"[{label}] claude -p timed out after 1800s")
         if r.returncode == 0:
             break
-        # Only retry when there's no useful error to surface (transient crash)
+        # Check for 529 overloaded — always worth retrying with backoff
+        is_529 = "529" in r.stdout or "Overloaded" in r.stdout
+        if is_529 and attempt < 3:
+            wait = 30 * (attempt + 1)  # 30s, 60s, 90s
+            print(f"    ⚠  [{label}] API 529 overloaded, retrying in {wait}s (attempt {attempt+1}/3)...")
+            time.sleep(wait)
+            continue
+        # Only retry silent failures (no output to diagnose)
         if r.stderr.strip() or r.stdout.strip():
             break
         last_err = RuntimeError(f"[{label}] claude -p failed silently (rc={r.returncode}), attempt {attempt+1}")
         if attempt == 0:
-            import time as _time; _time.sleep(5)
+            time.sleep(5)
     if r.returncode != 0:
         # Find error/result events in stdout for diagnosis
         err_events = []

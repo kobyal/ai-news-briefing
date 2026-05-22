@@ -143,7 +143,8 @@ deps_stale=0
 if [ -f "$DEPS_MARKER" ]; then
   for req in adk-news-agent/requirements.txt perplexity-news-agent/requirements.txt \
              tavily-news-agent/requirements.txt merger-agent/requirements.txt \
-             rss-news-agent/requirements.txt twitter-agent/requirements.txt; do
+             rss-news-agent/requirements.txt twitter-agent/requirements.txt \
+             linkedin-agent/requirements.txt; do
     [ -f "$req" ] && [ "$req" -nt "$DEPS_MARKER" ] && { deps_stale=1; break; }
   done
 fi
@@ -166,7 +167,7 @@ else
   # without taking down the others. The 2026-04-27 ADK silent failure was
   # caused by the old batched form.
   for req in adk-news-agent perplexity-news-agent tavily-news-agent \
-             merger-agent rss-news-agent twitter-agent; do
+             merger-agent rss-news-agent twitter-agent linkedin-agent; do
     # Filter known-harmless 'x-client-transaction' upstream-unreachable error
     # (twitter-agent's git+https dep). Memory: package is already installed
     # locally; the per-requirement loop ensures one failed dep doesn't take
@@ -343,11 +344,20 @@ aws cloudfront create-invalidation --distribution-id "$CF_DIST" \
 
 # Editorial synthesis — reads last 7 days of data, calls Opus for cross-vendor
 # theme + 3 thematic lenses + editor picks. Output: docs/data/editorial.json
-# (local only — NOT uploaded to S3 until reviewed). Non-blocking.
+# Auto-uploaded to S3 so /main always shows fresh data. Non-blocking.
 echo
-echo "[3d/6] Editorial synthesis (local only — NOT uploaded to S3)..."
+echo "[3d/6] Editorial synthesis + S3 upload..."
 if "$PYTHON_BIN" editorial-agent/run.py --date "$DATE" 2>&1 | sed 's/^/  /'; then
   echo "  ✓ docs/data/editorial.json written"
+  if [ "$DO_PUSH" -eq 1 ]; then
+    aws s3 cp docs/data/editorial.json "s3://${S3_BUCKET}/data/editorial.json" \
+      --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
+      --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
+      && echo "  ✓ editorial.json uploaded to S3" \
+      || echo "  ⚠ editorial.json S3 upload failed (non-blocking)"
+    aws cloudfront create-invalidation --distribution-id "$CF_DIST" \
+      --paths "/data/editorial.json" --profile "$S3_PROFILE" >/dev/null 2>&1 || true
+  fi
 else
   echo "  ⚠ Editorial agent failed (non-blocking — pipeline continues)"
 fi

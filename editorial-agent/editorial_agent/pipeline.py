@@ -719,7 +719,11 @@ def _translate(synthesis: dict) -> dict:
     }
     prompt = TRANSLATE_USER.format(content=json.dumps(to_translate, ensure_ascii=False, indent=2))
     print("  → Sonnet: Hebrew translation (upgraded from Haiku)...")
-    raw = _call_llm(prompt, TRANSLATE_SYSTEM, label="editorial-translate", model="claude-sonnet-4-6")
+    try:
+        raw = _call_llm(prompt, TRANSLATE_SYSTEM, label="editorial-translate", model="claude-sonnet-4-6")
+    except RuntimeError as e:
+        print(f"  ⚠ Translation failed ({e}) — using empty Hebrew fields")
+        return {}
     try:
         return _parse_json(raw)
     except json.JSONDecodeError as e:
@@ -728,10 +732,10 @@ def _translate(synthesis: dict) -> dict:
             f"The following JSON has a syntax error. Fix ONLY the JSON syntax "
             f"(escape any unescaped quotes inside string values) and return valid JSON only:\n\n{raw}"
         )
-        raw2 = _call_llm(repair_prompt, "Return only valid JSON. No explanation.", label="editorial-translate-repair", model="claude-sonnet-4-6")
         try:
+            raw2 = _call_llm(repair_prompt, "Return only valid JSON. No explanation.", label="editorial-translate-repair", model="claude-sonnet-4-6")
             return _parse_json(raw2)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, RuntimeError):
             print("  ⚠ Translation repair also failed — using empty Hebrew fields")
             return {}
 

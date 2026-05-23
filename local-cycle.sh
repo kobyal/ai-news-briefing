@@ -415,12 +415,6 @@ print('\n'.join(random.sample(ids, min(5,len(ids)))))" 2>/dev/null || true)
   fi
 fi
 
-# Email moved to LAST step (was [4/6]) so its agent-delivery snapshot reflects
-# post-ingest state. Previously the "site=" column always showed ⚠0 because
-# the email captured before the lambda re-ingest happened in [6b/6]. All
-# pre-email steps below are fail-soft so the email still goes out if push or
-# ingest hiccups (helpful for debugging).
-
 if [ "$DO_PUSH" -eq 1 ]; then
   echo
   echo "[4/6] git add + commit + push..."
@@ -450,6 +444,13 @@ else
   echo "[4/6] git push SKIPPED (--no-push)"
   push_ok=0
 fi
+
+echo
+echo "[5/6] Sending email (subject will be tagged [LOCAL])..."
+# Email runs before the GH Pages wait so the Mac sleeping during the 3-min poll
+# doesn't silently kill it. The "site=" delivery snapshot may show ⚠0 for some
+# agents, but reliable delivery outweighs that cosmetic trade-off.
+"$PYTHON_BIN" send_email.py
 
 if [ "$DO_INGEST" -eq 1 ] && [ "$push_ok" -eq 1 ]; then
   echo
@@ -540,10 +541,6 @@ else
   echo
   echo "[5/6] ingest SKIPPED ($([ "$DO_INGEST" -eq 0 ] && echo "--no-ingest" || echo "no push"))"
 fi
-
-echo
-echo "[6/6] Sending email (subject will be tagged [LOCAL])..."
-"$PYTHON_BIN" send_email.py
 
 echo
 echo "[QA] Running QA evaluator on ${DATE}..."

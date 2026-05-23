@@ -19,11 +19,15 @@ Cookie refresh (run when expired, ~every few weeks):
 import json
 import os
 import re
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+
+# Allow importing shared/ utilities from the project root
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 _TODAY     = lambda: datetime.now().strftime("%B %d, %Y")
 _TODAY_ISO = lambda: datetime.now().strftime("%Y-%m-%d")
@@ -147,12 +151,28 @@ _EXTRACT_JS = """
             if (/reaction|like/i.test(lb)) likes = Math.max(likes, n);
             else if (/\\d+ comment/i.test(lb)) comments = n;
         }
+        // Extract post date: prefer <time datetime="..."> ISO string, fall back to
+        // relative text in the actor sub-description (e.g. "1w", "2d", "5h")
+        let date_iso = '';
+        let date_rel = '';
+        const timeEl = container.querySelector('time[datetime]');
+        if (timeEl) {
+            date_iso = timeEl.getAttribute('datetime') || '';
+        }
+        const subDesc = container.querySelector('.update-components-actor__sub-description');
+        if (subDesc) {
+            const spans = [...subDesc.querySelectorAll('span')].map(s => s.innerText.trim()).filter(Boolean);
+            // Sub-description spans: [relative-time, "•", scope-icon]
+            date_rel = spans[0] || '';
+        }
         results.push({
             post: text.slice(0, 600).trim(),
             url,
             likes,
             comments,
             scraped_author,
+            date_iso,
+            date_rel,
         });
     }
     return results;
@@ -406,6 +426,7 @@ def _fetch_person_posts(page, person: dict) -> list[dict]:
             "title":         f"{person['role']} · {person['org']}",
             "is_company":    False,
             "vendor":        vendor,
+            "date":          _resolve_date(p.get("date_iso", ""), p.get("date_rel", "")),
         })
     return results
 
@@ -415,6 +436,71 @@ def _derive_vendor(text: str) -> str:
         if pattern.search(text):
             return vendor
     return ""
+
+
+def _resolve_date(date_iso: str, date_rel: str) -> str:
+    """Convert scraped date info to a human-readable date string like 'May 22, 2026'."""
+    if date_iso:
+        try:
+            dt = datetime.fromisoformat(date_iso.replace("Z", "+00:00"))
+            return dt.strftime("%B %d, %Y")
+        except ValueError:
+            pass
+    # Relative date → approximate absolute date from today
+    today = datetime.now()
+    m = re.match(r"(\d+)(h|d|w|mo?)", date_rel.strip().lower())
+    if m:
+        n, unit = int(m.group(1)), m.group(2)
+        from datetime import timedelta
+        if unit == "h":
+            dt = today - timedelta(hours=n)
+        elif unit == "d":
+            dt = today - timedelta(days=n)
+        elif unit == "w":
+            dt = today - timedelta(weeks=n)
+        else:
+            dt = today - timedelta(days=n * 30)
+        return dt.strftime("%B %d, %Y")
+    if date_rel.lower() in ("just now", "now"):
+        return today.strftime("%B %d, %Y")
+    return today.strftime("%B %d, %Y")
+
+
+def _translate_posts(posts: list[dict]) -> list[dict]:
+    """Add post_he Hebrew translation to each post. Skips gracefully on any failure."""
+    try:
+        from shared.anthropic_cc import agent as _cc_agent, is_enabled as _cc_enabled
+    except ImportError:
+        return posts
+
+    if not _cc_enabled():
+        return posts
+
+    texts = [p["post"] for p in posts]
+    if not texts:
+        return posts
+
+    batch = json.dumps([{"i": i, "text": t[:400]} for i, t in enumerate(texts)], ensure_ascii=False)
+    prompt = (
+        "Translate these LinkedIn post excerpts to Hebrew. "
+        "Return a JSON array in the same order: [{\"i\":0,\"he\":\"...\"}, ...]. "
+        "Keep brand names and technical terms in English. "
+        "Be concise — max 2 sentences per post.\n\n" + batch
+    )
+    try:
+        raw = _cc_agent(
+            prompt,
+            instructions="You are a professional Hebrew tech translator. Return only valid JSON.",
+            json_mode=True,
+            label="linkedin-translate",
+        )
+        translations = json.loads(raw)
+        he_map = {item["i"]: item.get("he", "") for item in translations}
+        for i, p in enumerate(posts):
+            p["post_he"] = he_map.get(i, "")
+    except Exception as e:
+        print(f"  ⚠ LinkedIn translation failed ({e}) — showing English only")
+    return posts
 
 
 def _get_cookies() -> tuple[str, str]:
@@ -514,6 +600,9 @@ def run_pipeline() -> dict:
     if not capped:
         print("  ⚠  Scrape returned 0 posts — using fallback data")
         return _write_output(_load_fallback_posts(), fallback=True)
+
+    print("  Translating posts to Hebrew...")
+    capped = _translate_posts(capped)
 
     elapsed = time.time() - t_start
     print(f"\n  → {len(capped)} posts kept ({len(all_posts)} raw, {elapsed:.0f}s)")

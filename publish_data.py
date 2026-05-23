@@ -336,6 +336,36 @@ linkedin_posts = linkedin_briefing.get("linkedin_posts", [])
 if linkedin_posts:
     print(f"  LinkedIn posts: {len(linkedin_posts)}")
 
+# Auto-tag community items with related_vendor based on POST CONTENT.
+# Reddit/Twitter posts lack this field; the frontend's vendorOK() filter
+# only works for community_pulse_items (which already carry related_vendor).
+# By tagging posts here, vendorOK() can also block wrong-vendor posts from
+# appearing on story detail pages.
+# Rule: tag ONLY when classify_vendor returns a single known vendor.
+# Multi-vendor / ambiguous → leave empty so strongMatch() handles it normally.
+def _tag_vendor(text: str) -> str:
+    try:
+        from shared.vendors import classify_vendor as _cv
+        v = _cv(text)
+        return v if v != "Other" else ""
+    except Exception:
+        return ""
+
+for _post in reddit_posts:
+    if not _post.get("related_vendor"):
+        _v = _tag_vendor((_post.get("title") or "") + " " + (_post.get("body") or "")[:300])
+        if _v:
+            _post["related_vendor"] = _v
+
+_tw_people = twitter_data["people"]
+for _person in _tw_people:
+    if not _person.get("related_vendor"):
+        # Use post CONTENT (not org) — a Google person tweeting about Claude
+        # should still appear on Anthropic story pages.
+        _v = _tag_vendor(_person.get("post") or _person.get("text") or "")
+        if _v:
+            _person["related_vendor"] = _v
+
 _tw_items = twitter_data["trending"] + twitter_data["people"]
 _tw_posts = [(i.get("post") or i.get("text") or "") for i in _tw_items]
 if _tw_posts:

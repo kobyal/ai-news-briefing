@@ -560,7 +560,9 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
       for (const p of all) {
         if (!p.url?.includes("x.com")) continue;
         const text = `${p.post || p.text || ""} ${p.handle || ""} ${p.org || ""}`;
-        if (strongMatch(text)) x.push(p);
+        // vendorOK uses related_vendor tagged by publish_data — blocks posts that
+        // are explicitly single-vendor but wrong vendor (e.g. Google post on Anthropic story).
+        if (vendorOK({ item: p }) && strongMatch(text)) x.push(p);
       }
     }
     const xUrlSet = new Set(x.map(p => stripQuery(p.url || "")));
@@ -573,7 +575,9 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
       && !xUrlSet.has(stripQuery((entry.item as { source_url?: string }).source_url || ""))
       && strongMatch(`${entry.item.headline} ${entry.item.body || ""}`)
     );
-    const reddit = (d.top_reddit || []).filter((p: { title?: string }) => strongMatch(p.title || ""));
+    const reddit = (d.top_reddit || []).filter(
+      (p: { title?: string }) => vendorOK({ item: p }) && strongMatch(p.title || "")
+    );
     return { pulseItems: pulse, xPosts: x, redditPosts: reddit };
   };
 

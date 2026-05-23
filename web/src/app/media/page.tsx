@@ -205,6 +205,20 @@ const CHANNELS: Channel[] = [
     url: "https://open.spotify.com/show/0O65xhqvGVhpgdIrrdlEYk", platform: "spotify", lang: "en" },
 ];
 
+// ── Topic categories for the AI carousel ──────────────────────────────────
+const TOPIC_CATEGORIES = [
+  { icon: "🤖", name: "AI Agents", name_he: "סוכני AI", query: "build ai agents langgraph crewai 2025 tutorial", color: "#7c3aed" },
+  { icon: "☁️", name: "AWS Bedrock", name_he: "AWS Bedrock", query: "aws bedrock agents tutorial 2025", color: "#f97316" },
+  { icon: "🔷", name: "Google ADK", name_he: "Google ADK", query: "google agent development kit ADK vertex tutorial", color: "#2563eb" },
+  { icon: "🔮", name: "Claude Code", name_he: "Claude Code", query: "claude code agentic coding tutorial 2025", color: "#8b5cf6" },
+  { icon: "⚡", name: "Vibe Coding", name_he: "Vibe Coding", query: "vibe coding cursor windsurf ai programming 2025", color: "#dc2626" },
+  { icon: "🧠", name: "Prompt Engineering", name_he: "הנדסת פרומפטים", query: "prompt engineering advanced techniques LLM 2025", color: "#059669" },
+  { icon: "🔵", name: "Azure AI", name_he: "Azure AI", query: "azure openai agents ai studio foundry tutorial 2025", color: "#0284c7" },
+  { icon: "🛠️", name: "RAG & LLM Ops", name_he: "RAG ו-LLM Ops", query: "rag pipeline llm production engineering 2025", color: "#b45309" },
+  { icon: "🔗", name: "MCP & Tools", name_he: "MCP וכלים", query: "model context protocol MCP servers tools claude 2025", color: "#64748b" },
+  { icon: "🏗️", name: "Agent Frameworks", name_he: "Agent Frameworks", query: "langgraph autogen crewai agent framework tutorial 2025", color: "#0f766e" },
+];
+
 function channelInitials(name: string): string {
   const words = name.replace(/[-_]/g, " ").trim().split(/\s+/).filter(Boolean);
   if (!words.length) return "?";
@@ -700,6 +714,47 @@ function PodCard({ channel, isHe, meta }: { channel: Channel; isHe: boolean; met
   );
 }
 
+// ── Topic carousel (Browse-by-topic pill strip) ─────────────────────────────
+function TopicsCarousel({ isHe }: { isHe: boolean }) {
+  return (
+    <div style={{ marginBottom: "8px" }}>
+      <p style={{ fontSize: "10px", color: "#9a9ab8", marginBottom: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+        {isHe ? "גלול לפי נושא ב-YouTube" : "Browse YouTube by topic"}
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
+        {TOPIC_CATEGORIES.map((cat) => (
+          <a
+            key={cat.name}
+            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(cat.query)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "5px",
+              padding: "5px 11px",
+              background: `${cat.color}0d`,
+              border: `1px solid ${cat.color}30`,
+              borderRadius: "999px",
+              textDecoration: "none",
+              fontSize: "12px",
+              fontWeight: 700,
+              color: cat.color,
+              whiteSpace: "nowrap",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = `${cat.color}1f`; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = `${cat.color}0d`; }}
+          >
+            <span style={{ fontSize: "13px" }}>{cat.icon}</span>
+            {isHe ? cat.name_he : cat.name}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Show-more button ────────────────────────────────────────────────────────
 function ShowMoreButton({ open, onClick, label, accent = "#dc2626" }: { open: boolean; onClick: () => void; label: string; accent?: string }) {
   return (
@@ -738,11 +793,18 @@ function ShowMoreButton({ open, onClick, label, accent = "#dc2626" }: { open: bo
 }
 
 // ── Section title bar ───────────────────────────────────────────────────────
-function SectionHead({ title, sub, count, accent = "yt", iconChar = "▶" }: { title: string; sub?: string; count?: string; accent?: "yt" | "sp"; iconChar?: string }) {
+function SectionHead({ title, sub, count, accent = "yt", iconChar = "▶", collapsible = false, open = false, onToggle }: {
+  title: string; sub?: string; count?: string; accent?: "yt" | "sp"; iconChar?: string;
+  collapsible?: boolean; open?: boolean; onToggle?: () => void;
+}) {
   const bg = accent === "yt" ? "#dc2626" : "#1DB954";
   return (
-    <div className="mt-9 mb-3.5">
-      <div className="flex items-baseline justify-between gap-2">
+    <div
+      className="mt-9 mb-3.5"
+      onClick={collapsible ? onToggle : undefined}
+      style={{ cursor: collapsible ? "pointer" : undefined, userSelect: collapsible ? "none" : undefined }}
+    >
+      <div className="flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-2" style={{ fontFamily: "var(--font-display)", fontSize: "19px", fontWeight: 800, margin: 0, color: "#0f0f1a" }}>
           <span
             className="inline-flex items-center justify-center"
@@ -752,7 +814,12 @@ function SectionHead({ title, sub, count, accent = "yt", iconChar = "▶" }: { t
           </span>
           {title}
         </h2>
-        {count && <span style={{ fontSize: "11px", color: "#9a9ab8" }}>{count}</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {count && <span style={{ fontSize: "11px", color: "#9a9ab8" }}>{count}</span>}
+          {collapsible && (
+            <span style={{ fontSize: "15px", color: "#9a9ab8", lineHeight: 1, fontWeight: 400 }}>{open ? "▴" : "▾"}</span>
+          )}
+        </div>
       </div>
       {sub && <p style={{ fontSize: "12px", color: "#9a9ab8", margin: "4px 0 0" }}>{sub}</p>}
     </div>
@@ -763,6 +830,7 @@ function SectionHead({ title, sub, count, accent = "yt", iconChar = "▶" }: { t
 // Excludes the timeless sections (channels, podcasts) which only render once
 // at the bottom of the page.
 function DayMediaBlock({ data, isHe, includeTopVideos = false }: { data: DayData; isHe: boolean; includeTopVideos?: boolean }) {
+  const [explainersOpen, setExplainersOpen] = useState(false);
   const allVideos = (data.youtube || []) as YouTubeVideo[];
   const pairs = pairedExplainers(data.stories || [], allVideos);
   const pairedUrls = new Set(pairs.map(({ video }) => videoUrl(video)));
@@ -781,20 +849,25 @@ function DayMediaBlock({ data, isHe, includeTopVideos = false }: { data: DayData
             sub={isHe ? "סרטונים ש-LLM שייך לסיפורי היום" : "Videos LLM-paired to today's stories"}
             count={isHe ? `${pairsBelow.length} כתבות` : `${pairsBelow.length} stories`}
             iconChar="🎬"
+            collapsible
+            open={explainersOpen}
+            onToggle={() => setExplainersOpen((o) => !o)}
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {pairsBelow.map(({ story, video }) => (
-              <PairCard key={story.story_id} story={story} video={video} isHe={isHe} />
-            ))}
-          </div>
+          {explainersOpen && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {pairsBelow.map(({ story, video }) => (
+                <PairCard key={story.story_id} story={story} video={video} isHe={isHe} />
+              ))}
+            </div>
+          )}
         </>
       )}
 
       {includeTopVideos && restVideosBelow.length > 0 && (
         <>
           <SectionHead
-            title={isHe ? "סרטוני AI מובילים השבוע" : "Top AI Videos This Week"}
-            sub={isHe ? "הנצפים ביותר מ-25+ ערוצי AI — מקסימום 2 לערוץ" : "Most-watched from 25+ AI channels — capped at 2 per channel"}
+            title={isHe ? "הדרכות ופיתוח AI" : "AI Engineering Tutorials"}
+            sub={isHe ? "טוטוריאלים ופיצ׳רים מ-AWS, Google, Claude Code ועוד" : "Tutorials & features from AWS, Google, Claude Code and more"}
             count={isHe ? `${restVideosBelow.length} סרטונים` : `${restVideosBelow.length} videos`}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -821,6 +894,7 @@ function MediaPageInner() {
   const [data, setData] = useState<DayData | null>(null);
   const [archive, setArchive] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [explainersOpen, setExplainersOpen] = useState(false);
   const [showAllChannels, setShowAllChannels] = useState(false);
   const [showAllVideos, setShowAllVideos] = useState(false);
   const [showAllPodcasts, setShowAllPodcasts] = useState(false);
@@ -959,9 +1033,9 @@ function MediaPageInner() {
 
   const ytChannels = CHANNELS.filter((c) => c.platform === "youtube");
   const podChannels = CHANNELS.filter((c) => c.platform === "spotify");
-  const visibleChannels = showAllChannels ? ytChannels : ytChannels.slice(0, 6);
+  const visibleChannels = showAllChannels ? ytChannels : ytChannels.slice(0, 4);
   const visibleVideos = showAllVideos ? restVideosBelow : restVideosBelow.slice(0, 6);
-  const visiblePodcasts = showAllPodcasts ? podChannels : podChannels.slice(0, 6);
+  const visiblePodcasts = showAllPodcasts ? podChannels : podChannels.slice(0, 4);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-base)" }}>
@@ -985,40 +1059,44 @@ function MediaPageInner() {
               sub={isHe ? "סרטונים ש-LLM שייך לסיפורי היום" : "Videos LLM-paired to today's stories"}
               count={isHe ? `${pairsBelow.length} כתבות` : `${pairsBelow.length} stories`}
               iconChar="🎬"
+              collapsible
+              open={explainersOpen}
+              onToggle={() => setExplainersOpen((o) => !o)}
             />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {pairsBelow.map(({ story, video }) => (
-                <PairCard key={story.story_id} story={story} video={video} isHe={isHe} />
-              ))}
-            </div>
+            {explainersOpen && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {pairsBelow.map(({ story, video }) => (
+                  <PairCard key={story.story_id} story={story} video={video} isHe={isHe} />
+                ))}
+              </div>
+            )}
           </>
         )}
 
-        {/* ── TOP-VIDEOS SHELF (3-col, expandable) ─────── */}
+        {/* ── AI ENGINEERING TUTORIALS (renamed, with topic carousel) ── */}
+        <SectionHead
+          title={isHe ? "הדרכות ופיתוח AI" : "AI Engineering Tutorials"}
+          sub={isHe ? "טוטוריאלים ופיצ׳רים מ-AWS, Google, Claude Code ועוד" : "Tutorials & features from AWS, Google, Claude Code and more"}
+          count={restVideosBelow.length > 0 ? (isHe ? `${restVideosBelow.length} סרטונים` : `${restVideosBelow.length} videos`) : undefined}
+        />
+        <TopicsCarousel isHe={isHe} />
         {restVideosBelow.length > 0 && (
-          <>
-            <SectionHead
-              title={isHe ? "סרטוני AI מובילים השבוע" : "Top AI Videos This Week"}
-              sub={isHe ? "הנצפים ביותר מ-25+ ערוצי AI — מקסימום 2 לערוץ" : "Most-watched from 25+ AI channels — capped at 2 per channel"}
-              count={isHe ? `${restVideosBelow.length} סרטונים` : `${restVideosBelow.length} videos`}
-            />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {visibleVideos.map((v) => (
-                <VideoCard key={videoUrl(v)} video={v} />
-              ))}
-              {restVideosBelow.length > 6 && (
-                <ShowMoreButton
-                  open={showAllVideos}
-                  onClick={() => setShowAllVideos(!showAllVideos)}
-                  label={
-                    showAllVideos
-                      ? (isHe ? "הצג פחות" : "Show less")
-                      : (isHe ? `הצג את כל ${restVideosBelow.length} הסרטונים` : `Show all ${restVideosBelow.length} videos`)
-                  }
-                />
-              )}
-            </div>
-          </>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {visibleVideos.map((v) => (
+              <VideoCard key={videoUrl(v)} video={v} />
+            ))}
+            {restVideosBelow.length > 6 && (
+              <ShowMoreButton
+                open={showAllVideos}
+                onClick={() => setShowAllVideos(!showAllVideos)}
+                label={
+                  showAllVideos
+                    ? (isHe ? "הצג פחות" : "Show less")
+                    : (isHe ? `הצג את כל ${restVideosBelow.length} הסרטונים` : `Show all ${restVideosBelow.length} videos`)
+                }
+              />
+            )}
+          </div>
         )}
 
         {/* ── CHANNELS GRID (collapsible) ──────────────── */}
@@ -1032,7 +1110,7 @@ function MediaPageInner() {
           {visibleChannels.map((c) => (
             <ChannelCard key={c.url} channel={c} latest={channelLatest[c.url]} isHe={isHe} />
           ))}
-          {ytChannels.length > 6 && (
+          {ytChannels.length > 4 && (
             <ShowMoreButton
               open={showAllChannels}
               onClick={() => setShowAllChannels(!showAllChannels)}
@@ -1057,7 +1135,7 @@ function MediaPageInner() {
           {visiblePodcasts.map((c) => (
             <PodCard key={c.url} channel={c} isHe={isHe} meta={podcastMeta[c.url]} />
           ))}
-          {podChannels.length > 6 && (
+          {podChannels.length > 4 && (
             <ShowMoreButton
               open={showAllPodcasts}
               onClick={() => setShowAllPodcasts(!showAllPodcasts)}

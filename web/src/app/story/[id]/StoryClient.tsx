@@ -576,7 +576,7 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
       && strongMatch(`${entry.item.headline} ${entry.item.body || ""}`)
     );
     const reddit = (d.top_reddit || []).filter(
-      (p: { title?: string }) => vendorOK({ item: p }) && strongMatch(p.title || "")
+      (p: { title?: string; related_vendor?: string }) => vendorOK({ item: p }) && strongMatch(p.title || "")
     );
     return { pulseItems: pulse, xPosts: x, redditPosts: reddit };
   };

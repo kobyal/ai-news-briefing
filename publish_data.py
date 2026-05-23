@@ -543,6 +543,12 @@ def _regen_tldr_over_union(_merger: dict) -> bool:
         return False
 
     _bullets_he = _translate_he(_bullets)
+    # If translation failed (no API key / all empty), keep the merger's original tldr_he
+    if not any(_bullets_he):
+        _existing_he = (_merger.get("briefing_he") or {}).get("tldr_he") or []
+        if any(_existing_he):
+            print(f"  TLDR regen: translation unavailable — keeping original HE TLDR")
+            _bullets_he = _existing_he
 
     _briefing_local["tldr"] = _bullets
     if "briefing_he" not in _merger:

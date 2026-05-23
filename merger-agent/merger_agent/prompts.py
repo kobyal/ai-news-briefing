@@ -50,6 +50,10 @@ SOURCE D (Tavily News Search + Perplexity API):
 
 SOURCE E (Social signals — X/Twitter, Reddit communities, LinkedIn):
 {social_briefing}
+NOTE: social_briefing["linkedin_posts"] contains real posts from AI leaders (Dario Amodei, Jensen Huang, Werner Vogels, Jeff Dean, Jerry Liu, etc.) and vendor pages on LinkedIn. Each post has author, title, org, date, post text, url, likes, comments. Use these as:
+- News signals: an announcement or product post from a CEO/VP is a valid story source
+- Community pulse: a LinkedIn post with high engagement (likes+comments) signals industry reaction
+- Source URLs: always include the post URL when citing a LinkedIn item
 
 ADDITIONAL SOURCES (Exa semantic search, NewsAPI, YouTube AI channels, GitHub trending repos):
 {extra_sources}

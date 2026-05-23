@@ -401,6 +401,20 @@ def _step1_load_sources() -> tuple:
             social_briefing["top_reddit"] = reddit_posts
             print(f"  Found: Reddit posts from RSS ({len(reddit_posts)} posts)")
 
+    # LinkedIn posts — inject into social_briefing so the merger can surface
+    # LinkedIn discussions as community pulse items and news signals
+    li_raw = _find_latest_json(_ROOT / "linkedin-agent" / "output")
+    if li_raw:
+        li_posts = (li_raw.get("briefing") or li_raw).get("linkedin_posts", [])
+        if li_posts:
+            social_briefing["linkedin_posts"] = [
+                {"author": p.get("author"), "title": p.get("title"), "org": p.get("vendor"),
+                 "date": p.get("date"), "post": p.get("post"), "url": p.get("url"),
+                 "likes": p.get("likes", 0), "comments": p.get("comments", 0)}
+                for p in li_posts
+            ]
+            print(f"  Found: LinkedIn ({len(li_posts)} posts)")
+
     # Enriched articles from Article Reader
     enriched_articles = _load_article_reader()
 
@@ -409,9 +423,10 @@ def _step1_load_sources() -> tuple:
     n_rss    = len(rss_briefing.get("news_items", []))
     n_tavily = len(tavily_briefing.get("news_items", []))
     n_social = len(social_briefing.get("people_highlights", []))
+    n_li     = len(social_briefing.get("linkedin_posts", []))
     n_articles = len(enriched_articles)
     n_extra = sum(len(s["briefing"].get("news_items", [])) for s in extra_sources)
-    print(f"  ADK: {n_adk}  |  Perplexity: {n_px}  |  RSS: {n_rss}  |  Tavily: {n_tavily}  |  Social/xAI: {n_social} people  |  Articles: {n_articles}  |  Extra: {n_extra}")
+    print(f"  ADK: {n_adk}  |  Perplexity: {n_px}  |  RSS: {n_rss}  |  Tavily: {n_tavily}  |  Social/xAI: {n_social} people  |  LinkedIn: {n_li}  |  Articles: {n_articles}  |  Extra: {n_extra}")
     return adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources, youtube_data, github_data, xai_data
 
 

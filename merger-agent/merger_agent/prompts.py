@@ -71,6 +71,18 @@ Produce ONE merged briefing as a JSON object. Rules:
    - ONLY merge when stories describe the SAME specific announcement (e.g. two articles about "Bedrock Agent Registry launch").
      Do NOT merge different announcements from the same vendor (e.g. "Agent Registry" and "Project Houdini" are separate stories even though both are AWS).
 
+1b. ONE ANNOUNCEMENT PER STORY — each news_item must cover exactly ONE specific event or announcement.
+   - If a source article bundles 2+ distinct events (e.g. "OpenAI files IPO + ships ChatGPT in PowerPoint + claims math breakthrough"),
+     SPLIT them into separate stories, one per event.
+   - The test: can you write a ONE-CLAUSE headline? If the headline needs "and" or "+" to cover everything, it's two stories.
+   ❌ "OpenAI preps IPO filing, ships ChatGPT inside PowerPoint, and claims to solve 80-year math problem"
+   ✓  "OpenAI files IPO prospectus with Goldman and Morgan Stanley"
+   ✓  "ChatGPT lands inside Microsoft PowerPoint in public beta"
+   ✓  "OpenAI claims breakthrough on 80-year-old math problem"
+   - Exception: a tightly-coupled release (e.g. a model launch with its pricing and benchmark) can stay as one story
+     because the details explain each other. The criterion is: would a reader need to read both parts to understand either?
+     If yes → one story. If each part stands alone → split.
+
 2. UNIQUE STORIES — if a story appears in only one source, include it as-is. Do not discard niche or technical stories.
    A vendor CAN and SHOULD have multiple stories if they made multiple distinct announcements.
 

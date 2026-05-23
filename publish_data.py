@@ -7,6 +7,7 @@ import json
 import glob
 import os
 import re
+import sys
 import urllib.request
 import urllib.parse
 from datetime import datetime, timedelta
@@ -160,15 +161,47 @@ def _generate_per_story_audio(
 
 
 def _translate_he(texts: list) -> list:
-    """Translate a batch of texts to Hebrew via Claude Haiku."""
+    """Translate a batch of texts to Hebrew.
+
+    Prefers the Claude Code subscription path (claude -p) when
+    MERGER_VIA_CLAUDE_CODE=1, falls back to direct API key call.
+    """
     if not texts:
         return []
-    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("IMAGE_VISION_API_KEY", "")
-    if not api_key:
-        return [""] * len(texts)
     numbered = "\n".join(f"{i+1}. {(t or '')[:500]}" for i, t in enumerate(texts))
     prompt = (f"Translate these {len(texts)} items to Hebrew. "
               "Return ONLY the translations, numbered the same way, no explanations:\n\n" + numbered)
+
+    def _parse(text: str) -> list:
+        lines = []
+        for line in text.strip().split("\n"):
+            line = line.strip()
+            if line and line[0].isdigit():
+                m = __import__("re").match(r"^\d+\.\s*(.+)$", line)
+                if m:
+                    lines.append(m.group(1))
+        if len(lines) == len(texts):
+            return lines
+        print(f"  Claude translate: got {len(lines)} lines for {len(texts)} texts — padding")
+        return lines + [""] * (len(texts) - len(lines))
+
+    # Subscription path (local runs with MERGER_VIA_CLAUDE_CODE=1)
+    if os.environ.get("MERGER_VIA_CLAUDE_CODE") == "1":
+        try:
+            sys.path.insert(0, str(Path(__file__).parent))
+            from shared.anthropic_cc import agent as _cc_agent
+            raw = _cc_agent(prompt,
+                            instructions="You are a Hebrew translator. Return only the numbered translations.",
+                            label="publish-translate-he")
+            return _parse(raw)
+        except Exception as e:
+            print(f"  Claude translate (sub) error: {e}")
+            return [""] * len(texts)
+
+    # API key path (CI / pipeline with ANTHROPIC_API_KEY / IMAGE_VISION_API_KEY)
+    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("IMAGE_VISION_API_KEY", "")
+    if not api_key:
+        return [""] * len(texts)
     try:
         payload = json.dumps({
             "model": "claude-haiku-4-5-20251001",
@@ -182,18 +215,7 @@ def _translate_he(texts: list) -> list:
         )
         with urllib.request.urlopen(req, timeout=60) as resp:
             result = json.loads(resp.read())
-        text = result["content"][0]["text"]
-        lines = []
-        for line in text.strip().split("\n"):
-            line = line.strip()
-            if line and line[0].isdigit():
-                m = __import__("re").match(r"^\d+\.\s*(.+)$", line)
-                if m:
-                    lines.append(m.group(1))
-        if len(lines) == len(texts):
-            return lines
-        print(f"  Claude translate: got {len(lines)} lines for {len(texts)} texts — padding")
-        return lines + [""] * (len(texts) - len(lines))
+        return _parse(result["content"][0]["text"])
     except Exception as e:
         print(f"  Claude translate error: {e}")
         return [""] * len(texts)

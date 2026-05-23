@@ -27,7 +27,7 @@ AGENTS = {
     "github":     ("github-trending-agent/run.py",    "free",  "GitHub API (free)"),
     "xai":        ("xai-twitter-agent/run.py",        "paid",  "xAI Grok-4 (~$0.35/run) — disabled"),
     "twitter":    ("twitter-agent/run.py",             "free",  "X GraphQL direct (no API key)"),
-    "linkedin":   ("linkedin-agent/run.py",            "free",  "LinkedIn Voyager API (li_at cookie)"),
+    "linkedin":   ("linkedin-agent/run.py",            "paid",  "Apify HarvestAPI (~$0.04/day for 31 profiles)"),
     # Merger (always runs last)
     "merger":     ("merger-agent/run.py",             "paid",  "Anthropic Claude"),
 }

@@ -30,47 +30,71 @@ APIFY_BASE     = "https://api.apify.com/v2"
 # Tracked people — same list as before, now used to build targetUrls
 # ---------------------------------------------------------------------------
 TRACKED_PEOPLE = [
-    {"name": "Sam Altman",       "slug": "samaltman",                "org": "OpenAI",      "role": "CEO"},
-    {"name": "Demis Hassabis",   "slug": "demishassabis",            "org": "Google",      "role": "CEO, DeepMind"},
-    {"name": "Mustafa Suleyman", "slug": "mustafasuleyman",          "org": "Microsoft",   "role": "CEO, Microsoft AI"},
-    {"name": "Jensen Huang",     "slug": "jensen-huang",             "org": "NVIDIA",      "role": "CEO"},
-    {"name": "Satya Nadella",    "slug": "satyanadella",             "org": "Azure",       "role": "CEO, Microsoft"},
-    {"name": "Sundar Pichai",    "slug": "sundarpichai",             "org": "Google",      "role": "CEO, Google"},
-    {"name": "Arthur Mensch",    "slug": "arthurmensch",             "org": "Mistral",     "role": "CEO"},
-    {"name": "Aidan Gomez",      "slug": "aidangomez",               "org": "Cohere",      "role": "CEO"},
-    {"name": "Greg Brockman",    "slug": "gregbrockman",             "org": "OpenAI",      "role": "Co-founder"},
-    {"name": "Andrew Ng",        "slug": "andrewyng",                "org": "Independent", "role": "AI educator"},
-    {"name": "Yann LeCun",       "slug": "yann-lecun",               "org": "Meta",        "role": "Chief AI Scientist"},
-    {"name": "Fei-Fei Li",       "slug": "fei-fei-li-6b021318",      "org": "Independent", "role": "AI researcher"},
-    {"name": "Andrej Karpathy",  "slug": "andreykarpathy",           "org": "Independent", "role": "AI researcher"},
-    {"name": "Ilya Sutskever",   "slug": "ilyasutskever",            "org": "SSI",         "role": "Co-founder"},
-    {"name": "Harrison Chase",   "slug": "harrison-chase-961561187", "org": "LangChain",   "role": "CEO"},
-    {"name": "Chip Huyen",       "slug": "chiphuyen",                "org": "Independent", "role": "ML engineer & author"},
-    {"name": "Simon Willison",   "slug": "simonw",                   "org": "Independent", "role": "AI builder"},
-    {"name": "Ethan Mollick",    "slug": "ethanmollick",             "org": "Wharton",     "role": "Professor & AI educator"},
-    {"name": "Gary Marcus",      "slug": "gary-marcus",              "org": "Independent", "role": "AI critic & professor"},
-    {"name": "Elad Gil",         "slug": "elad-gil",                 "org": "Independent", "role": "Investor"},
+    # OpenAI
+    {"name": "Sam Altman",          "slug": "samaltman",                    "org": "OpenAI",      "role": "CEO"},
+    {"name": "Greg Brockman",       "slug": "gregbrockman",                 "org": "OpenAI",      "role": "Co-founder"},
+    {"name": "John Schulman",       "slug": "john-schulman-ba3884b4",       "org": "TML",         "role": "Co-founder, ex-OpenAI"},
+    # Anthropic
+    {"name": "Dario Amodei",        "slug": "dario-amodei-3934934",         "org": "Anthropic",   "role": "CEO"},
+    {"name": "Amanda Askell",       "slug": "amanda-askell",                "org": "Anthropic",   "role": "Alignment researcher"},
+    {"name": "Chris Olah",          "slug": "christopher-olah-b574414a",    "org": "Anthropic",   "role": "Interpretability researcher"},
+    # Google / DeepMind
+    {"name": "Demis Hassabis",      "slug": "demishassabis",                "org": "Google",      "role": "CEO, DeepMind"},
+    {"name": "Sundar Pichai",       "slug": "sundarpichai",                 "org": "Google",      "role": "CEO, Google"},
+    {"name": "Jeff Dean",           "slug": "jeff-dean-8b212555",           "org": "Google",      "role": "Chief Scientist, DeepMind"},
+    # Microsoft / Azure
+    {"name": "Satya Nadella",       "slug": "satyanadella",                 "org": "Azure",       "role": "CEO, Microsoft"},
+    {"name": "Mustafa Suleyman",    "slug": "mustafasuleyman",              "org": "Microsoft",   "role": "CEO, Microsoft AI"},
+    # AWS / Amazon
+    {"name": "Werner Vogels",       "slug": "wernervogels",                 "org": "AWS",         "role": "CTO, Amazon"},
+    {"name": "Swami Sivasubramanian","slug": "swaminathansivasubramanian",  "org": "AWS",         "role": "VP, Agentic AI"},
+    {"name": "Matt Wood",           "slug": "themza",                       "org": "AWS",         "role": "Chief AI Officer"},
+    # NVIDIA / hardware
+    {"name": "Jensen Huang",        "slug": "jensen-huang",                 "org": "NVIDIA",      "role": "CEO"},
+    # Other model labs
+    {"name": "Arthur Mensch",       "slug": "arthurmensch",                 "org": "Mistral",     "role": "CEO"},
+    {"name": "Aidan Gomez",         "slug": "aidangomez",                   "org": "Cohere",      "role": "CEO"},
+    {"name": "Ilya Sutskever",      "slug": "ilyasutskever",                "org": "SSI",         "role": "Co-founder"},
+    # AI agents / builders
+    {"name": "Harrison Chase",      "slug": "harrison-chase-961561187",     "org": "LangChain",   "role": "CEO"},
+    {"name": "Jerry Liu",           "slug": "jerry-liu-64390071",           "org": "LlamaIndex",  "role": "CEO"},
+    {"name": "Kanjun Qiu",          "slug": "kanjun",                       "org": "Imbue",       "role": "CEO"},
+    # Researchers / educators
+    {"name": "Andrew Ng",           "slug": "andrewyng",                    "org": "Independent", "role": "AI educator"},
+    {"name": "Yann LeCun",          "slug": "yann-lecun",                   "org": "Meta",        "role": "Chief AI Scientist"},
+    {"name": "Fei-Fei Li",          "slug": "fei-fei-li-6b021318",          "org": "Independent", "role": "AI researcher"},
+    {"name": "Andrej Karpathy",     "slug": "andreykarpathy",               "org": "Independent", "role": "AI researcher"},
+    {"name": "Chip Huyen",          "slug": "chiphuyen",                    "org": "Independent", "role": "ML engineer & author"},
+    {"name": "Simon Willison",      "slug": "simonw",                       "org": "Independent", "role": "AI builder"},
+    {"name": "Ethan Mollick",       "slug": "ethanmollick",                 "org": "Wharton",     "role": "Professor & AI educator"},
+    {"name": "Linus Ekenstam",      "slug": "linusekenstam",                "org": "Independent", "role": "AI practitioner"},
+    # Critics / investors
+    {"name": "Gary Marcus",         "slug": "gary-marcus",                  "org": "Independent", "role": "AI critic & professor"},
+    {"name": "Elad Gil",            "slug": "elad-gil",                     "org": "Independent", "role": "Investor"},
 ]
 
 _SLUG_TO_PERSON = {p["slug"]: p for p in TRACKED_PEOPLE}
 
 _AI_RELEVANCE_RE = re.compile(
-    r"\b(openai|anthropic|claude|chatgpt|gpt|gemini|llm|llms|agi|"
+    r"\b(openai|anthropic|claude|claude code|chatgpt|gpt|gemini|llm|llms|agi|"
     r"artificial intelligence|machine learning|deep learning|"
-    r"ai agent|foundation model|frontier model|large language|"
-    r"nvidia|grok|mistral|cohere|deepseek|hugging.?face|"
-    r"transformer|neural network|fine.?tun|embedding|"
+    r"ai agent|ai agents|agentic ai|foundation model|frontier model|large language|"
+    r"nvidia|grok|mistral|cohere|deepseek|hugging.?face|llamaindex|langchain|"
+    r"transformer|neural network|fine.?tun|embedding|rag|retrieval.augmented|"
     r"generative ai|gen ai|agentic|cursor|copilot|vibe.?cod|"
-    r"benchmark|evals|reasoning model|multimodal|inference|"
-    r"open.?source.*model|model.*release|context.?window)\b",
+    r"bedrock|sagemaker|amazon q|aws ai|re.?invent|"
+    r"benchmark|evals|reasoning model|multimodal|inference|mcp|"
+    r"open.?source.*model|model.*release|context.?window|prompt.?engin)\b",
     re.IGNORECASE,
 )
 
 _VENDOR_PATTERNS = [
-    ("Anthropic",    re.compile(r"\b(anthropic|claude)\b", re.IGNORECASE)),
-    ("OpenAI",       re.compile(r"\b(openai|chatgpt|gpt|codex)\b", re.IGNORECASE)),
-    ("Google",       re.compile(r"\b(gemini|google ai|deepmind|google io|google cloud)\b", re.IGNORECASE)),
+    ("Anthropic",    re.compile(r"\b(anthropic|claude(?!\s+von))\b", re.IGNORECASE)),
+    ("OpenAI",       re.compile(r"\b(openai|chatgpt|gpt-?\d|codex|o1|o3)\b", re.IGNORECASE)),
+    ("Google",       re.compile(r"\b(gemini|google ai|deepmind|google i/?o|google cloud)\b", re.IGNORECASE)),
+    ("AWS",          re.compile(r"\b(aws|bedrock|sagemaker|amazon q|amazon web|re.?invent)\b", re.IGNORECASE)),
     ("Meta",         re.compile(r"\b(llama|meta ai)\b", re.IGNORECASE)),
+    ("Azure",        re.compile(r"\b(azure|microsoft ai|copilot)\b", re.IGNORECASE)),
     ("NVIDIA",       re.compile(r"\bnvidia\b", re.IGNORECASE)),
     ("Mistral",      re.compile(r"\bmistral\b", re.IGNORECASE)),
     ("Cohere",       re.compile(r"\bcohere\b", re.IGNORECASE)),
@@ -78,9 +102,8 @@ _VENDOR_PATTERNS = [
     ("DeepSeek",     re.compile(r"\bdeepseek\b", re.IGNORECASE)),
     ("xAI",          re.compile(r"\b(grok|xai)\b", re.IGNORECASE)),
     ("Perplexity",   re.compile(r"\bperplexity\b", re.IGNORECASE)),
-    ("AWS",          re.compile(r"\b(aws|bedrock|amazon web)\b", re.IGNORECASE)),
-    ("Azure",        re.compile(r"\b(azure|microsoft ai|copilot)\b", re.IGNORECASE)),
-    ("LangChain",    re.compile(r"\blangchain\b", re.IGNORECASE)),
+    ("LangChain",    re.compile(r"\b(langchain|langgraph)\b", re.IGNORECASE)),
+    ("LlamaIndex",   re.compile(r"\b(llamaindex|llama.?index)\b", re.IGNORECASE)),
 ]
 
 
@@ -276,8 +299,18 @@ def _translate_posts(posts: list[dict]) -> list[dict]:
             json_mode=True,
             label="linkedin-translate",
         )
-        translations = json.loads(raw)
-        he_map = {item["i"]: item.get("he", "") for item in translations}
+        # Strip markdown fences if present
+        stripped = raw.strip()
+        if stripped.startswith("```"):
+            stripped = stripped.split("```")[1]
+            if stripped.startswith("json"):
+                stripped = stripped[4:]
+            stripped = stripped.strip()
+        parsed = json.loads(stripped)
+        # Handle both plain array and object-wrapped {"translations": [...]}
+        if isinstance(parsed, dict):
+            parsed = next((v for v in parsed.values() if isinstance(v, list)), [])
+        he_map = {item["i"]: item.get("he", "") for item in parsed}
         for i, p in enumerate(posts):
             p["post_he"] = he_map.get(i, "")
     except Exception as e:
@@ -304,7 +337,7 @@ def run_pipeline() -> dict:
 
     actor_input = {
         "targetUrls":        target_urls,
-        "maxPosts":          5,
+        "maxPosts":          3,
         "postedLimit":       "week",
         "includeReposts":    True,
         "includeQuotePosts": True,
@@ -312,7 +345,7 @@ def run_pipeline() -> dict:
         "scrapeComments":    False,
     }
 
-    print(f"\n  Calling Apify actor ({len(target_urls)} profiles, last week, max 5 posts each)...")
+    print(f"\n  Calling Apify actor ({len(target_urls)} profiles, last week, max {actor_input['maxPosts']} posts each)...")
     t_start = time.time()
 
     try:

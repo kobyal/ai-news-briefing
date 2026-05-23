@@ -82,6 +82,9 @@ Produce ONE merged briefing as a JSON object. Rules:
    - Exception: a tightly-coupled release (e.g. a model launch with its pricing and benchmark) can stay as one story
      because the details explain each other. The criterion is: would a reader need to read both parts to understand either?
      If yes → one story. If each part stands alone → split.
+   - After splitting, apply a significance filter to each piece: would this item earn its own slot if it arrived
+     as a standalone tip? If not (e.g. a minor UX tweak buried in a round-up), DROP it rather than give it
+     a weak solo slot. The cap is 15-25 total stories — splitting should raise quality, not inflate count.
 
 2. UNIQUE STORIES — if a story appears in only one source, include it as-is. Do not discard niche or technical stories.
    A vendor CAN and SHOULD have multiple stories if they made multiple distinct announcements.

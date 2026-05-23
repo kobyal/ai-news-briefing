@@ -348,26 +348,10 @@ def _check_apis() -> list[dict]:
             status = "exhausted" if ("403" in err or "429" in err or "quota" in err.lower()) else "error"
             checks.append({"name": name, "status": status, "detail": err[:60], "console_url": console_url, "tier": "paid"})
 
-    # ── FREE: DeepL — authoritative chars used/limit ───────────────────
-    deepl_key = os.environ.get("DEEPL_API_KEY", "")
-    if deepl_key:
-        try:
-            req = urllib.request.Request("https://api-free.deepl.com/v2/usage")
-            req.add_header("Authorization", f"DeepL-Auth-Key {deepl_key}")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                d = json.loads(resp.read())
-            used = d.get("character_count", 0)
-            limit = d.get("character_limit", 1)
-            pct = 100 * used / limit if limit else 0
-            status = "exhausted" if used >= limit else ("warn" if pct >= _WARN_THRESHOLD_PCT else "ok")
-            checks.append({"name": "DeepL", "status": status,
-                           "detail": f"{used:,}/{limit:,} chars{_pct(used, limit)}",
-                           "console_url": "https://www.deepl.com/account/usage", "tier": "free"})
-        except Exception as e:
-            checks.append({"name": "DeepL", "status": "error", "detail": str(e)[:40],
-                           "console_url": "https://www.deepl.com/account/usage", "tier": "free"})
-
-    # ── FREE: Tavily — authoritative plan + paygo credit usage ──────────
+    # ── FREE: Tavily — one combined row; exhausted keys are expected rotation ──
+    # Show overall status as ok/warn if at least one key is active.
+    # Only marks as exhausted when ALL keys are gone.
+    _tavily_slots = []
     for i, key_name in enumerate(["TAVILY_API_KEY", "TAVILY_API_KEY2", "TAVILY_API_KEY3"], 1):
         key = os.environ.get(key_name, "")
         if not key:
@@ -378,34 +362,34 @@ def _check_apis() -> list[dict]:
             with urllib.request.urlopen(req, timeout=8) as resp:
                 d = json.loads(resp.read())
             acct = d.get("account", {}) or {}
-            plan = acct.get("current_plan", "Unknown")
             plan_used = acct.get("plan_usage", 0) or 0
             plan_limit = acct.get("plan_limit", 0) or 0
-            paygo_used = acct.get("paygo_usage", 0) or 0
-            paygo_limit = acct.get("paygo_limit", 0) or 0
-            parts = []
-            if plan_limit:
-                parts.append(f"{plan_used:,}/{plan_limit:,} credits{_pct(plan_used, plan_limit)} · {plan}")
-            elif plan_used:
-                parts.append(f"{plan_used:,} credits · {plan}")
-            else:
-                parts.append(plan)
-            if paygo_used or paygo_limit:
-                parts.append(f"paygo {paygo_used:,}/{paygo_limit or '∞'}")
             pct = 100 * plan_used / plan_limit if plan_limit else 0
             if plan_limit and plan_used >= plan_limit:
-                status = "exhausted"
+                slot_status = "exhausted"
             elif pct >= _WARN_THRESHOLD_PCT:
-                status = "warn"
+                slot_status = "warn"
             else:
-                status = "ok"
-            checks.append({"name": f"Tavily #{i}", "status": status, "detail": " · ".join(parts),
-                           "console_url": "https://app.tavily.com/home", "tier": "free"})
+                slot_status = "ok"
+            detail = f"#{i} {plan_used:,}/{plan_limit:,}{_pct(plan_used, plan_limit)}"
         except Exception as e:
             err = str(e)
-            status = "exhausted" if ("usage limit" in err or "432" in err or "429" in err) else "error"
-            checks.append({"name": f"Tavily #{i}", "status": status, "detail": err[:60],
-                           "console_url": "https://app.tavily.com/home", "tier": "free"})
+            slot_status = "exhausted" if ("usage limit" in err or "432" in err or "429" in err) else "error"
+            detail = f"#{i} {err[:30]}"
+        _tavily_slots.append({"status": slot_status, "detail": detail})
+    if _tavily_slots:
+        _active = [s for s in _tavily_slots if s["status"] in ("ok", "warn")]
+        if not _active:
+            _tv_status = "exhausted"
+        elif any(s["status"] == "warn" for s in _active):
+            _tv_status = "warn"
+        else:
+            _tv_status = "ok"
+        _tv_detail = " · ".join(s["detail"] for s in _tavily_slots)
+        if len(_tavily_slots) > 1:
+            _tv_detail += f" · {len(_active)}/{len(_tavily_slots)} active"
+        checks.append({"name": "Tavily", "status": _tv_status, "detail": _tv_detail,
+                       "console_url": "https://app.tavily.com/home", "tier": "free"})
 
     # ── FREE: YouTube — 10k unit/day quota, no programmatic check ──────
     if yt_key:
@@ -450,62 +434,6 @@ def _check_apis() -> list[dict]:
             else:
                 checks.append({"name": f"Jina #{i}", "status": "error", "detail": err[:60],
                                "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
-
-    # ── FREE: Exa — probe via exa_py SDK (same code path the agent uses),
-    # not raw HTTP with guessed field names. Previous raw probe was 403-ing
-    # because of a numResults/num_results mismatch, falsely reporting "revoked".
-    for i, key_name in enumerate(["EXA_API_KEY", "EXA_API_KEY2"], 1):
-        key = os.environ.get(key_name, "")
-        if not key:
-            continue
-        try:
-            from exa_py import Exa
-            Exa(api_key=key).search("test", num_results=1)
-            checks.append({"name": f"Exa #{i}", "status": "ok", "detail": "PAYG · check spend",
-                           "console_url": "https://dashboard.exa.ai/usage?tab=spend", "tier": "free"})
-        except ImportError:
-            # exa_py not available in the email step — fall back to raw HTTP with the
-            # correct snake_case field name the API actually accepts.
-            try:
-                body = json.dumps({"query": "test", "num_results": 1, "type": "auto"}).encode()
-                req = urllib.request.Request("https://api.exa.ai/search", data=body,
-                                              headers={"x-api-key": key, "Content-Type": "application/json",
-                                                       # Cloudflare WAF on api.exa.ai 403s urllib's default UA (error 1010).
-                                                       # Browser-shaped UA gets through without changing what we test.
-                                                       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"})
-                with urllib.request.urlopen(req, timeout=8):
-                    checks.append({"name": f"Exa #{i}", "status": "ok", "detail": "PAYG · check spend",
-                                   "console_url": "https://dashboard.exa.ai/usage?tab=spend", "tier": "free"})
-            except Exception as e:
-                err = str(e)
-                status = "exhausted" if ("403" in err or "429" in err) else "error"
-                checks.append({"name": f"Exa #{i}", "status": status, "detail": err[:60],
-                               "console_url": "https://dashboard.exa.ai/usage?tab=spend", "tier": "free"})
-        except Exception as e:
-            err = str(e)
-            status = "exhausted" if ("403" in err or "429" in err) else "error"
-            checks.append({"name": f"Exa #{i}", "status": status, "detail": err[:60],
-                           "console_url": "https://dashboard.exa.ai/usage?tab=spend", "tier": "free"})
-
-    # ── FREE: NewsAPI — no usage endpoint, show known free tier cap ────
-    for i, key_name in enumerate(["NEWSAPI_KEY", "NEWSAPI_KEY2"], 1):
-        key = os.environ.get(key_name, "")
-        if not key:
-            continue
-        try:
-            req = urllib.request.Request(f"https://newsapi.org/v2/top-headlines?country=us&pageSize=1&apiKey={key}")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                d = json.loads(resp.read())
-            if d.get("status") == "ok":
-                checks.append({"name": f"NewsAPI #{i}", "status": "ok", "detail": "100 req/day quota",
-                               "console_url": "https://newsapi.org/account", "tier": "free"})
-            else:
-                checks.append({"name": f"NewsAPI #{i}", "status": "error",
-                               "detail": d.get("message", "unknown")[:50],
-                               "console_url": "https://newsapi.org/account", "tier": "free"})
-        except Exception as e:
-            checks.append({"name": f"NewsAPI #{i}", "status": "error", "detail": str(e)[:50],
-                           "console_url": "https://newsapi.org/account", "tier": "free"})
 
     # ── FREE: X/Twitter scrape — surfaces auth-cookie expiry as ⚠️ ─────
     today = datetime.now().strftime("%Y-%m-%d")

@@ -1,73 +1,35 @@
-"""LinkedIn Agent — scrapes posts from vendor company pages and AI leaders.
+"""LinkedIn Agent — fetches posts via Apify HarvestAPI scraper (no cookies needed).
 
-Uses Playwright (headless Chromium) with li_at session cookie. The old Voyager
-API endpoints (/voyager/api/feed/updatesV2) were deprecated by LinkedIn ~2024
-and return 400/404. This version drives a headless browser instead.
-
-⚠️  ACCOUNT SAFETY: ALWAYS use the kobytest100@gmail.com LinkedIn account.
-    NEVER use kobyal@gmail.com — LinkedIn will ban your personal account.
+Actor: harvestapi/linkedin-profile-posts (ID: A3cAPGpwBEG8RJwse)
+Cost:  ~$2.00 / 1,000 posts  (~$0.04/day for 20 profiles × 5 posts)
+Docs:  https://apify.com/harvestapi/linkedin-profile-posts
 
 Env vars (in private/.env):
-    KOBYTEST_LI_AT      — li_at cookie from kobytest100's linkedin.com session
-    KOBYTEST_JSESSIONID — JSESSIONID cookie (ajax:NNNN, no surrounding quotes)
-
-Cookie refresh (run when expired, ~every few weeks):
-    1. Log into linkedin.com in Chrome as kobytest100@gmail.com
-    2. Run:  python3 scripts/extract_linkedin_cookies.py
-    3. Paste the printed values into private/.env
+    APIFY_API_TOKEN — Personal API token from console.apify.com/settings/integrations
 """
 import json
 import os
-import random
 import re
 import sys
 import time
-from datetime import datetime, timezone
+import urllib.request
+import urllib.error
+from datetime import datetime
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
-
-# Allow importing shared/ utilities from the project root
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 _TODAY     = lambda: datetime.now().strftime("%B %d, %Y")
 _TODAY_ISO = lambda: datetime.now().strftime("%Y-%m-%d")
-# Wider lookback for "top posts" mode — we want quality posts from the past week+
 _LOOKBACK  = lambda: int(os.environ.get("LOOKBACK_DAYS", "14"))
 
-BASE = "https://www.linkedin.com"
+APIFY_ACTOR_ID = "A3cAPGpwBEG8RJwse"  # harvestapi/linkedin-profile-posts
+APIFY_BASE     = "https://api.apify.com/v2"
 
 # ---------------------------------------------------------------------------
-# Company pages — fetched sorted by TOP engagement (sortBy=TOP in URL)
-# slug from linkedin.com/company/{slug}/
-# ---------------------------------------------------------------------------
-TRACKED_COMPANIES = [
-    {"name": "Anthropic",      "slug": "anthropic",           "org": "Anthropic"},
-    {"name": "OpenAI",         "slug": "openai",              "org": "OpenAI"},
-    {"name": "Google DeepMind","slug": "googledeepmind",      "org": "Google"},
-    {"name": "AWS",            "slug": "amazon-web-services", "org": "AWS"},
-    {"name": "Microsoft",      "slug": "microsoft",           "org": "Azure"},
-    {"name": "Meta",           "slug": "meta",                "org": "Meta"},
-    {"name": "NVIDIA",         "slug": "nvidia",              "org": "NVIDIA"},
-    {"name": "Mistral AI",     "slug": "mistralai",           "org": "Mistral"},
-    {"name": "Hugging Face",   "slug": "huggingface",         "org": "Hugging Face"},
-    {"name": "Cohere",         "slug": "cohere-ai",           "org": "Cohere"},
-    {"name": "DeepSeek",       "slug": "deepseek-ai",         "org": "DeepSeek"},
-    {"name": "xAI",            "slug": "x-ai",                "org": "xAI"},
-    {"name": "Perplexity AI",  "slug": "perplexity-ai",       "org": "Perplexity"},
-    {"name": "Scale AI",       "slug": "scale-ai",            "org": "Scale AI"},
-    {"name": "Runway",         "slug": "runwayml",            "org": "Runway"},
-    {"name": "Together AI",    "slug": "togetherai",          "org": "Together AI"},
-    {"name": "Apple",          "slug": "apple",               "org": "Apple"},
-    {"name": "Samsung",        "slug": "samsung-semiconductor","org": "Samsung"},
-]
-
-# ---------------------------------------------------------------------------
-# Individual voices — mix of lab execs, researchers, critics, builders, VCs
-# slug from linkedin.com/in/{slug}/
+# Tracked people — same list as before, now used to build targetUrls
 # ---------------------------------------------------------------------------
 TRACKED_PEOPLE = [
-    # Lab executives
     {"name": "Sam Altman",       "slug": "samaltman",                "org": "OpenAI",      "role": "CEO"},
     {"name": "Demis Hassabis",   "slug": "demishassabis",            "org": "Google",      "role": "CEO, DeepMind"},
     {"name": "Mustafa Suleyman", "slug": "mustafasuleyman",          "org": "Microsoft",   "role": "CEO, Microsoft AI"},
@@ -77,22 +39,20 @@ TRACKED_PEOPLE = [
     {"name": "Arthur Mensch",    "slug": "arthurmensch",             "org": "Mistral",     "role": "CEO"},
     {"name": "Aidan Gomez",      "slug": "aidangomez",               "org": "Cohere",      "role": "CEO"},
     {"name": "Greg Brockman",    "slug": "gregbrockman",             "org": "OpenAI",      "role": "Co-founder"},
-    # Researchers & scientists
     {"name": "Andrew Ng",        "slug": "andrewyng",                "org": "Independent", "role": "AI educator"},
     {"name": "Yann LeCun",       "slug": "yann-lecun",               "org": "Meta",        "role": "Chief AI Scientist"},
     {"name": "Fei-Fei Li",       "slug": "fei-fei-li-6b021318",      "org": "Independent", "role": "AI researcher"},
     {"name": "Andrej Karpathy",  "slug": "andreykarpathy",           "org": "Independent", "role": "AI researcher"},
     {"name": "Ilya Sutskever",   "slug": "ilyasutskever",            "org": "SSI",         "role": "Co-founder"},
-    # Builders & practitioners
     {"name": "Harrison Chase",   "slug": "harrison-chase-961561187", "org": "LangChain",   "role": "CEO"},
     {"name": "Chip Huyen",       "slug": "chiphuyen",                "org": "Independent", "role": "ML engineer & author"},
     {"name": "Simon Willison",   "slug": "simonw",                   "org": "Independent", "role": "AI builder"},
     {"name": "Ethan Mollick",    "slug": "ethanmollick",             "org": "Wharton",     "role": "Professor & AI educator"},
-    # Critics & balanced voices
     {"name": "Gary Marcus",      "slug": "gary-marcus",              "org": "Independent", "role": "AI critic & professor"},
-    # Investors
     {"name": "Elad Gil",         "slug": "elad-gil",                 "org": "Independent", "role": "Investor"},
 ]
+
+_SLUG_TO_PERSON = {p["slug"]: p for p in TRACKED_PEOPLE}
 
 _AI_RELEVANCE_RE = re.compile(
     r"\b(openai|anthropic|claude|chatgpt|gpt|gemini|llm|llms|agi|"
@@ -123,152 +83,138 @@ _VENDOR_PATTERNS = [
     ("LangChain",    re.compile(r"\blangchain\b", re.IGNORECASE)),
 ]
 
-# JavaScript injected into each page to extract post data from the rendered DOM.
-_EXTRACT_JS = """
-() => {
-    const results = [];
-    for (const container of document.querySelectorAll('[data-urn*="activity"]')) {
-        const urn = container.getAttribute('data-urn') || '';
-        const url = urn
-            ? 'https://www.linkedin.com/feed/update/' + encodeURIComponent(urn) + '/'
-            : '';
-        const textEl = container.querySelector(
-            '.update-components-text .break-words span[dir],' +
-            '.update-components-text .break-words,' +
-            '.feed-shared-text span[dir],' +
-            '.feed-shared-inline-show-more-text'
-        );
-        const text = textEl ? textEl.innerText.trim() : '';
-        if (!text || text.length < 30) continue;
-        const authorEl = container.querySelector(
-            '.update-components-actor__name span[aria-hidden="true"]'
-        );
-        const scraped_author = authorEl ? authorEl.innerText.trim() : '';
-        let likes = 0, comments = 0;
-        for (const el of container.querySelectorAll('[aria-label]')) {
-            const lb = el.getAttribute('aria-label') || '';
-            const m = lb.match(/([\\d,]+)/);
-            const n = m ? parseInt(m[1].replace(/,/g, '')) : 0;
-            if (/reaction|like/i.test(lb)) likes = Math.max(likes, n);
-            else if (/\\d+ comment/i.test(lb)) comments = n;
-        }
-        // Extract post date: prefer <time datetime="..."> ISO string, fall back to
-        // relative text in the actor sub-description (e.g. "1w", "2d", "5h")
-        let date_iso = '';
-        let date_rel = '';
-        const timeEl = container.querySelector('time[datetime]');
-        if (timeEl) {
-            date_iso = timeEl.getAttribute('datetime') || '';
-        }
-        const subDesc = container.querySelector('.update-components-actor__sub-description');
-        if (subDesc) {
-            const spans = [...subDesc.querySelectorAll('span')].map(s => s.innerText.trim()).filter(Boolean);
-            // Sub-description spans: [relative-time, "•", scope-icon]
-            date_rel = spans[0] || '';
-        }
-        results.push({
-            post: text.slice(0, 600).trim(),
-            url,
-            likes,
-            comments,
-            scraped_author,
-            date_iso,
-            date_rel,
-        });
-    }
-    return results;
-}
-"""
+
+def _derive_vendor(text: str) -> str:
+    for vendor, pattern in _VENDOR_PATTERNS:
+        if pattern.search(text):
+            return vendor
+    return ""
 
 
 # ---------------------------------------------------------------------------
-# Cookie helpers — auto-extract from Chrome + persist back to .env
+# Apify API helpers
 # ---------------------------------------------------------------------------
 
-_ENV_PATH = Path(__file__).parent.parent.parent / "private" / ".env"
+def _apify_request(path: str, method: str = "GET", body: dict | None = None) -> dict | list:
+    token = os.environ.get("APIFY_API_TOKEN", "")
+    if not token:
+        raise RuntimeError("APIFY_API_TOKEN not set in environment")
+    url = f"{APIFY_BASE}{path}?token={token}"
+    data = json.dumps(body).encode() if body else None
+    headers = {"Content-Type": "application/json"} if data else {}
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read())
 
 
-def _try_extract_cookies_from_chrome() -> tuple[str, list[dict]]:
-    """Scan Chrome profiles for LinkedIn cookies.
+def _run_actor_sync(input_data: dict, timeout_secs: int = 300) -> list[dict]:
+    """Run the Apify actor synchronously and return the dataset items."""
+    token = os.environ.get("APIFY_API_TOKEN", "")
+    if not token:
+        raise RuntimeError("APIFY_API_TOKEN not set in environment")
 
-    Returns (li_at, pw_cookies) where pw_cookies is the full set of LinkedIn
-    cookies as Playwright-ready dicts (all 10-12 cookies, including bcookie/
-    bscookie which LinkedIn needs to avoid redirect-loop bot detection).
-    Uses the LAST profile found so Profile 7 (kobytest100) beats Profile 1.
-    """
-    try:
-        import browser_cookie3
-        import shutil
-        import tempfile
-        import glob as _glob
-    except ImportError:
-        print("    browser_cookie3 not installed — run: pip install browser_cookie3")
-        return "", []
+    # Start the run
+    url = f"{APIFY_BASE}/acts/{APIFY_ACTOR_ID}/runs?token={token}"
+    data = json.dumps(input_data).encode()
+    req = urllib.request.Request(url, data=data,
+                                  headers={"Content-Type": "application/json"},
+                                  method="POST")
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        run_info = json.loads(resp.read())
 
-    chrome_base = os.path.expanduser("~/Library/Application Support/Google/Chrome")
-    profiles = sorted(
-        _glob.glob(os.path.join(chrome_base, "Profile *")) +
-        [os.path.join(chrome_base, "Default")]
-    )
+    run_id = run_info["data"]["id"]
+    print(f"  Run started: {run_id}")
 
-    found_li_at = ""
-    found_pw_cookies: list[dict] = []
-    found_profile = ""
+    # Poll until finished
+    deadline = time.time() + timeout_secs
+    while time.time() < deadline:
+        time.sleep(5)
+        status_resp = _apify_request(f"/actor-runs/{run_id}")
+        status = status_resp["data"]["status"]
+        if status in ("SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"):
+            print(f"  Run {status}")
+            break
+        print(f"  ... {status}")
+    else:
+        print("  ⚠ Timed out waiting for Apify run")
+        return []
 
-    for profile in profiles:
-        cookie_file = os.path.join(profile, "Cookies")
-        if not os.path.exists(cookie_file):
-            continue
-        tmp = tempfile.mktemp(suffix=".db")
+    if status != "SUCCEEDED":
+        print(f"  ✗ Run ended with status: {status}")
+        return []
+
+    # Fetch dataset items
+    dataset_id = status_resp["data"]["defaultDatasetId"]
+    items_resp = _apify_request(f"/datasets/{dataset_id}/items")
+    return items_resp if isinstance(items_resp, list) else []
+
+
+# ---------------------------------------------------------------------------
+# Post processing
+# ---------------------------------------------------------------------------
+
+def _slug_from_url(url: str) -> str:
+    """Extract LinkedIn slug from a profile URL."""
+    m = re.search(r"linkedin\.com/in/([^/?#]+)", url)
+    return m.group(1).rstrip("/") if m else ""
+
+
+def _process_item(item: dict) -> dict | None:
+    """Convert a raw Apify item into our linkedin_posts format."""
+    content = item.get("content", "") or ""
+    if not content or len(content) < 30:
+        return None
+    if not _AI_RELEVANCE_RE.search(content):
+        return None
+
+    author = item.get("author") or {}
+    share_url = (item.get("socialContent") or {}).get("shareUrl", "") or item.get("linkedinUrl", "")
+
+    # Try to find the person in our tracked list by URL
+    author_url = author.get("linkedinUrl", "") or ""
+    slug = _slug_from_url(author_url) or author.get("publicIdentifier", "")
+    person = _SLUG_TO_PERSON.get(slug)
+
+    name  = author.get("name", "") or (person["name"] if person else slug)
+    title = author.get("info", "") or (f"{person['role']} · {person['org']}" if person else "")
+    org   = person["org"] if person else ""
+
+    vendor = _derive_vendor(content) or org
+
+    posted_at = item.get("postedAt") or {}
+    date_str = ""
+    if posted_at.get("date"):
         try:
-            shutil.copy2(cookie_file, tmp)
-            raw = list(browser_cookie3.chrome(domain_name=".linkedin.com", cookie_file=tmp))
-            li_at = next((c.value for c in raw if c.name == "li_at"), "")
-            if li_at:
-                pw_cookies = []
-                for c in raw:
-                    domain = c.domain if c.domain.startswith(".") else "." + c.domain
-                    domain = domain.replace(".www.linkedin.com", ".linkedin.com")
-                    pw_cookies.append({
-                        "name": c.name, "value": c.value,
-                        "domain": domain, "path": c.path or "/",
-                        "secure": bool(c.secure), "sameSite": "None",
-                    })
-                found_li_at = li_at
-                found_pw_cookies = pw_cookies
-                found_profile = os.path.basename(profile)
-        except Exception:
+            dt = datetime.fromisoformat(posted_at["date"].replace("Z", "+00:00"))
+            date_str = dt.strftime("%B %d, %Y")
+        except ValueError:
             pass
-        finally:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
+    if not date_str:
+        date_str = _TODAY()
 
-    if found_li_at:
-        print(f"    ✓ {len(found_pw_cookies)} cookies from Chrome ({found_profile})")
-    return found_li_at, found_pw_cookies
+    engagement = item.get("engagement") or {}
+    likes = int(engagement.get("likes", 0) or 0)
+    comments = int(engagement.get("comments", 0) or 0)
+
+    return {
+        "post":          content[:600].strip(),
+        "url":           share_url,
+        "likes":         likes,
+        "comments":      comments,
+        "author":        name,
+        "author_handle": slug,
+        "title":         title,
+        "is_company":    False,
+        "vendor":        vendor,
+        "date":          date_str,
+    }
 
 
-def _save_cookies_to_env(li_at: str, jsessionid: str) -> None:
-    """Write refreshed KOBYTEST_* cookies back to private/.env."""
-    if not _ENV_PATH.exists():
-        return
-    text = _ENV_PATH.read_text()
-    if re.search(r"^KOBYTEST_LI_AT=", text, re.M):
-        text = re.sub(r"^KOBYTEST_LI_AT=.*$", f"KOBYTEST_LI_AT={li_at}", text, re.M)
-    else:
-        text += f"\nKOBYTEST_LI_AT={li_at}"
-    if re.search(r"^KOBYTEST_JSESSIONID=", text, re.M):
-        text = re.sub(r"^KOBYTEST_JSESSIONID=.*$", f"KOBYTEST_JSESSIONID={jsessionid}", text, re.M)
-    else:
-        text += f"\nKOBYTEST_JSESSIONID={jsessionid}"
-    _ENV_PATH.write_text(text)
-    print("    ✓ Cookies saved to private/.env")
-
+# ---------------------------------------------------------------------------
+# Fallback + output helpers
+# ---------------------------------------------------------------------------
 
 def _load_fallback_posts() -> list[dict]:
-    """Return linkedin_posts from the most recent previous run (up to 7 days back)."""
     import glob as _glob
     today = _TODAY_ISO()
     pattern = str(Path(__file__).parent.parent / "output" / "**" / "linkedin_*.json")
@@ -306,164 +252,16 @@ def _write_output(posts: list[dict], fallback: bool = False) -> dict:
     return {"saved_to": str(path), "success": True}
 
 
-# ---------------------------------------------------------------------------
-# Auth check — fast single request before committing to full scrape
-# ---------------------------------------------------------------------------
-
-def _check_auth(page) -> bool:
-    """Return True if the session cookie is valid (feed loads without login redirect)."""
-    try:
-        page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=15_000)
-    except Exception:
-        return False
-    url = page.url
-    return "login" not in url and "uas/login" not in url and "signup" not in url
-
-
-def _make_browser_context(playwright, pw_cookies: list[dict]):
-    """Create a headless Chromium context pre-loaded with all LinkedIn cookies."""
-    browser = playwright.chromium.launch(
-        headless=True,
-        args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
-    )
-    ctx = browser.new_context(
-        user_agent=(
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
-        ),
-        viewport={"width": 1280, "height": 800},
-        locale="en-US",
-        extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
-    )
-    ctx.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-    ctx.add_cookies(pw_cookies)
-    return browser, ctx
-
-
-def _scrape_page(page, url: str, label: str) -> list[dict]:
-    """Navigate to url, slow-scroll to trigger lazy loading, extract via JS."""
-    try:
-        page.goto(url, wait_until="domcontentloaded", timeout=20_000)
-    except Exception as e:
-        print(f"    ✗ error ({label}): {str(e)[:80]}")
-        return []
-    # Redirect to login = cookies expired
-    if "linkedin.com/login" in page.url or "linkedin.com/uas/login" in page.url:
-        print(f"    ✗ auth redirect — KOBYTEST cookies expired!")
-        print(f"      Fix: log into linkedin.com as kobytest100@gmail.com, then run:")
-        print(f"        python3 scripts/extract_linkedin_cookies.py")
-        return []
-    if "linkedin.com/signup" in page.url or "Sign Up" in (page.title() or ""):
-        print(f"    ✗ sign-up redirect — profile may be private ({label})")
-        return []
-    # Slow scroll to trigger lazy-loaded post content (LinkedIn uses occludable hints
-    # that only populate with real DOM when they scroll into the viewport)
-    for _ in range(5):
-        page.mouse.wheel(0, 800)
-        time.sleep(1.0)
-    try:
-        posts = page.evaluate(_EXTRACT_JS)
-    except Exception as e:
-        print(f"    ✗ JS eval error ({label}): {str(e)[:80]}")
-        return []
-    return posts or []
-
-
-def _fetch_company_posts(page, company: dict) -> list[dict]:
-    # sortBy=TOP returns highest-engagement posts of recent weeks, not just today
-    url = f"{BASE}/company/{company['slug']}/posts/?feedView=all&sortBy=TOP"
-    raw = _scrape_page(page, url, company["name"])
-    results = []
-    for p in raw:
-        if not _AI_RELEVANCE_RE.search(p["post"]):
-            continue
-        results.append({
-            "post":          p["post"],
-            "url":           p["url"],
-            "likes":         p["likes"],
-            "comments":      p["comments"],
-            "author":        company["name"],
-            "author_handle": company["slug"],
-            "title":         f"Official · {company['org']}",
-            "is_company":    True,
-            "vendor":        company["org"],
-        })
-    return results
-
-
-def _fetch_person_posts(page, person: dict) -> list[dict]:
-    url = f"{BASE}/in/{person['slug']}/recent-activity/all/"
-    raw = _scrape_page(page, url, person["name"])
-    results = []
-    for p in raw:
-        if not _AI_RELEVANCE_RE.search(p["post"]):
-            continue
-        vendor = _derive_vendor(p["post"]) or person["org"]
-        results.append({
-            "post":          p["post"],
-            "url":           p["url"],
-            "likes":         p["likes"],
-            "comments":      p["comments"],
-            "author":        person["name"],
-            "author_handle": person["slug"],
-            "title":         f"{person['role']} · {person['org']}",
-            "is_company":    False,
-            "vendor":        vendor,
-            "date":          _resolve_date(p.get("date_iso", ""), p.get("date_rel", "")),
-        })
-    return results
-
-
-def _derive_vendor(text: str) -> str:
-    for vendor, pattern in _VENDOR_PATTERNS:
-        if pattern.search(text):
-            return vendor
-    return ""
-
-
-def _resolve_date(date_iso: str, date_rel: str) -> str:
-    """Convert scraped date info to a human-readable date string like 'May 22, 2026'."""
-    if date_iso:
-        try:
-            dt = datetime.fromisoformat(date_iso.replace("Z", "+00:00"))
-            return dt.strftime("%B %d, %Y")
-        except ValueError:
-            pass
-    # Relative date → approximate absolute date from today
-    today = datetime.now()
-    m = re.match(r"(\d+)(h|d|w|mo?)", date_rel.strip().lower())
-    if m:
-        n, unit = int(m.group(1)), m.group(2)
-        from datetime import timedelta
-        if unit == "h":
-            dt = today - timedelta(hours=n)
-        elif unit == "d":
-            dt = today - timedelta(days=n)
-        elif unit == "w":
-            dt = today - timedelta(weeks=n)
-        else:
-            dt = today - timedelta(days=n * 30)
-        return dt.strftime("%B %d, %Y")
-    if date_rel.lower() in ("just now", "now"):
-        return today.strftime("%B %d, %Y")
-    return today.strftime("%B %d, %Y")
-
-
 def _translate_posts(posts: list[dict]) -> list[dict]:
-    """Add post_he Hebrew translation to each post. Skips gracefully on any failure."""
     try:
         from shared.anthropic_cc import agent as _cc_agent, is_enabled as _cc_enabled
     except ImportError:
         return posts
-
     if not _cc_enabled():
         return posts
-
     texts = [p["post"] for p in posts]
     if not texts:
         return posts
-
     batch = json.dumps([{"i": i, "text": t[:400]} for i, t in enumerate(texts)], ensure_ascii=False)
     prompt = (
         "Translate these LinkedIn post excerpts to Hebrew. "
@@ -487,93 +285,70 @@ def _translate_posts(posts: list[dict]) -> list[dict]:
     return posts
 
 
-def _get_cookies() -> tuple[str, list[dict]]:
-    """Return (li_at, pw_cookies) — always extracts all cookies fresh from Chrome.
-
-    We always re-extract from Chrome (not just on missing env var) because
-    LinkedIn requires the full browser fingerprint cookies (bcookie, bscookie,
-    lidc, etc.) that are NOT stored in .env. The li_at from env is used only
-    to verify the env is configured; the actual Playwright context always gets
-    the full cookie jar from Chrome.
-    """
-    li_at = os.environ.get("KOBYTEST_LI_AT", "") or os.environ.get("LINKEDIN_LI_AT", "")
-    # Always try Chrome for the full cookie set
-    chrome_li_at, pw_cookies = _try_extract_cookies_from_chrome()
-    if chrome_li_at:
-        _save_cookies_to_env(chrome_li_at,
-                             next((c["value"] for c in pw_cookies if c["name"] == "JSESSIONID"), ""))
-        return chrome_li_at, pw_cookies
-    # Chrome extract failed — build minimal cookie set from env as last resort
-    if li_at:
-        print("  ⚠  Chrome extract failed — using env cookies only (may not work)")
-        jsessionid = os.environ.get("KOBYTEST_JSESSIONID", "")
-        quoted = f'"{jsessionid}"' if jsessionid and not jsessionid.startswith('"') else jsessionid
-        pw_cookies = [
-            {"name": "li_at", "value": li_at, "domain": ".linkedin.com", "path": "/", "secure": True, "sameSite": "None"},
-            {"name": "JSESSIONID", "value": quoted, "domain": ".linkedin.com", "path": "/", "secure": True, "sameSite": "None"},
-            {"name": "lang", "value": "v=2&lang=en-us", "domain": ".linkedin.com", "path": "/", "secure": False, "sameSite": "None"},
-        ]
-        return li_at, pw_cookies
-    return "", []
-
+# ---------------------------------------------------------------------------
+# Main pipeline
+# ---------------------------------------------------------------------------
 
 def run_pipeline() -> dict:
     print("=" * 60)
-    print(" LinkedIn Agent (Playwright DOM scraper)")
-    print(f" {_TODAY()}  |  {len(TRACKED_PEOPLE)} individual profiles")
+    print(" LinkedIn Agent (Apify — no cookies)")
+    print(f" {_TODAY()}  |  {len(TRACKED_PEOPLE)} profiles")
     print("=" * 60)
 
-    li_at, pw_cookies = _get_cookies()
-
-    if not li_at:
-        print("  ✗ No cookies available (Chrome extract failed + env unset)")
-        print("    Fix: log into linkedin.com as kobytest100@gmail.com in Chrome")
-        print("    ↩  Using fallback data from previous run")
+    token = os.environ.get("APIFY_API_TOKEN", "")
+    if not token:
+        print("  ✗ APIFY_API_TOKEN not set — using fallback data")
         return _write_output(_load_fallback_posts(), fallback=True)
 
+    target_urls = [f"https://www.linkedin.com/in/{p['slug']}/" for p in TRACKED_PEOPLE]
+
+    actor_input = {
+        "targetUrls":        target_urls,
+        "maxPosts":          5,
+        "postedLimit":       "week",
+        "includeReposts":    True,
+        "includeQuotePosts": True,
+        "scrapeReactions":   False,
+        "scrapeComments":    False,
+    }
+
+    print(f"\n  Calling Apify actor ({len(target_urls)} profiles, last week, max 5 posts each)...")
     t_start = time.time()
+
+    try:
+        raw_items = _run_actor_sync(actor_input, timeout_secs=300)
+    except Exception as e:
+        print(f"  ✗ Apify run failed: {e}")
+        return _write_output(_load_fallback_posts(), fallback=True)
+
+    elapsed = time.time() - t_start
+    print(f"  → {len(raw_items)} raw items in {elapsed:.0f}s")
+
+    # Process and filter
     all_posts: list[dict] = []
+    for item in raw_items:
+        post = _process_item(item)
+        if post:
+            all_posts.append(post)
 
-    with sync_playwright() as pw:
-        browser, ctx = _make_browser_context(pw, pw_cookies)
-        page = ctx.new_page()
-        page.on("console", lambda _: None)
+    print(f"  → {len(all_posts)} AI-relevant posts after filtering")
 
-        # ── Auth check ───────────────────────────────────────────────────
-        print("\n  Checking auth...")
-        if not _check_auth(page):
-            print("  ✗ Auth failed — using fallback data")
-            print("    Fix: log into linkedin.com as kobytest100@gmail.com in Chrome")
-            browser.close()
-            return _write_output(_load_fallback_posts(), fallback=True)
-        print("  ✓ Auth OK")
+    if not all_posts:
+        print("  ⚠  0 posts after filtering — using fallback")
+        return _write_output(_load_fallback_posts(), fallback=True)
 
-        # ── Individual profiles ──────────────────────────────────────────
-        # Company pages are not scraped: fresh LinkedIn accounts see wrong entities
-        # or "No posts yet" due to account restrictions. Person profiles work well.
-        print(f"\nFetching {len(TRACKED_PEOPLE)} individual profiles...")
-        for person in TRACKED_PEOPLE:
-            posts = _fetch_person_posts(page, person)
-            all_posts.extend(posts)
-            best = max((p["likes"] + p["comments"] * 2 for p in posts), default=0)
-            marker = f"{len(posts)} AI posts, top_score={best}" if posts else "no AI posts"
-            print(f"    {'✓' if posts else '·'} {person['name']:<24} {marker}")
-            time.sleep(random.uniform(8, 15))
-
-        browser.close()
-
-    # ── Dedup by URL ─────────────────────────────────────────────────────
-    seen_urls: set[str] = set()
+    # Dedup by URL
+    seen: set[str] = set()
     unique: list[dict] = []
     for p in sorted(all_posts, key=lambda x: x["likes"] + x["comments"] * 2, reverse=True):
         url = p.get("url", "")
-        if url and url in seen_urls:
+        if url and url in seen:
             continue
         if url:
-            seen_urls.add(url)
+            seen.add(url)
         unique.append(p)
 
-    # ── Cap 3 posts per vendor so no single company dominates ─────────────
+    # Cap 3 posts per vendor
     vendor_counts: dict[str, int] = {}
     capped: list[dict] = []
     for p in unique:
@@ -582,17 +357,10 @@ def run_pipeline() -> dict:
             capped.append(p)
             vendor_counts[v] = vendor_counts.get(v, 0) + 1
 
-    # If we scraped zero posts despite successful auth, fall back rather than
-    # leaving the section empty (e.g. LinkedIn changed their DOM selectors).
-    if not capped:
-        print("  ⚠  Scrape returned 0 posts — using fallback data")
-        return _write_output(_load_fallback_posts(), fallback=True)
-
     print("  Translating posts to Hebrew...")
     capped = _translate_posts(capped)
 
-    elapsed = time.time() - t_start
-    print(f"\n  → {len(capped)} posts kept ({len(all_posts)} raw, {elapsed:.0f}s)")
+    print(f"\n  → {len(capped)} posts kept")
     print(f"    Vendors: {sorted(vendor_counts.keys())}")
     print("=" * 60)
     return _write_output(capped)

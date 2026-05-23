@@ -18,6 +18,7 @@ Cookie refresh (run when expired, ~every few weeks):
 """
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -187,13 +188,13 @@ _EXTRACT_JS = """
 _ENV_PATH = Path(__file__).parent.parent.parent / "private" / ".env"
 
 
-def _try_extract_cookies_from_chrome() -> tuple[str, str]:
-    """Scan all Chrome profiles for a LinkedIn li_at cookie.
+def _try_extract_cookies_from_chrome() -> tuple[str, list[dict]]:
+    """Scan Chrome profiles for LinkedIn cookies.
 
-    Copies each profile's Cookies DB to /tmp first to avoid SQLite lock
-    errors when Chrome is open. Returns the LAST profile's cookies so that
-    the highest-numbered profile wins (kobytest100 lives in Profile 7,
-    kobyal in Profile 1 — last-found always picks kobytest100).
+    Returns (li_at, pw_cookies) where pw_cookies is the full set of LinkedIn
+    cookies as Playwright-ready dicts (all 10-12 cookies, including bcookie/
+    bscookie which LinkedIn needs to avoid redirect-loop bot detection).
+    Uses the LAST profile found so Profile 7 (kobytest100) beats Profile 1.
     """
     try:
         import browser_cookie3
@@ -202,7 +203,7 @@ def _try_extract_cookies_from_chrome() -> tuple[str, str]:
         import glob as _glob
     except ImportError:
         print("    browser_cookie3 not installed — run: pip install browser_cookie3")
-        return "", ""
+        return "", []
 
     chrome_base = os.path.expanduser("~/Library/Application Support/Google/Chrome")
     profiles = sorted(
@@ -211,7 +212,7 @@ def _try_extract_cookies_from_chrome() -> tuple[str, str]:
     )
 
     found_li_at = ""
-    found_jsessionid = ""
+    found_pw_cookies: list[dict] = []
     found_profile = ""
 
     for profile in profiles:
@@ -221,20 +222,20 @@ def _try_extract_cookies_from_chrome() -> tuple[str, str]:
         tmp = tempfile.mktemp(suffix=".db")
         try:
             shutil.copy2(cookie_file, tmp)
-            cookies = browser_cookie3.chrome(
-                domain_name=".linkedin.com",
-                cookie_file=tmp,
-            )
-            li_at = ""
-            jsessionid = ""
-            for c in cookies:
-                if c.name == "li_at":
-                    li_at = c.value
-                elif c.name == "JSESSIONID":
-                    jsessionid = c.value.strip('"')
+            raw = list(browser_cookie3.chrome(domain_name=".linkedin.com", cookie_file=tmp))
+            li_at = next((c.value for c in raw if c.name == "li_at"), "")
             if li_at:
+                pw_cookies = []
+                for c in raw:
+                    domain = c.domain if c.domain.startswith(".") else "." + c.domain
+                    domain = domain.replace(".www.linkedin.com", ".linkedin.com")
+                    pw_cookies.append({
+                        "name": c.name, "value": c.value,
+                        "domain": domain, "path": c.path or "/",
+                        "secure": bool(c.secure), "sameSite": "None",
+                    })
                 found_li_at = li_at
-                found_jsessionid = jsessionid
+                found_pw_cookies = pw_cookies
                 found_profile = os.path.basename(profile)
         except Exception:
             pass
@@ -245,8 +246,8 @@ def _try_extract_cookies_from_chrome() -> tuple[str, str]:
                 pass
 
     if found_li_at:
-        print(f"    ✓ Cookies found in Chrome ({found_profile})")
-    return found_li_at, found_jsessionid
+        print(f"    ✓ {len(found_pw_cookies)} cookies from Chrome ({found_profile})")
+    return found_li_at, found_pw_cookies
 
 
 def _save_cookies_to_env(li_at: str, jsessionid: str) -> None:
@@ -319,7 +320,8 @@ def _check_auth(page) -> bool:
     return "login" not in url and "uas/login" not in url and "signup" not in url
 
 
-def _make_browser_context(playwright, li_at: str, jsessionid: str):
+def _make_browser_context(playwright, pw_cookies: list[dict]):
+    """Create a headless Chromium context pre-loaded with all LinkedIn cookies."""
     browser = playwright.chromium.launch(
         headless=True,
         args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
@@ -334,26 +336,8 @@ def _make_browser_context(playwright, li_at: str, jsessionid: str):
         locale="en-US",
         extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
     )
-    # Prevent LinkedIn from detecting headless Playwright via navigator.webdriver
     ctx.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-    quoted = f'"{jsessionid}"' if not jsessionid.startswith('"') else jsessionid
-    ctx.add_cookies([
-        {
-            "name": "li_at", "value": li_at,
-            "domain": ".linkedin.com", "path": "/",
-            "secure": True, "httpOnly": True, "sameSite": "None",
-        },
-        {
-            "name": "JSESSIONID", "value": quoted,
-            "domain": ".linkedin.com", "path": "/",
-            "secure": True, "httpOnly": False, "sameSite": "None",
-        },
-        {
-            "name": "lang", "value": "v=2&lang=en-us",
-            "domain": ".linkedin.com", "path": "/",
-            "secure": False,
-        },
-    ])
+    ctx.add_cookies(pw_cookies)
     return browser, ctx
 
 
@@ -503,17 +487,34 @@ def _translate_posts(posts: list[dict]) -> list[dict]:
     return posts
 
 
-def _get_cookies() -> tuple[str, str]:
-    """Return (li_at, jsessionid) from env, falling back to Chrome auto-extract."""
-    li_at      = os.environ.get("KOBYTEST_LI_AT", "") or os.environ.get("LINKEDIN_LI_AT", "")
-    jsessionid = os.environ.get("KOBYTEST_JSESSIONID", "") or os.environ.get("LINKEDIN_JSESSIONID", "")
+def _get_cookies() -> tuple[str, list[dict]]:
+    """Return (li_at, pw_cookies) — always extracts all cookies fresh from Chrome.
+
+    We always re-extract from Chrome (not just on missing env var) because
+    LinkedIn requires the full browser fingerprint cookies (bcookie, bscookie,
+    lidc, etc.) that are NOT stored in .env. The li_at from env is used only
+    to verify the env is configured; the actual Playwright context always gets
+    the full cookie jar from Chrome.
+    """
+    li_at = os.environ.get("KOBYTEST_LI_AT", "") or os.environ.get("LINKEDIN_LI_AT", "")
+    # Always try Chrome for the full cookie set
+    chrome_li_at, pw_cookies = _try_extract_cookies_from_chrome()
+    if chrome_li_at:
+        _save_cookies_to_env(chrome_li_at,
+                             next((c["value"] for c in pw_cookies if c["name"] == "JSESSIONID"), ""))
+        return chrome_li_at, pw_cookies
+    # Chrome extract failed — build minimal cookie set from env as last resort
     if li_at:
-        return li_at, jsessionid
-    print("  KOBYTEST_LI_AT not in env — trying Chrome auto-extract...")
-    li_at, jsessionid = _try_extract_cookies_from_chrome()
-    if li_at:
-        _save_cookies_to_env(li_at, jsessionid)
-    return li_at, jsessionid
+        print("  ⚠  Chrome extract failed — using env cookies only (may not work)")
+        jsessionid = os.environ.get("KOBYTEST_JSESSIONID", "")
+        quoted = f'"{jsessionid}"' if jsessionid and not jsessionid.startswith('"') else jsessionid
+        pw_cookies = [
+            {"name": "li_at", "value": li_at, "domain": ".linkedin.com", "path": "/", "secure": True, "sameSite": "None"},
+            {"name": "JSESSIONID", "value": quoted, "domain": ".linkedin.com", "path": "/", "secure": True, "sameSite": "None"},
+            {"name": "lang", "value": "v=2&lang=en-us", "domain": ".linkedin.com", "path": "/", "secure": False, "sameSite": "None"},
+        ]
+        return li_at, pw_cookies
+    return "", []
 
 
 def run_pipeline() -> dict:
@@ -522,11 +523,11 @@ def run_pipeline() -> dict:
     print(f" {_TODAY()}  |  {len(TRACKED_PEOPLE)} individual profiles")
     print("=" * 60)
 
-    li_at, jsessionid = _get_cookies()
+    li_at, pw_cookies = _get_cookies()
 
     if not li_at:
-        print("  ✗ No cookies available (env unset + Chrome extract failed)")
-        print("    Fix: log into linkedin.com as kobytest100@gmail.com, then re-run")
+        print("  ✗ No cookies available (Chrome extract failed + env unset)")
+        print("    Fix: log into linkedin.com as kobytest100@gmail.com in Chrome")
         print("    ↩  Using fallback data from previous run")
         return _write_output(_load_fallback_posts(), fallback=True)
 
@@ -534,32 +535,18 @@ def run_pipeline() -> dict:
     all_posts: list[dict] = []
 
     with sync_playwright() as pw:
-        browser, ctx = _make_browser_context(pw, li_at, jsessionid)
+        browser, ctx = _make_browser_context(pw, pw_cookies)
         page = ctx.new_page()
         page.on("console", lambda _: None)
 
-        # ── Auth check — fast fail before full scrape ────────────────────
+        # ── Auth check ───────────────────────────────────────────────────
         print("\n  Checking auth...")
         if not _check_auth(page):
-            print("  ✗ Cookies expired — trying Chrome auto-extract...")
+            print("  ✗ Auth failed — using fallback data")
+            print("    Fix: log into linkedin.com as kobytest100@gmail.com in Chrome")
             browser.close()
-            li_at, jsessionid = _try_extract_cookies_from_chrome()
-            if li_at:
-                _save_cookies_to_env(li_at, jsessionid)
-                # Reinit with fresh cookies
-                browser, ctx = _make_browser_context(pw, li_at, jsessionid)
-                page = ctx.new_page()
-                page.on("console", lambda _: None)
-                if not _check_auth(page):
-                    print("  ✗ Still failing after refresh — using fallback data")
-                    browser.close()
-                    return _write_output(_load_fallback_posts(), fallback=True)
-                print("  ✓ Auth OK with refreshed cookies")
-            else:
-                print("  ✗ Chrome extract failed — using fallback data")
-                return _write_output(_load_fallback_posts(), fallback=True)
-        else:
-            print("  ✓ Auth OK")
+            return _write_output(_load_fallback_posts(), fallback=True)
+        print("  ✓ Auth OK")
 
         # ── Individual profiles ──────────────────────────────────────────
         # Company pages are not scraped: fresh LinkedIn accounts see wrong entities
@@ -571,7 +558,7 @@ def run_pipeline() -> dict:
             best = max((p["likes"] + p["comments"] * 2 for p in posts), default=0)
             marker = f"{len(posts)} AI posts, top_score={best}" if posts else "no AI posts"
             print(f"    {'✓' if posts else '·'} {person['name']:<24} {marker}")
-            time.sleep(1.2)
+            time.sleep(random.uniform(8, 15))
 
         browser.close()
 

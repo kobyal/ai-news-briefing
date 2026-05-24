@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { fetchSearchIndex, fetchDayData, fetchEditorial, type SearchResult } from "@/lib/api";
 import { useLang } from "@/context/LangContext";
@@ -128,6 +128,20 @@ function VendorContent() {
   const vendorInfo = getVendor(vendorParam);
   const logoUrl = getVendorLogo(vendorParam, 48);
 
+  // All hooks must run before any early returns
+  const GENERIC_OG = ["arxiv-logo", "placeholder", "default-og", "twitter_card_default"];
+  const ogImageMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const d of allDays) {
+      for (const s of d.stories || []) {
+        if (s.story_id && s.og_image && !GENERIC_OG.some(g => s.og_image!.includes(g))) {
+          m.set(s.story_id, s.og_image);
+        }
+      }
+    }
+    return m;
+  }, [allDays]);
+
   if (loading) {
     return (
       <>
@@ -152,53 +166,101 @@ function VendorContent() {
 
   const dateLabel = fmtDateRange(cutoff, today, isHe);
 
+  // Stats for the hero row
+  const videoCount = allDays.reduce((n, d) => {
+    const vLower = vendorParam.toLowerCase();
+    return n + ((d.youtube || []) as Array<Record<string,unknown>>)
+      .filter(v => String(v.title || v.headline || "").toLowerCase().includes(vLower)).length;
+  }, 0);
+
   return (
     <>
       <Header date={today} archive={[]} />
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "40px 24px 80px" }} dir={isHe ? "rtl" : "ltr"}>
 
-        {/* Back */}
-        <a href="/main" style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          fontSize: 13, color: "#6366f1", fontWeight: 600, textDecoration: "none",
-          marginBottom: 32,
-        }}>
-          {isHe ? "→ חזרה לעמוד הראשי" : "← Back to Editorial"}
-        </a>
+      {/* Hero banner */}
+      <div style={{
+        background: `linear-gradient(135deg, ${vendorInfo.color}12 0%, ${vendorInfo.color}05 60%, transparent 100%)`,
+        borderBottom: `1px solid ${vendorInfo.color}20`,
+      }}>
+        <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 24px 24px" }} dir={isHe ? "rtl" : "ltr"}>
 
-        {/* Vendor header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
-          {logoUrl && (
-            <img src={logoUrl} alt="" width={40} height={40}
-              style={{ borderRadius: 10, flexShrink: 0 }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-          )}
-          <div>
-            <span style={{
-              fontSize: 10, fontWeight: 800, letterSpacing: ".12em",
-              textTransform: "uppercase" as const, color: vendorInfo.color,
-            }}>{isHe ? "ספק" : "Vendor"}</span>
-            <h1 style={{ margin: "2px 0 0", fontSize: 36, fontWeight: 900, color: "#111827", letterSpacing: "-.02em", lineHeight: 1.1 }}>
-              {vendorParam}
-            </h1>
+          {/* Back */}
+          <a href="/main" style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            fontSize: 12, color: vendorInfo.color, fontWeight: 700, textDecoration: "none",
+            opacity: 0.8, marginBottom: 20,
+          }}>
+            {isHe ? "→ כל הספקים" : "← All vendors"}
+          </a>
+
+          {/* Logo + name row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 16 }}>
+            {logoUrl && (
+              <div style={{
+                width: 56, height: 56, borderRadius: 14, flexShrink: 0,
+                background: "#fff",
+                boxShadow: `0 0 0 3px ${vendorInfo.color}30, 0 4px 16px ${vendorInfo.color}25`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                overflow: "hidden",
+              }}>
+                <img src={logoUrl} alt="" width={40} height={40}
+                  style={{ borderRadius: 8 }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              </div>
+            )}
+            <div>
+              <span style={{
+                fontSize: 10, fontWeight: 800, letterSpacing: ".14em",
+                textTransform: "uppercase" as const, color: vendorInfo.color, opacity: 0.8,
+              }}>{isHe ? "ספק" : "Vendor"}</span>
+              <h1 style={{ margin: "2px 0 0", fontSize: 34, fontWeight: 900, color: "#0f0f1a", letterSpacing: "-.025em", lineHeight: 1.1 }}>
+                {vendorParam}
+              </h1>
+            </div>
+          </div>
+
+          {/* Stats + date row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            {articles.length > 0 && (
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: vendorInfo.color,
+                background: "#fff", border: `1px solid ${vendorInfo.color}35`,
+                padding: "4px 11px", borderRadius: 100,
+                boxShadow: `0 1px 4px ${vendorInfo.color}15`,
+              }}>
+                {articles.length} {isHe ? "כתבות" : "articles"}
+              </span>
+            )}
+            {pulseItems.length > 0 && (
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: vendorInfo.color,
+                background: "#fff", border: `1px solid ${vendorInfo.color}35`,
+                padding: "4px 11px", borderRadius: 100,
+                boxShadow: `0 1px 4px ${vendorInfo.color}15`,
+              }}>
+                {pulseItems.length} pulse
+              </span>
+            )}
+            {videoCount > 0 && (
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: vendorInfo.color,
+                background: "#fff", border: `1px solid ${vendorInfo.color}35`,
+                padding: "4px 11px", borderRadius: 100,
+                boxShadow: `0 1px 4px ${vendorInfo.color}15`,
+              }}>
+                {videoCount} {isHe ? "סרטונים" : "videos"}
+              </span>
+            )}
+            <span style={{ fontSize: 11, color: "#9ca3af", marginInlineStart: 4 }}>{dateLabel}</span>
           </div>
         </div>
+      </div>
 
-        {/* Date range badge */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
-          <span style={{
-            fontSize: 11, fontWeight: 700, color: vendorInfo.color,
-            background: vendorInfo.bg, border: `1px solid ${vendorInfo.color}30`,
-            padding: "3px 10px", borderRadius: 100,
-          }}>
-            {isHe ? "4 ימים אחרונים" : "Last 4 days"}
-          </span>
-          <span style={{ fontSize: 11, color: "#9ca3af" }}>{dateLabel}</span>
-        </div>
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px 80px" }} dir={isHe ? "rtl" : "ltr"}>
 
         <div style={{
           height: 2,
-          background: `linear-gradient(90deg, ${vendorInfo.color}, transparent)`,
+          background: `linear-gradient(${isHe ? "270deg" : "90deg"}, ${vendorInfo.color}, transparent)`,
           borderRadius: 2, marginBottom: 32,
         }} />
 
@@ -211,11 +273,11 @@ function VendorContent() {
                 <p style={{ margin: "0 0 12px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase" as const, color: "#111827" }}>
                   {isHe ? "עיקרי העריכה" : "Editorial Highlights"}
                 </p>
-                <div style={{ background: vendorInfo.bg, border: `1px solid ${vendorInfo.color}25`, borderInlineStart: `3px solid ${vendorInfo.color}`, borderRadius: 10, padding: "14px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ background: "#fff", border: `1px solid ${vendorInfo.color}20`, borderRadius: 12, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10, boxShadow: `0 2px 12px ${vendorInfo.color}10` }}>
                   {bullets.map((note, i) => (
-                    <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                      <span style={{ color: vendorInfo.color, fontWeight: 900, fontSize: 13, flexShrink: 0, lineHeight: 1.5 }}>→</span>
-                      <span style={{ fontSize: 13, color: "#1f2937", lineHeight: 1.55 }}>{note}</span>
+                    <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: vendorInfo.color, flexShrink: 0, marginTop: 7 }} />
+                      <span style={{ fontSize: 13, color: "#1f2937", lineHeight: 1.6 }}>{note}</span>
                     </div>
                   ))}
                 </div>
@@ -245,11 +307,11 @@ function VendorContent() {
               <p style={{ margin: "0 0 12px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase" as const, color: "#111827" }}>
                 {isHe ? "כותרות אחרונות" : "Recent Headlines"}
               </p>
-              <div style={{ background: vendorInfo.bg, border: `1px solid ${vendorInfo.color}25`, borderInlineStart: `3px solid ${vendorInfo.color}`, borderRadius: 10, padding: "14px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ background: "#fff", border: `1px solid ${vendorInfo.color}20`, borderRadius: 12, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10, boxShadow: `0 2px 12px ${vendorInfo.color}10` }}>
                 {bullets.slice(0, 12).map((note, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                    <span style={{ color: vendorInfo.color, fontWeight: 900, fontSize: 13, flexShrink: 0, lineHeight: 1.5 }}>→</span>
-                    <span style={{ fontSize: 13, color: "#1f2937", lineHeight: 1.55 }}>{note}</span>
+                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: vendorInfo.color, flexShrink: 0, marginTop: 7 }} />
+                    <span style={{ fontSize: 13, color: "#1f2937", lineHeight: 1.6 }}>{note}</span>
                   </div>
                 ))}
               </div>
@@ -266,6 +328,8 @@ function VendorContent() {
               {isHe ? "אין כתבות לספק זה ב-4 ימים האחרונים" : "No articles for this vendor in the last 4 days"}
             </div>
           );
+          const [hero, ...rest] = listArticles;
+          const heroImg = hero.story_id ? ogImageMap.get(hero.story_id) : undefined;
           return (
             <div style={{ marginBottom: 40 }}>
               <p style={{ margin: "0 0 12px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase" as const, color: "#111827" }}>
@@ -273,19 +337,64 @@ function VendorContent() {
                 <span style={{ fontWeight: 400, color: "#9ca3af", marginInlineStart: 6 }}>({listArticles.length})</span>
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {listArticles.map((article) => {
+                {/* Hero article — full-width with image if available */}
+                <a href={`/story/${hero.story_id}`} target="_blank" rel="noopener noreferrer"
+                  style={{ display: "block", borderRadius: 14, background: "#fff", border: `1px solid ${vendorInfo.color}25`, textDecoration: "none", overflow: "hidden", boxShadow: `0 2px 12px ${vendorInfo.color}15`, transition: "box-shadow .15s, transform .15s" }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.boxShadow = `0 6px 24px ${vendorInfo.color}28`;
+                    (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.boxShadow = `0 2px 12px ${vendorInfo.color}15`;
+                    (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                  }}
+                >
+                  {heroImg && (
+                    <div style={{ height: 160, overflow: "hidden", background: "#f3f4f6" }}>
+                      <img src={heroImg} alt="" referrerPolicy="no-referrer"
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = "none"; }} />
+                    </div>
+                  )}
+                  <div style={{ padding: "14px 18px" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: vendorInfo.color, textTransform: "uppercase" as const, letterSpacing: ".1em" }}>
+                      {isHe ? "מומלץ" : "Featured"} · {hero.date}
+                    </span>
+                    <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 700, color: "#111827", lineHeight: 1.45 }}>
+                      {isHe && hero.headline_he ? hero.headline_he : hero.headline}
+                    </p>
+                  </div>
+                </a>
+
+                {/* Remaining articles with thumbnail */}
+                {rest.map((article) => {
                   const title = isHe && article.headline_he ? article.headline_he : article.headline;
+                  const thumb = article.story_id ? ogImageMap.get(article.story_id) : undefined;
                   return (
                     <a key={article.story_id} href={`/story/${article.story_id}`}
                       target="_blank" rel="noopener noreferrer"
-                      style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 16px", borderRadius: 10, background: "#fff", border: `1px solid ${vendorInfo.color}20`, textDecoration: "none", transition: "border-color .15s" }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = `${vendorInfo.color}55`; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = `${vendorInfo.color}20`; }}
+                      style={{ display: "flex", alignItems: "center", gap: 0, borderRadius: 12, background: "#fff", border: `1px solid ${vendorInfo.color}18`, textDecoration: "none", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", transition: "border-color .15s, box-shadow .15s, transform .15s" }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.borderColor = `${vendorInfo.color}50`;
+                        (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 16px ${vendorInfo.color}18`;
+                        (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.borderColor = `${vendorInfo.color}18`;
+                        (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
+                        (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                      }}
                     >
-                      <span style={{ color: vendorInfo.color, fontWeight: 900, fontSize: 13, lineHeight: 1.5, flexShrink: 0 }}>→</span>
-                      <div style={{ minWidth: 0, flex: 1 }}>
+                      {thumb && (
+                        <div style={{ width: 72, height: 72, flexShrink: 0, overflow: "hidden", background: "#f3f4f6" }}>
+                          <img src={thumb} alt="" referrerPolicy="no-referrer"
+                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                            onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = "none"; }} />
+                        </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0, padding: "12px 16px" }}>
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111827", lineHeight: 1.5 }}>{title}</p>
-                        <p style={{ margin: "2px 0 0", fontSize: 10, color: "#9ca3af", fontFamily: "monospace" }}>{article.date}</p>
+                        <p style={{ margin: "3px 0 0", fontSize: 10, color: "#9ca3af", fontFamily: "monospace" }}>{article.date}</p>
                       </div>
                     </a>
                   );

@@ -199,8 +199,8 @@ function VendorCard({
   isHe: boolean;
   colorIdx: number;
 }) {
-  const { bg, accent } = VENDOR_PALETTE[colorIdx % VENDOR_PALETTE.length];
-  const logoUrl = getVendorLogo(vendor, 32);
+  const { accent } = VENDOR_PALETTE[colorIdx % VENDOR_PALETTE.length];
+  const logoUrl = getVendorLogo(vendor, 48);
   const vendorHref = `/main/vendor?v=${encodeURIComponent(vendor)}`;
 
   return (
@@ -208,46 +208,66 @@ function VendorCard({
       href={vendorHref}
       style={{
         display: "block",
-        background: bg,
-        border: "1px solid #e5e7eb",
-        borderInlineStart: `3px solid ${accent}`,
-        borderRadius: 12,
-        padding: "16px 20px",
-        overflowWrap: "break-word",
-        wordBreak: "break-word",
-        minWidth: 0,
+        background: "#ffffff",
+        border: "1px solid #e8e8f0",
+        borderRadius: 14,
+        overflow: "hidden",
         textDecoration: "none",
         cursor: "pointer",
-        transition: "border-color .15s, box-shadow .15s",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+        transition: "box-shadow .18s, transform .18s, border-color .18s",
       }}
       dir={isHe ? "rtl" : "ltr"}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.borderColor = accent;
-        (e.currentTarget as HTMLElement).style.boxShadow = `0 2px 12px ${accent}18`;
+        (e.currentTarget as HTMLElement).style.boxShadow = `0 6px 24px ${accent}22, 0 1px 4px rgba(0,0,0,0.06)`;
+        (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
+        (e.currentTarget as HTMLElement).style.borderColor = `${accent}55`;
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb";
-        (e.currentTarget as HTMLElement).style.boxShadow = "none";
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 4px rgba(0,0,0,0.06)";
+        (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+        (e.currentTarget as HTMLElement).style.borderColor = "#e8e8f0";
       }}
     >
-      <div style={{ display: "inline-flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
-        {logoUrl && (
-          <img src={logoUrl} alt="" width={16} height={16}
-            style={{ borderRadius: 3, flexShrink: 0 }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-        )}
-        <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase" as const, letterSpacing: ".07em", color: accent }}>
-          {vendor} ↗
+      {/* Colored top accent strip */}
+      <div style={{ height: 3, background: `linear-gradient(90deg, ${accent}, ${accent}88)` }} />
+
+      {/* Header row */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "14px 18px 10px", background: `${accent}08`,
+        borderBottom: `1px solid ${accent}18`,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {logoUrl
+            ? <img src={logoUrl} alt="" width={26} height={26}
+                style={{ borderRadius: 7, flexShrink: 0, boxShadow: `0 0 0 2px ${accent}30` }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            : <div style={{ width: 26, height: 26, borderRadius: 7, background: `${accent}20`, flexShrink: 0 }} />
+          }
+          <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase" as const, letterSpacing: ".08em", color: accent }}>
+            {vendor}
+          </span>
+        </div>
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: accent,
+          background: `${accent}15`, padding: "2px 8px", borderRadius: 100,
+        }}>
+          {stories.length} {isHe ? "עדכונים" : "updates"} ↗
         </span>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* Bullets */}
+      <div style={{ padding: "12px 18px 14px", display: "flex", flexDirection: "column", gap: 7 }}>
         {stories.map((s, i) => {
           const note = isHe ? (s.editorial_note_he || s.editorial_note) : s.editorial_note;
           return (
-            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-              <span style={{ color: accent, fontWeight: 900, fontSize: 13, lineHeight: 1.5, flexShrink: 0 }}>→</span>
-              <span style={{ color: "#1f2937", fontSize: 13, lineHeight: 1.55 }}>{note}</span>
+            <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+              <span style={{
+                width: 5, height: 5, borderRadius: "50%", background: accent,
+                flexShrink: 0, marginTop: 7,
+              }} />
+              <span style={{ color: "#374151", fontSize: 13, lineHeight: 1.55, fontWeight: 450 }}>{note}</span>
             </div>
           );
         })}

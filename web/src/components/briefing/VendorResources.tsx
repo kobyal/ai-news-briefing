@@ -323,21 +323,45 @@ export function VendorResources({ vendor, data, isHe }: {
               const m = String(vid.summary || vid.description || "").match(/^\[([^·\]]+)/);
               return m ? m[1].trim() : "";
             })();
+            // Derive YouTube thumbnail: use stored field or extract from URL
+            const thumb = (() => {
+              if (vid.thumbnail) return String(vid.thumbnail);
+              const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/);
+              return m ? `https://img.youtube.com/vi/${m[1]}/mqdefault.jpg` : null;
+            })();
             return (
               <a key={`vid-${i}`} href={inSiteHref("video", url, String(vid._date || data.date), today)}
                  target="_blank" rel="noopener noreferrer"
-                 className="group flex items-center gap-3 rounded-xl px-4 py-3 transition-all"
-                 style={{ background: "#fff", border: "1px solid rgba(220,38,38,0.18)" }}
-                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#dc2626"; }}
-                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(220,38,38,0.18)"; }}>
-                <div className="shrink-0 flex items-center justify-center rounded-lg"
-                     style={{ width: 28, height: 28, background: "#dc2626", color: "white", fontSize: 11 }}>▶</div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold leading-snug"
-                     style={{ color: "#0f0f1a", display: "-webkit-box", WebkitBoxOrient: "vertical" as const, WebkitLineClamp: 2, overflow: "hidden" }}>
+                 style={{ display: "flex", alignItems: "center", gap: 0, borderRadius: 12, background: "#fff", border: "1px solid rgba(220,38,38,0.18)", overflow: "hidden", textDecoration: "none", transition: "border-color .15s, box-shadow .15s" }}
+                 onMouseEnter={(e) => {
+                   (e.currentTarget as HTMLElement).style.borderColor = "#dc2626";
+                   (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(220,38,38,0.15)";
+                 }}
+                 onMouseLeave={(e) => {
+                   (e.currentTarget as HTMLElement).style.borderColor = "rgba(220,38,38,0.18)";
+                   (e.currentTarget as HTMLElement).style.boxShadow = "none";
+                 }}>
+                {thumb ? (
+                  <div style={{ width: 96, height: 64, flexShrink: 0, overflow: "hidden", background: "#1a1a1a", position: "relative" }}>
+                    <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                        (e.target as HTMLImageElement).parentElement!.style.background = "#dc2626";
+                        (e.target as HTMLImageElement).parentElement!.innerHTML = '<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:white;font-size:18px">▶</span>';
+                      }} />
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0 }} className="group-hover:opacity-100">
+                      <div style={{ width: 28, height: 28, background: "rgba(220,38,38,0.9)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 11 }}>▶</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ width: 56, height: 56, flexShrink: 0, background: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 16 }}>▶</div>
+                )}
+                <div style={{ flex: 1, minWidth: 0, padding: "10px 14px" }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#0f0f1a", lineHeight: 1.4,
+                    display: "-webkit-box", WebkitBoxOrient: "vertical" as const, WebkitLineClamp: 2, overflow: "hidden" }}>
                     {title}
                   </p>
-                  {channel && <span className="text-[10px]" style={{ color: "#dc2626" }}>{channel}</span>}
+                  {channel && <span style={{ fontSize: 10, color: "#dc2626", marginTop: 3, display: "block" }}>{channel}</span>}
                 </div>
               </a>
             );

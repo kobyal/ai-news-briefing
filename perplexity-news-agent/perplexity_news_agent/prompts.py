@@ -62,6 +62,7 @@ Rules:
    - published_date: exact date from source, e.g. "April 2, 2026"
    - summary: 2-3 sentences, concrete details — model names, numbers, capabilities
    - urls: 1-3 source URLs from the SOURCES sections. Each URL used ONCE across all items.
+   CRITICAL: Only include items published within the last 7 days. Any story older than 7 days MUST be dropped entirely — do not include it.
 3. community_pulse: 4-6 bullet points (each starting with "• ") covering specific developer reactions — concrete opinions, what they liked/disliked, notable quotes or threads. No fluff.
 4. community_urls: 1-3 URLs from COMMUNITY_SOURCES.
 

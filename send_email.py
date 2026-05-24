@@ -752,6 +752,25 @@ def _collect_agent_delivery() -> list[dict]:
                                           at_least=json_at_least),
                      "status": status, "note": note})
 
+    li = _latest("linkedin-agent")
+    if li:
+        li_posts = ((li.get("briefing") or {}).get("linkedin_posts") or [])
+        li_fallback = li.get("fallback", False)
+        n_li = len(li_posts)
+        if n_li == 0:
+            streak = _zero_streak("linkedin-agent", ["briefing", "linkedin_posts"])
+            note = f"ran but 0 posts ({streak}-day streak)" if streak >= 2 else "ran but 0 posts"
+            status = "error" if streak >= 2 else "warn"
+        elif li_fallback:
+            status, note = "warn", f"FALLBACK — Apify returned stale data ({n_li} posts)"
+        else:
+            status, note = "ok", ""
+        rows.append({"agent": "linkedin", "raw": str(n_li), "json": "(merged)", "site": "(merged)",
+                     "status": status, "note": note})
+    else:
+        rows.append({"agent": "linkedin", "raw": "—", "json": "—", "site": "—",
+                     "status": "error", "note": "agent didn't run today"})
+
     # ── Side-data (not per-agent — built by scripts/ at [3b/6] + [5c/6]) ──
     # hot_tools.json, podcasts.json, search-index.json. Each script writes
     # a run-log JSONL we read for status; if the log is missing the row
@@ -944,13 +963,150 @@ def _collect_freshness() -> list[dict]:
             d = _load_json(rss_files[-1])
             posts = d.get("reddit_posts") or (d.get("briefing", {}) or {}).get("reddit_posts", []) or []
             if posts:
-                rows.append({"label": "Reddit · today's posts", "value": str(len(posts)),
-                             "status": "ok", "note": ""})
+                latest_r = None
+                for p in posts:
+                    s = (p.get("date") or "").strip()
+                    try:
+                        dt = datetime.strptime(s, "%B %d, %Y")
+                    except (ValueError, TypeError):
+                        continue
+                    if latest_r is None or dt > latest_r:
+                        latest_r = dt
+                if latest_r:
+                    age = (today.date() - latest_r.date()).days
+                    if age <= 1:
+                        status, note = "ok", f"today's posts ({len(posts)})"
+                    elif age <= 2:
+                        status, note = "warn", f"newest post {age} day{'s' if age != 1 else ''} ago ({len(posts)} posts)"
+                    else:
+                        status, note = "error", f"newest post {age} days ago — content stale ({len(posts)} posts)"
+                    rows.append({"label": "Reddit · latest post date", "value": latest_r.strftime("%b %d"),
+                                 "status": status, "note": note})
+                else:
+                    rows.append({"label": "Reddit · today's posts", "value": str(len(posts)),
+                                 "status": "ok", "note": ""})
             else:
                 rows.append({"label": "Reddit · today's posts", "value": "0",
                              "status": "warn", "note": "ArcticShift returned empty"})
         except Exception:
             pass
+
+    li_files = sorted(glob.glob(f"linkedin-agent/output/{today_str}/linkedin_*.json"))
+    if li_files:
+        try:
+            d = _load_json(li_files[-1])
+            fallback = d.get("fallback", False)
+            posts = (d.get("briefing", {}) or {}).get("linkedin_posts", []) or []
+            latest_li = None
+            for p in posts:
+                s = (p.get("date") or "").strip()
+                try:
+                    dt = datetime.strptime(s, "%B %d, %Y")
+                except (ValueError, TypeError):
+                    continue
+                if latest_li is None or dt > latest_li:
+                    latest_li = dt
+            if latest_li:
+                age = (today.date() - latest_li.date()).days
+                if fallback:
+                    status, note = "warn", f"FALLBACK data, newest post {age} day{'s' if age != 1 else ''} ago"
+                elif age <= 2:
+                    status, note = "ok", f"{age} day{'s' if age != 1 else ''} ago ({len(posts)} posts)"
+                elif age <= 4:
+                    status, note = "warn", f"newest post {age} days ago ({len(posts)} posts)"
+                else:
+                    status, note = "error", f"newest post {age} days ago — Apify stale ({len(posts)} posts)"
+                rows.append({"label": "LinkedIn · latest post date", "value": latest_li.strftime("%b %d"),
+                             "status": status, "note": note})
+            elif fallback:
+                rows.append({"label": "LinkedIn · fallback", "value": "—",
+                             "status": "warn", "note": "running on fallback data"})
+            elif posts:
+                rows.append({"label": "LinkedIn · posts", "value": str(len(posts)),
+                             "status": "ok", "note": "no parseable dates"})
+            else:
+                rows.append({"label": "LinkedIn · posts", "value": "0",
+                             "status": "warn", "note": "no posts in output"})
+        except Exception as e:
+            rows.append({"label": "LinkedIn data", "value": "—", "status": "error", "note": str(e)[:60]})
+
+    yt_files = sorted(glob.glob(f"youtube-news-agent/output/{today_str}/youtube_*.json"))
+    if yt_files:
+        try:
+            d = _load_json(yt_files[-1])
+            items = (d.get("briefing", {}) or {}).get("news_items", []) or []
+            latest_yt = None
+            for item in items:
+                s = (item.get("published_date") or "").strip()
+                try:
+                    dt = datetime.strptime(s, "%B %d, %Y")
+                except (ValueError, TypeError):
+                    continue
+                if latest_yt is None or dt > latest_yt:
+                    latest_yt = dt
+            if latest_yt:
+                age = (today.date() - latest_yt.date()).days
+                if age <= 1:
+                    status, note = "ok", f"today's videos ({len(items)})"
+                elif age <= 2:
+                    status, note = "warn", f"newest video {age} day{'s' if age != 1 else ''} ago ({len(items)} items)"
+                else:
+                    status, note = "error", f"newest video {age} days ago — quota exhausted? ({len(items)} items)"
+                rows.append({"label": "YouTube · latest video date", "value": latest_yt.strftime("%b %d"),
+                             "status": status, "note": note})
+            elif items:
+                rows.append({"label": "YouTube · videos", "value": str(len(items)),
+                             "status": "ok", "note": "no parseable dates"})
+            else:
+                rows.append({"label": "YouTube · videos", "value": "0",
+                             "status": "warn", "note": "no videos in output"})
+        except Exception as e:
+            rows.append({"label": "YouTube data", "value": "—", "status": "error", "note": str(e)[:60]})
+
+    # Generic news agents: check newest published_date in briefing.news_items
+    _news_agents = [
+        ("perplexity-news-agent", "briefing_*.json",    "Perplexity", 2, 3),
+        ("tavily-news-agent",     "tavily_*.json",      "Tavily",     2, 3),
+        ("adk-news-agent",        "briefing_*.json",    "ADK",        2, 3),
+        ("github-trending-agent", "github_*.json",      "GitHub",     3, 5),
+        ("exa-news-agent",        "exa_*.json",         "Exa",        2, 3),
+        ("newsapi-agent",         "newsapi_*.json",     "NewsAPI",    2, 3),
+    ]
+    for agent_dir, pat, label, warn_days, err_days in _news_agents:
+        files = sorted(glob.glob(f"{agent_dir}/output/{today_str}/{pat}"))
+        if not files:
+            continue
+        try:
+            d = _load_json(files[-1])
+            b = d.get("briefing", d) or {}
+            items = b.get("news_items", b.get("articles", b.get("stories", []))) or []
+            latest_n = None
+            for item in items:
+                s = (item.get("published_date") or item.get("date") or "").strip()
+                try:
+                    dt = datetime.strptime(s, "%B %d, %Y")
+                except (ValueError, TypeError):
+                    continue
+                if latest_n is None or dt > latest_n:
+                    latest_n = dt
+            if latest_n:
+                age = (today.date() - latest_n.date()).days
+                if age < warn_days:
+                    status, note = "ok", f"{age} day{'s' if age != 1 else ''} ago ({len(items)} items)"
+                elif age < err_days:
+                    status, note = "warn", f"newest item {age} days ago ({len(items)} items)"
+                else:
+                    status, note = "error", f"newest item {age} days ago — stale ({len(items)} items)"
+                rows.append({"label": f"{label} · latest item date", "value": latest_n.strftime("%b %d"),
+                             "status": status, "note": note})
+            elif items:
+                rows.append({"label": f"{label} · items", "value": str(len(items)),
+                             "status": "ok", "note": "no parseable dates"})
+            else:
+                rows.append({"label": f"{label} · items", "value": "0",
+                             "status": "warn", "note": "no items in output"})
+        except Exception as e:
+            rows.append({"label": f"{label} data", "value": "—", "status": "error", "note": str(e)[:60]})
 
     return rows
 

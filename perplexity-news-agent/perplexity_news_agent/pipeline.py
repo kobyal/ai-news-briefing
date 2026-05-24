@@ -397,6 +397,24 @@ def _step5_publish(briefing_json: str, hebrew_json: str) -> dict:
     json_path = os.path.join(out_dir, f"briefing_{datetime.now().strftime('%H%M%S')}.json")
     data = _parse(briefing_json)
     he   = _parse(hebrew_json) if hebrew_json else {}
+
+    # Hard staleness filter — drop news_items older than 7 days regardless of
+    # what the LLM included. The prompt asks for ≤7 days but LLMs slip.
+    _MAX_AGE = 7
+    _today_dt = datetime.now()
+    if isinstance(data, dict) and data.get("news_items"):
+        def _is_fresh(item):
+            s = (item.get("published_date") or "").strip()
+            try:
+                return (_today_dt - datetime.strptime(s, "%B %d, %Y")).days <= _MAX_AGE
+            except (ValueError, TypeError):
+                return True
+        before = len(data["news_items"])
+        data["news_items"] = [i for i in data["news_items"] if _is_fresh(i)]
+        dropped = before - len(data["news_items"])
+        if dropped:
+            print(f"  ⚠️  Dropped {dropped} stale item(s) older than {_MAX_AGE} days")
+
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump({"source": "perplexity", "briefing": data, "briefing_he": he}, f, ensure_ascii=False)
     print(f"  Saved → {json_path}")

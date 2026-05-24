@@ -205,19 +205,37 @@ const CHANNELS: Channel[] = [
     url: "https://open.spotify.com/show/0O65xhqvGVhpgdIrrdlEYk", platform: "spotify", lang: "en" },
 ];
 
-// ── Topic categories for the AI carousel ──────────────────────────────────
-const TOPIC_CATEGORIES = [
-  { icon: "🤖", name: "AI Agents", name_he: "סוכני AI", query: "build ai agents langgraph crewai 2025 tutorial", color: "#7c3aed" },
-  { icon: "☁️", name: "AWS Bedrock", name_he: "AWS Bedrock", query: "aws bedrock agents tutorial 2025", color: "#f97316" },
-  { icon: "🔷", name: "Google ADK", name_he: "Google ADK", query: "google agent development kit ADK vertex tutorial", color: "#2563eb" },
-  { icon: "🔮", name: "Claude Code", name_he: "Claude Code", query: "claude code agentic coding tutorial 2025", color: "#8b5cf6" },
-  { icon: "⚡", name: "Vibe Coding", name_he: "Vibe Coding", query: "vibe coding cursor windsurf ai programming 2025", color: "#dc2626" },
-  { icon: "🧠", name: "Prompt Engineering", name_he: "הנדסת פרומפטים", query: "prompt engineering advanced techniques LLM 2025", color: "#059669" },
-  { icon: "🔵", name: "Azure AI", name_he: "Azure AI", query: "azure openai agents ai studio foundry tutorial 2025", color: "#0284c7" },
-  { icon: "🛠️", name: "RAG & LLM Ops", name_he: "RAG ו-LLM Ops", query: "rag pipeline llm production engineering 2025", color: "#b45309" },
-  { icon: "🔗", name: "MCP & Tools", name_he: "MCP וכלים", query: "model context protocol MCP servers tools claude 2025", color: "#64748b" },
-  { icon: "🏗️", name: "Agent Frameworks", name_he: "Agent Frameworks", query: "langgraph autogen crewai agent framework tutorial 2025", color: "#0f766e" },
+// ── Video topic taxonomy ───────────────────────────────────────────────────
+const VIDEO_TOPICS = [
+  { id: "claude",   icon: "🔮", label: "Claude Code",   label_he: "Claude Code",   color: "#8b5cf6" },
+  { id: "agents",   icon: "🤖", label: "AI Agents",     label_he: "סוכני AI",       color: "#7c3aed" },
+  { id: "aws",      icon: "☁️", label: "AWS Bedrock",   label_he: "AWS Bedrock",   color: "#f97316" },
+  { id: "google",   icon: "🔷", label: "Google ADK",    label_he: "Google ADK",    color: "#2563eb" },
+  { id: "azure",    icon: "🔵", label: "Azure AI",      label_he: "Azure AI",      color: "#0284c7" },
+  { id: "lectures", icon: "🧠", label: "Lectures",      label_he: "הרצאות",         color: "#059669" },
+  { id: "vibe",     icon: "⚡", label: "Vibe Coding",   label_he: "Vibe Coding",   color: "#dc2626" },
+  { id: "rag",      icon: "🛠️", label: "RAG & LLM Ops", label_he: "RAG ו-LLM",     color: "#b45309" },
 ];
+
+function classifyVideo(v: YouTubeVideo): Set<string> {
+  const t = (videoTitle(v)).toLowerCase();
+  const ch = (v.channel || "").toLowerCase();
+  const tags = new Set<string>();
+  if (/claude\s*code|claude\s*4|claude\s*3|anthropic|claude\s*agent/.test(t) ||
+      /claude|anthropic|yuv.ai|yuv ai/.test(ch)) tags.add("claude");
+  if (/\bagent\b|\bagentic|langgraph|crewai|autogen|multi.agent|autonomous\s*ai/.test(t) ||
+      /cole medin|ai jason|sam witteveen|david shapiro/.test(ch)) tags.add("agents");
+  if (/\baws\b|bedrock|sagemaker|\bamazon\s*ai/.test(t) ||
+      /amazon web services/.test(ch)) tags.add("aws");
+  if (/\badk\b|vertex\s*ai|gemini|google\s*ai|google\s*cloud|google\s*i\/o|google\s*io/.test(t) ||
+      /google cloud|google for dev|google develop/.test(ch)) tags.add("google");
+  if (/\bazure\b|azure\s*openai|microsoft\s*ai|ai\s*foundry|copilot\s*stack/.test(t)) tags.add("azure");
+  if (/lecture|tutorial|course|\bexplained\b|neural\s*network|transformer|paper\b|research\b/.test(t) ||
+      /karpathy|yannic|two minute papers|andrej/.test(ch)) tags.add("lectures");
+  if (/vibe\s*cod|\bcursor\b|\bwindsurf\b|ai.cod|agentic\s*programm|bolt\.new|lovable/.test(t)) tags.add("vibe");
+  if (/\brag\b|retrieval|embedding|vector\s*db|llm\s*op|production\s*llm|fine.tun/.test(t)) tags.add("rag");
+  return tags;
+}
 
 function channelInitials(name: string): string {
   const words = name.replace(/[-_]/g, " ").trim().split(/\s+/).filter(Boolean);
@@ -714,43 +732,117 @@ function PodCard({ channel, isHe, meta }: { channel: Channel; isHe: boolean; met
   );
 }
 
-// ── Topic carousel (Browse-by-topic pill strip) ─────────────────────────────
-function TopicsCarousel({ isHe }: { isHe: boolean }) {
+// ── Topic filter bar (card carousel, filters on-site videos) ────────────────
+const TOPIC_CARD_W = 80;
+const TOPIC_CARD_H = 68;
+const TOPIC_CARD_GAP = 8;
+
+function TopicFilterBar({ topics, counts, selected, onSelect, isHe }: {
+  topics: typeof VIDEO_TOPICS;
+  counts: Record<string, number>;
+  selected: string | null;
+  onSelect: (id: string | null) => void;
+  isHe: boolean;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollBy = (dir: 1 | -1) => {
+    scrollRef.current?.scrollBy({ left: dir * (TOPIC_CARD_W + TOPIC_CARD_GAP) * 3, behavior: "smooth" });
+  };
+
+  const btnBase = {
+    flexShrink: 0,
+    width: `${TOPIC_CARD_W}px`,
+    height: `${TOPIC_CARD_H}px`,
+    borderRadius: "12px",
+    cursor: "pointer",
+    display: "flex" as const,
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "4px",
+    transition: "transform 0.15s, background 0.15s, border 0.15s",
+    scrollSnapAlign: "start",
+    outline: "none",
+  };
+
+  const arrowBtn = {
+    position: "absolute" as const,
+    top: "50%",
+    transform: "translateY(-50%)",
+    zIndex: 2,
+    width: "28px",
+    height: "28px",
+    borderRadius: "50%",
+    background: "#fff",
+    border: "1px solid #e0e0ec",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "18px",
+    color: "#4a4a6a",
+    lineHeight: 1,
+    outline: "none",
+  };
+
   return (
-    <div style={{ marginBottom: "8px" }}>
-      <p style={{ fontSize: "10px", color: "#9a9ab8", marginBottom: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-        {isHe ? "גלול לפי נושא ב-YouTube" : "Browse YouTube by topic"}
-      </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
-        {TOPIC_CATEGORIES.map((cat) => (
-          <a
-            key={cat.name}
-            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(cat.query)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              padding: "5px 11px",
-              background: `${cat.color}0d`,
-              border: `1px solid ${cat.color}30`,
-              borderRadius: "999px",
-              textDecoration: "none",
-              fontSize: "12px",
-              fontWeight: 700,
-              color: cat.color,
-              whiteSpace: "nowrap",
-              transition: "background 0.15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = `${cat.color}1f`; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = `${cat.color}0d`; }}
-          >
-            <span style={{ fontSize: "13px" }}>{cat.icon}</span>
-            {isHe ? cat.name_he : cat.name}
-          </a>
-        ))}
+    <div style={{ position: "relative", marginBottom: "16px" }}>
+      <button onClick={() => scrollBy(-1)} style={{ ...arrowBtn, left: 0 }}>‹</button>
+      <div
+        ref={scrollRef}
+        style={{
+          display: "flex",
+          gap: `${TOPIC_CARD_GAP}px`,
+          overflowX: "auto",
+          scrollbarWidth: "none",
+          padding: "4px 36px",
+          scrollSnapType: "x mandatory",
+        }}
+      >
+        {/* "All" card */}
+        <button
+          onClick={() => onSelect(null)}
+          style={{
+            ...btnBase,
+            border: selected === null ? "2px solid #6b6b8a" : "1.5px solid #e0e0ec",
+            background: selected === null ? "linear-gradient(135deg,#6b6b8a 0%,#4a4a6a 100%)" : "#fff",
+            color: selected === null ? "#fff" : "#6b6b8a",
+            transform: selected === null ? "scale(1.08)" : "scale(1)",
+            opacity: 1,
+          }}
+        >
+          <span style={{ fontSize: "20px" }}>🎬</span>
+          <span style={{ fontSize: "10px", fontWeight: 800, lineHeight: 1.2 }}>{isHe ? "הכל" : "All"}</span>
+          {(counts["__all__"] || 0) > 0 && <span style={{ fontSize: "9px", opacity: 0.6 }}>{counts["__all__"]}</span>}
+        </button>
+        {topics.map((topic) => {
+          const count = counts[topic.id] || 0;
+          const isActive = selected === topic.id;
+          return (
+            <button
+              key={topic.id}
+              onClick={() => onSelect(isActive ? null : topic.id)}
+              style={{
+                ...btnBase,
+                border: isActive ? `2px solid ${topic.color}` : "1.5px solid #e0e0ec",
+                background: isActive ? `linear-gradient(135deg,${topic.color}28 0%,${topic.color}14 100%)` : "#fff",
+                color: isActive ? topic.color : "#6b6b8a",
+                transform: isActive ? "scale(1.08)" : "scale(1)",
+                opacity: count === 0 ? 0.42 : 1,
+              }}
+            >
+              <span style={{ fontSize: "20px" }}>{topic.icon}</span>
+              <span style={{ fontSize: "10px", fontWeight: 800, lineHeight: 1.2, textAlign: "center" }}>
+                {isHe ? topic.label_he : topic.label}
+              </span>
+              {count > 0 && <span style={{ fontSize: "9px", opacity: 0.6 }}>{count}</span>}
+            </button>
+          );
+        })}
       </div>
+      <button onClick={() => scrollBy(1)} style={{ ...arrowBtn, right: 0 }}>›</button>
     </div>
   );
 }
@@ -898,6 +990,7 @@ function MediaPageInner() {
   const [showAllChannels, setShowAllChannels] = useState(false);
   const [showAllVideos, setShowAllVideos] = useState(false);
   const [showAllPodcasts, setShowAllPodcasts] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [olderDays, setOlderDays] = useState<OlderMediaDay[]>([]);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [podcastMeta, setPodcastMeta] = useState<Record<string, PodcastMeta>>({});
@@ -920,6 +1013,21 @@ function MediaPageInner() {
       // Retry scroll-to-hash after data lands (browser gave up earlier).
       if (typeof window !== "undefined" && window.location.hash) {
         scrollToHash();
+      }
+      // Eagerly preload up to 7 past days for the video pool (topic filter needs a wide pool).
+      if (dayData) {
+        const pastDates = archiveDates.filter((d) => d < dayData!.date).slice(0, 7);
+        const results = await Promise.all(
+          pastDates.map(async (date) => {
+            inFlightDates.current.add(date);
+            const d = await fetchDayData(date);
+            return d ? { date, data: d } : null;
+          })
+        );
+        const loaded = (results.filter(Boolean) as OlderMediaDay[]).sort(
+          (a, b) => b.date.localeCompare(a.date)
+        );
+        if (loaded.length > 0) setOlderDays(loaded);
       }
     }
     load();
@@ -997,6 +1105,49 @@ function MediaPageInner() {
     return () => observer.disconnect();
   }, [hasMoreOlderDays, loadingOlder, loadNextOlderDay]);
 
+  // Reset pagination when topic filter changes.
+  useEffect(() => { setShowAllVideos(false); }, [selectedTopic]);
+
+  // Aggregate video pool: today's unpaired + all preloaded older days, deduped, sorted by views.
+  // Must be before the early return — hooks can't be called conditionally.
+  const allPoolVideos = useMemo(() => {
+    if (!data) return [];
+    const todayVideos = (data.youtube || []) as YouTubeVideo[];
+    const todayPairs = pairedExplainers(data.stories || [], todayVideos);
+    const todayPairedUrls = new Set(todayPairs.map(({ video }) => videoUrl(video)));
+    const pool: YouTubeVideo[] = todayVideos.filter((v) => !todayPairedUrls.has(videoUrl(v)));
+    for (const day of olderDays) {
+      const dv = (day.data.youtube || []) as YouTubeVideo[];
+      const dp = pairedExplainers(day.data.stories || [], dv);
+      const du = new Set(dp.map(({ video }) => videoUrl(video)));
+      for (const v of dv) { if (!du.has(videoUrl(v))) pool.push(v); }
+    }
+    const seen = new Set<string>();
+    const out: YouTubeVideo[] = [];
+    for (const v of pool) {
+      const u = videoUrl(v);
+      if (!seen.has(u)) { seen.add(u); out.push(v); }
+    }
+    return out.sort((a, b) => {
+      const av = typeof a.views === "number" ? a.views : 0;
+      const bv = typeof b.views === "number" ? b.views : 0;
+      return bv - av;
+    });
+  }, [data, olderDays]);
+
+  const topicCounts = useMemo(() => {
+    const c: Record<string, number> = { "__all__": allPoolVideos.length };
+    for (const v of allPoolVideos) {
+      for (const id of classifyVideo(v)) { c[id] = (c[id] || 0) + 1; }
+    }
+    return c;
+  }, [allPoolVideos]);
+
+  const filteredPoolVideos = useMemo(
+    () => selectedTopic ? allPoolVideos.filter((v) => classifyVideo(v).has(selectedTopic)) : allPoolVideos,
+    [allPoolVideos, selectedTopic]
+  );
+
   if (loading || !data) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-base)" }}>
@@ -1013,9 +1164,7 @@ function MediaPageInner() {
   const numericViews = (v: YouTubeVideo): number =>
     typeof v.views === "number" ? v.views : 0;
   const pairsBelow = pairs;
-  const restVideosBelow = [...unpairedVideos].sort(
-    (a, b) => numericViews(b) - numericViews(a)
-  );
+  const visiblePoolVideos = showAllVideos ? filteredPoolVideos : filteredPoolVideos.slice(0, 6);
 
   // Per-channel latest map (keyed by channel URL from CHANNELS table)
   const channelLatest: Record<string, ChannelLatestVideo> = {};
@@ -1034,7 +1183,6 @@ function MediaPageInner() {
   const ytChannels = CHANNELS.filter((c) => c.platform === "youtube");
   const podChannels = CHANNELS.filter((c) => c.platform === "spotify");
   const visibleChannels = showAllChannels ? ytChannels : ytChannels.slice(0, 4);
-  const visibleVideos = showAllVideos ? restVideosBelow : restVideosBelow.slice(0, 6);
   const visiblePodcasts = showAllPodcasts ? podChannels : podChannels.slice(0, 4);
 
   return (
@@ -1073,30 +1221,40 @@ function MediaPageInner() {
           </>
         )}
 
-        {/* ── AI ENGINEERING TUTORIALS (renamed, with topic carousel) ── */}
+        {/* ── AI ENGINEERING TUTORIALS (multi-day pool + topic filter) ── */}
         <SectionHead
           title={isHe ? "הדרכות ופיתוח AI" : "AI Engineering Tutorials"}
-          sub={isHe ? "טוטוריאלים ופיצ׳רים מ-AWS, Google, Claude Code ועוד" : "Tutorials & features from AWS, Google, Claude Code and more"}
-          count={restVideosBelow.length > 0 ? (isHe ? `${restVideosBelow.length} סרטונים` : `${restVideosBelow.length} videos`) : undefined}
+          sub={isHe ? "טוטוריאלים ופיצ׳רים מ-AWS, Google, Claude Code ועוד — מימים אחרונים" : "Tutorials & features from AWS, Google, Claude Code and more — recent days"}
+          count={allPoolVideos.length > 0 ? (isHe ? `${allPoolVideos.length} סרטונים` : `${allPoolVideos.length} videos`) : undefined}
         />
-        <TopicsCarousel isHe={isHe} />
-        {restVideosBelow.length > 0 && (
+        <TopicFilterBar
+          topics={VIDEO_TOPICS}
+          counts={topicCounts}
+          selected={selectedTopic}
+          onSelect={setSelectedTopic}
+          isHe={isHe}
+        />
+        {filteredPoolVideos.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {visibleVideos.map((v) => (
+            {visiblePoolVideos.map((v) => (
               <VideoCard key={videoUrl(v)} video={v} />
             ))}
-            {restVideosBelow.length > 6 && (
+            {filteredPoolVideos.length > 6 && (
               <ShowMoreButton
                 open={showAllVideos}
                 onClick={() => setShowAllVideos(!showAllVideos)}
                 label={
                   showAllVideos
                     ? (isHe ? "הצג פחות" : "Show less")
-                    : (isHe ? `הצג את כל ${restVideosBelow.length} הסרטונים` : `Show all ${restVideosBelow.length} videos`)
+                    : (isHe ? `הצג את כל ${filteredPoolVideos.length} הסרטונים` : `Show all ${filteredPoolVideos.length} videos`)
                 }
               />
             )}
           </div>
+        ) : (
+          <p style={{ fontSize: "13px", color: "#9a9ab8", fontStyle: "italic" }}>
+            {isHe ? "לא נמצאו סרטונים בקטגוריה זו" : "No videos found for this topic"}
+          </p>
         )}
 
         {/* ── CHANNELS GRID (collapsible) ──────────────── */}

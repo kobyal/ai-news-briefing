@@ -74,14 +74,20 @@ function CollapsibleSection({
   );
 }
 
-export function VendorResources({ vendor, data, isHe }: {
+export function VendorResources({ vendor, data, isHe, allDays: allDaysProp, onCounts }: {
   vendor: string;
   data: DayData;
   isHe: boolean;
+  allDays?: DayData[];
+  onCounts?: (c: { pulse: number; tweets: number; reddit: number; linkedin: number; videos: number }) => void;
 }) {
   const today = new Date().toISOString().split("T")[0];
-  const [extraDays, setExtraDays] = useState<DayData[]>([]);
+  const [fetchedExtra, setFetchedExtra] = useState<DayData[]>([]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Use allDays prop if provided (deduped by date), else use data + fetchedExtra
+  const extraDays = allDaysProp
+    ? allDaysProp.filter(d => d.date !== data.date)
+    : fetchedExtra;
 
   const toggleSection = (id: string) =>
     setCollapsed(prev => {
@@ -91,16 +97,17 @@ export function VendorResources({ vendor, data, isHe }: {
     });
 
   useEffect(() => {
+    if (allDaysProp) return; // skip fetch when parent provides data
     async function load() {
       const dt = new Date(`${today}T00:00:00Z`);
       const dates = [1, 2]
         .map(i => { const d = new Date(dt); d.setUTCDate(d.getUTCDate() - i); return d.toISOString().split("T")[0]; })
         .filter(d => d !== data.date);
       const results = await Promise.all(dates.map(d => fetchDayData(d)));
-      setExtraDays(results.filter(Boolean) as DayData[]);
+      setFetchedExtra(results.filter(Boolean) as DayData[]);
     }
     load();
-  }, [today, data.date]);
+  }, [today, data.date, allDaysProp]);
 
   const v = vendor.toLowerCase();
   const aliases = VENDOR_ALIASES[v] || [v];
@@ -169,6 +176,12 @@ export function VendorResources({ vendor, data, isHe }: {
   }
 
   const total = pulseItems.length + xPosts.length + redditPosts.length + linkedinPosts.length + videos.length;
+
+  // Report counts to parent after each render
+  useEffect(() => {
+    onCounts?.({ pulse: pulseItems.length, tweets: xPosts.length, reddit: redditPosts.length, linkedin: linkedinPosts.length, videos: videos.length });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [total]);
 
   if (total === 0) {
     return (

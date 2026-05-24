@@ -53,6 +53,7 @@ function VendorContent() {
   const [allDays, setAllDays] = useState<DayData[]>([]);
   const [editorialNotes, setEditorialNotes] = useState<EditorialNote[]>([]);
   const [pulseItems, setPulseItems] = useState<Array<{ headline: string; headline_he?: string }>>([]);
+  const [commCounts, setCommCounts] = useState<{ pulse: number; tweets: number; reddit: number; linkedin: number; videos: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const cutoffDt = new Date(`${today}T00:00:00Z`);
@@ -166,12 +167,6 @@ function VendorContent() {
 
   const dateLabel = fmtDateRange(cutoff, today, isHe);
 
-  // Stats for the hero row
-  const videoCount = allDays.reduce((n, d) => {
-    const vLower = vendorParam.toLowerCase();
-    return n + ((d.youtube || []) as Array<Record<string,unknown>>)
-      .filter(v => String(v.title || v.headline || "").toLowerCase().includes(vLower)).length;
-  }, 0);
 
   return (
     <>
@@ -219,7 +214,7 @@ function VendorContent() {
             </div>
           </div>
 
-          {/* Stats + date row */}
+          {/* Stats + date row — counts come from VendorResources via onCounts */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             {articles.length > 0 && (
               <span style={{
@@ -231,24 +226,24 @@ function VendorContent() {
                 {articles.length} {isHe ? "כתבות" : "articles"}
               </span>
             )}
-            {pulseItems.length > 0 && (
+            {commCounts && (commCounts.pulse + commCounts.tweets + commCounts.reddit) > 0 && (
               <span style={{
                 fontSize: 11, fontWeight: 700, color: vendorInfo.color,
                 background: "#fff", border: `1px solid ${vendorInfo.color}35`,
                 padding: "4px 11px", borderRadius: 100,
                 boxShadow: `0 1px 4px ${vendorInfo.color}15`,
               }}>
-                {pulseItems.length} pulse
+                {commCounts.pulse + commCounts.tweets + commCounts.reddit} {isHe ? "פוסטים" : "posts"}
               </span>
             )}
-            {videoCount > 0 && (
+            {commCounts && commCounts.videos > 0 && (
               <span style={{
                 fontSize: 11, fontWeight: 700, color: vendorInfo.color,
                 background: "#fff", border: `1px solid ${vendorInfo.color}35`,
                 padding: "4px 11px", borderRadius: 100,
                 boxShadow: `0 1px 4px ${vendorInfo.color}15`,
               }}>
-                {videoCount} {isHe ? "סרטונים" : "videos"}
+                {commCounts.videos} {isHe ? "סרטונים" : "videos"}
               </span>
             )}
             <span style={{ fontSize: 11, color: "#9ca3af", marginInlineStart: 4 }}>{dateLabel}</span>
@@ -405,7 +400,15 @@ function VendorContent() {
         })()}
 
         {/* Community & Media */}
-        {dayData && <VendorResources vendor={vendorParam} data={dayData} isHe={isHe} />}
+        {dayData && (
+          <VendorResources
+            vendor={vendorParam}
+            data={dayData}
+            isHe={isHe}
+            allDays={allDays}
+            onCounts={setCommCounts}
+          />
+        )}
       </div>
     </>
   );

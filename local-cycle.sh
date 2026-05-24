@@ -450,7 +450,11 @@ echo "[5/6] Sending email (subject will be tagged [LOCAL])..."
 # Email runs before the GH Pages wait so the Mac sleeping during the 3-min poll
 # doesn't silently kill it. The "site=" delivery snapshot may show ⚠0 for some
 # agents, but reliable delivery outweighs that cosmetic trade-off.
-"$PYTHON_BIN" send_email.py
+# Hard 3-min timeout guards against send_email.py hanging on a stale TCP
+# connection (SMTP or Jina/Cloudflare HTTPS keepalive that never closes).
+# Root cause: 2026-05-23 run hung in send_email.py for 24+ hours, blocking
+# launchd from firing today's 06:00 cycle.
+timeout 180 "$PYTHON_BIN" send_email.py || echo "  ⚠ send_email.py timed out or failed (exit $?)"
 
 if [ "$DO_INGEST" -eq 1 ] && [ "$push_ok" -eq 1 ]; then
   echo

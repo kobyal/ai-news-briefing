@@ -36,8 +36,10 @@ async function safeFetch<T>(url: string): Promise<T | null> {
 export async function fetchDayData(date?: string): Promise<DayData | null> {
   const d = date || new Date().toISOString().split("T")[0];
   if (_dayDataCache[d]) return _dayDataCache[d];
-  // Try static S3 JSON first (fast path — no Lambda cold start)
-  let res = await safeFetch<{ date: string; stories: NewsItem[] }>(`${API}/data/${d}.json`);
+  // Try relative path first (works in local dev without CORS; same result on prod).
+  // Falls back to absolute API URL only if relative path returns nothing.
+  let res = await safeFetch<{ date: string; stories: NewsItem[] }>(`/data/${d}.json`);
+  if (!res && API) res = await safeFetch<{ date: string; stories: NewsItem[] }>(`${API}/data/${d}.json`);
   // Extract static JSON aggregates BEFORE res is overwritten by Lambda response.
   // Static JSON: briefing.{tldr,community_pulse,news_items,...} + top-level {twitter,youtube,github,...}
   // Lambda: per-story embedding of all aggregates. When Lambda returns null we
@@ -172,7 +174,8 @@ const _dayDataCache: Record<string, DayData> = {};
  *  `extras` array still work — they just won't match non-article queries. */
 export async function fetchSearchIndex(): Promise<SearchResult[]> {
   if (_searchIndexCache) return _searchIndexCache;
-  const res = await safeFetch<SearchIndexPayload>(`${API}/data/search-index.json`);
+  let res = await safeFetch<SearchIndexPayload>(`/data/search-index.json`);
+  if (!res && API) res = await safeFetch<SearchIndexPayload>(`${API}/data/search-index.json`);
   const stories = (res?.stories || []).map((s) => ({ type: "article" as SearchResultType, ...s }));
   const extras = res?.extras || [];
   _searchIndexCache = [...stories, ...extras];

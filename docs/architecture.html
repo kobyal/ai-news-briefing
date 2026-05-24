@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI News Briefing — Architecture</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --teal: #39d353;
+    --pink: #f778ba;
+    --yellow: #e3b341;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── Header ─────────────────────────────────────────── */
+  header {
+    text-align: center;
+    padding: 48px 24px 32px;
+    background: linear-gradient(180deg, #0d1117 0%, #161b22 100%);
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--muted); margin-top: 8px; font-size: .95rem; }
+  .badges { display: flex; gap: 8px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+  .badge {
+    padding: 4px 12px; border-radius: 20px; font-size: .78rem; font-weight: 600;
+    border: 1px solid;
+  }
+  .badge-blue  { background: #0d2543; border-color: #1f6feb; color: #58a6ff; }
+  .badge-green { background: #0a2911; border-color: #238636; color: #3fb950; }
+  .badge-purple{ background: #1e0a4d; border-color: #6e40c9; color: #bc8cff; }
+  .badge-orange{ background: #2d1900; border-color: #9e6a03; color: #e3b341; }
+
+  /* ─── Layout ──────────────────────────────────────────── */
+  .main { max-width: 1200px; margin: 0 auto; padding: 40px 24px 80px; }
+  .section-title {
+    font-size: 1.1rem; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 20px; margin-top: 48px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ─── Pipeline flow ───────────────────────────────────── */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: center;
+  }
+  .pipeline-stage {
+    width: 100%;
+    max-width: 960px;
+  }
+  .stage-label {
+    text-align: center;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .arrow-down {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+    color: var(--border);
+    font-size: 1.5rem;
+  }
+  .arrow-down svg { opacity: .6; }
+
+  /* ─── Agent grid ──────────────────────────────────────── */
+  .agent-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+  .agent-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 12px;
+    cursor: default;
+    transition: border-color .2s, transform .15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .agent-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .agent-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--card-color, var(--accent));
+    border-radius: 10px 10px 0 0;
+  }
+  .agent-icon { font-size: 1.4rem; margin-bottom: 6px; }
+  .agent-name { font-weight: 600; font-size: .88rem; }
+  .agent-sub  { color: var(--muted); font-size: .77rem; margin-top: 3px; }
+  .agent-cost {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: .72rem; font-weight: 600;
+    padding: 2px 7px; border-radius: 10px;
+  }
+  .cost-free  { background: #0a2911; color: #3fb950; }
+  .cost-paid  { background: #2d1900; color: #e3b341; }
+  .cost-cheap { background: #0d2543; color: #58a6ff; }
+
+  /* ─── Merger block ────────────────────────────────────── */
+  .merger-block {
+    background: linear-gradient(135deg, #1a1030 0%, #0d1f3c 100%);
+    border: 2px solid #6e40c9;
+    border-radius: 14px;
+    padding: 24px 28px;
+    text-align: center;
+    max-width: 960px;
+    width: 100%;
+    position: relative;
+  }
+  .merger-block .tag {
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    background: #6e40c9; color: white; padding: 2px 14px;
+    border-radius: 20px; font-size: .75rem; font-weight: 700; letter-spacing: .5px;
+    white-space: nowrap;
+  }
+  .merger-block h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 6px; }
+  .merger-block .model-badge {
+    display: inline-block;
+    background: #2d1068; border: 1px solid #6e40c9;
+    color: #bc8cff; padding: 3px 10px; border-radius: 20px;
+    font-size: .78rem; font-weight: 600; margin: 4px;
+  }
+  .merger-block p { color: var(--muted); font-size: .85rem; margin-top: 8px; }
+  .he-badges { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+  .he-badge {
+    background: #1a2b1a; border: 1px solid #238636;
+    color: #3fb950; padding: 4px 12px; border-radius: 8px;
+    font-size: .8rem; font-weight: 600;
+  }
+
+  /* ─── Publish block ───────────────────────────────────── */
+  .publish-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    max-width: 960px;
+    width: 100%;
+  }
+  .publish-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    transition: border-color .2s;
+  }
+  .publish-card:hover { border-color: var(--green); }
+  .publish-card .ico { font-size: 1.4rem; margin-bottom: 8px; }
+  .publish-card h4 { font-size: .9rem; font-weight: 700; }
+  .publish-card p  { font-size: .78rem; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .publish-card code {
+    background: var(--surface2); border-radius: 4px;
+    padding: 1px 5px; font-size: .72rem; color: var(--accent);
+  }
+
+  /* ─── Two columns section ─────────────────────────────── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 680px) { .two-col { grid-template-columns: 1fr; } }
+  .info-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .info-card h4 {
+    font-size: .9rem; font-weight: 700; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .info-card table { width: 100%; border-collapse: collapse; }
+  .info-card td, .info-card th {
+    padding: 6px 8px; font-size: .8rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  .info-card th { color: var(--muted); font-weight: 600; font-size: .73rem; text-transform: uppercase; }
+  .info-card tr:last-child td { border-bottom: none; }
+
+  /* ─── Mode switcher visual ────────────────────────────── */
+  .modes-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    max-width: 960px; width: 100%;
+  }
+  @media (max-width: 600px) { .modes-row { grid-template-columns: 1fr; } }
+  .mode-card {
+    border-radius: 12px; padding: 20px;
+    border: 2px solid;
+  }
+  .mode-api  { background: #0d1f2d; border-color: #1f6feb; }
+  .mode-sub  { background: #1a1030; border-color: #6e40c9; }
+  .mode-card h4 { font-weight: 700; font-size: 1rem; margin-bottom: 8px; }
+  .mode-api h4  { color: #58a6ff; }
+  .mode-sub h4  { color: #bc8cff; }
+  .mode-card .cost-big {
+    font-size: 1.5rem; font-weight: 800; margin: 8px 0 4px;
+  }
+  .mode-api .cost-big { color: #e3b341; }
+  .mode-sub .cost-big { color: #3fb950; }
+  .mode-card p { font-size: .82rem; color: var(--muted); line-height: 1.5; }
+  .mode-card .env-var {
+    display: inline-block;
+    margin-top: 10px;
+    background: var(--surface2); border-radius: 6px;
+    padding: 4px 10px; font-family: monospace; font-size: .78rem;
+    color: var(--teal); border: 1px solid var(--border);
+  }
+
+  /* ─── AWS topology ────────────────────────────────────── */
+  .aws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 10px; }
+  .aws-card {
+    background: var(--surface);
+    border: 1px solid #1f3a1f;
+    border-radius: 10px;
+    padding: 14px;
+    transition: border-color .2s;
+  }
+  .aws-card:hover { border-color: var(--orange); }
+  .aws-card .aws-icon { font-size: 1.5rem; margin-bottom: 6px; }
+  .aws-card h5 { font-size: .85rem; font-weight: 700; color: var(--orange); }
+  .aws-card p  { font-size: .77rem; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+
+  /* ─── Frontend routes ─────────────────────────────────── */
+  .routes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .route-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    transition: border-color .2s;
+  }
+  .route-card:hover { border-color: var(--pink); }
+  .route-card .route-path {
+    font-family: monospace; font-size: .88rem;
+    color: var(--pink); font-weight: 700;
+  }
+  .route-card p { font-size: .78rem; color: var(--muted); margin-top: 5px; line-height: 1.4; }
+
+  /* ─── Data flow JSON ──────────────────────────────────── */
+  .json-schema {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: .78rem;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  .json-key  { color: #79c0ff; }
+  .json-str  { color: #a5d6ff; }
+  .json-arr  { color: #e3b341; }
+  .json-obj  { color: #e3b341; }
+  .json-cmt  { color: #8b949e; font-style: italic; }
+
+  /* ─── Safeguards ──────────────────────────────────────── */
+  .safeguards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .safeguard-card {
+    background: var(--surface);
+    border-left: 3px solid var(--red);
+    border-radius: 0 10px 10px 0;
+    border-top: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 14px;
+  }
+  .safeguard-card h5 { font-size: .84rem; font-weight: 700; color: var(--red); margin-bottom: 4px; }
+  .safeguard-card p  { font-size: .77rem; color: var(--muted); line-height: 1.4; }
+
+  /* ─── Tooltip ─────────────────────────────────────────── */
+  [data-tip] { position: relative; }
+  [data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%);
+    background: #2d333b; border: 1px solid var(--border);
+    color: var(--text); font-size: .75rem;
+    padding: 6px 10px; border-radius: 6px;
+    white-space: nowrap; pointer-events: none;
+    z-index: 100;
+  }
+
+  /* ─── Footer ──────────────────────────────────────────── */
+  footer {
+    text-align: center;
+    padding: 32px;
+    color: var(--muted);
+    font-size: .8rem;
+    border-top: 1px solid var(--border);
+    margin-top: 60px;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  /* ─── Pulse animation ─────────────────────────────────── */
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(88, 166, 255, 0); }
+    50%       { box-shadow: 0 0 0 6px rgba(88, 166, 255, .12); }
+  }
+  .merger-block { animation: pulse-glow 3s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AI News Briefing — <span>Architecture</span></h1>
+  <p>Bilingual daily AI news pipeline · aibriefing.dev</p>
+  <div class="badges">
+    <span class="badge badge-blue">Claude Sonnet 4.6 (merger)</span>
+    <span class="badge badge-green">GitHub Pages + S3/CloudFront</span>
+    <span class="badge badge-purple">Claude Max subscription path</span>
+    <span class="badge badge-orange">~$0.16–$1.01 / run</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- ══════════════════════════════════════════════════════
+       PIPELINE FLOW
+  ══════════════════════════════════════════════════════ -->
+  <div class="section-title">Pipeline Overview</div>
+  <div class="pipeline">
+
+    <!-- STAGE 1: Collection -->
+    <div class="pipeline-stage">
+      <div class="stage-label">① Collection — parallel agents</div>
+      <div class="agent-grid">
+
+        <div class="agent-card" style="--card-color:#bc8cff" data-tip="Gemini 2.5 Flash grounding">
+          <div class="agent-icon">🔬</div>
+          <div class="agent-name">ADK / Gemini</div>
+          <div class="agent-sub">Vendor blog research via Gemini</div>
+          <span class="agent-cost cost-paid">~$0.04</span>
+        </div>
+
+        <div class="agent-card" style="--card-color:#58a6ff" data-tip="Sonar Pro web search">
+          <div class="agent-icon">🔭</div>
+          <div class="agent-name">Perplexity</div>
+          <div class="agent-sub">Sonar web synthesis</div>
+          <span class="agent-cost cost-paid">~$0.12</span>
+        </div>
+
+        <div class="agent-card" style="--card-color:#3fb950" data-tip="75+ RSS feeds + HN + Reddit via Arctic Shift">
+          <div class="agent-icon">📡</div>
+          <div class="agent-name">RSS Agent</div>
+          <div class="agent-sub">75+ feeds + HN + Reddit</div>
+          <span class="agent-cost cost-cheap">~$0.05</span>
+        </div>
+
+        <div class="agent-card" style="--card-color:#e3b341" data-tip="3-key cascade → DuckDuckGo fallback">
+          <div class="agent-icon">🔍</div>
+          <div class="agent-name">Tavily</div>
+          <div class="agent-sub">Vendor topic search</div>
+          <span class="agent-cost cost-cheap">~$0.04</span>
+        </div>
+
+        <div class="agent-card" style="--card-color:#f778ba" data-tip="Jina → Firecrawl → local cache">
+          <div class="agent-icon">📰</div>
+          <div class="agent-name">Article Reader</div>
+          <div class="agent-sub">Full-text extraction</div>
+          <span class="agent-cost cost-free">free</span>
+        </div>
+
+        <div class="agent-card" style="--card-color:#39d353" data-tip="Semantic search, 2-key cascade">
+          <div class="agent-icon">🧠</div>
+          <div class="agent-name">Exa</div>
+          <div class="agent-sub">Semantic research search</div>
+          <span class="agent-cost cost-free">free tier</span>
+        </div>
+
+        <div class="agent-card" style="--card-color:#d29922" data-tip="Mainstream wire services">
+          <div class="agent-icon">🗞️</div>
+          <div class="agent-name">NewsAPI</div>
+          <div class="agent-sub">Wire service news</div>
+          <span class="agent-cost cost-free">free tier</span>
+        </div>
+
+        <div class="agent-card" style="--card-color:#ff4444" data-tip="YouTube Data API, multi-key rotation">
+          <div class="agent-icon">▶️</div>
+          <div class="agent-name">YouTube</div>
+          <div class="agent-sub">Video discovery + metadata</div>
+          <span class="agent-cost cost-free">free quota</span>
+        </div>
+
+        <div class="agent-card" style="--card-color:#6e96ea" data-tip="GitHub REST, no auth needed">
+          <div class="agent-icon">⭐</div>
+          <div class="agent-name">GitHub Trending</div>
+          <div class="agent-sub">Trending repos + releases</div>
+          <span class="agent-cost cost-free">free</span>
+        </div>
+
+        <div class="agent-card" style="--card-color:#1d9bf0" data-tip="Direct GraphQL scrape, no API cost">
+          <div class="agent-icon">🐦</div>
+          <div class="agent-name">Twitter / X</div>
+          <div class="agent-sub">People highlights, trending</div>
+          <span class="agent-cost cost-free">free scrape</span>
+        </div>
+
+        <div class="agent-card" style="--card-color:#0077b5" data-tip="31 profiles via Apify HarvestAPI actor">
+          <div class="agent-icon">💼</div>
+          <div class="agent-name">LinkedIn</div>
+          <div class="agent-sub">31 tracked AI profiles</div>
+          <span class="agent-cost cost-paid">~$0.04</span>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="arrow-down">
+      <svg width="24" height="32" viewBox="0 0 24 32" fill="none">
+        <line x1="12" y1="0" x2="12" y2="24" stroke="#58a6ff" stroke-width="2" stroke-dasharray="4 3"/>
+        <polyline points="5,20 12,28 19,20" fill="none" stroke="#58a6ff" stroke-width="2"/>
+      </svg>
+    </div>
+
+    <!-- STAGE 2: Merger -->
+    <div class="pipeline-stage">
+      <div class="stage-label">② Synthesis — merger agent</div>
+      <div class="merger-block">
+        <span class="tag">Claude Anthropic</span>
+        <h3>Merger Agent</h3>
+        <div>
+          <span class="model-badge">claude-sonnet-4-6</span>
+          <span class="model-badge">claude-opus-4-7 (subscription)</span>
+        </div>
+        <p>Loads all per-agent JSON outputs · deduplicates · ranks · produces 1 merged briefing call + 3 parallel Hebrew translations</p>
+        <div class="he-badges">
+          <div class="he-badge">🇮🇱 TLDR → Hebrew</div>
+          <div class="he-badge">🇮🇱 Stories → Hebrew (×N parallel)</div>
+          <div class="he-badge">🇮🇱 Community → Hebrew</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-down">
+      <svg width="24" height="32" viewBox="0 0 24 32" fill="none">
+        <line x1="12" y1="0" x2="12" y2="24" stroke="#3fb950" stroke-width="2" stroke-dasharray="4 3"/>
+        <polyline points="5,20 12,28 19,20" fill="none" stroke="#3fb950" stroke-width="2"/>
+      </svg>
+    </div>
+
+    <!-- STAGE 3: Publish -->
+    <div class="pipeline-stage">
+      <div class="stage-label">③ Publish — data preparation</div>
+      <div class="publish-row">
+        <div class="publish-card">
+          <div class="ico">🔧</div>
+          <h4>publish_data.py</h4>
+          <p>Combines all agent outputs → <code>docs/data/DATE.json</code>. Adds Reddit, Twitter, YouTube, GitHub directly. Generates 4 MP3s per story (EN+HE × summary+detail).</p>
+        </div>
+        <div class="publish-card">
+          <div class="ico">🔎</div>
+          <h4>build_search_index.py</h4>
+          <p>Walks every <code>docs/data/*.json</code> → static <code>search-index.json</code> with 7 resource types. No Lambda needed for search.</p>
+        </div>
+        <div class="publish-card">
+          <div class="ico">🛠️</div>
+          <h4>fetch_hot_tools.py</h4>
+          <p>HF models, HF Spaces, Docker Hub, PyPI, npm → <code>hot_tools.json</code> with GitHub org avatars + Hebrew descriptions.</p>
+        </div>
+        <div class="publish-card">
+          <div class="ico">📧</div>
+          <h4>send_email.py</h4>
+          <p>Daily status email: per-agent token costs, fallback rotations, EN/HE parity audit, MTD dashboard. Sent via Gmail app password.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-down">
+      <svg width="24" height="32" viewBox="0 0 24 32" fill="none">
+        <line x1="12" y1="0" x2="12" y2="24" stroke="#e3b341" stroke-width="2" stroke-dasharray="4 3"/>
+        <polyline points="5,20 12,28 19,20" fill="none" stroke="#e3b341" stroke-width="2"/>
+      </svg>
+    </div>
+
+    <!-- STAGE 4: Deploy -->
+    <div class="pipeline-stage">
+      <div class="stage-label">④ Deploy — two destinations</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="publish-card" style="border-color: #238636;">
+          <div class="ico">📄</div>
+          <h4>GitHub Pages</h4>
+          <p><code>docs/index.html</code> · <code>docs/data/*.json</code><br>Free hosting, fork-friendly. Primary trigger for Lambda ingest.</p>
+        </div>
+        <div class="publish-card" style="border-color: #d29922;">
+          <div class="ico">☁️</div>
+          <h4>S3 + CloudFront</h4>
+          <p>Bucket <code>ai-news-briefing-web2</code> · CDN <code>E1TSW76SSEILK4</code><br>aibriefing.dev · OG image proxying · CF invalidation after each push.</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /pipeline -->
+
+
+  <!-- ══════════════════════════════════════════════════════
+       EXECUTION MODES
+  ══════════════════════════════════════════════════════ -->
+  <div class="section-title">Execution Modes</div>
+  <div class="modes-row">
+    <div class="mode-card mode-api">
+      <h4>🔑 Anthropic API (default)</h4>
+      <div class="cost-big">~$1.01 / run</div>
+      <p>~$30/month at 1× daily. Uses <code>ANTHROPIC_API_KEY</code> directly. Suitable for CI, forks, metered accounts.</p>
+      <span class="env-var">ANTHROPIC_API_KEY=sk-ant-...</span>
+    </div>
+    <div class="mode-card mode-sub">
+      <h4>💜 Claude Max Subscription</h4>
+      <div class="cost-big">~$0.16 / run</div>
+      <p>~$5/month residual cost (Sonar + Gemini only). All Anthropic calls routed via <code>claude -p</code> CLI OAuth keychain. Writes marker file → CI skips re-run within 5h.</p>
+      <span class="env-var">MERGER_VIA_CLAUDE_CODE=1</span>
+    </div>
+  </div>
+
+  <div style="margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; max-width: 960px; font-size: .82rem; color: var(--muted); line-height: 1.6;">
+    <strong style="color: var(--text);">local-cycle.sh</strong> (maintainer daily driver) — guards against:
+    <span style="color: var(--red); font-weight: 600;"> duplicate emails</span> (email_status.json check) ·
+    <span style="color: var(--red); font-weight: 600;"> wrong branch runs</span> (auto-switch to main) ·
+    <span style="color: var(--red); font-weight: 600;"> auth leakage</span> (strips CLAUDE_CODE_* env before <code>claude -p</code> subprocess)
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       AWS TOPOLOGY
+  ══════════════════════════════════════════════════════ -->
+  <div class="section-title">AWS Infrastructure (optional enrichment)</div>
+  <div class="aws-grid">
+    <div class="aws-card">
+      <div class="aws-icon">⚡</div>
+      <h5>Lambda: ai-news-ingest</h5>
+      <p>Reads <code>docs/data/DATE.json</code> from GH Pages → DynamoDB + CloudFront invalidation. Invoked after each push.</p>
+    </div>
+    <div class="aws-card">
+      <div class="aws-icon">🗄️</div>
+      <h5>DynamoDB</h5>
+      <p>Story archive indexed by date + story ID. Powers <code>/story/[id]</code> and archive routes.</p>
+    </div>
+    <div class="aws-card">
+      <div class="aws-icon">🌐</div>
+      <h5>Lambda: ai-news-api</h5>
+      <p>Serves <code>/api/stories</code>, <code>/api/archive</code>, <code>/api/story/:id</code> from DynamoDB.</p>
+    </div>
+    <div class="aws-card">
+      <div class="aws-icon">🪣</div>
+      <h5>S3 Bucket</h5>
+      <p><code>ai-news-briefing-web2</code> hosts Next.js static export. Always exclude <code>data/</code>, <code>audio/</code>, <code>img/</code> from sync to avoid clobber.</p>
+    </div>
+    <div class="aws-card">
+      <div class="aws-icon">📦</div>
+      <h5>CloudFront</h5>
+      <p><code>E1TSW76SSEILK4</code> · aibriefing.dev · CDN + OG image proxy. Invalidated after every publish.</p>
+    </div>
+    <div class="aws-card">
+      <div class="aws-icon">⏰</div>
+      <h5>EventBridge (OFF)</h5>
+      <p>Two rules exist but <em>disabled</em>. <code>local-cycle.sh</code> is the daily driver. Re-enable: <code>aws events enable-rule</code>.</p>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       FRONTEND ROUTES
+  ══════════════════════════════════════════════════════ -->
+  <div class="section-title">Frontend — Next.js Static Export</div>
+  <div class="routes-grid">
+    <div class="route-card">
+      <div class="route-path">/</div>
+      <p>Homepage: TLDR, KEY POINTS, 22 story cards, vendor filter, infinite scroll. Hebrew toggle.</p>
+    </div>
+    <div class="route-card">
+      <div class="route-path">/community/</div>
+      <p>Twitter + Reddit + Community Pulse. Vendor clustering, deep-link anchors.</p>
+    </div>
+    <div class="route-card">
+      <div class="route-path">/media/</div>
+      <p>Top Picks, Story Explainers, YouTube grid, Podcasts with cover art + latest episodes.</p>
+    </div>
+    <div class="route-card">
+      <div class="route-path">/tools/</div>
+      <p>Hot AI Tools: GitHub trending, HF models/spaces, Docker, PyPI, npm. Hebrew descriptions.</p>
+    </div>
+    <div class="route-card">
+      <div class="route-path">/search/</div>
+      <p>Site-wide static search. 7 type-filter chips. Deep-link routing. No Lambda needed.</p>
+    </div>
+    <div class="route-card">
+      <div class="route-path">/archive/</div>
+      <p>Day listing from DynamoDB or static index.</p>
+    </div>
+    <div class="route-card">
+      <div class="route-path">/story/[id]/</div>
+      <p>Story detail: community discussion, paired video, OG meta tags for WhatsApp/Slack previews.</p>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       DATA SHAPE
+  ══════════════════════════════════════════════════════ -->
+  <div class="section-title">Published JSON Shape</div>
+  <div class="json-schema">
+<span class="json-obj">{</span>
+  <span class="json-key">"date"</span>: <span class="json-str">"2026-05-23"</span>,
+  <span class="json-key">"briefing"</span>: <span class="json-obj">{</span>
+    <span class="json-key">"tldr"</span>: <span class="json-str">"..."</span>,          <span class="json-cmt">// one-line EN summary</span>
+    <span class="json-key">"tldr_he"</span>: <span class="json-str">"..."</span>,       <span class="json-cmt">// Hebrew (Claude Haiku)</span>
+    <span class="json-key">"stories"</span>: <span class="json-arr">[</span>
+      <span class="json-obj">{</span>
+        <span class="json-key">"id"</span>: <span class="json-str">"..."</span>,           <span class="json-cmt">// stable story ID</span>
+        <span class="json-key">"headline"</span>: <span class="json-str">"..."</span>,
+        <span class="json-key">"summary"</span>: <span class="json-str">"..."</span>,
+        <span class="json-key">"detail"</span>: <span class="json-str">"..."</span>,
+        <span class="json-key">"vendor"</span>: <span class="json-str">"OpenAI"</span>,
+        <span class="json-key">"urls"</span>: <span class="json-arr">[...]</span>,
+        <span class="json-key">"images"</span>: <span class="json-arr">[...]</span>,        <span class="json-cmt">// OG → vendor logo fallback chain</span>
+        <span class="json-key">"audio_en"</span>: <span class="json-obj">{ "summary": "..mp3", "detail": "..mp3" }</span>,
+        <span class="json-key">"audio_he"</span>: <span class="json-obj">{ "summary": "..mp3", "detail": "..mp3" }</span>
+      <span class="json-obj">}</span>
+    <span class="json-arr">]</span>,
+    <span class="json-key">"stories_he"</span>: <span class="json-arr">[...]</span>       <span class="json-cmt">// parallel Hebrew array, same structure</span>
+  <span class="json-obj">}</span>,
+  <span class="json-key">"social"</span>: <span class="json-obj">{</span>
+    <span class="json-key">"people_highlights"</span>: <span class="json-arr">[...]</span>,
+    <span class="json-key">"community_pulse"</span>: <span class="json-str">"..."</span>,
+    <span class="json-key">"top_reddit"</span>: <span class="json-arr">[...]</span>,        <span class="json-cmt">// score ≥ 20, Hebrew translated</span>
+    <span class="json-key">"linkedin_posts"</span>: <span class="json-arr">[...]</span>     <span class="json-cmt">// 31 tracked profiles via Apify</span>
+  <span class="json-obj">}</span>,
+  <span class="json-key">"youtube"</span>: <span class="json-arr">[{ "title", "url", "channel", "thumbnail" }]</span>,
+  <span class="json-key">"github"</span>: <span class="json-arr">[{ "repo", "url", "stars_today", "description" }]</span>
+<span class="json-obj">}</span>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       RESILIENCE + COST
+  ══════════════════════════════════════════════════════ -->
+  <div class="section-title">Providers &amp; Fallback Chains</div>
+  <div class="two-col">
+    <div class="info-card">
+      <h4>🔗 Key rotation chains</h4>
+      <table>
+        <tr><th>Provider</th><th>Fallback</th></tr>
+        <tr><td>Tavily</td><td>key1 → key2 → key3 → DuckDuckGo</td></tr>
+        <tr><td>Jina Reader</td><td>Firecrawl → local cache</td></tr>
+        <tr><td>Exa</td><td>2-key cascade → skip</td></tr>
+        <tr><td>NewsAPI</td><td>2-key cascade → skip</td></tr>
+        <tr><td>YouTube</td><td>multi-key on 403/429</td></tr>
+        <tr><td>Twitter scraper</td><td>xAI Grok ($0.35/run)</td></tr>
+        <tr><td>Reddit</td><td>Arctic Shift API (free)</td></tr>
+      </table>
+    </div>
+    <div class="info-card">
+      <h4>💰 Cost breakdown (API path)</h4>
+      <table>
+        <tr><th>Agent</th><th>Model</th><th>Cost</th></tr>
+        <tr><td>Merger</td><td>Sonnet 4.6</td><td style="color:var(--yellow)">$0.757</td></tr>
+        <tr><td>RSS</td><td>Haiku 4.5</td><td>$0.047</td></tr>
+        <tr><td>Tavily</td><td>Haiku 4.5</td><td>$0.043</td></tr>
+        <tr><td>Perplexity</td><td>Sonar</td><td>$0.122</td></tr>
+        <tr><td>ADK</td><td>Gemini Flash</td><td>$0.042</td></tr>
+        <tr><td>LinkedIn</td><td>Apify</td><td>$0.040</td></tr>
+        <tr><td style="font-weight:700">TOTAL API</td><td></td><td style="color:var(--orange);font-weight:700">~$1.01</td></tr>
+        <tr><td style="font-weight:700">TOTAL Sub</td><td></td><td style="color:var(--green);font-weight:700">~$0.16</td></tr>
+      </table>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       SAFEGUARDS
+  ══════════════════════════════════════════════════════ -->
+  <div class="section-title">Operational Safeguards</div>
+  <div class="safeguards-grid">
+    <div class="safeguard-card">
+      <h5>Three-Layer URL Defense</h5>
+      <p>Merger prompt forbids invented URLs → pipeline drops URLs not in source → publish_data.py keyword-matches page titles. Prevents cross-story URL misassignment.</p>
+    </div>
+    <div class="safeguard-card">
+      <h5>Branch Guard</h5>
+      <p>local-cycle.sh auto-switches to <code>main</code> if on a feature branch. Prevents Monday-data-loss incident (2026-05-18).</p>
+    </div>
+    <div class="safeguard-card">
+      <h5>Duplicate Email Guard</h5>
+      <p><code>email_status.json</code> records sent_at + recipient. If email already sent today, cycle.sh skips re-run entirely.</p>
+    </div>
+    <div class="safeguard-card">
+      <h5>5-Hour CI Skip Window</h5>
+      <p>Marker file <code>.via_subscription.done</code> signals GitHub Actions to short-circuit within 5h of local subscription run. No double-billing.</p>
+    </div>
+    <div class="safeguard-card">
+      <h5>EN/HE Parity Audit</h5>
+      <p>publish_data.py flags mismatched story counts between <code>briefing.stories</code> and <code>briefing_he</code>. Surfaced in daily email.</p>
+    </div>
+    <div class="safeguard-card">
+      <h5>Fallback Tracker</h5>
+      <p>Every API key rotation logged to <code>_fallbacks.jsonl</code>. Uploaded to S3. Surfaced in daily email so silent degradations never hide.</p>
+    </div>
+    <div class="safeguard-card">
+      <h5>Git Email Lock</h5>
+      <p>Global pre-commit hook rejects commits with bank email (<code>@bankleumi.co.il</code>). Always uses <code>kobyal@gmail.com</code>. Hard-wired to prevent SOC recurrence.</p>
+    </div>
+    <div class="safeguard-card">
+      <h5>QA Evaluator (nightly)</h5>
+      <p>LangGraph 6-node check: data integrity, URL health, images, sections, content quality, live Playwright probes with functional tests.</p>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<footer>
+  <p>AI News Briefing · <a href="https://aibriefing.dev" target="_blank">aibriefing.dev</a> · built with Claude Sonnet 4.6</p>
+</footer>
+
+</body>
+</html>

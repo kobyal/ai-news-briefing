@@ -429,7 +429,7 @@ function FeaturedCard({ story }: { story: NewsItem }) {
             color: "#0f0f1a",
             lineHeight: "1.06",
             letterSpacing: "-0.04em",
-            unicodeBidi: "plaintext",
+            ...(isHe ? { direction: "rtl" as const } : { unicodeBidi: "plaintext" as const }),
           }}
         >
           {headline}
@@ -625,7 +625,7 @@ function SecondaryCard({ story }: { story: NewsItem }) {
             color: "#0f0f1a",
             lineHeight: "1.22",
             letterSpacing: "-0.018em",
-            unicodeBidi: "plaintext",
+            ...(isHe ? { direction: "rtl" as const } : { unicodeBidi: "plaintext" as const }),
           }}
         >
           {headline}
@@ -832,7 +832,7 @@ function RegularCard({ story, rank }: { story: NewsItem; rank?: number }) {
             WebkitLineClamp: 3,
             overflow: "hidden",
             cursor: "pointer",
-            unicodeBidi: "plaintext",
+            ...(isHe ? { direction: "rtl" as const } : { unicodeBidi: "plaintext" as const }),
           }}
           onClick={() => window.location.href = `/story/${story.story_id}/`}
         >
@@ -1014,7 +1014,7 @@ function SidebarCard({ story }: { story: NewsItem }) {
             WebkitBoxOrient: "vertical" as const,
             WebkitLineClamp: 2,
             overflow: "hidden",
-            unicodeBidi: "plaintext",
+            ...(isHe ? { direction: "rtl" as const } : { unicodeBidi: "plaintext" as const }),
           }}
         >
           {headline}

@@ -139,7 +139,7 @@ export default function StoryPage({ id }: { id: string }) {
         </div>
 
         {/* Headline */}
-        <h1 className="mb-4" style={{ fontFamily: "var(--font-display)", fontSize: "26px", fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.3 }}>
+        <h1 className="mb-4" style={{ fontFamily: "var(--font-display)", fontSize: "26px", fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.3, ...(isHe ? { direction: "rtl" as const } : { unicodeBidi: "plaintext" as const }) }}>
           {headline}
         </h1>
 

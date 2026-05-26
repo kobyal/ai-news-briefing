@@ -111,6 +111,7 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
     twitter: (staticTwitter !== undefined ? staticTwitter : s0r.twitter) as DayData["twitter"] || [],
     twitter_descs_he: (sbhe.twitter_descs_he as DayData["twitter_descs_he"]) || (s0r.twitter_descs_he as DayData["twitter_descs_he"]),
     youtube_descs_he: (sbhe.youtube_descs_he as DayData["youtube_descs_he"]) || (s0r.youtube_descs_he as DayData["youtube_descs_he"]),
+    youtube_headlines_he: (sbhe.youtube_headlines_he as DayData["youtube_headlines_he"]) || (s0r.youtube_headlines_he as DayData["youtube_headlines_he"]),
     linkedin_posts: ((sd.linkedin_posts || s0r.linkedin_posts) as DayData["linkedin_posts"]) || [],
   };
   _dayDataCache[d] = result;

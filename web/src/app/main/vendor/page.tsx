@@ -226,14 +226,24 @@ function VendorContent() {
                 {articles.length} {isHe ? "כתבות" : "articles"}
               </span>
             )}
-            {commCounts && (commCounts.pulse + commCounts.tweets + commCounts.reddit) > 0 && (
-              <span style={{
-                fontSize: 11, fontWeight: 700, color: vendorInfo.color,
-                background: "#fff", border: `1px solid ${vendorInfo.color}35`,
-                padding: "4px 11px", borderRadius: 100,
-                boxShadow: `0 1px 4px ${vendorInfo.color}15`,
-              }}>
-                {commCounts.pulse + commCounts.tweets + commCounts.reddit} {isHe ? "פוסטים" : "posts"}
+            {commCounts && commCounts.pulse > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 700, color: vendorInfo.color, background: "#fff", border: `1px solid ${vendorInfo.color}35`, padding: "4px 11px", borderRadius: 100, boxShadow: `0 1px 4px ${vendorInfo.color}15` }}>
+                {commCounts.pulse} Pulse
+              </span>
+            )}
+            {commCounts && commCounts.tweets > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 700, color: vendorInfo.color, background: "#fff", border: `1px solid ${vendorInfo.color}35`, padding: "4px 11px", borderRadius: 100, boxShadow: `0 1px 4px ${vendorInfo.color}15` }}>
+                {commCounts.tweets} 𝕏
+              </span>
+            )}
+            {commCounts && commCounts.reddit > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 700, color: vendorInfo.color, background: "#fff", border: `1px solid ${vendorInfo.color}35`, padding: "4px 11px", borderRadius: 100, boxShadow: `0 1px 4px ${vendorInfo.color}15` }}>
+                {commCounts.reddit} Reddit
+              </span>
+            )}
+            {commCounts && commCounts.linkedin > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 700, color: vendorInfo.color, background: "#fff", border: `1px solid ${vendorInfo.color}35`, padding: "4px 11px", borderRadius: 100, boxShadow: `0 1px 4px ${vendorInfo.color}15` }}>
+                {commCounts.linkedin} LinkedIn
               </span>
             )}
             {commCounts && commCounts.videos > 0 && (
@@ -246,7 +256,11 @@ function VendorContent() {
                 {commCounts.videos} {isHe ? "סרטונים" : "videos"}
               </span>
             )}
-            <span style={{ fontSize: 11, color: "#9ca3af", marginInlineStart: 4 }}>{dateLabel}</span>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <span style={{ fontSize: 11, color: "#9ca3af" }}>
+              {dateLabel} &nbsp;·&nbsp; {Math.round((new Date(`${today}T00:00:00Z`).getTime() - new Date(`${cutoff}T00:00:00Z`).getTime()) / 86400000) + 1} {isHe ? "ימים" : "days"}
+            </span>
           </div>
         </div>
       </div>
@@ -300,7 +314,7 @@ function VendorContent() {
           return (
             <div style={{ marginBottom: 36 }}>
               <p style={{ margin: "0 0 12px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase" as const, color: "#111827" }}>
-                {isHe ? "כותרות אחרונות" : "Recent Headlines"}
+                {isHe ? "עיקרי העריכה" : "Editorial Highlights"}
               </p>
               <div style={{ background: "#fff", border: `1px solid ${vendorInfo.color}20`, borderRadius: 12, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10, boxShadow: `0 2px 12px ${vendorInfo.color}10` }}>
                 {bullets.slice(0, 12).map((note, i) => (

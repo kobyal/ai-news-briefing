@@ -48,7 +48,7 @@ function CollapsibleSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mt-6">
+    <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #ededf5" }}>
       <button
         onClick={() => onToggle(id)}
         className="flex items-center gap-2 w-full text-start"
@@ -165,14 +165,16 @@ export function VendorResources({ vendor, data, isHe, allDays: allDaysProp, onCo
       }
     }
 
-    for (const vid of ((d.youtube || []) as AnyRec[])) {
+    const ytHeadlinesHe: string[] = (d.youtube_headlines_he as string[] | undefined) || [];
+    ;(d.youtube || [] as AnyRec[]).forEach((vid: AnyRec, vi: number) => {
       const url = String(vid.url || (Array.isArray(vid.urls) && vid.urls[0]) || "");
-      if (seen.has(url)) continue;
-      const title = String(vid.title || vid.headline || "").toLowerCase();
-      if (aliases.some(a => title.includes(a.toLowerCase()))) {
-        seen.add(url); videos.push({ ...vid, _date: d.date });
+      if (seen.has(url)) return;
+      const titleLower = String(vid.title || vid.headline || "").toLowerCase();
+      if (aliases.some(a => titleLower.includes(a.toLowerCase()))) {
+        seen.add(url);
+        videos.push({ ...vid, _date: d.date, _headline_he: ytHeadlinesHe[vi] || "" });
       }
-    }
+    });
   }
 
   const total = pulseItems.length + xPosts.length + redditPosts.length + linkedinPosts.length + videos.length;
@@ -329,7 +331,9 @@ export function VendorResources({ vendor, data, isHe, allDays: allDaysProp, onCo
           count={videos.length} collapsed={collapsed.has("videos")} onToggle={toggleSection}
         >
           {videos.map((vid, i) => {
-            const title = String(vid.title || vid.headline || "");
+            const decodeHtml = (s: string) => s.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+            const enTitle = decodeHtml(String(vid.title || vid.headline || ""));
+            const title = (isHe && vid._headline_he) ? String(vid._headline_he) : enTitle;
             const url = String(vid.url || (Array.isArray(vid.urls) && vid.urls[0]) || "#");
             const channel = (() => {
               if (vid.channel) return String(vid.channel);

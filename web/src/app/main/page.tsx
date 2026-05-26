@@ -81,6 +81,14 @@ interface FeaturedStory {
   date?: string;
 }
 
+interface ThemeRef {
+  type: string;
+  label: string;
+  url: string;
+  story_id?: string;
+  vendor?: string;
+}
+
 interface Editorial {
   date: string;
   days_analyzed: number;
@@ -90,6 +98,7 @@ interface Editorial {
   featured_stories: FeaturedStory[];
   community_spotlight: CommunityItem[];
   editor_picks: EditorPick[];
+  theme_refs?: ThemeRef[];
 }
 
 // ── constants ─────────────────────────────────────────────────────────────────
@@ -229,43 +238,63 @@ function VendorCard({
         (e.currentTarget as HTMLElement).style.borderColor = "#e8e8f0";
       }}
     >
-      {/* Colored top accent strip */}
-      <div style={{ height: 3, background: `linear-gradient(90deg, ${accent}, ${accent}88)` }} />
-
-      {/* Header row */}
+      {/* Header — gradient bg, large logo, decorative orb */}
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "14px 18px 10px", background: `${accent}08`,
-        borderBottom: `1px solid ${accent}18`,
+        position: "relative", overflow: "hidden",
+        padding: "16px 18px 14px",
+        background: `linear-gradient(135deg, ${accent}22 0%, ${accent}08 60%, transparent 100%)`,
+        borderBottom: `1px solid ${accent}22`,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {logoUrl
-            ? <img src={logoUrl} alt="" width={26} height={26}
-                style={{ borderRadius: 7, flexShrink: 0, boxShadow: `0 0 0 2px ${accent}30` }}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-            : <div style={{ width: 26, height: 26, borderRadius: 7, background: `${accent}20`, flexShrink: 0 }} />
-          }
-          <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase" as const, letterSpacing: ".08em", color: accent }}>
-            {vendor}
-          </span>
+        {/* decorative background orb */}
+        <div style={{
+          position: "absolute", insetInlineEnd: -24, top: -24,
+          width: 90, height: 90, borderRadius: "50%",
+          background: `radial-gradient(circle, ${accent}28 0%, transparent 70%)`,
+          pointerEvents: "none",
+        }} />
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {logoUrl
+              ? <img src={logoUrl} alt="" width={40} height={40}
+                  style={{ borderRadius: 11, flexShrink: 0,
+                    boxShadow: `0 2px 8px ${accent}44, 0 0 0 2px #fff` }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              : <div style={{
+                  width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+                  background: `linear-gradient(135deg, ${accent}55, ${accent}22)`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 18, fontWeight: 900, color: accent,
+                }}>{vendor[0]}</div>
+            }
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 900, textTransform: "uppercase" as const,
+                letterSpacing: ".08em", color: accent }}>{vendor}</div>
+              <div style={{ fontSize: 10, color: `${accent}bb`, fontWeight: 600, marginTop: 1 }}>
+                {stories.length} {isHe ? "עדכונים השבוע" : "updates this week"}
+              </div>
+            </div>
+          </div>
+          <div style={{
+            width: 28, height: 28, borderRadius: "50%",
+            background: accent, display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 13, color: "#fff", fontWeight: 800, flexShrink: 0,
+            boxShadow: `0 2px 8px ${accent}55`,
+          }}>↗</div>
         </div>
-        <span style={{
-          fontSize: 10, fontWeight: 700, color: accent,
-          background: `${accent}15`, padding: "2px 8px", borderRadius: 100,
-        }}>
-          {stories.length} {isHe ? "עדכונים" : "updates"} ↗
-        </span>
       </div>
 
       {/* Bullets */}
-      <div style={{ padding: "12px 18px 14px", display: "flex", flexDirection: "column", gap: 7 }}>
+      <div style={{ padding: "12px 18px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
         {stories.map((s, i) => {
           const note = isHe ? (s.editorial_note_he || s.editorial_note) : s.editorial_note;
           return (
-            <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+            <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
               <span style={{
-                width: 5, height: 5, borderRadius: "50%", background: accent,
+                width: 6, height: 6, borderRadius: "50%",
+                background: `linear-gradient(135deg, ${accent}, ${accent}88)`,
                 flexShrink: 0, marginTop: 7,
+                boxShadow: `0 0 0 2px ${accent}20`,
               }} />
               <span style={{ color: "#374151", fontSize: 13, lineHeight: 1.55, fontWeight: 450 }}>{note}</span>
             </div>
@@ -324,44 +353,128 @@ function LensCard({ lens, isHe }: { lens: Lens; isHe: boolean }) {
 
 // ── Community item ────────────────────────────────────────────────────────────
 
-function CommunityCard({ item, isHe, today }: { item: CommunityItem; isHe: boolean; today: string }) {
-  const heatColor = HEAT_COLOR[item.heat] || "#6b7280";
-  const href = item.source_url
-    ? (() => {
-        const u = item.source_url;
-        if ((u.includes("x.com/") || u.includes("twitter.com/")) && u.includes("/status/"))
-          return inSiteHref("tweet", u, item.date || today, today);
-        if (u.includes("reddit.com/"))
-          return inSiteHref("reddit", u, item.date || today, today);
-        return inSiteHref("pulse", u, item.date || today, today);
-      })()
-    : "/community/";
+type SocialType = "pulse" | "x" | "reddit" | "linkedin";
+
+interface SocialItem {
+  type: SocialType;
+  headline: string;
+  headline_he?: string;
+  body?: string;
+  body_he?: string;
+  source_label: string;
+  source_url: string;
+  heat?: string;
+  date?: string;
+  og_image?: string;
+  _pri?: number; // lower = shown first; used to sort before capping at MAX_SOCIAL
+}
+
+const SOURCE_META: Record<SocialType, { color: string; bg: string; badge: string }> = {
+  pulse:    { color: "#6366f1", bg: "#eef2ff", badge: "💬 Pulse" },
+  x:        { color: "#000000", bg: "#f3f4f6", badge: "𝕏" },
+  reddit:   { color: "#ff4500", bg: "#fff4f0", badge: "r/" },
+  linkedin: { color: "#0077b5", bg: "#e8f4fd", badge: "in" },
+};
+
+const HEAT_META: Record<string, { emoji: string; color: string }> = {
+  hot:    { emoji: "🔥", color: "#dc2626" },
+  warm:   { emoji: "🟡", color: "#d97706" },
+  viral:  { emoji: "⚡", color: "#7c3aed" },
+  mild:   { emoji: "💬", color: "#64748b" },
+};
+
+function SocialCard({ item, isHe, today }: { item: SocialItem; isHe: boolean; today: string }) {
+  const [bodyExpanded, setBodyExpanded] = useState(false);
+  const meta = SOURCE_META[item.type];
+  const heat = item.heat ? (HEAT_META[item.heat] || HEAT_META.mild) : null;
+  const headline = isHe && item.headline_he ? item.headline_he : item.headline;
+  const body     = isHe && item.body_he ? item.body_he : item.body;
+
+  const href = (() => {
+    const u = item.source_url;
+    if (!u) return "/community/";
+    if (item.type === "x" || u.includes("x.com/") || u.includes("twitter.com/"))
+      return inSiteHref("tweet", u, item.date || today, today);
+    if (item.type === "reddit" || u.includes("reddit.com/"))
+      return inSiteHref("reddit", u, item.date || today, today);
+    if (item.type === "linkedin") return u;
+    return inSiteHref("pulse", u, item.date || today, today);
+  })();
+
+  const SOURCE_ICON: Record<SocialType, string> = {
+    pulse: "💬", x: "𝕏", reddit: "🔴", linkedin: "💼",
+  };
 
   return (
-    <a href={href} style={{ textDecoration: "none", display: "block" }}>
-      <div
-        style={{ borderLeft: `3px solid ${heatColor}`, paddingLeft: 14, paddingTop: 4, paddingBottom: 4 }}
-        dir={isHe ? "rtl" : "ltr"}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-          {item.heat && (
-            <span style={{
-              fontSize: 10, fontWeight: 800, textTransform: "uppercase" as const,
-              letterSpacing: ".08em", color: heatColor,
-            }}>🔥 {item.heat}</span>
-          )}
-          <span style={{ fontSize: 11, color: "#9ca3af" }}>{item.source_label}</span>
+    <a href={href} target="_blank" rel="noopener noreferrer"
+       style={{ textDecoration: "none", display: "flex", flexDirection: "column", borderRadius: 14,
+         overflow: "hidden", background: "#ffffff", border: "1px solid #e8e8f0",
+         boxShadow: "0 1px 4px rgba(0,0,0,0.05)", transition: "box-shadow .18s, transform .18s, border-color .18s" }}
+       onMouseEnter={(e) => {
+         (e.currentTarget as HTMLElement).style.boxShadow = `0 6px 20px ${meta.color}22`;
+         (e.currentTarget as HTMLElement).style.borderColor = `${meta.color}50`;
+         (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+       }}
+       onMouseLeave={(e) => {
+         (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 4px rgba(0,0,0,0.05)";
+         (e.currentTarget as HTMLElement).style.borderColor = "#e8e8f0";
+         (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+       }}>
+      {/* Visual header — image if available, else styled color banner */}
+      {item.og_image ? (
+        <div style={{ position: "relative", height: 130, overflow: "hidden" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={item.og_image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to bottom, transparent 40%, ${meta.color}99)` }} />
+          <div style={{ position: "absolute", bottom: 8, insetInlineStart: 10, display: "flex", gap: 5, alignItems: "center" }}>
+            <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 100,
+              color: "#fff", background: `${meta.color}cc`, letterSpacing: ".04em" }}>{meta.badge}</span>
+            {heat && <span style={{ fontSize: 12 }}>{heat.emoji}</span>}
+          </div>
         </div>
-        <p style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#0f172a", lineHeight: 1.4 }}>
-          {item.headline.length > 160 ? item.headline.slice(0, 160) + "…" : item.headline}
-        </p>
-        {item.body && (
-          <p style={{ margin: "0 0 6px", fontSize: 12, color: "#6b7280", lineHeight: 1.55 }}>
-            {item.body.length > 140 ? item.body.slice(0, 140) + "…" : item.body}
-          </p>
+      ) : (
+        <div style={{ height: 44, background: `linear-gradient(135deg, ${meta.color}15, ${meta.color}05)`,
+          borderBottom: `1px solid ${meta.color}18`, display: "flex", alignItems: "center", padding: "0 14px", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>{SOURCE_ICON[item.type]}</span>
+          <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 100,
+            color: meta.color, background: meta.bg, letterSpacing: ".04em" }}>{meta.badge}</span>
+          {heat && <span style={{ fontSize: 12, marginInlineStart: 2 }}>{heat.emoji}</span>}
+          <span style={{ fontSize: 11, color: "#9ca3af", flex: 1, overflow: "hidden",
+            textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.source_label}</span>
+        </div>
+      )}
+
+      <div style={{ padding: "12px 16px", flex: 1, display: "flex", flexDirection: "column" }} dir={isHe ? "rtl" : "ltr"}>
+        {/* source row — only shown when image covers badge */}
+        {item.og_image && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            <span style={{ fontSize: 11, color: "#9ca3af" }}>{item.source_label}</span>
+          </div>
         )}
-        <span style={{ fontSize: 11, fontWeight: 600, color: heatColor }}>
-          {isHe ? "לדיון בקהילה ←" : "See in community →"}
+        {/* headline */}
+        <p style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 700, color: "#0f0f1a", lineHeight: 1.45,
+          display: "-webkit-box", WebkitBoxOrient: "vertical" as const, WebkitLineClamp: 3, overflow: "hidden" }}>
+          {headline}
+        </p>
+        {/* body preview with inline expand */}
+        {body && (
+          <>
+            <p style={{ margin: "0 0 4px", fontSize: 12, color: "#6b7280", lineHeight: 1.55,
+              ...(bodyExpanded ? {} : { display: "-webkit-box", WebkitBoxOrient: "vertical" as const, WebkitLineClamp: 2, overflow: "hidden" }) }}>
+              {body}
+            </p>
+            {body.length > 120 && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBodyExpanded(!bodyExpanded); }}
+                style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, marginBottom: 4,
+                  fontSize: 11, fontWeight: 600, color: meta.color, cursor: "pointer", opacity: 0.8 }}>
+                {bodyExpanded ? (isHe ? "↑ פחות" : "↑ less") : (isHe ? "↓ קרא עוד" : "↓ more")}
+              </button>
+            )}
+          </>
+        )}
+        <span style={{ marginTop: "auto", paddingTop: 6, fontSize: 11, fontWeight: 600, color: meta.color }}>
+          {isHe ? "← לדיון" : "→ discuss"}
         </span>
       </div>
     </a>
@@ -585,29 +698,98 @@ export default function MainPage() {
     <>
       <Header date={editorial.date} archive={[]} />
 
-      {/* Page header */}
-      <div style={{ borderBottom: "2px solid #0f172a", marginBottom: 36 }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 24px 20px" }} dir={isHe ? "rtl" : "ltr"}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+      {/* ── EDITORIAL THEME HERO ─────────────────────────────────────────────── */}
+      <div style={{
+        background: "linear-gradient(135deg, #f0f0ff 0%, #f8f6ff 50%, #f4f4f8 100%)",
+        borderBottom: "1px solid #e0e0ec",
+        marginBottom: 0,
+      }}>
+        <div style={{ maxWidth: 860, margin: "0 auto", padding: "36px 24px 40px" }} dir={isHe ? "rtl" : "ltr"}>
+          {/* Eyebrow */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
             <span style={{
-              fontSize: 10, fontWeight: 800, letterSpacing: ".16em",
+              fontSize: 10, fontWeight: 800, letterSpacing: ".18em",
               textTransform: "uppercase" as const, color: "#6366f1",
             }}>
-              {isHe ? "סינתזה שבועית" : "Weekly Synthesis"}
+              {isHe ? "נושא השבוע" : "Theme of the Week"}
             </span>
             <span style={{ fontSize: 11, color: "#9ca3af" }}>
-              {editorial.date} · {t.days_analyzed}{isHe ? " ימים" : "d"} · {t.story_count} {isHe ? "כתבות" : "stories"}
+              {editorial.date} · {t.days_analyzed}{isHe ? " ימים" : " days"} · {t.story_count} {isHe ? "כתבות" : "stories"}
             </span>
           </div>
+          {/* Headline */}
+          <h1 style={{
+            margin: "0 0 8px", fontSize: "clamp(26px, 4vw, 40px)",
+            fontWeight: 900, color: "#0f0f1a", letterSpacing: "-.03em", lineHeight: 1.15,
+          }}>
+            {isHe ? (t.headline_he || t.headline) : t.headline}
+          </h1>
+          {/* Subheadline */}
+          {(isHe ? t.subheadline_he : t.subheadline) && (
+            <p style={{ margin: "0 0 22px", fontSize: 17, color: "#6366f1", fontStyle: "italic", fontWeight: 500, lineHeight: 1.4 }}>
+              {isHe ? (t.subheadline_he || t.subheadline) : t.subheadline}
+            </p>
+          )}
+          {/* Body */}
+          {(isHe ? t.body_he : t.body) && (
+            <div style={{ marginBottom: 22 }}>
+              {(isHe ? (t.body_he || t.body) : t.body).split("\n\n").map((para, i) => (
+                <p key={i} style={{ margin: "0 0 14px", fontSize: 15, color: "#374151", lineHeight: 1.75 }}>{para}</p>
+              ))}
+            </div>
+          )}
+          {/* Pull quote */}
+          {(isHe ? t.pull_quote_he : t.pull_quote) && (
+            <blockquote style={{
+              margin: "0 0 22px 0",
+              borderInlineStart: "3px solid #6366f1",
+              paddingInlineStart: 16,
+              fontStyle: "italic",
+              fontSize: 15, color: "#312e81", lineHeight: 1.65,
+            }}>
+              {isHe ? (t.pull_quote_he || t.pull_quote) : t.pull_quote}
+            </blockquote>
+          )}
+          {/* Theme refs */}
+          {(editorial.theme_refs?.length ?? 0) > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {(editorial.theme_refs || []).slice(0, 8).map((ref, i) => (
+                <a key={i} href={ref.url} target={ref.url.startsWith("http") ? "_blank" : undefined}
+                  rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 3,
+                    fontSize: 10, fontWeight: 600, color: "#4338ca",
+                    background: "#eef2ff", border: "1px solid #c7d2fe",
+                    padding: "3px 9px", borderRadius: 100,
+                  }}>
+                    {ref.type === "community" ? "💬" : "📰"} {(ref.label || "").length > 35 ? (ref.label || "").slice(0, 35) + "…" : (ref.label || "")}
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Single-column content */}
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px 80px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "44px 24px 80px" }}>
 
-        {/* 1. Vendor breakdown — first */}
+        {/* 1. Editorial Lenses — first, immediately after theme */}
+        {lenses.length > 0 && (
+          <section style={{ marginBottom: 44 }}>
+            <SectionTitle label={isHe ? "ניתוחים מעמיקים" : "Editorial Lenses"} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {lenses.map(lens => (
+                <LensCard key={lens.id} lens={lens} isHe={isHe} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* 2. Vendor breakdown */}
         {vendorOrder.length > 0 && (
           <section style={{ marginBottom: 44 }}>
+            <SectionTitle label={isHe ? "כיסוי לפי ספק" : "Coverage by Vendor"} />
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {vendorOrder.map((vendor, i) => (
                 <VendorCard
@@ -622,41 +804,95 @@ export default function MainPage() {
           </section>
         )}
 
-        {/* 2. Editorial Lenses */}
-        {lenses.length > 0 && (
-          <section style={{ marginBottom: 44 }}>
-            <SectionTitle label={isHe ? "ניתוחים מעמיקים" : "Editorial Lenses"} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {lenses.map(lens => (
-                <LensCard key={lens.id} lens={lens} isHe={isHe} />
-              ))}
-            </div>
-          </section>
-        )}
+        {/* 3. Community — unified feed from all sources */}
+        {(() => {
+          const seen = new Set<string>();
+          const feed: SocialItem[] = [];
+          const MAX_SOCIAL = 6;
+          const heatPri = (h?: string) => h === "hot" || h === "viral" ? 1 : h === "warm" ? 2 : 3;
 
-        {/* 3. Community */}
-        {community.length > 0 && (
-          <section style={{ marginBottom: 44 }}>
-            <SectionTitle label={isHe ? "מה רוחש ברשת" : "Community Heat"} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }} dir={isHe ? "rtl" : "ltr"}>
-              {community.map((item, i) => (
-                <CommunityCard key={i} item={item} isHe={isHe} today={today} />
-              ))}
-            </div>
-          </section>
-        )}
+          // Build Hebrew lookup from allDays pulse items (url → he translations)
+          const pulseHeByUrl = new Map<string, { headline_he?: string; body_he?: string }>();
+          for (const d of allDays) {
+            (d.community_pulse_items || []).forEach((p, i) => {
+              const u = p.source_url || "";
+              if (u) {
+                const he = (d.community_pulse_items_he || [])[i] as { headline_he?: string; body_he?: string } | undefined;
+                if (he && !pulseHeByUrl.has(u)) pulseHeByUrl.set(u, he);
+              }
+            });
+          }
 
-        {/* 4. Tools / editor picks */}
-        {picks.length > 0 && (
-          <section>
-            <SectionTitle label={isHe ? "חדש בסטאק" : "New in Stack"} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              {picks.map((pick, i) => (
-                <ToolCard key={i} pick={pick} isHe={isHe} today={today} />
-              ))}
-            </div>
-          </section>
-        )}
+          // Editorial spotlight first (curated, highest signal) — priority 0
+          for (const item of community) {
+            const u = item.source_url || "";
+            const key = u || item.headline;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const type: SocialType =
+              u.includes("x.com/") || u.includes("twitter.com/") ? "x" :
+              u.includes("reddit.com/") ? "reddit" : "pulse";
+            const heItem = pulseHeByUrl.get(u);
+            feed.push({ type, headline: item.headline, headline_he: heItem?.headline_he, body: item.body, body_he: heItem?.body_he, source_label: item.source_label, source_url: u, heat: item.heat, date: item.date, og_image: item.og_image || undefined, _pri: 0 });
+          }
+
+          // Pulse from allDays — prioritised by heat
+          for (const d of allDays) {
+            (d.community_pulse_items || []).forEach((p, i) => {
+              const u = p.source_url || "";
+              const key = u || p.headline;
+              if (seen.has(key)) return;
+              seen.add(key);
+              const heItem = (d.community_pulse_items_he || [])[i] as { headline_he?: string; body_he?: string } | undefined;
+              const type: SocialType = u.includes("x.com/") || u.includes("twitter.com/") ? "x" : u.includes("reddit.com/") ? "reddit" : "pulse";
+              const heat = p.heat || "mild";
+              feed.push({ type, headline: p.headline, headline_he: heItem?.headline_he, body: p.body, body_he: heItem?.body_he, source_label: p.source_label, source_url: u, heat, date: d.date, og_image: p.og_image || undefined, _pri: heatPri(heat) });
+            });
+
+            // X posts — only those with explicit heat
+            const tweets: Array<Record<string, unknown>> = [
+              ...(Array.isArray(d.twitter) ? d.twitter : []),
+              ...((d.twitter as Record<string, unknown>)?.trending as Array<Record<string, unknown>> || []),
+              ...((d.twitter as Record<string, unknown>)?.people as Array<Record<string, unknown>> || []),
+            ];
+            for (const t of tweets) {
+              const u = String(t.url || "");
+              if (!u.includes("x.com") || seen.has(u)) continue;
+              seen.add(u);
+              const handle = String(t.handle || "");
+              const name = String(t.name || t.author || "");
+              const heat = String(t.heat || "");
+              feed.push({ type: "x", headline: String(t.post || t.text || "").slice(0, 240), headline_he: t.post_he ? String(t.post_he).slice(0, 240) : undefined, source_label: handle ? `@${handle.replace("@", "")}` : name, source_url: u, heat, date: d.date, _pri: heatPri(heat) });
+            }
+
+            // Reddit — top scoring only
+            const sortedReddit = [...(d.top_reddit || [])].sort((a, b) => (b.score || 0) - (a.score || 0));
+            for (const r of sortedReddit) {
+              const u = r.url || "";
+              if (seen.has(u)) continue;
+              seen.add(u);
+              const score = r.score ? `${r.score} pts` : "";
+              feed.push({ type: "reddit", headline: r.title || "", headline_he: r.title_he, source_label: `r/${r.subreddit || ""}${score ? " · " + score : ""}`, source_url: u, date: d.date, _pri: (r.score || 0) > 1000 ? 1 : 2 });
+            }
+          }
+
+          // Sort by priority, keep top MAX_SOCIAL
+          const sorted = feed.sort((a, b) => (a._pri ?? 9) - (b._pri ?? 9));
+          const visible = sorted.slice(0, MAX_SOCIAL);
+
+          if (sorted.length === 0) return null;
+          return (
+            <section style={{ marginBottom: 44 }}>
+              <SectionTitle label={isHe ? "מה רוחש ברשת" : "Community Heat"} />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+                {visible.map((item, i) => (
+                  <SocialCard key={i} item={item} isHe={isHe} today={today} />
+                ))}
+              </div>
+            </section>
+          );
+        })()}
+
 
       </div>
     </>

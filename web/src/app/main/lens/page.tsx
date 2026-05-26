@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { fetchEditorial } from "@/lib/api";
 import { useLang } from "@/context/LangContext";
 import { inSiteHref } from "@/lib/anchors";
+import { Header } from "@/components/layout/Header";
+import { Footer } from "@/components/layout/Footer";
 
 interface LensSource {
   type: "story" | "community" | "video" | "tool";
@@ -80,6 +82,11 @@ function SourceCard({ src, isHe, today }: { src: LensSource; isHe: boolean; toda
     return src.url;
   })();
   const title = isHe ? src.label_he : src.label;
+  const GENERIC_HE = new Set(["קהילה", "כתבות", "סרטונים", "כלים"]);
+  // Only use label_he as the display title if it's a real translated string (not a generic type label)
+  const meaningfulHe = isHe && src.label_he && !GENERIC_HE.has(src.label_he);
+  const rawTitle = meaningfulHe ? src.label_he! : (src.headline || title);
+  const displayTitle = rawTitle?.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"') ?? "";
 
   const cardStyle = {
     textDecoration: "none" as const, display: "flex", gap: 12, alignItems: "flex-start",
@@ -102,7 +109,7 @@ function SourceCard({ src, isHe, today }: { src: LensSource; isHe: boolean; toda
           <p style={{
             margin: 0, fontSize: 13, fontWeight: 600, color: "#111827", lineHeight: 1.4,
             overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-          }}>{src.headline || title}</p>
+          }}>{displayTitle}</p>
           <p style={{ margin: "4px 0 0", fontSize: 11, color: "#9ca3af" }}>
             {[src.vendor, src.date].filter(Boolean).join(" · ")}
           </p>
@@ -117,7 +124,7 @@ function SourceCard({ src, isHe, today }: { src: LensSource; isHe: boolean; toda
         <p style={{
           margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: "#111827", lineHeight: 1.4,
           overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-        }}>{src.headline || title}</p>
+        }}>{displayTitle}</p>
         <p style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>
           {[src.source_label, src.heat].filter(Boolean).join(" · ")}
           <span style={{ marginInlineStart: 6, color: "#6366f1", fontWeight: 600 }}>
@@ -138,7 +145,7 @@ function SourceCard({ src, isHe, today }: { src: LensSource; isHe: boolean; toda
           <p style={{
             margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: "#111827", lineHeight: 1.4,
             overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-          }}>{src.headline || title}</p>
+          }}>{displayTitle}</p>
           <p style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>
             {[src.channel, src.duration_text].filter(Boolean).join(" · ")}
             <span style={{ marginInlineStart: 6, color: "#6366f1", fontWeight: 600 }}>
@@ -222,19 +229,27 @@ function LensContent() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ fontSize: 14, color: "#9090b8" }}>Loading…</p>
-      </div>
+      <>
+        <Header date={today} archive={[]} />
+        <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <p style={{ fontSize: 14, color: "#9090b8" }}>Loading…</p>
+        </div>
+        <Footer />
+      </>
     );
   }
 
   if (!lens) {
     return (
-      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ color: "#f87171", background: "#fef2f2", padding: "12px 20px", borderRadius: 10 }}>
-          Lens not found
-        </p>
-      </div>
+      <>
+        <Header date={today} archive={[]} />
+        <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <p style={{ color: "#f87171", background: "#fef2f2", padding: "12px 20px", borderRadius: 10 }}>
+            Lens not found
+          </p>
+        </div>
+        <Footer />
+      </>
     );
   }
 
@@ -260,92 +275,124 @@ function LensContent() {
     (byType[src.type] = byType[src.type] || []).push(src);
   }
 
+  const accent = "#6366f1";
+
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", padding: "40px 24px 80px" }} dir={isHe ? "rtl" : "ltr"}>
-      {/* Back */}
-      <a href="/main" style={{
-        display: "inline-flex", alignItems: "center", gap: 6,
-        fontSize: 13, color: "#6366f1", fontWeight: 600, textDecoration: "none",
-        marginBottom: 32,
+    <>
+      <Header date={today} archive={[]} />
+
+      {/* Hero banner — mirrors vendor page structure */}
+      <div style={{
+        background: `linear-gradient(135deg, ${accent}12 0%, ${accent}05 60%, transparent 100%)`,
+        borderBottom: `1px solid ${accent}20`,
       }}>
-        {isHe ? "→ חזרה לעמוד הראשי" : "← Back to Editorial"}
-      </a>
+        <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 24px 24px" }} dir={isHe ? "rtl" : "ltr"}>
 
-      {/* Breadcrumb theme */}
-      {themeHL && (
-        <p style={{ margin: "0 0 8px", fontSize: 12, color: "#9ca3af", fontStyle: "italic" }}>
-          {isHe ? "נושא השבוע" : "This week's theme"}: {themeHL}
-        </p>
-      )}
+          {/* Back */}
+          <a href="/main" style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            fontSize: 12, color: accent, fontWeight: 700, textDecoration: "none",
+            opacity: 0.8, marginBottom: 20,
+          }}>
+            {isHe ? "→ כל הניתוחים" : "← All Lenses"}
+          </a>
 
-      {/* Lens header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-        <span style={{
-          fontSize: 48, lineHeight: 1,
-          background: "linear-gradient(135deg, #eef2ff, #e0e7ff)",
-          width: 72, height: 72, borderRadius: 16,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          flexShrink: 0,
-        }}>{lens.icon}</span>
-        <div>
-          <span style={{
-            fontSize: 10, fontWeight: 800, letterSpacing: ".12em",
-            textTransform: "uppercase" as const, color: "#6366f1",
-          }}>{isHe ? "ניתוח מעמיק" : "Editorial Lens"}</span>
-          <h1 style={{ margin: "4px 0 0", fontSize: 30, fontWeight: 900, color: "#111827", letterSpacing: "-.02em" }}>
-            {label}
-          </h1>
+          {/* Icon + title row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 16 }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 14, flexShrink: 0,
+              background: "#fff",
+              boxShadow: `0 0 0 3px ${accent}30, 0 4px 16px ${accent}25`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 28,
+            }}>
+              {lens.icon}
+            </div>
+            <div>
+              <span style={{
+                fontSize: 10, fontWeight: 800, letterSpacing: ".14em",
+                textTransform: "uppercase" as const, color: accent, opacity: 0.8,
+              }}>{isHe ? "ניתוח מעמיק" : "Editorial Lens"}</span>
+              <h1 style={{ margin: "2px 0 0", fontSize: 34, fontWeight: 900, color: "#0f0f1a", letterSpacing: "-.025em", lineHeight: 1.1 }}>
+                {label}
+              </h1>
+            </div>
+          </div>
+
+          {/* Source count badges */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            {Object.entries(byType).map(([t, items]) => {
+              const meta = TYPE_META[t] || { icon: "📎", label: t, label_he: t };
+              return (
+                <span key={t} style={{
+                  fontSize: 11, fontWeight: 700, color: accent,
+                  background: "#fff", border: `1px solid ${accent}35`,
+                  padding: "4px 11px", borderRadius: 100,
+                  boxShadow: `0 1px 4px ${accent}15`,
+                }}>
+                  {items.length} {isHe ? meta.label_he : meta.label}
+                </span>
+              );
+            })}
+          </div>
+
+          {/* Theme breadcrumb */}
+          {themeHL && (
+            <div style={{ marginTop: 8 }}>
+              <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                {isHe ? "נושא השבוע" : "This week's theme"}: {themeHL}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Gradient divider */}
-      <div style={{
-        height: 3,
-        background: "linear-gradient(90deg, #6366f1, #8b5cf6, transparent)",
-        borderRadius: 2, marginBottom: 32,
-      }} />
+      <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px 80px" }} dir={isHe ? "rtl" : "ltr"}>
 
-      {/* Teaser deck */}
-      <p style={{
-        margin: "0 0 32px", fontSize: 18, color: "#374151", lineHeight: 1.7,
-        fontStyle: "italic", paddingBottom: 28, borderBottom: "1px solid #e5e7eb",
-        fontWeight: 500,
-      }}>{body}</p>
+        {/* Colored gradient divider */}
+        <div style={{
+          height: 2,
+          background: `linear-gradient(${isHe ? "270deg" : "90deg"}, ${accent}, transparent)`,
+          borderRadius: 2, marginBottom: 32,
+        }} />
 
-      {/* Full post body */}
-      {postBody ? (
-        <div style={{ marginBottom: 48 }}>
-          {postBody.split("\n\n").map((para, i) => (
-            <p key={i} style={{
-              margin: "0 0 22px", fontSize: 16, color: "#1f2937", lineHeight: 1.85,
-            }}>{para}</p>
-          ))}
-        </div>
-      ) : (
-        <p style={{ color: "#9ca3af", fontStyle: "italic", marginBottom: 48 }}>
-          {isHe ? "הניתוח המלא יהיה זמין בקרוב" : "Full editorial coming soon"}
-        </p>
-      )}
+        {/* Teaser deck */}
+        <p style={{
+          margin: "0 0 32px", fontSize: 17, color: "#374151", lineHeight: 1.75,
+          fontStyle: "italic", paddingBottom: 28, borderBottom: "1px solid #e5e7eb",
+          fontWeight: 500,
+        }}>{body}</p>
 
-      {/* Sources — grouped by type */}
-      {allSources.length > 0 && (
-        <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 32 }}>
-          <p style={{
-            margin: "0 0 20px", fontSize: 14, fontWeight: 700, color: "#374151",
-          }}>
-            {isHe ? "מקורות וחומרים" : "Sources & Resources"}
-            <span style={{ fontWeight: 400, color: "#9ca3af", marginInlineStart: 6 }}>
-              ({allSources.length})
-            </span>
+        {/* Full post body */}
+        {postBody ? (
+          <div style={{ marginBottom: 48 }}>
+            {postBody.split("\n\n").map((para, i) => (
+              <p key={i} style={{ margin: "0 0 22px", fontSize: 15, color: "#1f2937", lineHeight: 1.85 }}>{para}</p>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: "#9ca3af", fontStyle: "italic", marginBottom: 48 }}>
+            {isHe ? "הניתוח המלא יהיה זמין בקרוב" : "Full editorial coming soon"}
           </p>
-          {typeOrder.map(t => {
-            const items = byType[t];
-            if (!items?.length) return null;
-            return <SourceGroup key={t} type={t} sources={items} isHe={isHe} today={today} />;
-          })}
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Sources — grouped by type */}
+        {allSources.length > 0 && (
+          <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 32 }}>
+            <p style={{ margin: "0 0 20px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase" as const, color: "#9a9ab8" }}>
+              {isHe ? "מקורות וחומרים" : "Sources & Resources"}
+              <span style={{ fontWeight: 400, marginInlineStart: 6 }}>({allSources.length})</span>
+            </p>
+            {typeOrder.map(t => {
+              const items = byType[t];
+              if (!items?.length) return null;
+              return <SourceGroup key={t} type={t} sources={items} isHe={isHe} today={today} />;
+            })}
+          </div>
+        )}
+      </main>
+      <Footer />
+    </>
   );
 }
 

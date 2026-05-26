@@ -166,5 +166,6 @@ export interface DayData {
   // pre-2026-05-10 display ceiling of 12 by the merger; aligned by URL to
   // `youtube[i]` after publish_data.py's per-channel cap remap.
   youtube_descs_he?: string[];
+  youtube_headlines_he?: string[];
   linkedin_posts?: LinkedInPost[];
 }

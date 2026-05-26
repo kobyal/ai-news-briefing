@@ -351,8 +351,22 @@ def _build_tool_catalog(days: list, tools: dict) -> dict:
 def _fmt_stories(catalog: dict, days: list) -> str:
     lines = []
     by_date = {}
+    vendor_counts: dict[str, int] = {}
     for key, v in catalog.items():
         by_date.setdefault(v["date"], []).append((key, v))
+        vendor = v.get("vendor", "").strip()
+        if vendor:
+            vendor_counts[vendor] = vendor_counts.get(vendor, 0) + 1
+
+    # Prepend vendor breakdown so the model knows which vendors need multi-bullet coverage
+    if vendor_counts:
+        sorted_vc = sorted(vendor_counts.items(), key=lambda x: -x[1])
+        lines.append("VENDOR STORY COUNTS (this week):")
+        lines.append("  " + " | ".join(f"{v}: {c}" for v, c in sorted_vc))
+        multi = [v for v, c in sorted_vc if c >= 2]
+        if multi:
+            lines.append(f"  → MUST cover with 2+ separate bullets: {', '.join(multi)}")
+        lines.append("")
 
     for date in sorted(by_date.keys(), reverse=True):
         items = by_date[date]

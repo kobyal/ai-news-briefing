@@ -50,7 +50,7 @@ Synthesize the above into a rich editorial package. Rules:
 - lenses[*].body: 2-sentence teaser only
 - lenses[*].post_body: 4-5 paragraph BLOG POST for this lens. Journalistic, opinionated, specific. Opens with a hook, develops the argument across paragraphs, ends with implication. Longer and richer than body. Every fact must trace to the catalog.
 - lenses[*].source_ids: list ALL catalog items that are relevant to this lens. Aim for 5-15 items. Stories first (S-IDs), then community (C-IDs), then videos (V-IDs), then tools (T-IDs). More is better — include every item that genuinely supports the analysis. Use ONLY IDs from the catalog above.
-- featured_stories: pick 5-6 story S-IDs that best illustrate the week's theme. Write 1 compelling editorial_note per story (15-25 words) — why THIS story stands out this specific week. MUST include: any major funding round, valuation milestone, market move, or competitive threat (e.g. a $30B raise, a pricing cut forcing a competitor's hand). These are the stories readers will regret missing.
+- featured_stories: pick 8-14 story S-IDs — every story readers will regret missing. Write 1 editorial_note per story (15-25 words) — why THIS story stands out this week. CRITICAL RULES: (1) ONE EVENT PER BULLET — a hire, a product launch, a valuation, and an acquisition are four separate events even if from the same company; each needs its own S-ID and its own bullet. NEVER write "X + Y + Z" in a single note. (2) MUST include every major funding round, valuation milestone, market move, competitive threat, key hire, acquisition, and significant product launch. (3) If a single vendor had 3+ distinct major events this week, all of them get separate bullets. (4) VENDOR COVERAGE: The STORIES section opens with a "VENDOR STORY COUNTS" header. Any vendor listed there with 2+ entries MUST receive AT LEAST 2 separate bullets. Never leave a multi-story vendor with a single bullet — that means you missed something. These are the stories readers will regret missing.
 - theme_refs: pick 5-8 story or community IDs that are directly cited or implied in your theme body text. These become clickable inline references. Include: at least 1 finance/business story if one exists, at least 1 community reaction (HN/Reddit/Twitter), and the most important technical story.
 - community_spotlight: pick 3-4 community C-IDs with the highest reader engagement / heat. These are the items real humans are actually reacting to.
 - top_videos: pick 2-3 video V-IDs. Prefer hot/recent videos from well-known channels (big vendors, popular creators). At least one should directly relate to the theme.
@@ -84,7 +84,7 @@ Return a single JSON object:
       "story_id": "S-ID from the stories section",
       "editorial_note": "15-25 words: why this specific story stands out this week — what it reveals, not what it says."
     }},
-    ... (3-4 stories)
+    ... (8-14 stories — one bullet per distinct event, never compound)
   ],
   "community_spotlight": [
     {{

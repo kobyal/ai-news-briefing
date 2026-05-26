@@ -664,22 +664,23 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
             ]
         if yt_items:
             # Cap at 12 — matches the YouTubeSection render limit
-            # (web/components/briefing/YouTubeSection.tsx slices to first 12).
-            # Phase 1+2 enrichment may add videos beyond display, no need to
-            # translate descriptions for ones that won't appear on /media/.
             yt_descs = []
+            yt_headlines = []
             for v in yt_items[:12]:
+                # Headline for title translation
+                yt_headlines.append(v.get("headline", ""))
+                # Description for summary translation
                 summary = v.get("summary", "")
                 m = re.match(r'\[([^\]]+)\]\s*(.*)', summary, re.DOTALL)
                 desc = m.group(2).strip() if m else summary.strip()
-                # Clean sponsor text
                 desc = re.sub(r'https?://\S+', '', desc).strip()
                 desc = re.sub(r'(?i)(try|get|check out|sign up|use code|sponsored by|thank you .{0,30} for sponsoring).*$', '', desc, flags=re.MULTILINE).strip()
                 lines = [l.strip() for l in desc.split('\n') if l.strip()]
                 desc = lines[0] if lines else ""
-                if desc:
-                    yt_descs.append(desc)
-            if yt_descs:
+                yt_descs.append(desc)
+            if yt_headlines:
+                translate_input["youtube_headlines"] = yt_headlines
+            if any(yt_descs):
                 translate_input["youtube_descs"] = yt_descs
 
         if trending:
@@ -710,6 +711,7 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
                 + '\n\nהחזר JSON בלבד עם:\n'
                   '- people_he: [{\"post_he\": \"...\", \"why_he\": \"...\"}] (אותו סדר)\n'
                   '- pulse_items_he: [{\"headline_he\": \"...\", \"body_he\": \"...\"}] (אותו סדר)\n'
+                  '- youtube_headlines_he: [\"כותרת 1\", \"כותרת 2\", ...] (אותו סדר, רק אם youtube_headlines קיים — כותרת קצרה ותמציתית בעברית)\n'
                   '- youtube_descs_he: [\"תיאור 1\", \"תיאור 2\", ...] (אותו סדר, רק אם youtube_descs קיים)\n'
                   '- twitter_descs_he: [\"משפט אחד שמסביר במה הפוסט עוסק\", ...] (אותו סדר, רק אם twitter_posts קיים — לא תרגום! שורה אחת קצרה שמסבירה על מה הפוסט מדבר)'
             ),
@@ -762,6 +764,8 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
         he["people_he"] = people_parsed["people_he"]
     if people_parsed.get("pulse_items_he"):
         he["pulse_items_he"] = people_parsed["pulse_items_he"]
+    if people_parsed.get("youtube_headlines_he"):
+        he["youtube_headlines_he"] = people_parsed["youtube_headlines_he"]
     if people_parsed.get("youtube_descs_he"):
         he["youtube_descs_he"] = people_parsed["youtube_descs_he"]
     if people_parsed.get("twitter_descs_he"):

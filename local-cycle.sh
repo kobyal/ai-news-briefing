@@ -454,7 +454,8 @@ echo "[5/6] Sending email (subject will be tagged [LOCAL])..."
 # connection (SMTP or Jina/Cloudflare HTTPS keepalive that never closes).
 # Root cause: 2026-05-23 run hung in send_email.py for 24+ hours, blocking
 # launchd from firing today's 06:00 cycle.
-timeout 180 "$PYTHON_BIN" send_email.py || echo "  ⚠ send_email.py timed out or failed (exit $?)"
+# macOS has no GNU timeout; send_email.py has internal urllib timeouts (10s/8s/5s)
+"$PYTHON_BIN" send_email.py || echo "  ⚠ send_email.py failed (exit $?)"
 
 if [ "$DO_INGEST" -eq 1 ] && [ "$push_ok" -eq 1 ]; then
   echo

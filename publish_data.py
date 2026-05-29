@@ -351,6 +351,51 @@ def _tag_vendor(text: str) -> str:
     except Exception:
         return ""
 
+# Brand-handle override (2026-05-29): when @handle is itself a known vendor
+# account (e.g. @OpenAI, @Alibaba_Qwen, @huggingface), tag related_vendor to
+# the BRAND, not to whatever competitor the post text happens to mention.
+# Without this a Qwen promo saying "...on par with Claude Opus..." gets
+# tagged Anthropic and bleeds into every Anthropic story. Personal accounts
+# (@sundarpichai, @elonmusk) don't contain a vendor alias as a token, so
+# they still fall through to content-based tagging.
+import re as _re
+_BRAND_HANDLE_TOKENS = {  # alias-token → official vendor label
+    "anthropic": "Anthropic", "anthropicai": "Anthropic", "claudeai": "Anthropic",
+    "openai": "OpenAI", "openaidevs": "OpenAI", "chatgptapp": "OpenAI",
+    "google": "Google", "googleai": "Google", "googledeepmind": "Google", "gemini": "Google",
+    "aws": "AWS", "awscloud": "AWS", "amazonscience": "AWS",
+    "microsoft": "Microsoft", "msftresearch": "Microsoft", "azure": "Azure", "copilot": "Microsoft",
+    "meta": "Meta", "metaai": "Meta", "ai_at_meta": "Meta", "llama": "Meta",
+    "xai": "xAI", "grok": "xAI",
+    "nvidia": "NVIDIA", "nvidiaai": "NVIDIA",
+    "mistralai": "Mistral",
+    "apple": "Apple",
+    "huggingface": "Hugging Face",
+    "deepseek_ai": "DeepSeek", "deepseekai": "DeepSeek",
+    "samsung": "Samsung",
+    "alibaba_qwen": "Alibaba", "alibaba": "Alibaba", "qwenlm": "Alibaba", "qwen": "Alibaba",
+    "cohere": "Cohere",
+    "spacex": "SpaceX",
+    "ibm": "IBM", "ibmresearch": "IBM",
+    "tesla": "Tesla", "teslaai": "Tesla",
+    "cerebrassystems": "Cerebras", "cerebras": "Cerebras",
+    "perplexity_ai": "Perplexity", "perplexityai": "Perplexity",
+}
+def _brand_from_handle(handle: str) -> str:
+    """If the X handle is a known brand account, return the vendor label.
+       Token-boundary match: '@Alibaba_Qwen' → 'Alibaba'; '@sundarpichai' → ''."""
+    h = (handle or "").lower().lstrip("@")
+    if not h:
+        return ""
+    # Exact-match fast path
+    if h in _BRAND_HANDLE_TOKENS:
+        return _BRAND_HANDLE_TOKENS[h]
+    # Token-boundary fallback: any alias appears as its own token
+    for alias, vendor_name in _BRAND_HANDLE_TOKENS.items():
+        if _re.search(rf'(?:^|[_\W\d]){_re.escape(alias)}(?:$|[_\W\d])', h):
+            return vendor_name
+    return ""
+
 for _post in reddit_posts:
     if not _post.get("related_vendor"):
         _v = _tag_vendor((_post.get("title") or "") + " " + (_post.get("body") or "")[:300])
@@ -359,12 +404,19 @@ for _post in reddit_posts:
 
 _tw_people = twitter_data["people"]
 for _person in _tw_people:
-    if not _person.get("related_vendor"):
-        # Use post CONTENT (not org) — a Google person tweeting about Claude
-        # should still appear on Anthropic story pages.
-        _v = _tag_vendor(_person.get("post") or _person.get("text") or "")
-        if _v:
-            _person["related_vendor"] = _v
+    if _person.get("related_vendor"):
+        continue
+    # Brand-account handles take precedence over post content.
+    _brand = _brand_from_handle(_person.get("handle") or "")
+    if _brand:
+        _person["related_vendor"] = _brand
+        continue
+    # Personal/anonymous handles → content-based tagging (preserves intended
+    # behavior of e.g. a Google exec tweeting about Claude appearing on
+    # Anthropic stories).
+    _v = _tag_vendor(_person.get("post") or _person.get("text") or "")
+    if _v:
+        _person["related_vendor"] = _v
 
 _tw_items = twitter_data["trending"] + twitter_data["people"]
 _tw_posts = [(i.get("post") or i.get("text") or "") for i in _tw_items]

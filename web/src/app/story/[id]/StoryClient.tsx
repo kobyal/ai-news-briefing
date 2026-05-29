@@ -557,9 +557,32 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
   // Reject items explicitly tagged as a DIFFERENT vendor than this story — they
   // mention this story's keywords only as comparison context (e.g. an Anthropic
   // pulse item whose body says "...vs DeepSeek..." would falsely match a DeepSeek story).
-  const vendorOK = ({ item }: { item: { related_vendor?: string } }) => {
+  //
+  // Brand-handle check (2026-05-29): when the tweet's @handle is itself a
+  // competitor brand account (e.g. @Alibaba_Qwen, @OpenAI, @xai), reject it
+  // even if the upstream tagged related_vendor matches this story. Cause:
+  // ingest infers related_vendor from text mentions, so a Qwen promo tweet
+  // saying "...on par with Claude Opus 4.6..." got tagged Anthropic and bled
+  // into an Anthropic story. Personal handles (@sundarpichai, @elonmusk) don't
+  // include a vendor alias as a token, so commentary from execs still passes.
+  const isCompetitorHandle = (handle: string): boolean => {
+    if (!handle) return false;
+    const h = handle.toLowerCase();
+    for (const [vendorName, aliases] of Object.entries(vendorAliases)) {
+      if (vendorName === v) continue;
+      for (const alias of aliases) {
+        const a = alias.replace(/\s+/g, "").toLowerCase();
+        // Alias must appear as a token boundary (start, end, or after _/digit/non-letter).
+        if (new RegExp(`(?:^|[_\\W\\d])${a}(?:$|[_\\W\\d])`, "i").test(h)) return true;
+      }
+    }
+    return false;
+  };
+  const vendorOK = ({ item }: { item: { related_vendor?: string; handle?: string } }) => {
     const tag = (item.related_vendor || "").toLowerCase();
-    return !tag || tag === v;
+    if (tag && tag !== v) return false;
+    if (isCompetitorHandle(item.handle || "")) return false;
+    return true;
   };
   // Match all 3 community pools against the story. Used for today's data first;
   // re-used for yesterday's data when today yields nothing.

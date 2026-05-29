@@ -3,7 +3,13 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Today's AI Stories — AI Briefing",
   description: "The day's most important AI news: breakthroughs, releases, funding, and policy — curated for developers, founders, and investors.",
-  alternates: { canonical: "https://aibriefing.dev/stories" },
+  alternates: {
+    canonical: "https://aibriefing.dev/stories/",
+    languages: {
+      en: "https://aibriefing.dev/stories/",
+      he: "https://aibriefing.dev/he/stories/",
+    },
+  },
   openGraph: {
     title: "Today's AI Stories — AI Briefing",
     description: "The day's most important AI news: breakthroughs, releases, funding, and policy — curated for developers, founders, and investors.",

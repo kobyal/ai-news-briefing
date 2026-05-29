@@ -15,13 +15,17 @@ const LangContext = createContext<LangCtx>({
   isHe: false,
 });
 
-export function LangProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLang] = useState<Lang>("en");
+export function LangProvider({ children, initialLang }: { children: React.ReactNode; initialLang?: Lang }) {
+  const [lang, setLang] = useState<Lang>(initialLang ?? "en");
 
   useEffect(() => {
+    // When the route forces a language (e.g. /he/* routes), trust the URL
+    // over the saved preference so static HTML and hydration match the
+    // language Google indexed for that URL.
+    if (initialLang) return;
     const saved = localStorage.getItem("lang") as Lang;
     if (saved === "en" || saved === "he") setLang(saved);
-  }, []);
+  }, [initialLang]);
 
   const toggle = () =>
     setLang((l) => {

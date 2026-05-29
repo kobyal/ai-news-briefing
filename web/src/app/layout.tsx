@@ -24,6 +24,10 @@ export const metadata: Metadata = {
   // origin URL when no og:url / canonical is present.
   alternates: {
     canonical: "/",
+    languages: {
+      en: "https://aibriefing.dev/",
+      he: "https://aibriefing.dev/he/",
+    },
   },
   openGraph: {
     title: "AI Briefing — Daily AI Intelligence",

@@ -24,11 +24,6 @@ export const metadata: Metadata = {
   // origin URL when no og:url / canonical is present.
   alternates: {
     canonical: "/",
-    languages: {
-      "en": "https://aibriefing.dev/",
-      "he": "https://aibriefing.dev/",
-      "x-default": "https://aibriefing.dev/",
-    },
   },
   openGraph: {
     title: "AI Briefing — Daily AI Intelligence",
@@ -66,15 +61,17 @@ export default function RootLayout({
                 "description": "Your daily digest of AI news from Anthropic, OpenAI, Google, and more",
               },
               {
-                "@type": "Organization",
+                "@type": "NewsMediaOrganization",
                 "name": "AI Briefing",
                 "url": "https://aibriefing.dev",
+                "description": "Daily AI intelligence for developers, founders, investors, and technical leaders.",
                 "logo": {
                   "@type": "ImageObject",
                   "url": "https://aibriefing.dev/og.png",
                   "width": 1200,
                   "height": 630,
                 },
+                "knowsAbout": ["Artificial Intelligence", "Machine Learning", "Large Language Models", "AI Research"],
               },
             ],
           }) }}

@@ -17,6 +17,28 @@ type IndexEntry = {
 
 type SearchIndex = { stories?: IndexEntry[]; extras?: IndexEntry[] };
 
+type DailyStory = {
+  story_id?: string;
+  headline?: string;
+  headline_he?: string;
+  summary?: string;
+  summary_he?: string;
+  detail?: string;
+  detail_he?: string;
+  vendor?: string;
+  secondary_vendor?: string;
+  published_date?: string;
+  og_image?: string;
+  urls?: string[];
+  source_count?: number;
+  summary_audio_url?: string;
+  summary_audio_url_he?: string;
+  detail_audio_url?: string;
+  detail_audio_url_he?: string;
+};
+
+type DailyData = { date?: string; briefing?: { news_items?: DailyStory[] }; stories?: DailyStory[] };
+
 // Read the published search-index from the repo's docs/data/ at build time.
 // This is the same file the daily pipeline writes and uploads to S3.
 let _cached: SearchIndex | null = null;
@@ -26,6 +48,30 @@ function loadIndex(): SearchIndex {
   const raw = readFileSync(path, "utf8");
   _cached = JSON.parse(raw) as SearchIndex;
   return _cached;
+}
+
+// Build-time cache of daily JSONs so 1000+ static story pages don't re-read.
+const _dailyCache = new Map<string, DailyData | null>();
+function loadDaily(date: string): DailyData | null {
+  if (_dailyCache.has(date)) return _dailyCache.get(date) ?? null;
+  try {
+    const path = join(process.cwd(), "..", "docs", "data", `${date}.json`);
+    const raw = readFileSync(path, "utf8");
+    const parsed = JSON.parse(raw) as DailyData;
+    _dailyCache.set(date, parsed);
+    return parsed;
+  } catch {
+    _dailyCache.set(date, null);
+    return null;
+  }
+}
+
+function findDailyStory(date: string | undefined, id: string): DailyStory | null {
+  if (!date) return null;
+  const daily = loadDaily(date);
+  if (!daily) return null;
+  const items = daily.briefing?.news_items ?? daily.stories ?? [];
+  return items.find((s) => s.story_id === id) ?? null;
 }
 
 export async function generateStaticParams() {
@@ -62,11 +108,6 @@ export async function generateMetadata(
       description: summary,
       alternates: {
         canonical: url,
-        languages: {
-          "en": url,
-          "he": url,
-          "x-default": url,
-        },
       },
       openGraph: {
         title: headline,
@@ -100,6 +141,10 @@ export default async function StoryPage(
   })();
 
   const storyUrl = `https://aibriefing.dev/story/${id}/`;
+  // Pull the full article body from the daily JSON so AI crawlers and
+  // structured-data parsers see the actual story text, not just the summary.
+  const dailyStory = story ? findDailyStory(story.date, id) : null;
+  const articleBody = (dailyStory?.detail || story?.summary || "").trim();
   const jsonLd = story ? {
     "@context": "https://schema.org",
     "@graph": [
@@ -107,7 +152,11 @@ export default async function StoryPage(
         "@type": "NewsArticle",
         "headline": story.headline ?? "AI Briefing",
         "description": (story.summary ?? "").slice(0, 280),
+        "articleBody": articleBody,
+        "articleSection": "Artificial Intelligence",
+        "inLanguage": "en",
         "url": storyUrl,
+        "mainEntityOfPage": { "@type": "WebPage", "@id": storyUrl },
         "datePublished": story.date ? `${story.date}T00:00:00Z` : undefined,
         "dateModified": story.date ? `${story.date}T00:00:00Z` : undefined,
         "image": (story.og_image || "https://aibriefing.dev/og.png")
@@ -118,9 +167,15 @@ export default async function StoryPage(
           "url": "https://aibriefing.dev",
         },
         "publisher": {
-          "@type": "Organization",
+          "@type": "NewsMediaOrganization",
           "name": "AI Briefing",
           "url": "https://aibriefing.dev",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://aibriefing.dev/og.png",
+            "width": 1200,
+            "height": 630,
+          },
         },
       },
       {
@@ -133,6 +188,40 @@ export default async function StoryPage(
     ],
   } : null;
 
+  // Build a NewsItem-shaped initial value so the static HTML rendered at
+  // build time contains the headline + body — crawlers (Googlebot, GPTBot,
+  // ClaudeBot, Perplexity) don't execute JS, so without this they'd see
+  // only "Loading...". Client-side fetch then upgrades to the full record.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const initialStory: any = story ? {
+    story_id: id,
+    date: story.date,
+    vendor: dailyStory?.vendor || story.vendor || "",
+    secondary_vendor: dailyStory?.secondary_vendor,
+    headline: dailyStory?.headline || story.headline || "",
+    headline_he: dailyStory?.headline_he || story.headline_he || "",
+    summary: dailyStory?.summary || story.summary || "",
+    summary_he: dailyStory?.summary_he || story.summary_he || "",
+    detail: dailyStory?.detail || "",
+    detail_he: dailyStory?.detail_he || "",
+    og_image: dailyStory?.og_image || story.og_image,
+    published_date: dailyStory?.published_date || story.date || "",
+    urls: dailyStory?.urls || [],
+    source_count: dailyStory?.source_count || 0,
+    summary_audio_url: dailyStory?.summary_audio_url,
+    summary_audio_url_he: dailyStory?.summary_audio_url_he,
+    detail_audio_url: dailyStory?.detail_audio_url,
+    detail_audio_url_he: dailyStory?.detail_audio_url_he,
+    tldr: [],
+    tldr_he: [],
+    community_pulse: "",
+    community_pulse_he: "",
+    community_urls: [],
+    trending_topics: [],
+    people_highlights: [],
+    top_reddit: [],
+  } : null;
+
   return (
     <>
       {jsonLd && (
@@ -141,7 +230,7 @@ export default async function StoryPage(
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <StoryClient id={id} />
+      <StoryClient id={id} initialStory={initialStory} />
     </>
   );
 }

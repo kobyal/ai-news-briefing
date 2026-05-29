@@ -29,12 +29,16 @@ function StoryImage({ src }: { src?: string }) {
   );
 }
 
-export default function StoryPage({ id }: { id: string }) {
+export default function StoryPage({ id, initialStory }: { id: string; initialStory?: NewsItem | null }) {
   const { isHe } = useLang();
-  const [story, setStory] = useState<NewsItem | null>(null);
+  // `initialStory` is server-rendered from the daily JSON at build time so
+  // the static HTML contains the headline + body for crawlers (Googlebot,
+  // GPTBot, ClaudeBot). The client-side fetch below then upgrades to the
+  // full record (community pulse, related videos, audio URLs, etc.).
+  const [story, setStory] = useState<NewsItem | null>(initialStory ?? null);
   const [data, setData] = useState<DayData | null>(null);
   const [archive, setArchive] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialStory);
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -82,7 +86,7 @@ export default function StoryPage({ id }: { id: string }) {
     load();
   }, [id]);
 
-  if (loading) {
+  if (loading && !story) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-base)" }}>
         <div className="text-sm animate-pulse" style={{ color: "#9a9ab8" }}>Loading...</div>
@@ -90,7 +94,7 @@ export default function StoryPage({ id }: { id: string }) {
     );
   }
 
-  if (!story || !data) {
+  if (!story) {
     return (
       <div className="min-h-screen" style={{ background: "var(--bg-base)" }}>
         {/* noindex prevents Soft 404: page returns HTTP 200 but has no article content */}
@@ -117,7 +121,7 @@ export default function StoryPage({ id }: { id: string }) {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-base)" }}>
-      <Header date={data.date} archive={archive} />
+      <Header date={data?.date || story.date || story.published_date || new Date().toISOString().split("T")[0]} archive={archive} />
       <main className="max-w-3xl mx-auto px-4 sm:px-6 pb-8 pt-8">
         {/* Back */}
         <a href="/" className="inline-flex items-center gap-1.5 text-[12px] font-semibold mb-6" style={{ color: "#9a9ab8" }}>
@@ -237,11 +241,15 @@ export default function StoryPage({ id }: { id: string }) {
           </div>
         )}
 
-        {/* Article-related videos (explainers etc.) */}
-        <RelatedVideos storyId={story.story_id} headline={story.headline} videos={data.youtube} isHe={isHe} />
-
-        {/* Community Discussion */}
-        <CommunityLinks vendor={story.vendor} headline={story.headline} storyUrls={urls} data={data} isHe={isHe} />
+        {/* Article-related videos + community — gated on full day data (loaded
+            client-side). Server-prerendered HTML skips these for crawlers; the
+            article body above is what matters for SEO. */}
+        {data && (
+          <>
+            <RelatedVideos storyId={story.story_id} headline={story.headline} videos={data.youtube} isHe={isHe} />
+            <CommunityLinks vendor={story.vendor} headline={story.headline} storyUrls={urls} data={data} isHe={isHe} />
+          </>
+        )}
       </main>
       <Footer />
     </div>

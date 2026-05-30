@@ -104,7 +104,11 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
       : (s0r.community_pulse_items as DayData["community_pulse_items"]) || [],
     // briefing_he stores as "pulse_items_he", Lambda stores as "community_pulse_items_he"
     community_pulse_items_he: (sbhe.pulse_items_he as DayData["community_pulse_items_he"]) || (s0r.community_pulse_items_he as DayData["community_pulse_items_he"]) || [],
-    top_reddit: s0.top_reddit || [],
+    // Static-first like youtube/github/twitter above: publish_data writes Reddit
+    // to the static doc's social.top_reddit. Without this fallback, Reddit only
+    // rendered via the Lambda per-story path (s0) — so when the site runs on the
+    // static JSON path (Lambda /api/stories empty), Reddit silently vanished.
+    top_reddit: ((sd.social as Record<string, unknown> | undefined)?.top_reddit as DayData["top_reddit"]) || s0.top_reddit || [],
     youtube: filterYoutubeByLanguage((sd.youtube || s0r.youtube) as unknown) as DayData["youtube"] || [],
     youtube_channel_latest: ((sd.youtube_channel_latest || s0r.youtube_channel_latest) as DayData["youtube_channel_latest"]) || [],
     github: ((sd.github || s0r.github) as DayData["github"]) || [],

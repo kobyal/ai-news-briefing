@@ -389,37 +389,59 @@ DEFAULT_SUBREDDIT_SCORE_FLOOR = 75
 
 _REDDIT_HEADERS = {"User-Agent": "ai-briefing-bot/2.0 (by /u/kobyalmog)"}
 
+# Reddit killed unauthenticated access to www.reddit.com/r/<sub>/hot.json
+# (HTTP 403, HTML block page — IP/heuristic based, not fixable via User-Agent;
+# regression hit 2026-05-29). We fetch via the Arctic Shift archive instead —
+# no auth, no Reddit app required.
+#
+# The catch that previously drove us OFF Arctic Shift: it ingests posts at
+# creation time, when score≈1 — so querying the *last 24h* yields useless
+# scores and SUBREDDIT_SCORE_FLOORS can't work. But Arctic Shift RE-CRAWLS and
+# updates scores after ~1-2 days. So we query a LAGGED window (posts 2-9 days
+# old): by then scores are fully matured (verified: 2-4d-old posts show real
+# 200-800 upvotes), the per-subreddit floors work again, and the data shape is
+# identical to the old hot.json path — downstream + UI need zero changes.
+# Tradeoff: "Hot on Reddit" shows week-old threads, not last-24h. Fine for a
+# community-sentiment widget (and consistent with the prior 7-day lookback).
+_ARCTIC_SEARCH_URL = "https://arctic-shift.photon-reddit.com/api/posts/search"
+_REDDIT_LAG_DAYS = 2     # skip posts younger than this (scores not yet matured)
+_REDDIT_WINDOW_DAYS = 9  # oldest post age to consider (volume for the floor)
+
 
 def _fetch_reddit_hot(url: str, since: datetime, max_items: int = 15) -> List[dict]:
-    """Fetch Reddit posts via the public hot.json API (no auth required).
+    """Fetch hot Reddit posts via the Arctic Shift archive (no auth required).
 
-    Replaces the Arctic Shift archive which stored scores at crawl time (score=1
-    for posts just submitted) — useless for filtering. Reddit's public hot.json
-    returns live upvote counts so SUBREDDIT_SCORE_FLOORS can actually work.
+    Queries a lagged window (posts _REDDIT_LAG_DAYS..._REDDIT_WINDOW_DAYS days
+    old) so Arctic Shift's re-crawled scores are matured and the per-subreddit
+    SUBREDDIT_SCORE_FLOORS quality filter works. See module note above.
 
     url is an Arctic-Shift-style URL; sub_name is extracted from `subreddit=` param.
     """
     sub_name = url.split("subreddit=")[-1].split("&")[0]
     floor = SUBREDDIT_SCORE_FLOORS.get(sub_name, DEFAULT_SUBREDDIT_SCORE_FLOOR)
 
-    # 7-day lookback floor so posts have time to accumulate votes
-    min_since = datetime.now(tz=timezone.utc) - timedelta(days=7)
-    reddit_since = min(since, min_since)
+    now = datetime.now(tz=timezone.utc)
+    after_ts  = int((now - timedelta(days=_REDDIT_WINDOW_DAYS)).timestamp())
+    before_ts = int((now - timedelta(days=_REDDIT_LAG_DAYS)).timestamp())
 
     try:
-        api_url = f"https://www.reddit.com/r/{sub_name}/hot.json"
-        resp = _requests.get(api_url, params={"limit": 50},
-                             headers=_REDDIT_HEADERS, timeout=15)
+        resp = _requests.get(
+            _ARCTIC_SEARCH_URL,
+            params={"subreddit": sub_name, "limit": 100, "sort": "desc",
+                    "sort_type": "created_utc", "after": after_ts, "before": before_ts},
+            headers=_REDDIT_HEADERS, timeout=20,
+        )
         resp.raise_for_status()
-        posts_raw = resp.json().get("data", {}).get("children", [])
+        # Arctic Shift returns a flat list of post objects under "data"
+        # (unlike reddit.com which wraps each in {"data": {...}} children).
+        posts_raw = resp.json().get("data", []) or []
     except Exception as e:
         print(f"  [Reddit] r/{sub_name} error: {e}")
         return []
 
     dropped_below_floor = 0
     articles = []
-    for item in posts_raw:
-        post = item.get("data", {})
+    for post in posts_raw:
         title = post.get("title", "")
         score = post.get("score", 0)
         permalink = post.get("permalink", "")
@@ -432,12 +454,11 @@ def _fetch_reddit_hot(url: str, since: datetime, max_items: int = 15) -> List[di
             continue
         if post.get("stickied"):
             continue
-        if not post.get("author") or post.get("removed_by_category"):
+        if post.get("author") in (None, "", "[deleted]") or post.get("removed_by_category"):
             continue
 
+        # created_utc is already bounded by the after/before query window.
         pub = datetime.fromtimestamp(int(ts), tz=timezone.utc) if ts else None
-        if pub and pub < reddit_since:
-            continue
 
         if score < floor:
             dropped_below_floor += 1
@@ -541,6 +562,21 @@ def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
         print(
             f"  ⚠️ THIN VENDOR FETCH: only {len(vendor_articles)} articles from "
             f"{len(FEEDS)} feeds. Expected 30+. Investigate feedparser/network/keys.",
+            file=_sys.stderr,
+        )
+    # Loud sanity check for Reddit specifically: with N subreddit feeds we should
+    # always get >0 posts. Zero means the Reddit source broke (Arctic Shift down /
+    # schema change / mass-403). This guard exists because the 2026-05-29 switch to
+    # reddit.com/hot.json silently 403'd and shipped 0 Reddit posts for 2 days
+    # unnoticed — a thin/empty fetch must SCREAM, never ship empty in silence.
+    _n_reddit_feeds = sum(1 for _u, _v, _t in FEEDS if _t == "reddit_arctic")
+    _n_reddit_posts = sum(1 for a in community_articles
+                          if "reddit.com" in (a.get("urls") or [""])[0])
+    if _n_reddit_feeds and _n_reddit_posts == 0:
+        import sys as _sys
+        print(
+            f"  ⚠️ NO REDDIT POSTS from {_n_reddit_feeds} subreddits — Arctic Shift "
+            f"may be down or its schema changed. 'Hot on Reddit' will be EMPTY.",
             file=_sys.stderr,
         )
     return vendor_articles, community_articles

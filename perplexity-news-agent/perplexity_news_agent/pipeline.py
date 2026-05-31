@@ -58,7 +58,7 @@ _usage_log: list[dict] = []
 _ANTHROPIC_PRICES = {"haiku": (1.0, 5.0), "sonnet": (3.0, 15.0), "opus": (15.0, 75.0)}
 
 # Subscription-path config — used when MERGER_VIA_CLAUDE_CODE=1 is set.
-_CC_MODEL  = lambda: os.environ.get("MERGER_CC_MODEL",  "claude-opus-4-7")
+_CC_MODEL  = lambda: os.environ.get("MERGER_CC_MODEL",  "claude-opus-4-8")
 _CC_EFFORT = lambda: os.environ.get("MERGER_CC_EFFORT", "low")
 
 
@@ -71,7 +71,7 @@ def _anthropic_via_claude_code(
 ) -> str:
     """Shells out to `claude -p` using OAuth keychain — no ANTHROPIC_API_KEY read.
 
-    Uses MERGER_CC_MODEL (default claude-opus-4-7) and MERGER_CC_EFFORT (low).
+    Uses MERGER_CC_MODEL (default claude-opus-4-8) and MERGER_CC_EFFORT (low).
     Extracts only the first assistant message to mirror the API path's
     max_tokens semantics (no auto-continuation across turns).
     """

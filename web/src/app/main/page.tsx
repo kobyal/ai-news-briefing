@@ -89,6 +89,15 @@ interface ThemeRef {
   vendor?: string;
 }
 
+interface Video {
+  headline: string;
+  channel: string;
+  views_text: string;
+  duration_text: string;
+  thumbnail: string;
+  url: string;
+}
+
 interface Editorial {
   date: string;
   days_analyzed: number;
@@ -99,6 +108,7 @@ interface Editorial {
   community_spotlight: CommunityItem[];
   editor_picks: EditorPick[];
   theme_refs?: ThemeRef[];
+  top_videos?: Video[];
 }
 
 // ── constants ─────────────────────────────────────────────────────────────────
@@ -893,6 +903,41 @@ export default function MainPage() {
           );
         })()}
 
+        {/* 4. Editor's Picks — curated tools/repos for the week */}
+        {picks.length > 0 && (
+          <section style={{ marginBottom: 44 }}>
+            <SectionTitle label={isHe ? "בחירות העורך" : "Editor's Picks"} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 18 }}>
+              {picks.map((pick, i) => (
+                <ToolCard key={i} pick={pick} isHe={isHe} today={today} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* 5. Watch — top videos of the week */}
+        {(editorial.top_videos?.length ?? 0) > 0 && (
+          <section style={{ marginBottom: 44 }}>
+            <SectionTitle label={isHe ? "לצפייה" : "Watch"} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+              {(editorial.top_videos || []).map((v, i) => (
+                <a key={i} href={v.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "block" }}>
+                  <div style={{ position: "relative", borderRadius: 10, overflow: "hidden", aspectRatio: "16 / 9", background: "#0f172a" }}>
+                    {v.thumbnail && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={v.thumbnail} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    )}
+                    {v.duration_text && (
+                      <span style={{ position: "absolute", bottom: 6, right: 6, background: "rgba(0,0,0,.8)", color: "#fff", fontSize: 11, fontWeight: 600, padding: "1px 6px", borderRadius: 4 }}>{v.duration_text}</span>
+                    )}
+                  </div>
+                  <p dir={isHe ? "rtl" : "ltr"} style={{ margin: "8px 0 2px", fontSize: 13, fontWeight: 700, color: "#0f172a", lineHeight: 1.4 }}>{v.headline}</p>
+                  <p dir={isHe ? "rtl" : "ltr"} style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>{v.channel}{v.views_text ? ` · ${v.views_text}` : ""}</p>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
 
       </div>
     </>

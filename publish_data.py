@@ -335,6 +335,18 @@ linkedin_briefing = (linkedin_raw.get("briefing", {}) if isinstance(linkedin_raw
 linkedin_posts = linkedin_briefing.get("linkedin_posts", [])
 if linkedin_posts:
     print(f"  LinkedIn posts: {len(linkedin_posts)}")
+    # Translate post bodies to Hebrew (mirror the X / Reddit path) so HE mode
+    # shows Hebrew instead of falling back to the English post — LinkedInSection
+    # reads post_he. LinkedIn was wired into the merger after the other social
+    # sources and this translation step was missed (English-in-Hebrew bug).
+    _li_texts = [(p.get("post") or "") for p in linkedin_posts]
+    if any(_li_texts):
+        print(f"Translating {len(_li_texts)} LinkedIn posts to Hebrew via Claude...")
+        _li_he = _translate_he(_li_texts)
+        for _p, _he in zip(linkedin_posts, _li_he):
+            if _he:
+                _p["post_he"] = _he
+        print(f"  Translated {sum(1 for h in _li_he if h)} LinkedIn posts")
 
 # Auto-tag community items with related_vendor based on POST CONTENT.
 # Reddit/Twitter posts lack this field; the frontend's vendorOK() filter
@@ -585,6 +597,45 @@ def _same_day_union(_merger: dict, _date: str) -> dict:
 _union_stats = _same_day_union(merger, date_str)
 
 
+# ── A2: Unconditional story-id de-dup ─────────────────────────────────────────
+# _same_day_union de-dups, but it returns early on the FIRST run of the day (no
+# existing file). So a merger that emits two stories sharing a primary URL
+# (→ identical sha256 story_id) ships a DUPLICATE id on first runs. That breaks
+# the frontend's getElementById('story-<id>') anchors — TLDR bullets and video
+# links resolve to whichever same-id card is first in the DOM. 2026-05-31: the
+# Opus 4.8 story and a YouTube story both carried
+# anthropic.com/news/claude-opus-4-8 → same id → TLDR bullet #1 jumped to the
+# YouTube story. Drop dupe ids here ALWAYS (idempotent after union), keeping the
+# briefing_he arrays index-aligned (see feedback_briefing_he_structure).
+def _dedupe_story_ids(_merger: dict) -> int:
+    _bj = _merger.get("briefing") or {}
+    _items = _bj.get("news_items") or []
+    def _sid(_it):
+        _urls = _it.get("urls") or []
+        _primary = _urls[0] if _urls else (_it.get("headline", "") or "")
+        return hashlib.sha256(_primary.encode()).hexdigest()[:12]
+    _seen, _keep = set(), []
+    for _i, _it in enumerate(_items):
+        _id = _sid(_it)
+        if _id in _seen:
+            continue
+        _seen.add(_id)
+        _keep.append(_i)
+    if len(_keep) == len(_items):
+        return 0
+    _bj["news_items"] = [_items[_i] for _i in _keep]
+    _bhe = _merger.get("briefing_he") or {}
+    for _k in ("headlines_he", "summaries_he", "details_he"):
+        _arr = _bhe.get(_k)
+        if isinstance(_arr, list) and len(_arr) == len(_items):
+            _bhe[_k] = [_arr[_i] for _i in _keep]
+    return len(_items) - len(_keep)
+
+_dropped_dupe_ids = _dedupe_story_ids(merger)
+if _dropped_dupe_ids:
+    print(f"  Story-id de-dup: dropped {_dropped_dupe_ids} duplicate-id story(ies)")
+
+
 # ── B: TLDR regen over the unioned set ───────────────────────────────────────
 # When same-day union triggered, the merger's TLDR is scoped to its 20 stories
 # only — morning-only stories (carried forward by union) get no TLDR coverage.
@@ -625,7 +676,7 @@ def _regen_tldr_over_union(_merger: dict) -> bool:
     print(f"  Regenerating TLDR over unioned {len(_items)} stories via claude -p...")
     try:
         _res = _subp.run(
-            ["claude", "-p", "--model", os.environ.get("MERGER_CC_MODEL", "claude-opus-4-7"), _prompt],
+            ["claude", "-p", "--model", os.environ.get("MERGER_CC_MODEL", "claude-opus-4-8"), _prompt],
             capture_output=True, text=True, check=False, timeout=180,
         )
         if _res.returncode != 0:

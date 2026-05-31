@@ -43,9 +43,14 @@ These are the ONLY items you may reference. Use the IDs shown for all links and 
 == TRENDING TOOLS & PACKAGES (select by T-ID) ==
 {tools_section}
 
+== LAST EDITION (do NOT repeat this framing) ==
+{prev_edition}
+
 ---
 
 Synthesize the above into a rich editorial package. Rules:
+- RECENCY: items dated in the last 48h are tagged "← RECENT" in the STORIES catalog. Lead with them — the theme and most featured_stories should reflect what's happening NOW. Reach back to older items (3-7 days) only when exceptionally high-signal (a major funding round/valuation, a launch still reverberating, a legal ruling) or when needed to explain a recent move. A theme built mostly on 5-day-old news reads as stale.
+- FRESH ANGLE: see "LAST EDITION" above — do NOT recycle that theme headline or lens framing. If the same macro-story still dominates the week, ADVANCE it (what changed, the next phase, the fresh reaction) rather than restating it. Aim for a clearly different theme headline and at least one new lens vs the last edition.
 - theme.body: 3 paragraphs, editorial prose, NO bullets, references only items in this catalog
 - lenses[*].body: 2-sentence teaser only
 - lenses[*].post_body: 4-5 paragraph BLOG POST for this lens. Journalistic, opinionated, specific. Opens with a hook, develops the argument across paragraphs, ends with implication. Longer and richer than body. Every fact must trace to the catalog.

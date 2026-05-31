@@ -21,13 +21,13 @@ def is_enabled() -> bool:
 def _cc_model() -> str:
     # Respect explicit override, then the model the active Claude Code session
     # is configured for (ANTHROPIC_MODEL is set to a Bedrock-prefixed id like
-    # "eu.anthropic.claude-opus-4-7" under CLAUDE_CODE_USE_BEDROCK=1, and to a
-    # plain id like "claude-opus-4-7" under Claude Max subscription). Fall back
+    # "eu.anthropic.claude-opus-4-8" under CLAUDE_CODE_USE_BEDROCK=1, and to a
+    # plain id like "claude-opus-4-8" under Claude Max subscription). Fall back
     # to the subscription-style id.
     return (
         os.environ.get("MERGER_CC_MODEL")
         or os.environ.get("ANTHROPIC_MODEL")
-        or "claude-opus-4-7"
+        or "claude-opus-4-8"
     )
 
 

@@ -368,9 +368,12 @@ def _fmt_stories(catalog: dict, days: list) -> str:
             lines.append(f"  → MUST cover with 2+ separate bullets: {', '.join(multi)}")
         lines.append("")
 
-    for date in sorted(by_date.keys(), reverse=True):
+    sorted_dates = sorted(by_date.keys(), reverse=True)
+    recent_dates = set(sorted_dates[:2])  # the 2 most recent days present
+    for date in sorted_dates:
+        tag = "   ← RECENT (last 48h): weight these most heavily" if date in recent_dates else ""
         items = by_date[date]
-        lines.append(f"\n[{date}]")
+        lines.append(f"\n[{date}]{tag}")
         for key, v in items:
             source = f"[{v['source']}] " if v["source"] else ""
             lines.append(f"  {key} {source}{v['headline']}")
@@ -715,7 +718,7 @@ def _synthesize(context: dict) -> dict:
     from .prompts import SYNTHESIS_SYSTEM, SYNTHESIS_USER
     prompt = SYNTHESIS_USER.format(**context)
     print("  → Opus: editorial synthesis (richer output)...")
-    raw = _call_llm(prompt, SYNTHESIS_SYSTEM, label="editorial-synthesis", model="claude-opus-4-7")
+    raw = _call_llm(prompt, SYNTHESIS_SYSTEM, label="editorial-synthesis", model="claude-opus-4-8")
     return _parse_json(raw)
 
 
@@ -863,6 +866,18 @@ def run_pipeline(date: Optional[str] = None) -> dict:
     print(f"  Catalog: {len(story_cat)} stories | {len(community_cat)} community | "
           f"{len(video_cat)} videos | {len(tool_cat)} tools")
 
+    # Previous edition — read the canonical file BEFORE _save() overwrites it, so
+    # the model can advance the story instead of repeating yesterday's framing.
+    prev_edition = "(no prior edition on file)"
+    try:
+        _prev = json.loads((_DOCS_DATA / "editorial.json").read_text())
+        _pth = (_prev.get("theme") or {}).get("headline", "")
+        _plabels = [l.get("label", "") for l in (_prev.get("lenses") or []) if l.get("label")]
+        if _pth:
+            prev_edition = f'Theme: "{_pth}". Lenses: {", ".join(_plabels)}. (from {_prev.get("date", "?")})'
+    except Exception:
+        pass
+
     context = {
         "days":              len(days),
         "date_range":        f"{days[-1]['_file_date']} → {days[0]['_file_date']}" if len(days) > 1 else days[0]["_file_date"],
@@ -870,6 +885,7 @@ def run_pipeline(date: Optional[str] = None) -> dict:
         "community_section": _fmt_community(community_cat),
         "videos_section":    _fmt_videos(video_cat),
         "tools_section":     _fmt_tools(tool_cat),
+        "prev_edition":      prev_edition,
     }
     total_chars = sum(len(v) for v in context.values() if isinstance(v, str))
     print(f"  Context: ~{total_chars:,} chars (~{total_chars//4:,} tokens est.)")

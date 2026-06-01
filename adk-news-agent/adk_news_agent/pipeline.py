@@ -23,6 +23,87 @@ _GEMINI_PRICES = {
 }
 
 
+def _enrich_story_urls(json_path: str) -> None:
+    """Fill empty `urls` fields in news_items using Tavily search.
+
+    Runs only when TAVILY_API_KEY is set. Called after build_and_save_html so
+    the JSON is always written before enrichment — failure here is non-fatal.
+    Root cause this guards against: Google grounding redirect URLs (used by
+    VendorResearcher) expire between pipeline steps; URLResolver then follows
+    dead links and returns empty resolved_sources, leaving every story with
+    urls=[]. Tavily gives us fresh canonical URLs for those stories.
+    """
+    # Try keys in order: TAVILY_API_KEY, TAVILY_API_KEY2, TAVILY_API_KEY3
+    tavily_keys = [
+        k for k in [
+            os.environ.get("TAVILY_API_KEY"),
+            os.environ.get("TAVILY_API_KEY2"),
+            os.environ.get("TAVILY_API_KEY3"),
+        ] if k
+    ]
+    if not tavily_keys:
+        return
+    try:
+        from tavily import TavilyClient  # type: ignore
+    except ImportError:
+        print("[Tavily] tavily-python not installed — skipping URL enrichment")
+        return
+
+    with open(json_path, encoding="utf-8") as f:
+        doc = json.load(f)
+
+    news_items = doc.get("briefing", {}).get("news_items", [])
+    empty_items = [item for item in news_items if not item.get("urls")]
+    if not empty_items:
+        print(f"[Tavily] All {len(news_items)} stories have URLs — skipping enrichment")
+        return
+
+    print(f"[Tavily] Enriching {len(empty_items)}/{len(news_items)} stories with missing URLs...")
+    key_idx = 0
+    client = TavilyClient(api_key=tavily_keys[key_idx])
+    enriched = 0
+
+    for item in empty_items:
+        headline = item.get("headline", "")
+        if not headline:
+            continue
+        vendor = item.get("vendor", "")
+        query = f"{vendor} {headline}".strip() if vendor else headline
+        try:
+            results = client.search(query=query, max_results=3, search_depth="basic")
+            urls = [r["url"] for r in results.get("results", []) if r.get("url")][:2]
+            if urls:
+                item["urls"] = urls
+                enriched += 1
+                print(f"  ✓ [{headline[:50]}] → {urls[0][:80]}")
+            else:
+                print(f"  ✗ [{headline[:50]}] no results")
+        except Exception as e:
+            # On quota/auth error, rotate to next key
+            if key_idx + 1 < len(tavily_keys):
+                key_idx += 1
+                client = TavilyClient(api_key=tavily_keys[key_idx])
+                print(f"  ↻ Tavily key rotated to key{key_idx + 1} after: {e}")
+                try:
+                    results = client.search(query=query, max_results=3, search_depth="basic")
+                    urls = [r["url"] for r in results.get("results", []) if r.get("url")][:2]
+                    if urls:
+                        item["urls"] = urls
+                        enriched += 1
+                        print(f"  ✓ [{headline[:50]}] → {urls[0][:80]}")
+                except Exception as e2:
+                    print(f"  ✗ [{headline[:50]}]: {e2}")
+            else:
+                print(f"  ✗ [{headline[:50]}]: {e}")
+
+    if enriched:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(doc, f, ensure_ascii=False)
+        print(f"[Tavily] Enriched {enriched}/{len(empty_items)} stories → re-saved {json_path}")
+    else:
+        print(f"[Tavily] Enrichment produced 0 URLs for {len(empty_items)} empty stories")
+
+
 def _price_for(model: str) -> tuple[float, float]:
     """Best-effort price lookup. Falls back to 2.5-flash rates."""
     for key, prices in _GEMINI_PRICES.items():
@@ -141,6 +222,8 @@ async def _run_async():
             result = build_and_save_html(topic="AI", tool_context=_StubCtx(state))
             elapsed = asyncio.get_event_loop().time() - t0
             print(f"  ✓  Publisher (direct)   {elapsed:.1f}s   saved={result.get('saved_to')}")
+            if result.get("saved_to"):
+                _enrich_story_urls(result["saved_to"])
         except Exception as e:
             print(f"  ✗  Publisher (direct) failed: {e}")
     else:

@@ -40,7 +40,7 @@ _WRITER_MODEL     = lambda: os.environ.get("MERGER_WRITER_MODEL",     "claude-so
 _TRANSLATOR_MODEL = lambda: os.environ.get("MERGER_TRANSLATOR_MODEL", "claude-sonnet-4-20250514")
 
 _VIA_CC     = lambda: os.environ.get("MERGER_VIA_CLAUDE_CODE") == "1"
-_CC_MODEL   = lambda: os.environ.get("MERGER_CC_MODEL",  "claude-opus-4-7")
+_CC_MODEL   = lambda: os.environ.get("MERGER_CC_MODEL",  "claude-opus-4-8")
 _CC_EFFORT  = lambda: os.environ.get("MERGER_CC_EFFORT", "low")
 
 _ROOT = Path(__file__).parent.parent.parent  # repo root
@@ -173,7 +173,7 @@ def _agent_via_claude_code(
 ) -> str:
     """Subscription path — shells out to `claude -p` using OAuth keychain creds.
 
-    Uses MERGER_CC_MODEL (default claude-opus-4-7) and MERGER_CC_EFFORT (default low).
+    Uses MERGER_CC_MODEL (default claude-opus-4-8) and MERGER_CC_EFFORT (default low).
     Never reads ANTHROPIC_API_KEY; never bills pay-per-token.
 
     Output capture strategy: parses stream-json and extracts the FIRST assistant
@@ -1032,6 +1032,7 @@ def run_pipeline() -> dict:
         if not h_toks:
             continue  # headline too generic to score against; leave URLs alone
         kept = []
+        vendor_only = []  # vendor-overlap only — eligible for fallback
         for url in item.get("urls", []):
             total_checked += 1
             s_toks = _slug_tokens(url)
@@ -1051,13 +1052,25 @@ def run_pipeline() -> dict:
             if overlap_non_vendor or (overlap_all and not h_non_vendor):
                 kept.append(url)
             elif overlap_all:
-                # Vendor-only overlap when headline DOES have non-vendor tokens =
-                # the wrong-topic signal (xda case). Drop.
+                # Vendor-only overlap when headline DOES have non-vendor tokens —
+                # normally the wrong-topic signal (xda case), but hold in reserve:
+                # the filter uses exact token matching and can't handle synonyms
+                # (e.g. "earnings" ≠ "revenue" for an NVIDIA financial story).
+                # If this URL ends up being the only evidence, we restore it below.
                 total_dropped += 1
-                print(f"  ✂ Irrelevant URL dropped from '{item.get('headline','')[:50]}': {url[:80]}")
+                vendor_only.append(url)
+                print(f"  ✂ Vendor-only URL (tentative) from '{item.get('headline','')[:50]}': {url[:80]}")
             else:
                 total_dropped += 1
                 print(f"  ✂ Irrelevant URL dropped from '{item.get('headline','')[:50]}': {url[:80]}")
+        # Fallback: if the filter left a story sourceless but we had vendor-matched
+        # URLs, restore them. A vendor-matched source from a credible briefing is
+        # better than no source; the LLM's URL-VALIDATION GATE already dropped the
+        # clearly-wrong ones before we even see them here.
+        if not kept and vendor_only:
+            kept = vendor_only
+            total_dropped -= len(vendor_only)
+            print(f"  ↩ Relevance fallback: restored {len(vendor_only)} vendor-matched URL(s) for '{item.get('headline','')[:50]}'")
         item["urls"] = kept
         item["source_count"] = len(kept)
     if total_dropped:

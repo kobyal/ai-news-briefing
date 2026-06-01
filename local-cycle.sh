@@ -113,12 +113,12 @@ set +a
 unset ANTHROPIC_API_KEY
 export MERGER_VIA_CLAUDE_CODE=1
 
-# Bedrock mode: `claude -p` rejects short model names ("claude-opus-4-7" → 400
+# Bedrock mode: `claude -p` rejects short model names ("claude-opus-4-8" → 400
 # "model identifier is invalid"). Detect and pass the full Bedrock ID instead.
 # Without this, merger fails (rc=1, empty stderr) and QA's 20+ LLM judges all
 # fall back to API — see 2026-05-14 17:00 re-run incident.
 if [ "${CLAUDE_CODE_USE_BEDROCK:-0}" = "1" ]; then
-  export MERGER_CC_MODEL="${ANTHROPIC_DEFAULT_OPUS_MODEL:-eu.anthropic.claude-opus-4-7}"
+  export MERGER_CC_MODEL="${ANTHROPIC_DEFAULT_OPUS_MODEL:-eu.anthropic.claude-opus-4-8}"
 fi
 
 # Suppress per-agent `open <output_json>` popups in pipeline runs (each
@@ -413,6 +413,16 @@ print('\n'.join(random.sample(ids, min(5,len(ids)))))" 2>/dev/null || true)
   else
     echo "  ⚠ npm run build failed — see $WEB_BUILD_LOG"
   fi
+fi
+
+# IndexNow ping — submit today's story URLs to Bing/Yandex so they crawl
+# without waiting for their natural cycle (Google still relies on sitemap +
+# its own discovery, no IndexNow equivalent). Gated on push because without
+# the frontend deploy in [3c/6] the URLs aren't live yet. Non-blocking.
+if [ "$DO_PUSH" -eq 1 ]; then
+  echo
+  echo "[3e/6] Pinging IndexNow (Bing/Yandex) with today's URLs..."
+  "$PYTHON_BIN" scripts/ping_indexnow.py "$DATE" || echo "  ⚠ IndexNow ping failed (non-blocking)"
 fi
 
 if [ "$DO_PUSH" -eq 1 ]; then

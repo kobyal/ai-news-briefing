@@ -150,8 +150,12 @@ def _fetch_jina(url: str) -> Optional[ArticleContent]:
                 if key:
                     headers["Authorization"] = f"Bearer {key}"
                 resp = requests.get(f"https://r.jina.ai/{url}", headers=headers, timeout=15)
-                if resp.status_code in (403, 429) and idx + 1 < len(keys):
-                    # key rejected/rate-limited — rotate to next key
+                if resp.status_code in (402, 403, 429) and idx + 1 < len(keys):
+                    # key rejected (403) / rate-limited (429) / out of paid
+                    # credits (402) — rotate to next key before giving up to
+                    # firecrawl. 402 was previously NOT rotated, so an exhausted
+                    # key #1 short-circuited to firecrawl and key #2 (free tier)
+                    # was never tried (2026-06-05: Jina #1 402 → jina=0).
                     try:
                         from .fallback_tracker import track
                         track("article_reader", key_name, keys[idx + 1][0], f"jina HTTP {resp.status_code}")

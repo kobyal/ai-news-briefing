@@ -404,7 +404,14 @@ _REDDIT_HEADERS = {"User-Agent": "ai-briefing-bot/2.0 (by /u/kobyalmog)"}
 # Tradeoff: "Hot on Reddit" shows week-old threads, not last-24h. Fine for a
 # community-sentiment widget (and consistent with the prior 7-day lookback).
 _ARCTIC_SEARCH_URL = "https://arctic-shift.photon-reddit.com/api/posts/search"
-_REDDIT_LAG_DAYS = 2     # skip posts younger than this (scores not yet matured)
+# Lag: skip posts younger than this so Arctic Shift's re-crawled scores have
+# matured past the per-subreddit floor. Was 2d, but that floored the freshest
+# possible post at ~2-3 days → chronic "Reddit content stale" QA flags. Probing
+# the live archive (2026-06-05): at a 1-day lag there are still ~49 posts above
+# the score>=20 floor with the freshest qualifying ~1.5d old and mature scores
+# (88-268), vs 113 posts / 2.0d at a 2-day lag. 1d keeps ample volume + quality
+# while halving staleness. Unmatured score=1 fresh posts are still floored out.
+_REDDIT_LAG_DAYS = 1     # skip posts younger than this (scores not yet matured)
 _REDDIT_WINDOW_DAYS = 9  # oldest post age to consider (volume for the floor)
 
 

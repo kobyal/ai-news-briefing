@@ -583,14 +583,27 @@ def _collect_agent_delivery() -> list[dict]:
     json_briefing = json_data.get("briefing", {}) or {}
     json_twitter = json_data.get("twitter", {}) or {}
 
+    # Fetch the LIVE published JSON. Retry a few times so a CloudFront/GH-Pages
+    # propagation lag right after the deploy doesn't read as "site=0" (the email
+    # runs minutes after the upload). The published structure is
+    # {briefing:{news_items}, youtube, github, twitter, ...} — there is NO
+    # top-level "stories" key, so the previous site_data.get("stories") was
+    # ALWAYS empty → merger (and youtube/github/twitter) chronically showed
+    # site=0/warn. Read the real keys instead. (2026-06-05)
+    import time as _time
     site_data = {}
-    try:
-        with urllib.request.urlopen(f"{WEBSITE_URL}/data/{today}.json", timeout=8) as r:
-            site_data = json.loads(r.read())
-    except Exception:
-        pass
-    site_stories = site_data.get("stories", []) or []
-    site_s0 = site_stories[0] if site_stories else {}
+    for _attempt in range(3):
+        try:
+            with urllib.request.urlopen(f"{WEBSITE_URL}/data/{today}.json", timeout=8) as r:
+                site_data = json.loads(r.read())
+        except Exception:
+            site_data = {}
+        if ((site_data.get("briefing") or {}).get("news_items")):
+            break
+        if _attempt < 2:
+            _time.sleep(8)  # let propagation catch up, then re-fetch
+    site_s0 = site_data  # top-level object carries briefing / youtube / github / twitter
+    site_stories = (site_data.get("briefing") or {}).get("news_items", []) or []
     site_twitter = site_s0.get("twitter", {}) or {}
 
     def _latest(agent_dir: str) -> dict:

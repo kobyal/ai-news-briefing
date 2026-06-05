@@ -107,31 +107,50 @@ export function readDateParam(params: URLSearchParams | null | undefined): strin
  *
  *  Polls every 150ms for up to 6 seconds. Returns a cleanup fn so callers
  *  can cancel from a useEffect. Idempotent — once it finds the element
- *  and scrolls, further calls during the same poll are no-op. */
-export function scrollToHash(behavior: ScrollBehavior = "smooth"): () => void {
+ *  and scrolls, further calls during the same poll are no-op.
+ *
+ *  Default behavior is "instant", NOT "smooth": the global `scroll-behavior:
+ *  smooth` (globals.css) makes a smooth programmatic scroll animate over
+ *  ~0.5s, and on re-render-heavy pages (the [date] briefing's infinite-scroll
+ *  + multi-date effects) that animation gets interrupted and the page snaps
+ *  back to the top — the exact "search result doesn't jump" bug. An instant
+ *  scroll can't be interrupted, so deep-links land reliably. (2026-06-05) */
+export function scrollToHash(behavior: ScrollBehavior = "instant"): () => void {
   if (typeof window === "undefined") return () => {};
   const hash = window.location.hash.slice(1);
   if (!hash) return () => {};
   let tries = 0;
-  let found = false;
+  let cancelled = false;
+  let reassert: ReturnType<typeof setInterval> | null = null;
   const tick = () => {
-    if (found) return;
+    if (cancelled || reassert) return;
     const el = document.getElementById(hash);
-    if (el) {
-      found = true;
-      el.scrollIntoView({ behavior, block: "start" });
-      // Soft purple highlight so the reader sees what was landed on.
-      el.style.transition = "background 0.4s ease";
-      const prev = el.style.background;
-      el.style.background = "rgba(124,58,237,0.10)";
-      setTimeout(() => { el.style.background = prev; }, 1800);
+    if (!el) {
+      if (++tries < 40) setTimeout(tick, 150);  // poll up to ~6s for async render
       return;
     }
-    if (++tries < 40) {
-      setTimeout(tick, 150);
-    }
+    const doScroll = () => el.scrollIntoView({ behavior, block: "start" });
+    doScroll();
+    // Re-assert on an INTERVAL for ~3s. A single (or few) scroll(s) lands but
+    // the [date] briefing's late post-mount reflows — older-day infinite-scroll
+    // appends, image loads, TLDR/multi-date renders — keep knocking the page
+    // back toward the top for a couple seconds, well past a few fixed timeouts.
+    // Re-firing every 200ms (only while the target has drifted out of the upper
+    // viewport, so it won't fight a user who scrolls away) makes the landing
+    // stick. Proven necessary on the live heavy date page. (2026-06-05)
+    let k = 0;
+    reassert = setInterval(() => {
+      const top = el.getBoundingClientRect().top;
+      if (top < -60 || top > window.innerHeight * 0.6) doScroll();
+      if (++k >= 15 || cancelled) { clearInterval(reassert!); reassert = null; }
+    }, 200);
+    // Soft purple highlight so the reader sees what was landed on.
+    el.style.transition = "background 0.4s ease";
+    const prev = el.style.background;
+    el.style.background = "rgba(124,58,237,0.10)";
+    setTimeout(() => { el.style.background = prev; }, 1800);
   };
   // Start once on this RAF so React has a chance to commit current state.
   requestAnimationFrame(tick);
-  return () => { found = true; };
+  return () => { cancelled = true; if (reassert) { clearInterval(reassert); reassert = null; } };
 }

@@ -876,17 +876,32 @@ def run_pipeline() -> dict:
 
     parsed = _parse(merged_json)
     hallucinated = 0
+    deduped = 0
     for item in parsed.get("news_items", []):
-        kept = [u for u in item.get("urls", []) if _norm_url(u) in whitelist]
-        dropped = [u for u in item.get("urls", []) if _norm_url(u) not in whitelist]
+        # Whitelist + de-dup in one pass: _norm_url collapses trailing-slash and
+        # case variants (e.g. ".../apis/" and ".../apis"), so the same source
+        # can't be listed twice on a story.
+        kept, dropped, seen = [], [], set()
+        for u in item.get("urls", []):
+            n = _norm_url(u)
+            if n not in whitelist:
+                dropped.append(u)
+            elif n in seen:
+                deduped += 1
+            else:
+                seen.add(n)
+                kept.append(u)
         if dropped:
             hallucinated += len(dropped)
             for u in dropped:
                 print(f"  ✂ Hallucinated URL dropped from '{item.get('headline', '?')[:50]}': {u[:80]}")
         item["urls"] = kept
-    if hallucinated:
+    if hallucinated or deduped:
         merged_json = json.dumps(parsed, ensure_ascii=False)
-        print(f"  URL whitelist: stripped {hallucinated} URLs not found in any source briefing")
+        if hallucinated:
+            print(f"  URL whitelist: stripped {hallucinated} URLs not found in any source briefing")
+        if deduped:
+            print(f"  URL dedup: collapsed {deduped} duplicate URL(s) (trailing-slash/case variants)")
 
     # Cross-day dup suppression: drop any story whose entire URL set was already
     # published in the prior 2 days. The merger prompt asks the LLM to avoid

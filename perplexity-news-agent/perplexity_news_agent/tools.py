@@ -9,36 +9,11 @@ nothing read it. The merger writes the only user-facing HTML.)
 import ast
 import json
 import re
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent.parent))
+from shared.json_repair import parse_json  # noqa: E402
 
 
 def _parse(value):
-    if isinstance(value, dict):
-        return value
-    if isinstance(value, str):
-        # Strip markdown fences if present
-        value = re.sub(r"^```(?:json)?\s*", "", value.strip())
-        value = re.sub(r"\s*```$", "", value.strip())
-        try:
-            return json.loads(value)
-        except json.JSONDecodeError:
-            pass
-        try:
-            return ast.literal_eval(value)
-        except Exception:
-            pass
-        # Fix Hebrew gershayim: ארה"ב → ארה״ב
-        try:
-            fixed = re.sub(r'([\u0590-\u05FF])"([\u0590-\u05FF])', r'\1\u05f4\2', value)
-            return json.loads(fixed)
-        except Exception:
-            pass
-        try:
-            fixed = re.sub(
-                r'(?<=: ")(.+?)(?="(?:\s*[,}]))',
-                lambda m: m.group(0).replace('"', '\\"'),
-                value,
-            )
-            return json.loads(fixed)
-        except Exception:
-            pass
-    return {}
+    return parse_json(value)

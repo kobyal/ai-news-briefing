@@ -6,6 +6,11 @@ import os
 import re
 from datetime import datetime
 
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent.parent))
+from shared.json_repair import parse_json  # noqa: E402
+
 
 def _esc(text: str) -> str:
     """Escape text for safe HTML rendering."""
@@ -17,53 +22,7 @@ def _esc(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _parse(value):
-    if isinstance(value, dict):
-        return value
-    if isinstance(value, str):
-        value = re.sub(r"^```(?:json)?\s*", "", value.strip())
-        value = re.sub(r"\s*```$", "", value.strip())
-        try:
-            return json.loads(value)
-        except json.JSONDecodeError:
-            pass
-        try:
-            return ast.literal_eval(value)
-        except Exception:
-            pass
-        # Fix unescaped quotes in Hebrew strings: ארה"ב → ארה\"ב
-        try:
-            fixed = re.sub(r'([\u0590-\u05FF])"([\u0590-\u05FF\s])', r'\1\\\"\2', value)
-            fixed = re.sub(r'([\u0590-\u05FF])"([^,}\]])', r'\1\\\"\2', fixed)
-            return json.loads(fixed)
-        except Exception:
-            pass
-        # Aggressive fix: escape all bare quotes inside string values
-        try:
-            fixed = re.sub(
-                r'(?<=: ")(.+?)(?="(?:\s*[,}\]]))',
-                lambda m: m.group(0).replace('"', '\\"'),
-                value,
-                flags=re.DOTALL,
-            )
-            return json.loads(fixed)
-        except Exception:
-            pass
-        # Last resort: extract what we can field by field
-        result = {}
-        for key in ("tldr_he", "community_pulse_he"):
-            m = re.search(rf'"{key}"\s*:\s*"(.*?)"(?=\s*[,}}])', value, re.DOTALL)
-            if m:
-                result[key] = m.group(1)
-        arr_m = re.search(r'"tldr_he"\s*:\s*\[([^\]]+)\]', value, re.DOTALL)
-        if arr_m:
-            items = re.findall(r'"([^"]+)"', arr_m.group(1))
-            if items:
-                result["tldr_he"] = items
-        if result:
-            print(f"  [_parse] partial recovery: {list(result.keys())}")
-            return result
-        print(f"  [_parse] FAILED on: {value[:200]!r}")
-    return {}
+    return parse_json(value)
 
 
 # ---------------------------------------------------------------------------

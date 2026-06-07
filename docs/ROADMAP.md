@@ -68,25 +68,23 @@ multiple places = lockstep edits + drift bugs. Convention going forward in
 the root CLAUDE.md: shared logic lives in `shared/` (Python) or
 `web/src/components/ui/` + `web/src/lib/` (frontend) — reuse/extend, don't copy.
 
-Tier 1 (real risk / has already bitten us) — **being tackled 2026-06-07**:
-- 🔧 LLM-call wrapper copied 4×: `rss`+`tavily` use `shared/anthropic_cc.py`, but
-  `merger` (`merger_agent/pipeline.py:167`) and `perplexity`
-  (`perplexity_news_agent/pipeline.py:65`) have their OWN `claude -p` wrappers.
-  LATENT BUG: the 2026-06-07 AUP-quarantine fix only landed in
-  shared/anthropic_cc.py, so the merger's copy can still hard-fail the whole run
-  on a "violative" (bio/cyber) story — a repeat of the 06-07 outage. Consolidate.
-- JSON parse+repair `_parse()` duplicated in 5 agents (tavily/rss/perplexity/
-  merger/adk `tools.py`). The 2026-05-31 Hebrew-gershayim bug had to be patched
-  5×. → `shared/json_repair.py`.
-- S3 bucket / CF dist id / AWS profile + invalidation hardcoded in 5+ scripts +
-  local-cycle.sh with inconsistent var names (BUCKET vs S3_BUCKET, etc.) — wrong
-  bucket string = silent deploy to wrong place. → `scripts/aws_config.py`.
-- Anthropic pricing tiers duplicated in 4 agents and ALREADY drifted: perplexity
-  uses haiku=(1.0,5.0) vs (0.80,4.0) elsewhere → wrong cost logs. → `shared/pricing.py`.
-- story_id `sha256(url)[:12]` in 4+ places (publish_data.py:566/616/2053,
-  build_search_index.py:183) — a `_story_id_hash()` already exists
-  (publish_data.py:1597) but copies ignore it. Must match the ingest lambda or
-  story pages 404. → `shared/story_id.py`.
+Tier 1 (real risk / has already bitten us) — **4 of 5 DONE 2026-06-07**:
+- ✅ [c7c1cbe] LLM-call wrapper: `merger` + `perplexity` now DELEGATE to
+  `shared/anthropic_cc.agent()` (was their own `claude -p` copies). Closed the
+  LATENT BUG — the AUP refusal fix now covers the merger; added a soft_timeout to
+  shared (preserves merger's 600→1800s fast-fail) + a merger-level sanitize-retry
+  (drops the flagged bio/cyber story and re-merges, so the 06-07 outage class is
+  actually prevented, verified end-to-end).
+- ✅ [552ce43] JSON parse+repair → `shared/json_repair.py` (union of all 5 agents'
+  strategies; verified no regressions). All 5 `tools.py` `_parse()` delegate to it.
+- ✅ [2b62810] Anthropic pricing → `shared/pricing.py` (fixed perplexity's drifted
+  haiku=(1.0,5.0) → (0.80,4.0)). 4 agents import it.
+- ✅ [e2847ef] story_id → `shared/story_id.py` (hash_primary + derive_story_id);
+  publish_data + build_search_index delegate. Verified byte-identical to stored ids.
+- ⏳ TODO #3: S3 bucket / CF dist id / AWS profile + invalidation hardcoded in 5+
+  scripts + local-cycle.sh with inconsistent var names (BUCKET vs S3_BUCKET, etc.)
+  — wrong bucket string = silent deploy to wrong place. → one `scripts/aws_config.py`.
+  (local-cycle.sh is gitignored — touch carefully.)
 
 Tier 2 (worth doing):
 - `_step4_publish` output-saving + usage-log aggregation duplicated across 5 / 4 agents.

@@ -2111,7 +2111,15 @@ def _mp3_cb(_p):
 if _generate_tldr_audio(_tldr_en_text, _TLDR_VOICE_EN, _audio_dir / "tldr_en.mp3"):
     _en_cb = _mp3_cb(_audio_dir / "tldr_en.mp3")
     published["briefing"]["tldr_audio_url"] = f"{_GH_PAGES_BASE}/audio/{date_str}/tldr_en.mp3?v={_en_cb}"
-if _generate_google_tts_audio(_tldr_he_text, _GOOGLE_TTS_VOICE_HE, _audio_dir / "tldr_he.mp3"):
+# HE TLDR: try Google Chirp3-HD (premium) first, then fall back to edge-tts
+# (free, always-installed — the same he-IL voice the per-story HE audio uses).
+# The Google voice has 400'd (HTTP 400 on he-IL-Chirp3-HD-Orus — deprecated
+# name / key scope), and a missing HE TLDR audio is *silent* on the site (no
+# play button in the HE view), so never depend on Google alone. (2026-06-07)
+_he_ok = _generate_google_tts_audio(_tldr_he_text, _GOOGLE_TTS_VOICE_HE, _audio_dir / "tldr_he.mp3")
+if not _he_ok:
+    _he_ok = _generate_tldr_audio(_tldr_he_text, _EDGE_TTS_VOICE_HE, _audio_dir / "tldr_he.mp3")
+if _he_ok:
     _he_cb = _mp3_cb(_audio_dir / "tldr_he.mp3")
     published.setdefault("briefing_he", {})["tldr_audio_url"] = (
         f"{_GH_PAGES_BASE}/audio/{date_str}/tldr_he.mp3?v={_he_cb}"

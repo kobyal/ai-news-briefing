@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getVendor, getVendorLogo } from "@/lib/vendors";
 
 
@@ -115,120 +115,63 @@ function VendorCard({
 
 export function VendorFilterBar({ activeVendor, onSelect, vendors, todayVendors }: VendorFilterBarProps) {
   const allItems: (string | null)[] = [null, ...vendors];
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const [offset, setOffset] = useState(0);
-  const [visibleCount, setVisibleCount] = useState(8);
-  const touchStartX = useRef(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Recompute how many cards fit
+  // Native horizontal scroll — same mechanism as the /media/ + /tools/ filter
+  // carousels (TopicFilterBar). Replaces the old transform/offset pagination
+  // whose manual onTouchStart/End jump felt sluggish on touch: native scroll
+  // gives 1:1 finger tracking + momentum, and inherits the page's RTL/LTR
+  // direction (so "All" sits on the right in Hebrew, matching media/tools).
+  const scrollByCards = (dir: -1 | 1) => {
+    scrollRef.current?.scrollBy({ left: dir * STEP * 3, behavior: "smooth" });
+  };
+
+  // Keep the active vendor in view when it changes (e.g. set from a deep link).
   useEffect(() => {
-    const measure = () => {
-      const w = wrapperRef.current?.clientWidth ?? 900;
-      const arrows = 88; // 2 × 40px + gaps
-      setVisibleCount(Math.max(3, Math.floor((w - arrows) / STEP)));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (wrapperRef.current) ro.observe(wrapperRef.current);
-    return () => ro.disconnect();
-  }, []);
-
-  const maxOffset = Math.max(0, allItems.length - visibleCount);
-  const canLeft = offset > 0;
-  const canRight = offset < maxOffset;
-
-  const shift = useCallback((dir: "left" | "right") => {
-    const step = Math.max(1, Math.floor(visibleCount / 2));
-    setOffset(o => dir === "right"
-      ? Math.min(maxOffset, o + step)
-      : Math.max(0, o - step)
-    );
-  }, [maxOffset, visibleCount]);
-
-  // Keep active vendor in view when it changes
-  useEffect(() => {
-    if (activeVendor === null) { setOffset(0); return; }
-    const idx = allItems.indexOf(activeVendor);
-    if (idx < 0) return;
-    setOffset(o => {
-      if (idx < o) return idx;
-      if (idx >= o + visibleCount) return Math.min(maxOffset, idx - visibleCount + 1);
-      return o;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const el = scrollRef.current?.querySelector('[data-vendor-active="true"]') as HTMLElement | null;
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   }, [activeVendor]);
 
-  const ArrowBtn = ({ dir }: { dir: "left" | "right" }) => {
-    const enabled = dir === "left" ? canLeft : canRight;
-    return (
-      <button
-        onClick={() => shift(dir)}
-        disabled={!enabled}
-        aria-label={dir === "left" ? "Previous vendors" : "Next vendors"}
-        style={{
-          flexShrink: 0,
-          width: "38px", height: "38px",
-          borderRadius: "50%",
-          background: enabled ? "#fff" : "#f0f0f6",
-          border: `1.5px solid ${enabled ? "#d0d0ea" : "#e8e8f0"}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          cursor: enabled ? "pointer" : "default",
-          fontSize: "18px", fontWeight: 700,
-          color: enabled ? "#3a3a5c" : "#c0c0d8",
-          boxShadow: enabled ? "0 2px 8px rgba(0,0,0,0.10)" : "none",
-          transition: "all 0.18s",
-          lineHeight: 1,
-        }}
-      >
-        {dir === "left" ? "‹" : "›"}
-      </button>
-    );
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const delta = e.changedTouches[0].clientX - touchStartX.current;
-    if (Math.abs(delta) > 40) shift(delta < 0 ? "right" : "left");
+  const arrowBtn = {
+    position: "absolute" as const, top: "50%", transform: "translateY(-50%)", zIndex: 2,
+    width: "28px", height: "28px", borderRadius: "50%", background: "#fff",
+    border: "1px solid #e0e0ec", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: "18px", color: "#4a4a6a", lineHeight: 1, outline: "none",
   };
 
   return (
-    <div
-      ref={wrapperRef}
-      dir="ltr"
-      className="mb-7"
-      style={{ display: "flex", alignItems: "center", gap: "8px", userSelect: "none" }}
-    >
-      <ArrowBtn dir="left" />
-
-      {/* Clipping viewport */}
+    <div className="mb-7" style={{ position: "relative" }}>
+      {/* dir="ltr" so the ‹ › glyphs aren't bidi-mirrored in Hebrew/RTL. */}
+      <button dir="ltr" aria-label="scroll left" onClick={() => scrollByCards(-1)} style={{ ...arrowBtn, left: 0 }}>‹</button>
       <div
-        style={{ flex: 1, overflow: "hidden", paddingTop: "6px", paddingBottom: "6px" }}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
+        ref={scrollRef}
+        style={{
+          display: "flex",
+          gap: `${CARD_GAP}px`,
+          overflowX: "auto",
+          scrollbarWidth: "none",
+          padding: "6px 40px",
+          scrollSnapType: "x proximity",
+          userSelect: "none",
+        }}
       >
-        <div
-          style={{
-            display: "flex",
-            gap: `${CARD_GAP}px`,
-            transform: `translateX(-${offset * STEP}px)`,
-            transition: "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)",
-          }}
-        >
-          {allItems.map((vendor) => (
+        {allItems.map((vendor) => (
+          <div
+            key={vendor ?? "__all__"}
+            data-vendor-active={vendor === activeVendor}
+            style={{ flexShrink: 0, scrollSnapAlign: "start" }}
+          >
             <VendorCard
-              key={vendor ?? "__all__"}
               vendor={vendor}
               isActive={vendor === activeVendor}
               hasToday={vendor === null || todayVendors.has(vendor ?? "")}
               onClick={() => onSelect(vendor === activeVendor ? null : vendor)}
             />
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
-
-      <ArrowBtn dir="right" />
+      <button dir="ltr" aria-label="scroll right" onClick={() => scrollByCards(1)} style={{ ...arrowBtn, right: 0 }}>›</button>
     </div>
   );
 }

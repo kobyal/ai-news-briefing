@@ -22,6 +22,7 @@ from .tools import _parse
 # Shared subscription path — shells to `claude -p` when MERGER_VIA_CLAUDE_CODE=1
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared import anthropic_cc  # noqa: E402
+from shared.pricing import estimate_cost  # noqa: E402
 
 _API_KEY   = lambda: os.environ.get("ANTHROPIC_API_KEY", "")
 _WRITER_MODEL     = lambda: os.environ.get("RSS_WRITER_MODEL",     "claude-haiku-4-5-20251001")
@@ -83,11 +84,8 @@ def _agent(input_text: str, *, model: str, instructions: str = None,
     tokens = f"  in={usage.input_tokens} out={usage.output_tokens}" if usage else ""
     print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model}{tokens}  stop={stop}")
     if usage:
-        _price = {"haiku": (0.80, 4.0), "sonnet": (3.0, 15.0), "opus": (15.0, 75.0)}
-        _tier = "haiku" if "haiku" in model else "opus" if "opus" in model else "sonnet"
-        _pin, _pout = _price[_tier]
-        _cost = (usage.input_tokens * _pin + usage.output_tokens * _pout) / 1_000_000
-        _usage_log.append({"step": label, "model": model, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "cost_usd": round(_cost, 4)})
+        _cost = estimate_cost(model, usage.input_tokens, usage.output_tokens)
+        _usage_log.append({"step": label, "model": model, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "cost_usd": _cost})
 
     if stop == "max_tokens":
         print(f"    ⚠  [{label}] Response truncated (max_tokens) — output may be incomplete")

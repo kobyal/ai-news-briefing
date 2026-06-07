@@ -27,6 +27,11 @@ from .prompts import MERGER_PROMPT, TRANSLATOR_PROMPT, VENDOR_ENUM
 from .schemas import BriefingContent, HebrewBriefing
 from .tools import build_and_save_html, _parse
 
+# Bootstrap repo root so shared/ is importable (matches rss/tavily).
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from shared.pricing import estimate_cost  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Config — Two execution paths (mutually exclusive, selected at call time):
 #   1. Subscription via `claude -p` — OAuth keychain, uses MERGER_CC_MODEL.
@@ -145,12 +150,8 @@ def _agent_via_anthropic_sdk(
     tokens = f"  in={usage.input_tokens} out={usage.output_tokens}" if usage else ""
     print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model}{tokens}  stop={stop}")
     if usage:
-        # Estimate cost: Haiku in=$0.80/M out=$4/M, Sonnet in=$3/M out=$15/M, Opus in=$15/M out=$75/M
-        _price = {"haiku": (0.80, 4.0), "sonnet": (3.0, 15.0), "opus": (15.0, 75.0)}
-        _tier = "haiku" if "haiku" in model else "opus" if "opus" in model else "sonnet"
-        _pin, _pout = _price[_tier]
-        _cost = (usage.input_tokens * _pin + usage.output_tokens * _pout) / 1_000_000
-        _usage_log.append({"step": label, "model": model, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "cost_usd": round(_cost, 4), "via": "api_key"})
+        _cost = estimate_cost(model, usage.input_tokens, usage.output_tokens)
+        _usage_log.append({"step": label, "model": model, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "cost_usd": _cost, "via": "api_key"})
 
     if stop == "max_tokens":
         print(f"    ⚠  [{label}] Response truncated (max_tokens) — output may be incomplete")

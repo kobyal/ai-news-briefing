@@ -23,6 +23,12 @@ from datetime import datetime
 
 import requests
 
+# Bootstrap repo root so shared/ is importable.
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from shared.pricing import estimate_cost  # noqa: E402
+
 from .prompts import (
     VENDOR_RESEARCHER_PROMPT,
     COMMUNITY_RESEARCHER_PROMPT,
@@ -53,9 +59,6 @@ _MONTH_YEAR    = lambda: datetime.now().strftime("%B %Y")
 
 # Track per-call usage/cost across the run — written to usage.json at the end.
 _usage_log: list[dict] = []
-
-# Anthropic direct pricing per 1M tokens (keep in sync with merger-agent)
-_ANTHROPIC_PRICES = {"haiku": (1.0, 5.0), "sonnet": (3.0, 15.0), "opus": (15.0, 75.0)}
 
 # Subscription-path config — used when MERGER_VIA_CLAUDE_CODE=1 is set.
 _CC_MODEL  = lambda: os.environ.get("MERGER_CC_MODEL",  "claude-opus-4-8")
@@ -201,9 +204,7 @@ def _anthropic_direct(
 
     # Track as Anthropic, not Perplexity — this is what lets us see the savings.
     if usage:
-        tier = "haiku" if "haiku" in anthropic_model else "opus" if "opus" in anthropic_model else "sonnet"
-        pin, pout = _ANTHROPIC_PRICES[tier]
-        cost = (usage.input_tokens * pin + usage.output_tokens * pout) / 1_000_000
+        cost = estimate_cost(anthropic_model, usage.input_tokens, usage.output_tokens)
         print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={anthropic_model}  in={usage.input_tokens} out={usage.output_tokens}  ${cost:.4f}  (direct)")
         _usage_log.append({
             "step": label,

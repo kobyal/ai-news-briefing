@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { fetchArchive, fetchDayData } from "@/lib/api";
@@ -699,12 +699,101 @@ function NpmCard({ n, isHe }: { n: NpmPackage; isHe: boolean }) {
   );
 }
 
+// ── Section filter bar (card carousel — same pattern as /media/ topics) ─────
+const TOOL_CARD_W = 84;
+const TOOL_CARD_H = 68;
+const TOOL_CARD_GAP = 8;
+
+interface ToolCat { id: string; label: string; label_he: string; icon: ReactNode; color: string; }
+const TOOL_CATS: ToolCat[] = [
+  { id: "github",    label: "GitHub",    label_he: "GitHub",    icon: <GitHubIcon size={19} />, color: "#1f2937" },
+  { id: "releases",  label: "Releases",  label_he: "Releases",  icon: "🚀", color: "#7c3aed" },
+  { id: "hf_models", label: "HF Models", label_he: "HF מודלים", icon: "🤗", color: "#f59e0b" },
+  { id: "hf_spaces", label: "HF Spaces", label_he: "HF Spaces", icon: "✨", color: "#eab308" },
+  { id: "docker",    label: "Docker",    label_he: "Docker",    icon: "🐳", color: "#2496ed" },
+  { id: "pypi",      label: "PyPI",      label_he: "PyPI",      icon: "🐍", color: "#3776ab" },
+  { id: "npm",       label: "npm",       label_he: "npm",       icon: "📦", color: "#cb3837" },
+];
+
+function ToolsFilterBar({ counts, selected, onSelect, isHe }: {
+  counts: Record<string, number>;
+  selected: string | null;
+  onSelect: (id: string | null) => void;
+  isHe: boolean;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollBy = (dir: 1 | -1) => {
+    scrollRef.current?.scrollBy({ left: dir * (TOOL_CARD_W + TOOL_CARD_GAP) * 3, behavior: "smooth" });
+  };
+  const btnBase = {
+    flexShrink: 0, width: `${TOOL_CARD_W}px`, height: `${TOOL_CARD_H}px`, borderRadius: "12px",
+    cursor: "pointer", display: "flex" as const, flexDirection: "column" as const,
+    alignItems: "center", justifyContent: "center", gap: "4px",
+    transition: "transform 0.15s, background 0.15s, border 0.15s",
+    scrollSnapAlign: "start", outline: "none",
+  };
+  const arrowBtn = {
+    position: "absolute" as const, top: "50%", transform: "translateY(-50%)", zIndex: 2,
+    width: "28px", height: "28px", borderRadius: "50%", background: "#fff",
+    border: "1px solid #e0e0ec", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: "18px", color: "#4a4a6a", lineHeight: 1, outline: "none",
+  };
+  return (
+    <div style={{ position: "relative", marginBottom: "20px" }}>
+      <button onClick={() => scrollBy(-1)} style={{ ...arrowBtn, left: 0 }}>‹</button>
+      <div ref={scrollRef} style={{ display: "flex", gap: `${TOOL_CARD_GAP}px`, overflowX: "auto", scrollbarWidth: "none", padding: "4px 36px", scrollSnapType: "x mandatory" }}>
+        <button
+          onClick={() => onSelect(null)}
+          style={{
+            ...btnBase,
+            border: selected === null ? "2px solid #6b6b8a" : "1.5px solid #e0e0ec",
+            background: selected === null ? "linear-gradient(135deg,#6b6b8a 0%,#4a4a6a 100%)" : "#fff",
+            color: selected === null ? "#fff" : "#6b6b8a",
+            transform: selected === null ? "scale(1.08)" : "scale(1)",
+          }}
+        >
+          <span style={{ fontSize: "20px" }}>🔥</span>
+          <span style={{ fontSize: "10px", fontWeight: 800, lineHeight: 1.2 }}>{isHe ? "הכל" : "All"}</span>
+          {(counts["__all__"] || 0) > 0 && <span style={{ fontSize: "9px", opacity: 0.6 }}>{counts["__all__"]}</span>}
+        </button>
+        {TOOL_CATS.map((cat) => {
+          const count = counts[cat.id] || 0;
+          const isActive = selected === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => count > 0 && onSelect(isActive ? null : cat.id)}
+              disabled={count === 0}
+              style={{
+                ...btnBase,
+                border: isActive ? `2px solid ${cat.color}` : "1.5px solid #e0e0ec",
+                background: isActive ? `linear-gradient(135deg,${cat.color}28 0%,${cat.color}14 100%)` : "#fff",
+                color: isActive ? cat.color : "#6b6b8a",
+                transform: isActive ? "scale(1.08)" : "scale(1)",
+                opacity: count === 0 ? 0.42 : 1,
+                cursor: count === 0 ? "default" : "pointer",
+              }}
+            >
+              <span style={{ fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center", height: "22px" }}>{cat.icon}</span>
+              <span style={{ fontSize: "10px", fontWeight: 800, lineHeight: 1.2, textAlign: "center" }}>{isHe ? cat.label_he : cat.label}</span>
+              {count > 0 && <span style={{ fontSize: "9px", opacity: 0.6 }}>{count}</span>}
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={() => scrollBy(1)} style={{ ...arrowBtn, right: 0 }}>›</button>
+    </div>
+  );
+}
+
 export default function GitHubPage() {
   const { isHe } = useLang();
   const [data, setData] = useState<DayData | null>(null);
   const [archive, setArchive] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [hotTools, setHotTools] = useState<HotTools | null>(null);
+  const [selectedCat, setSelectedCat] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -801,6 +890,23 @@ export default function GitHubPage() {
 
   const today = data?.date || new Date().toISOString().split("T")[0];
 
+  // Section counts for the filter bar. Older-day GitHub/Releases are timeless
+  // and load on scroll, so the chip counts reflect today's sections only.
+  const catCounts: Record<string, number> = {
+    github: trending.length,
+    releases: releases.length,
+    hf_models: hotTools?.hf_models?.length || 0,
+    hf_spaces: hotTools?.hf_spaces?.length || 0,
+    docker: hotTools?.docker?.length || 0,
+    pypi: hotTools?.pypi?.length || 0,
+    npm: hotTools?.npm?.length || 0,
+  };
+  catCounts["__all__"] = Object.values(catCounts).reduce((a, b) => a + b, 0);
+  const show = (id: string) => selectedCat === null || selectedCat === id;
+  // Older days only carry GitHub trending + releases — hide them for the
+  // timeless Hot-Tools categories (HF / Docker / PyPI / npm).
+  const showOlderDays = selectedCat === null || selectedCat === "github" || selectedCat === "releases";
+
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-base)" }}>
       <Header date={today} archive={archive} />
@@ -823,7 +929,9 @@ export default function GitHubPage() {
           </div>
         ) : (
           <>
-            {trending.length > 0 && (
+            <ToolsFilterBar counts={catCounts} selected={selectedCat} onSelect={setSelectedCat} isHe={isHe} />
+
+            {show("github") && trending.length > 0 && (
               <section className="mb-10">
                 <div className="flex items-center gap-2 mb-4">
                   <span style={{ color: "#1f2937" }}><GitHubIcon size={18} /></span>
@@ -838,7 +946,7 @@ export default function GitHubPage() {
               </section>
             )}
 
-            {releases.length > 0 && (
+            {show("releases") && releases.length > 0 && (
               <section className="mb-10">
                 <div className="flex items-baseline gap-2 mb-4">
                   <h2 className="text-[16px] font-bold" style={{ color: "#0f0f1a" }}>
@@ -852,7 +960,7 @@ export default function GitHubPage() {
               </section>
             )}
 
-            {hotTools?.hf_models && hotTools.hf_models.length > 0 && (
+            {show("hf_models") && hotTools?.hf_models && hotTools.hf_models.length > 0 && (
               <section className="mb-10">
                 <div className="flex items-center gap-2 mb-4">
                   <span style={{ fontSize: 20 }}>🤗</span>
@@ -872,7 +980,7 @@ export default function GitHubPage() {
               </section>
             )}
 
-            {hotTools?.hf_spaces && hotTools.hf_spaces.length > 0 && (
+            {show("hf_spaces") && hotTools?.hf_spaces && hotTools.hf_spaces.length > 0 && (
               <section className="mb-10">
                 <div className="flex items-center gap-2 mb-4">
                   <span style={{ fontSize: 18 }}>✨</span>
@@ -892,7 +1000,7 @@ export default function GitHubPage() {
               </section>
             )}
 
-            {hotTools?.docker && hotTools.docker.length > 0 && (
+            {show("docker") && hotTools?.docker && hotTools.docker.length > 0 && (
               <section className="mb-10">
                 <div className="flex items-center gap-2 mb-4">
                   <span style={{ fontSize: 20 }}>🐳</span>
@@ -912,7 +1020,7 @@ export default function GitHubPage() {
               </section>
             )}
 
-            {hotTools?.pypi && hotTools.pypi.length > 0 && (
+            {show("pypi") && hotTools?.pypi && hotTools.pypi.length > 0 && (
               <section className="mb-10">
                 <div className="flex items-center gap-2 mb-4">
                   <span style={{ fontSize: 20 }}>🐍</span>
@@ -932,7 +1040,7 @@ export default function GitHubPage() {
               </section>
             )}
 
-            {hotTools?.npm && hotTools.npm.length > 0 && (
+            {show("npm") && hotTools?.npm && hotTools.npm.length > 0 && (
               <section className="mb-10">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="inline-flex items-center justify-center font-extrabold" style={{ width: 22, height: 22, borderRadius: 6, background: "#cb3837", color: "#fff", fontSize: 9, letterSpacing: "-0.05em" }}>npm</span>
@@ -953,7 +1061,7 @@ export default function GitHubPage() {
             )}
 
             {/* ── INFINITE SCROLL: older days' GitHub trending + releases ── */}
-            {olderDays.map((day) => {
+            {showOlderDays && olderDays.map((day) => {
               const { trending: t, releases: r } = parseDay(day.data);
               if (!t.length && !r.length) return null;
               const labelDate = day.date;
@@ -969,7 +1077,7 @@ export default function GitHubPage() {
               return (
                 <section key={day.date}>
                   <DaySeparator label={labelMain} sublabel={labelDate} />
-                  {t.length > 0 && (
+                  {show("github") && t.length > 0 && (
                     <section className="mb-8">
                       <div className="flex items-center gap-2 mb-4">
                         <span style={{ color: "#1f2937" }}><GitHubIcon size={18} /></span>
@@ -983,7 +1091,7 @@ export default function GitHubPage() {
                       </div>
                     </section>
                   )}
-                  {r.length > 0 && (
+                  {show("releases") && r.length > 0 && (
                     <section className="mb-8">
                       <div className="flex items-baseline gap-2 mb-4">
                         <h2 className="text-[16px] font-bold" style={{ color: "#0f0f1a" }}>
@@ -1000,7 +1108,7 @@ export default function GitHubPage() {
               );
             })}
 
-            {hasMoreOlderDays && (
+            {showOlderDays && hasMoreOlderDays && (
               <div ref={sentinelRef}>
                 {loadingOlder && (
                   <LoadingSpinner label={isHe ? "טוען ימים קודמים..." : "Loading earlier days..."} />
@@ -1008,7 +1116,7 @@ export default function GitHubPage() {
               </div>
             )}
 
-            {!hasMoreOlderDays && olderDays.length > 0 && (
+            {showOlderDays && !hasMoreOlderDays && olderDays.length > 0 && (
               <div className="flex items-center justify-center py-8 mb-8">
                 <span className="text-xs" style={{ color: "#9a9ab8", letterSpacing: "0.1em", textTransform: "uppercase" }}>
                   {isHe ? "סוף הארכיון" : "End of archive"}

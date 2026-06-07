@@ -1,7 +1,7 @@
 AI Briefing — Roadmap & Improvement Ideas
 ==========================================
 Created: 2026-04-09
-Last updated: 2026-05-11
+Last updated: 2026-06-07
 
 Shipped (since 2026-04-09)
 --------------------------
@@ -60,6 +60,44 @@ Longer-term (big impact)
 - Mobile app (PWA) — the site already works on mobile, just needs a manifest + service worker for "Add to Home Screen"
 - Slack/Discord bot — push the daily briefing to team channels
 - Per-vendor RSS feeds — let readers subscribe to just Anthropic stories (or just OpenAI, etc.)
+
+Code health — DRY / centralization backlog (2026-06-07 audit)
+-------------------------------------------------------------
+Findings from a codebase-wide duplication audit. Same logic maintained in
+multiple places = lockstep edits + drift bugs. Convention going forward in
+the root CLAUDE.md: shared logic lives in `shared/` (Python) or
+`web/src/components/ui/` + `web/src/lib/` (frontend) — reuse/extend, don't copy.
+
+Tier 1 (real risk / has already bitten us) — **being tackled 2026-06-07**:
+- 🔧 LLM-call wrapper copied 4×: `rss`+`tavily` use `shared/anthropic_cc.py`, but
+  `merger` (`merger_agent/pipeline.py:167`) and `perplexity`
+  (`perplexity_news_agent/pipeline.py:65`) have their OWN `claude -p` wrappers.
+  LATENT BUG: the 2026-06-07 AUP-quarantine fix only landed in
+  shared/anthropic_cc.py, so the merger's copy can still hard-fail the whole run
+  on a "violative" (bio/cyber) story — a repeat of the 06-07 outage. Consolidate.
+- JSON parse+repair `_parse()` duplicated in 5 agents (tavily/rss/perplexity/
+  merger/adk `tools.py`). The 2026-05-31 Hebrew-gershayim bug had to be patched
+  5×. → `shared/json_repair.py`.
+- S3 bucket / CF dist id / AWS profile + invalidation hardcoded in 5+ scripts +
+  local-cycle.sh with inconsistent var names (BUCKET vs S3_BUCKET, etc.) — wrong
+  bucket string = silent deploy to wrong place. → `scripts/aws_config.py`.
+- Anthropic pricing tiers duplicated in 4 agents and ALREADY drifted: perplexity
+  uses haiku=(1.0,5.0) vs (0.80,4.0) elsewhere → wrong cost logs. → `shared/pricing.py`.
+- story_id `sha256(url)[:12]` in 4+ places (publish_data.py:566/616/2053,
+  build_search_index.py:183) — a `_story_id_hash()` already exists
+  (publish_data.py:1597) but copies ignore it. Must match the ingest lambda or
+  story pages 404. → `shared/story_id.py`.
+
+Tier 2 (worth doing):
+- `_step4_publish` output-saving + usage-log aggregation duplicated across 5 / 4 agents.
+- Frontend RTL style spread `...(isHe ? {direction:"rtl"} : {unicodeBidi:"plaintext"})`
+  in 13+ inline copies → a `rtlText(isHe)` helper / hook.
+- Frontend UI atoms repeated 5–8×: "NEW/היום" badge, green "sources" badge,
+  external-link SVG, `getDomain()`, `formatDate()` → `web/src/components/ui` + `lib`.
+
+Tier 3 (cosmetic): `_TODAY()`/`LOOKBACK_DAYS` one-liner lambdas (13+ agents),
+the Hebrew translation prompt (2 copies), `run.py` env-loading boilerplate,
+redundant vendor-classify wrappers (exa/newsapi wrap shared/vendors needlessly).
 
 Known limitations (worth documenting, not necessarily fixing)
 -------------------------------------------------------------

@@ -31,6 +31,7 @@ from .tools import build_and_save_html, _parse
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.pricing import estimate_cost  # noqa: E402
+from shared import anthropic_cc  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Config — Two execution paths (mutually exclusive, selected at call time):
@@ -172,104 +173,22 @@ def _agent_via_claude_code(
     json_mode: bool = False,
     label: str = "",
 ) -> str:
-    """Subscription path — shells out to `claude -p` using OAuth keychain creds.
+    """Subscription path — delegates to the shared `claude -p` wrapper.
 
-    Uses MERGER_CC_MODEL (default claude-opus-4-8) and MERGER_CC_EFFORT (default low).
-    Never reads ANTHROPIC_API_KEY; never bills pay-per-token.
-
-    Output capture strategy: parses stream-json and extracts the FIRST assistant
-    message's text only. This intentionally mirrors the API-key path's
-    max_tokens=32000 semantics — if the model would have auto-continued on a
-    second turn, we ignore the continuation and let downstream JSON-repair deal
-    with any truncation (same as the API path).
+    The implementation (env-stripping, stream-json parsing, 529 + silent-failure
+    retry, and the AUP `UsagePolicyRefusal` detection) lives ONCE in
+    shared/anthropic_cc.py. The merger's historical 600s→1800s soft-retry (the
+    2026-05-09 fast-fail) is preserved via soft_timeout. MERGER_CC_MODEL /
+    MERGER_CC_EFFORT are honoured by shared._cc_model()/_cc_effort().
     """
-    model = _CC_MODEL()
-    effort = _CC_EFFORT()
-    system_prompt = instructions or "You are a helpful assistant. Return only the requested output."
-
-    cmd = [
-        "claude", "-p",
-        "--model", model,
-        "--output-format", "stream-json",
-        "--verbose",
-        "--system-prompt", system_prompt,
-        "--tools", "",
-        "--no-session-persistence",
-        "--disable-slash-commands",
-        "--effort", effort,
-    ]
-
-    # Soft-retry: try a fast 600s window first; if that times out (cold-start
-    # or transient throttle — see 2026-05-09 incident where the 1800s wall was
-    # hit once, then a manual re-run succeeded in 462s), fall back to the full
-    # 1800s. If BOTH attempts time out the prompt is genuinely too large and
-    # the loud failure is the right signal.
-    t0 = time.time()
-    _SOFT_TIMEOUT = 600
-    _HARD_TIMEOUT = 1800
-    r = None
-    try:
-        r = subprocess.run(cmd, input=input_text, capture_output=True,
-                           text=True, timeout=_SOFT_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        print(f"    ⟳  [{label}] merger soft-retry: first {_SOFT_TIMEOUT}s timed out, falling back to {_HARD_TIMEOUT}s")
-        try:
-            r = subprocess.run(cmd, input=input_text, capture_output=True,
-                               text=True, timeout=_HARD_TIMEOUT)
-        except subprocess.TimeoutExpired:
-            raise RuntimeError(f"[{label}] claude -p timed out after {_HARD_TIMEOUT}s (soft-retry also failed)")
-    if r.returncode != 0:
-        raise RuntimeError(
-            f"[{label}] claude -p failed (rc={r.returncode}): {r.stderr[:500]}"
-        )
-
-    assistant_texts: list[str] = []
-    result_event = None
-    for line in r.stdout.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            obj = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if obj.get("type") == "assistant":
-            msg = obj.get("message", {}) or {}
-            blocks = [b.get("text", "") for b in (msg.get("content") or []) if b.get("type") == "text"]
-            if blocks:
-                assistant_texts.append("".join(blocks))
-        elif obj.get("type") == "result":
-            result_event = obj
-
-    text = assistant_texts[0] if assistant_texts else ""
-    elapsed = time.time() - t0
-    usage = (result_event or {}).get("usage", {}) or {}
-    in_tok = usage.get("input_tokens", 0)
-    out_tok = usage.get("output_tokens", 0)
-    stop = (result_event or {}).get("stop_reason", "unknown")
-    n_msgs = len(assistant_texts)
-
-    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model} (sub)  in={in_tok} out={out_tok}  stop={stop}  msgs={n_msgs}")
-
-    if n_msgs > 1:
-        print(f"    ⚠  [{label}] Claude Code auto-continued past max_tokens — using first turn only (rest discarded)")
-
-    _usage_log.append({
-        "step": label,
-        "model": model,
-        "input_tokens": in_tok,
-        "output_tokens": out_tok,
-        "cost_usd": 0.0,  # subscription-covered, no pay-per-token
-        "via": "subscription",
-        "reported_cost_informational": (result_event or {}).get("total_cost_usd"),
-    })
-
-    if json_mode and text:
-        stripped = text.strip()
-        if not (stripped.startswith("{") or stripped.startswith("[")):
-            print(f"    ⚠  [{label}] Expected JSON but got: {repr(stripped[:80])}")
-
-    return text
+    return anthropic_cc.agent(
+        input_text,
+        instructions=instructions,
+        json_mode=json_mode,
+        label=label,
+        usage_log=_usage_log,
+        soft_timeout=600,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -458,6 +377,39 @@ def _recent_headlines(n_days: int = 3) -> str:
     return "\n".join(out_lines) if out_lines else "(no recent briefings available)"
 
 
+def _sanitize_briefings(briefs: list, extras: list):
+    """Drop news_items that look AUP-violative (bio/cyber) from the source
+    briefings + extras — they trip claude -p's classifier during the merge.
+    Returns (new_briefs, new_extras, removed_count); operates on deep copies."""
+    import copy
+    removed = 0
+
+    def _risky(it: dict) -> bool:
+        return anthropic_cc.looks_cyber_risky(
+            f"{it.get('headline', '')} {it.get('summary', '')} {it.get('detail', '')}")
+
+    new_briefs = []
+    for b in briefs:
+        b2 = copy.deepcopy(b) if isinstance(b, dict) else b
+        if isinstance(b2, dict) and isinstance(b2.get("news_items"), list):
+            kept = [it for it in b2["news_items"] if not _risky(it)]
+            removed += len(b2["news_items"]) - len(kept)
+            b2["news_items"] = kept
+        new_briefs.append(b2)
+
+    new_extras = []
+    for src in extras:
+        s2 = copy.deepcopy(src)
+        bj = s2.get("briefing") if isinstance(s2, dict) else None
+        if isinstance(bj, dict) and isinstance(bj.get("news_items"), list):
+            kept = [it for it in bj["news_items"] if not _risky(it)]
+            removed += len(bj["news_items"]) - len(kept)
+            bj["news_items"] = kept
+        new_extras.append(s2)
+
+    return new_briefs, new_extras, removed
+
+
 def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
                  tavily_briefing: dict, social_briefing: dict,
                  enriched_articles: dict = None, extra_sources: list = None) -> str:
@@ -476,34 +428,57 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
 
     enriched_context = _build_enriched_context(enriched_articles, all_urls)
 
-    # Build extra sources context
-    extra_context = ""
-    for src in extra_sources:
-        extra_context += f"\n\nSOURCE ({src['label']}):\n"
-        extra_context += json.dumps(src["briefing"], ensure_ascii=False, indent=2)
-
     schema_desc = json.dumps(BriefingContent.model_json_schema(), indent=2)
-    prompt = MERGER_PROMPT
-    prompt = prompt.replace("{adk_briefing}", json.dumps(adk_briefing, ensure_ascii=False, indent=2))
-    prompt = prompt.replace("{perplexity_briefing}", json.dumps(px_briefing, ensure_ascii=False, indent=2))
-    prompt = prompt.replace("{rss_briefing}", json.dumps(rss_briefing, ensure_ascii=False, indent=2))
-    prompt = prompt.replace("{tavily_briefing}", json.dumps(tavily_briefing, ensure_ascii=False, indent=2))
-    prompt = prompt.replace("{social_briefing}", json.dumps(social_briefing, ensure_ascii=False, indent=2))
-    prompt = prompt.replace("{enriched_articles}", enriched_context)
-    prompt = prompt.replace("{extra_sources}", extra_context)
-    prompt = prompt.replace("{vendor_enum}", VENDOR_ENUM)
-    prompt = prompt.replace("{recent_headlines}", _recent_headlines(5))
-    return _agent(
-        input_text=f"{prompt}\n\nJSON SCHEMA:\n{schema_desc}",
-        model=_WRITER_MODEL(),
-        instructions=(
-            "Output ONLY a valid JSON object matching the schema. "
-            "No markdown fences, no explanation, no trailing text."
-        ),
-        json_mode=True,
-        max_steps=1,
-        label="Merger",
-    )
+
+    def _build_input(briefs: list, extras: list) -> str:
+        adk_b, px_b, rss_b, tav_b, soc_b = briefs
+        extra_context = ""
+        for src in extras:
+            extra_context += f"\n\nSOURCE ({src['label']}):\n"
+            extra_context += json.dumps(src["briefing"], ensure_ascii=False, indent=2)
+        prompt = MERGER_PROMPT
+        prompt = prompt.replace("{adk_briefing}", json.dumps(adk_b, ensure_ascii=False, indent=2))
+        prompt = prompt.replace("{perplexity_briefing}", json.dumps(px_b, ensure_ascii=False, indent=2))
+        prompt = prompt.replace("{rss_briefing}", json.dumps(rss_b, ensure_ascii=False, indent=2))
+        prompt = prompt.replace("{tavily_briefing}", json.dumps(tav_b, ensure_ascii=False, indent=2))
+        prompt = prompt.replace("{social_briefing}", json.dumps(soc_b, ensure_ascii=False, indent=2))
+        prompt = prompt.replace("{enriched_articles}", enriched_context)
+        prompt = prompt.replace("{extra_sources}", extra_context)
+        prompt = prompt.replace("{vendor_enum}", VENDOR_ENUM)
+        prompt = prompt.replace("{recent_headlines}", _recent_headlines(5))
+        return f"{prompt}\n\nJSON SCHEMA:\n{schema_desc}"
+
+    def _call(input_text: str) -> str:
+        return _agent(
+            input_text=input_text,
+            model=_WRITER_MODEL(),
+            instructions=(
+                "Output ONLY a valid JSON object matching the schema. "
+                "No markdown fences, no explanation, no trailing text."
+            ),
+            json_mode=True,
+            max_steps=1,
+            label="Merger",
+        )
+
+    # Sanitize-retry: a "violative" (bio/cyber) story in a source briefing can
+    # trip the AUP classifier and make claude -p refuse — which used to fail the
+    # ENTIRE daily run (2026-06-07). On a UsagePolicyRefusal, drop the flagged
+    # stories from the source briefings and re-merge, so the run survives minus
+    # the offending item instead of producing nothing.
+    briefs = [adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing]
+    extras = extra_sources
+    for _round in range(3):
+        try:
+            return _call(_build_input(briefs, extras))
+        except anthropic_cc.UsagePolicyRefusal:
+            briefs, extras, _removed = _sanitize_briefings(briefs, extras)
+            if not _removed:
+                raise
+            print(f"    ⚠  [Merger] Usage-Policy refusal — dropped {_removed} flagged "
+                  f"story/ies from source briefings, re-merging (round {_round + 1}/3)")
+    raise anthropic_cc.UsagePolicyRefusal(
+        "[Merger] still Usage-Policy blocked after sanitize rounds")
 
 
 def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: list = None, xai_data: dict = None) -> str:

@@ -87,11 +87,16 @@ def agent(
     json_mode: bool = False,
     label: str = "",
     usage_log: list | None = None,
+    soft_timeout: int | None = None,
 ) -> str:
     """One-shot Claude call via `claude -p` (subscription).
 
     Appends a usage entry to `usage_log` if provided (same structure as the
     API-path entries: step, model, input_tokens, output_tokens, cost_usd).
+
+    `soft_timeout` (seconds): try this shorter window first and, if it times
+    out, retry once on the full 1800s window — a fast-fail for cold-start /
+    transient throttle (merger 2026-05-09). None = single 1800s window.
     """
     system_prompt = instructions or "You are a helpful assistant. Return only the requested output."
     if json_mode:
@@ -129,12 +134,20 @@ def agent(
 
     t0 = time.time()
     last_err: Exception | None = None
+    _HARD_TIMEOUT = 1800
+    _timeout = soft_timeout or _HARD_TIMEOUT
     for attempt in range(4):  # up to 3 retries for transient/overload errors
         try:
             r = subprocess.run(cmd, input=input_text, capture_output=True,
-                               text=True, timeout=1800, env=child_env)
+                               text=True, timeout=_timeout, env=child_env)
         except subprocess.TimeoutExpired:
-            raise RuntimeError(f"[{label}] claude -p timed out after 1800s")
+            if _timeout < _HARD_TIMEOUT:
+                # Soft window timed out — retry once on the full window before
+                # giving up (cold-start / transient throttle).
+                print(f"    ⟳  [{label}] soft {_timeout}s timed out, falling back to {_HARD_TIMEOUT}s")
+                _timeout = _HARD_TIMEOUT
+                continue
+            raise RuntimeError(f"[{label}] claude -p timed out after {_timeout}s")
         if r.returncode == 0:
             break
         # Check for 529 overloaded — always worth retrying with backoff

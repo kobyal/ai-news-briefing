@@ -28,6 +28,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.pricing import estimate_cost  # noqa: E402
+from shared import anthropic_cc  # noqa: E402
 
 from .prompts import (
     VENDOR_RESEARCHER_PROMPT,
@@ -60,10 +61,6 @@ _MONTH_YEAR    = lambda: datetime.now().strftime("%B %Y")
 # Track per-call usage/cost across the run — written to usage.json at the end.
 _usage_log: list[dict] = []
 
-# Subscription-path config — used when MERGER_VIA_CLAUDE_CODE=1 is set.
-_CC_MODEL  = lambda: os.environ.get("MERGER_CC_MODEL",  "claude-opus-4-8")
-_CC_EFFORT = lambda: os.environ.get("MERGER_CC_EFFORT", "low")
-
 
 def _anthropic_via_claude_code(
     input_text: str,
@@ -72,76 +69,17 @@ def _anthropic_via_claude_code(
     json_mode: bool = False,
     label: str = "",
 ) -> str:
-    """Shells out to `claude -p` using OAuth keychain — no ANTHROPIC_API_KEY read.
-
-    Uses MERGER_CC_MODEL (default claude-opus-4-8) and MERGER_CC_EFFORT (low).
-    Extracts only the first assistant message to mirror the API path's
-    max_tokens semantics (no auto-continuation across turns).
-    """
-    system_prompt = instructions or ""
-    if json_mode:
-        system_prompt = (system_prompt + "\n" if system_prompt else "") + \
-                        "Respond with ONLY a valid JSON object. No markdown fences, no explanation."
-
-    cmd = [
-        "claude", "-p",
-        "--model", _CC_MODEL(),
-        "--output-format", "stream-json",
-        "--verbose",
-        "--system-prompt", system_prompt or "You are a helpful assistant. Return only the requested output.",
-        "--tools", "",
-        "--no-session-persistence",
-        "--disable-slash-commands",
-        "--effort", _CC_EFFORT(),
-    ]
-    t0 = time.time()
-    try:
-        r = subprocess.run(cmd, input=input_text, capture_output=True,
-                           text=True, timeout=1800)
-    except subprocess.TimeoutExpired:
-        raise RuntimeError(f"[{label}] claude -p timed out after 1800s")
-    if r.returncode != 0:
-        raise RuntimeError(f"[{label}] claude -p failed (rc={r.returncode}): {r.stderr[:500]}")
-
-    assistant_texts: list[str] = []
-    result_event = None
-    for line in r.stdout.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            obj = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if obj.get("type") == "assistant":
-            msg = obj.get("message", {}) or {}
-            blocks = [b.get("text", "") for b in (msg.get("content") or []) if b.get("type") == "text"]
-            if blocks:
-                assistant_texts.append("".join(blocks))
-        elif obj.get("type") == "result":
-            result_event = obj
-
-    text = assistant_texts[0] if assistant_texts else ""
-    elapsed = time.time() - t0
-    usage = (result_event or {}).get("usage", {}) or {}
-    in_tok = usage.get("input_tokens", 0)
-    out_tok = usage.get("output_tokens", 0)
-    stop = (result_event or {}).get("stop_reason", "unknown")
-    n_msgs = len(assistant_texts)
-    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={_CC_MODEL()} (sub)  in={in_tok} out={out_tok}  stop={stop}  msgs={n_msgs}")
-    if n_msgs > 1:
-        print(f"    ⚠  [{label}] Claude Code auto-continued — using first turn only")
-
-    _usage_log.append({
-        "step": label,
-        "model": _CC_MODEL(),
-        "api": "Anthropic (subscription)",
-        "input_tokens": in_tok,
-        "output_tokens": out_tok,
-        "cost_usd": 0.0,
-        "via": "subscription",
-    })
-    return text
+    """Subscription path — delegates to the shared `claude -p` wrapper
+    (shared/anthropic_cc.py), so env-stripping, stream-json parsing, retry, and
+    the AUP UsagePolicyRefusal detection are maintained ONCE. Honours
+    MERGER_CC_MODEL / MERGER_CC_EFFORT via shared._cc_model()/_cc_effort()."""
+    return anthropic_cc.agent(
+        input_text,
+        instructions=instructions,
+        json_mode=json_mode,
+        label=label,
+        usage_log=_usage_log,
+    )
 
 
 def _anthropic_direct(

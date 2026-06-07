@@ -741,7 +741,9 @@ function ToolsFilterBar({ counts, selected, onSelect, isHe }: {
   };
   return (
     <div style={{ position: "relative", marginBottom: "20px" }}>
-      <button onClick={() => scrollBy(-1)} style={{ ...arrowBtn, left: 0 }}>‹</button>
+      {/* dir="ltr" so the angle glyph isn't bidi-mirrored in Hebrew/RTL —
+          the arrow must point in its physical scroll direction. */}
+      <button dir="ltr" aria-label="scroll left" onClick={() => scrollBy(-1)} style={{ ...arrowBtn, left: 0 }}>‹</button>
       <div ref={scrollRef} style={{ display: "flex", gap: `${TOOL_CARD_GAP}px`, overflowX: "auto", scrollbarWidth: "none", padding: "4px 36px", scrollSnapType: "x mandatory" }}>
         <button
           onClick={() => onSelect(null)}
@@ -782,7 +784,7 @@ function ToolsFilterBar({ counts, selected, onSelect, isHe }: {
           );
         })}
       </div>
-      <button onClick={() => scrollBy(1)} style={{ ...arrowBtn, right: 0 }}>›</button>
+      <button dir="ltr" aria-label="scroll right" onClick={() => scrollBy(1)} style={{ ...arrowBtn, right: 0 }}>›</button>
     </div>
   );
 }

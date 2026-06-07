@@ -28,7 +28,9 @@ import requests as _requests  # REQUIRED
 
 FEEDS = [
     # ---- Anthropic -------------------------------------------------------
-    ("https://www.anthropic.com/rss.xml",                                  "Anthropic",     "rss"),
+    # www.anthropic.com/rss.xml returns 404 since ~2026-06 (Anthropic dropped
+    # their site RSS; no replacement feed exists). Anthropic news still flows in
+    # via tavily/perplexity/adk search + the GitHub release feeds below.
     ("https://github.com/anthropics/claude-code/releases.atom",            "Anthropic",     "rss"),
     ("https://github.com/anthropics/anthropic-sdk-python/releases.atom",   "Anthropic",     "rss"),
     # ---- OpenAI ----------------------------------------------------------
@@ -65,7 +67,9 @@ FEEDS = [
     ("https://www.microsoft.com/en-us/research/blog/feed/",                "Azure",         "rss"),
     ("https://devblogs.microsoft.com/semantic-kernel/feed/",               "Azure",         "rss"),
     # ---- Meta ------------------------------------------------------------
-    ("https://ai.meta.com/blog/feed/",                                     "Meta",          "rss"),
+    # ai.meta.com/blog/feed/ began 404'ing ~2026-06; about.fb.com/news carries
+    # Meta's AI product announcements (e.g. Creator Assistant) and is live.
+    ("https://about.fb.com/news/feed/",                                    "Meta",          "rss"),
     ("https://engineering.fb.com/feed/",                                   "Meta",          "rss"),
     ("https://pytorch.org/blog/feed.xml",                                  "Meta",          "rss"),
     # ---- NVIDIA ----------------------------------------------------------

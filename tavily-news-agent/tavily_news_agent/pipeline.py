@@ -103,15 +103,6 @@ def _step1_search() -> list[Article]:
 def _step2_write(articles: list[Article]) -> str:
     print(f"\n[2/4] BriefingWriter — synthesising via {_WRITER_MODEL()}...")
 
-    ctx = "\n\n".join(
-        f"[{i+1}] VENDOR: {a.vendor}\n"
-        f"HEADLINE: {a.headline}\n"
-        f"DATE: {a.published_date}\n"
-        f"SUMMARY: {a.snippet[:400]}\n"
-        f"URL: {a.url}"
-        for i, a in enumerate(articles[:50])
-    )
-
     schema = json.dumps({
         "tldr": ["5-6 bullet strings"],
         "news_items": [{"vendor": "string", "headline": "string",
@@ -120,7 +111,16 @@ def _step2_write(articles: list[Article]) -> str:
         "community_urls": [],
     }, indent=2)
 
-    prompt = f"""Today is {_TODAY()}. You are an AI news editor.
+    def _build(arts: list[Article]) -> str:
+        ctx = "\n\n".join(
+            f"[{i+1}] VENDOR: {a.vendor}\n"
+            f"HEADLINE: {a.headline}\n"
+            f"DATE: {a.published_date}\n"
+            f"SUMMARY: {a.snippet[:400]}\n"
+            f"URL: {a.url}"
+            for i, a in enumerate(arts)
+        )
+        return f"""Today is {_TODAY()}. You are an AI news editor.
 
 Below are the latest articles fetched via Tavily news search.
 
@@ -143,7 +143,16 @@ Return ONLY valid JSON matching the schema. No markdown fences.
 JSON SCHEMA:
 {schema}"""
 
-    return _llm(prompt, model=_WRITER_MODEL(), json_mode=True, label="BriefingWriter")
+    def _call(input_text: str) -> str:
+        return _llm(input_text, model=_WRITER_MODEL(), json_mode=True, label="BriefingWriter")
+
+    # Quarantine-retry: drop a security-exploit item that trips the AUP
+    # cyber-content filter instead of failing the whole agent (2026-06-07).
+    return anthropic_cc.agent_quarantine(
+        articles[:50], _build, _call,
+        text_of=lambda a: f"{a.headline} {a.snippet}",
+        label="BriefingWriter",
+    )
 
 
 def _step3_translate(briefing_json: str) -> str:

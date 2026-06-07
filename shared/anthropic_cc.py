@@ -10,8 +10,53 @@ JSON-repair handles truncation the same way the API path does.
 """
 import json
 import os
+import re
 import subprocess
 import time
+
+
+class UsagePolicyRefusal(RuntimeError):
+    """`claude -p` blocked the request under Anthropic's Usage Policy (AUP).
+
+    Raised instead of a generic RuntimeError so callers can catch it
+    distinctly and *quarantine the offending source item(s) and retry*
+    rather than failing the whole agent. Observed 2026-06-07: a
+    security-exploit news item ("violative cyber content") made the
+    BriefingWriter refuse, which crashed rss + tavily and ultimately the
+    merger — taking down the entire daily run.
+    """
+
+
+# Headline/summary terms that commonly trip Anthropic's AUP classifier when fed
+# into the briefing writer. The AUP covers more than "cyber": security-exploit
+# content AND biological / chemical / weapons content (observed 2026-06-07: a
+# "fed every coronavirus genome into an AI model → cleared human trials" story
+# triggered a refusal). Used by agent_quarantine() as a FAST first pass to drop
+# the likely offender — NOT to filter news in general (these stories are
+# legitimate; we just can't let one sink the whole batch on the subscription
+# path). When this heuristic misses, agent_quarantine falls back to a
+# content-agnostic progressive drop.
+_RISK_RE = re.compile(
+    r"\b("
+    # cyber / security-exploit
+    r"rce|remote code execution|exploit|0-?day|zero-?day|cve-\d|malware|"
+    r"ransomware|backdoor|payload|botnet|rootkit|keylogger|privilege escalation|"
+    r"arbitrary code|deserialization|sql injection|buffer overflow|"
+    r"proof[- ]of[- ]concept|poc exploit|weaponiz|jailbreak|"
+    # biological / chemical / weapons (CBRN)
+    r"pathogen|virus genome|coronavirus|influenza|bioweapon|biological weapon|"
+    r"nerve agent|chemical weapon|toxin|nuclear weapon|enrichment|gain[- ]of[- ]function"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def looks_cyber_risky(text: str) -> bool:
+    """Heuristic: does this text read like content (cyber-exploit or CBRN) that
+    may trip Anthropic's AUP classifier? Name kept for back-compat; coverage is
+    broader than cyber. Best-effort — agent_quarantine has a content-agnostic
+    fallback for the cases this misses."""
+    return bool(_RISK_RE.search(text or ""))
 
 
 def is_enabled() -> bool:
@@ -115,7 +160,13 @@ def agent(
                     err_events.append(json.dumps(_obj)[:400])
             except Exception:
                 pass
-        raise RuntimeError(f"[{label}] claude -p failed (rc={r.returncode}): {'; '.join(err_events) or r.stderr[:300] or r.stdout[-300:]}")
+        _detail = "; ".join(err_events) or r.stderr[:300] or r.stdout[-300:]
+        # Distinguish a Usage-Policy / AUP refusal from a generic failure so
+        # callers can quarantine the offending input item and retry instead of
+        # hard-failing the whole agent (2026-06-07 cyber-content incident).
+        if re.search(r"usage policy|violat|cyber content|\baup\b", _detail, re.IGNORECASE):
+            raise UsagePolicyRefusal(f"[{label}] claude -p blocked by Usage Policy: {_detail}")
+        raise RuntimeError(f"[{label}] claude -p failed (rc={r.returncode}): {_detail}")
 
     assistant_texts: list[str] = []
     result_event: dict | None = None
@@ -175,3 +226,59 @@ def agent(
             print(f"    ⚠  [{label}] Expected JSON but got: {repr(stripped[:80])}")
 
     return text
+
+
+def agent_quarantine(
+    articles: list,
+    build_input,
+    call,
+    *,
+    text_of=None,
+    label: str = "",
+    max_rounds: int = 3,
+) -> str:
+    """Run a briefing-writer call that's resilient to a Usage-Policy refusal.
+
+    - `build_input(articles) -> input_text` builds the prompt from a list of
+      source articles.
+    - `call(input_text) -> str` performs the actual LLM call (pass the caller's
+      own `_agent`, with model/instructions bound, so the API-key fallback path
+      is preserved — not just the subscription path).
+
+    On a UsagePolicyRefusal we drop the offending article(s) and retry, so one
+    "violative" story (cyber-exploit OR biological/CBRN — 2026-06-07) can't sink
+    the whole agent and, downstream, the whole daily run. Two strategies, in
+    order, each round:
+      1. KEYWORD pass — drop items matching looks_cyber_risky(text_of(item)).
+      2. CONTENT-AGNOSTIC fallback — if the keyword pass finds nothing new (the
+         AUP category isn't in our term list), drop the bottom ~third of the
+         (priority-ordered) pool and retry. We lose a few low-priority articles
+         but the agent degrades gracefully instead of hard-failing.
+    Re-raises only if even a single remaining article is still refused.
+    """
+    if text_of is None:
+        text_of = lambda a: f"{a.get('headline', '')} {a.get('summary', '')}"
+    pool = list(articles)
+    for round_i in range(max_rounds):
+        try:
+            return call(build_input(pool))
+        except UsagePolicyRefusal:
+            if len(pool) <= 1:
+                raise  # a single article still refused — not a quarantine case
+            risky_ids = {id(a) for a in pool if looks_cyber_risky(text_of(a))}
+            if risky_ids and len(risky_ids) < len(pool):
+                kept = [a for a in pool if id(a) not in risky_ids]
+                how = f"quarantined {len(risky_ids)} flagged item(s)"
+            else:
+                # Keyword heuristic missed it (or flagged everything) — drop the
+                # lowest-priority third and retry. Priority-ordered input means
+                # the most important articles survive.
+                cut = max(1, len(pool) // 3)
+                kept = pool[: len(pool) - cut]
+                how = f"dropped bottom {cut} (no keyword match)"
+            print(f"    ⚠  [{label}] Usage-Policy refusal — {how}, "
+                  f"retrying with {len(kept)} (round {round_i + 1}/{max_rounds})")
+            pool = kept
+    raise UsagePolicyRefusal(
+        f"[{label}] still Usage-Policy blocked after {max_rounds} quarantine rounds"
+    )

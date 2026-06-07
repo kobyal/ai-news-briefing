@@ -110,24 +110,60 @@ def _step1_fetch(lookback_days: int) -> tuple[list, list]:
     return fetch_all(lookback_days)
 
 
+# Official vendor-blog hosts the merger needs first-party coverage from. They're
+# low-volume and get crowded out of a recency-sorted feed by arxiv / dev.to /
+# medium, so _step2_synthesise guarantees a slice of them reaches the writer.
+_VENDOR_BLOG_HOSTS = (
+    "anthropic.com", "openai.com", "blog.google", "deepmind.google",
+    "aws.amazon.com", "blogs.microsoft.com", "azure.microsoft.com",
+    "devblogs.microsoft.com", "ai.meta.com", "about.fb.com", "engineering.fb.com",
+    "blogs.nvidia.com", "developer.nvidia.com", "mistral.ai",
+    "machinelearning.apple.com", "huggingface.co/blog",
+)
+
+
+def _is_vendor_blog(article: dict) -> bool:
+    url = (article.get("urls") or [""])[0]
+    return any(h in url for h in _VENDOR_BLOG_HOSTS)
+
+
 def _step2_synthesise(vendor_articles: list, community_articles: list) -> str:
     print("\n[2/4] BriefingWriter — synthesising RSS articles into structured JSON...")
 
-    # Build context for LLM — top 60 vendor articles + top 20 community
-    vendor_ctx = "\n\n".join(
-        f"[{i+1}] VENDOR: {a['vendor']}\n"
-        f"HEADLINE: {a['headline']}\n"
-        f"DATE: {a['published_date']}\n"
-        f"SUMMARY: {a['summary'][:400]}\n"
-        f"URL: {a['urls'][0] if a['urls'] else ''}"
-        for i, a in enumerate(vendor_articles[:60])
-    )
+    # Guarantee vendor-BLOG articles reach the writer. vendor_articles is sorted
+    # newest-first, and high-volume sources (arxiv, dev.to, medium) otherwise
+    # crowd the low-volume official blogs out of the top 60 — making the "≥4
+    # vendor-blog items" coverage floor unsatisfiable (0 vendor-blog items
+    # shipped 2026-06-06/07 despite ~30 fetched). Put vendor-blog articles FIRST
+    # (up to 24), then fill the remaining slots with everything else.
+    _blogs = [a for a in vendor_articles if _is_vendor_blog(a)]
+    _rest = [a for a in vendor_articles if not _is_vendor_blog(a)]
+    selected = (_blogs[:24] + _rest)[:60]
+    print(f"  Writer input: {len(selected)} vendor articles "
+          f"({sum(1 for a in selected if _is_vendor_blog(a))} from official blogs)")
+
     community_ctx = "\n\n".join(
         f"• {a['headline']} ({a['published_date']}) — {a['summary']}\n  URL: {a['urls'][0]}"
         for a in community_articles[:20]
     )
+    schema = json.dumps({
+        "tldr": ["string"],
+        "news_items": [{"vendor": "string", "headline": "string", "published_date": "string",
+                        "summary": "string", "urls": ["string"]}],
+        "community_pulse": "string (bullet points starting with •)",
+        "community_urls": ["string"],
+    }, indent=2)
 
-    prompt = f"""Today is {_TODAY()}. You are an AI news editor.
+    def _build(arts: list) -> str:
+        vendor_ctx = "\n\n".join(
+            f"[{i+1}] VENDOR: {a['vendor']}\n"
+            f"HEADLINE: {a['headline']}\n"
+            f"DATE: {a['published_date']}\n"
+            f"SUMMARY: {a['summary'][:400]}\n"
+            f"URL: {a['urls'][0] if a['urls'] else ''}"
+            for i, a in enumerate(arts)
+        )
+        prompt = f"""Today is {_TODAY()}. You are an AI news editor.
 
 Below are the latest articles fetched from official vendor blogs, tech news sites, and community platforms.
 
@@ -149,7 +185,8 @@ Write a structured briefing JSON with:
    COVERAGE FLOOR (added 2026-05-05 after a run shipped 17/18 arxiv-only items):
    The VENDOR ARTICLES list above is dominated by arxiv papers — they push 50+ AI papers/day.
    But the merger downstream NEEDS official vendor blog coverage (anthropic.com, openai.com,
-   blog.google, aws.amazon.com/blogs, etc.). Enforce these caps in your news_items selection:
+   blog.google, aws.amazon.com/blogs, etc.). The list above is ordered with official vendor-blog
+   articles FIRST. Enforce these caps in your news_items selection:
    - At MOST 3 arxiv.org items in news_items (was: 17 of 18 last incident).
    - At LEAST 4 items must come from real vendor blog hosts: anthropic.com, openai.com,
      blog.google, deepmind.google, aws.amazon.com, blogs.microsoft.com, ai.meta.com,
@@ -160,22 +197,20 @@ Write a structured briefing JSON with:
 4. community_urls: 2-4 URLs from the community posts.
 
 Return ONLY valid JSON. No markdown fences."""
+        return f"{prompt}\n\nJSON SCHEMA:\n{schema}"
 
-    schema = json.dumps({
-        "tldr": ["string"],
-        "news_items": [{"vendor": "string", "headline": "string", "published_date": "string",
-                        "summary": "string", "urls": ["string"]}],
-        "community_pulse": "string (bullet points starting with •)",
-        "community_urls": ["string"],
-    }, indent=2)
+    def _call(input_text: str) -> str:
+        return _agent(
+            input_text=input_text,
+            model=_WRITER_MODEL(),
+            instructions="Output ONLY a valid JSON object. No markdown fences, no explanation.",
+            json_mode=True,
+            label="BriefingWriter",
+        )
 
-    return _agent(
-        input_text=f"{prompt}\n\nJSON SCHEMA:\n{schema}",
-        model=_WRITER_MODEL(),
-        instructions="Output ONLY a valid JSON object. No markdown fences, no explanation.",
-        json_mode=True,
-        label="BriefingWriter",
-    )
+    # Quarantine-retry: if a security-exploit item trips the AUP cyber-content
+    # filter, drop it and retry instead of failing the whole agent (2026-06-07).
+    return anthropic_cc.agent_quarantine(selected, _build, _call, label="BriefingWriter")
 
 
 def _step3_translate(briefing_json: str) -> str:

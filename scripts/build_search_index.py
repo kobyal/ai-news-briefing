@@ -20,7 +20,9 @@ KEY = "data/search-index.json"
 PROFILE = "koby-personal"
 
 sys.path.insert(0, str(REPO / "scripts"))
+sys.path.insert(0, str(REPO))
 from _run_log import append_run_log  # noqa: E402
+from shared.story_id import hash_primary  # noqa: E402
 
 # Map (date, story_id) -> first-party og_image URL by listing the lambda's
 # S3 image mirrors. The ingest lambda uploads each story's og:image to
@@ -164,7 +166,6 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
     summaries_he_arr = briefing_he.get("summaries_he") or []
     # ── Articles ─────────────────────────────────────────────
     for idx, s in enumerate(briefing.get("news_items") or []):
-        import hashlib
         urls = s.get("urls") or []
         primary = urls[0] if urls else s.get("headline", "")
         headline_norm = (s.get("headline") or "").strip().lower()
@@ -180,7 +181,7 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
             S3_BY_URL.get((date, primary))
             or S3_BY_HEADLINE.get((date, headline_norm))
             or s.get("story_id")
-            or hashlib.sha256(primary.encode()).hexdigest()[:12]
+            or hash_primary(primary)
         )
         headline_he = s.get("headline_he") or (headlines_he_arr[idx] if idx < len(headlines_he_arr) else "")
         summary_he = s.get("summary_he") or (summaries_he_arr[idx] if idx < len(summaries_he_arr) else "")

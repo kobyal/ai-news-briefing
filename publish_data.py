@@ -560,10 +560,7 @@ def _same_day_union(_merger: dict, _date: str) -> dict:
     _unioned = list(new_items) + morning_only
 
     # Drop dupe story_ids (same urls[0] → same sha256)
-    def _sid(it):
-        _urls = it.get("urls") or []
-        _primary = _urls[0] if _urls else (it.get("headline","") or "")
-        return hashlib.sha256(_primary.encode()).hexdigest()[:12]
+    from shared.story_id import derive_story_id as _sid
     _seen, _dedup = set(), []
     for _it in _unioned:
         _id = _sid(_it)
@@ -610,10 +607,7 @@ _union_stats = _same_day_union(merger, date_str)
 def _dedupe_story_ids(_merger: dict) -> int:
     _bj = _merger.get("briefing") or {}
     _items = _bj.get("news_items") or []
-    def _sid(_it):
-        _urls = _it.get("urls") or []
-        _primary = _urls[0] if _urls else (_it.get("headline", "") or "")
-        return hashlib.sha256(_primary.encode()).hexdigest()[:12]
+    from shared.story_id import derive_story_id as _sid
     _seen, _keep = set(), []
     for _i, _it in enumerate(_items):
         _id = _sid(_it)
@@ -1595,9 +1589,8 @@ if _tavily_og_count:
 # and falls back to keyword matching when absent (so old data still works).
 def _story_id_hash(item: dict) -> str:
     """Mirror handler.py's story_id derivation — sha256(primary URL or headline)[:12]."""
-    urls = item.get("urls", [])
-    primary = urls[0] if urls else item.get("headline", "")
-    return hashlib.sha256(primary.encode()).hexdigest()[:12]
+    from shared.story_id import derive_story_id
+    return derive_story_id(item)
 
 
 _YT_STOP = {
@@ -2047,10 +2040,7 @@ _data_quality_issues = _audit_data_quality()
 # (e.g. by same-day union) or didn't survive, the slot becomes "" (frontend
 # falls back to scorer per-bullet). Strips _merger_idx tags after.
 if _pending_tldr_indices:
-    def _final_sid_for_bullet(_it: dict) -> str:
-        _urls = _it.get("urls") or []
-        _primary = _urls[0] if _urls else (_it.get("headline") or "")
-        return hashlib.sha256(_primary.encode()).hexdigest()[:12]
+    from shared.story_id import derive_story_id as _final_sid_for_bullet
     _idx_to_item = {}
     for _it in _news_items:
         _midx = _it.get("_merger_idx")

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { getVendor, getVendorLogo } from "@/lib/vendors";
+import { FilterCarousel } from "@/components/ui/FilterCarousel";
 
 
 
@@ -14,8 +15,6 @@ interface VendorFilterBarProps {
 
 const CARD_W = 82;
 const CARD_H = 72;
-const CARD_GAP = 8;
-const STEP = CARD_W + CARD_GAP;
 
 function VendorCard({
   vendor, isActive, hasToday, onClick,
@@ -115,63 +114,22 @@ function VendorCard({
 
 export function VendorFilterBar({ activeVendor, onSelect, vendors, todayVendors }: VendorFilterBarProps) {
   const allItems: (string | null)[] = [null, ...vendors];
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Native horizontal scroll — same mechanism as the /media/ + /tools/ filter
-  // carousels (TopicFilterBar). Replaces the old transform/offset pagination
-  // whose manual onTouchStart/End jump felt sluggish on touch: native scroll
-  // gives 1:1 finger tracking + momentum, and inherits the page's RTL/LTR
-  // direction (so "All" sits on the right in Hebrew, matching media/tools).
-  const scrollByCards = (dir: -1 | 1) => {
-    scrollRef.current?.scrollBy({ left: dir * STEP * 3, behavior: "smooth" });
-  };
-
-  // Keep the active vendor in view when it changes (e.g. set from a deep link).
-  useEffect(() => {
-    const el = scrollRef.current?.querySelector('[data-vendor-active="true"]') as HTMLElement | null;
-    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  }, [activeVendor]);
-
-  const arrowBtn = {
-    position: "absolute" as const, top: "50%", transform: "translateY(-50%)", zIndex: 2,
-    width: "28px", height: "28px", borderRadius: "50%", background: "#fff",
-    border: "1px solid #e0e0ec", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", cursor: "pointer",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: "18px", color: "#4a4a6a", lineHeight: 1, outline: "none",
-  };
-
   return (
-    <div className="mb-7" style={{ position: "relative" }}>
-      {/* dir="ltr" so the ‹ › glyphs aren't bidi-mirrored in Hebrew/RTL. */}
-      <button dir="ltr" aria-label="scroll left" onClick={() => scrollByCards(-1)} style={{ ...arrowBtn, left: 0 }}>‹</button>
-      <div
-        ref={scrollRef}
-        style={{
-          display: "flex",
-          gap: `${CARD_GAP}px`,
-          overflowX: "auto",
-          scrollbarWidth: "none",
-          padding: "6px 40px",
-          scrollSnapType: "x proximity",
-          userSelect: "none",
-        }}
-      >
-        {allItems.map((vendor) => (
-          <div
-            key={vendor ?? "__all__"}
-            data-vendor-active={vendor === activeVendor}
-            style={{ flexShrink: 0, scrollSnapAlign: "start" }}
-          >
-            <VendorCard
-              vendor={vendor}
-              isActive={vendor === activeVendor}
-              hasToday={vendor === null || todayVendors.has(vendor ?? "")}
-              onClick={() => onSelect(vendor === activeVendor ? null : vendor)}
-            />
-          </div>
-        ))}
-      </div>
-      <button dir="ltr" aria-label="scroll right" onClick={() => scrollByCards(1)} style={{ ...arrowBtn, right: 0 }}>›</button>
-    </div>
+    <FilterCarousel className="mb-7" activeKey={activeVendor ?? "__all__"}>
+      {allItems.map((vendor) => (
+        <div
+          key={vendor ?? "__all__"}
+          data-carousel-active={vendor === activeVendor}
+          style={{ flexShrink: 0, scrollSnapAlign: "start" }}
+        >
+          <VendorCard
+            vendor={vendor}
+            isActive={vendor === activeVendor}
+            hasToday={vendor === null || todayVendors.has(vendor ?? "")}
+            onClick={() => onSelect(vendor === activeVendor ? null : vendor)}
+          />
+        </div>
+      ))}
+    </FilterCarousel>
   );
 }

@@ -8,6 +8,7 @@ import { useLang } from "@/context/LangContext";
 import type { DayData } from "@/lib/types";
 import { LoadingSpinner, DaySeparator, INFINITE_SCROLL_ROOT_MARGIN, withMinDelay } from "@/components/ui/InfiniteScroll";
 import { BackToTopButton } from "@/components/ui/BackToTopButton";
+import { FilterCarousel } from "@/components/ui/FilterCarousel";
 
 // Hot Tools data (HF models + HF spaces today; Docker/PyPI/npm in future
 // phases). Built by scripts/fetch_hot_tools.py → docs/data/hot_tools.json.
@@ -702,7 +703,6 @@ function NpmCard({ n, isHe }: { n: NpmPackage; isHe: boolean }) {
 // ── Section filter bar (card carousel — same pattern as /media/ topics) ─────
 const TOOL_CARD_W = 84;
 const TOOL_CARD_H = 68;
-const TOOL_CARD_GAP = 8;
 
 interface ToolCat { id: string; label: string; label_he: string; icon: ReactNode; color: string; }
 const TOOL_CATS: ToolCat[] = [
@@ -721,10 +721,6 @@ function ToolsFilterBar({ counts, selected, onSelect, isHe }: {
   onSelect: (id: string | null) => void;
   isHe: boolean;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollBy = (dir: 1 | -1) => {
-    scrollRef.current?.scrollBy({ left: dir * (TOOL_CARD_W + TOOL_CARD_GAP) * 3, behavior: "smooth" });
-  };
   const btnBase = {
     flexShrink: 0, width: `${TOOL_CARD_W}px`, height: `${TOOL_CARD_H}px`, borderRadius: "12px",
     cursor: "pointer", display: "flex" as const, flexDirection: "column" as const,
@@ -732,60 +728,49 @@ function ToolsFilterBar({ counts, selected, onSelect, isHe }: {
     transition: "transform 0.15s, background 0.15s, border 0.15s",
     scrollSnapAlign: "start", outline: "none",
   };
-  const arrowBtn = {
-    position: "absolute" as const, top: "50%", transform: "translateY(-50%)", zIndex: 2,
-    width: "28px", height: "28px", borderRadius: "50%", background: "#fff",
-    border: "1px solid #e0e0ec", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", cursor: "pointer",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: "18px", color: "#4a4a6a", lineHeight: 1, outline: "none",
-  };
   return (
-    <div style={{ position: "relative", marginBottom: "20px" }}>
-      {/* dir="ltr" so the angle glyph isn't bidi-mirrored in Hebrew/RTL —
-          the arrow must point in its physical scroll direction. */}
-      <button dir="ltr" aria-label="scroll left" onClick={() => scrollBy(-1)} style={{ ...arrowBtn, left: 0 }}>‹</button>
-      <div ref={scrollRef} style={{ display: "flex", gap: `${TOOL_CARD_GAP}px`, overflowX: "auto", scrollbarWidth: "none", padding: "4px 36px", scrollSnapType: "x mandatory" }}>
-        <button
-          onClick={() => onSelect(null)}
-          style={{
-            ...btnBase,
-            border: selected === null ? "2px solid #6b6b8a" : "1.5px solid #e0e0ec",
-            background: selected === null ? "linear-gradient(135deg,#6b6b8a 0%,#4a4a6a 100%)" : "#fff",
-            color: selected === null ? "#fff" : "#6b6b8a",
-            transform: selected === null ? "scale(1.08)" : "scale(1)",
-          }}
-        >
-          <span style={{ fontSize: "20px" }}>🔥</span>
-          <span style={{ fontSize: "10px", fontWeight: 800, lineHeight: 1.2 }}>{isHe ? "הכל" : "All"}</span>
-          {(counts["__all__"] || 0) > 0 && <span style={{ fontSize: "9px", opacity: 0.6 }}>{counts["__all__"]}</span>}
-        </button>
-        {TOOL_CATS.map((cat) => {
-          const count = counts[cat.id] || 0;
-          const isActive = selected === cat.id;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => count > 0 && onSelect(isActive ? null : cat.id)}
-              disabled={count === 0}
-              style={{
-                ...btnBase,
-                border: isActive ? `2px solid ${cat.color}` : "1.5px solid #e0e0ec",
-                background: isActive ? `linear-gradient(135deg,${cat.color}28 0%,${cat.color}14 100%)` : "#fff",
-                color: isActive ? cat.color : "#6b6b8a",
-                transform: isActive ? "scale(1.08)" : "scale(1)",
-                opacity: count === 0 ? 0.42 : 1,
-                cursor: count === 0 ? "default" : "pointer",
-              }}
-            >
-              <span style={{ fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center", height: "22px" }}>{cat.icon}</span>
-              <span style={{ fontSize: "10px", fontWeight: 800, lineHeight: 1.2, textAlign: "center" }}>{isHe ? cat.label_he : cat.label}</span>
-              {count > 0 && <span style={{ fontSize: "9px", opacity: 0.6 }}>{count}</span>}
-            </button>
-          );
-        })}
-      </div>
-      <button dir="ltr" aria-label="scroll right" onClick={() => scrollBy(1)} style={{ ...arrowBtn, right: 0 }}>›</button>
-    </div>
+    <FilterCarousel style={{ marginBottom: "20px" }} activeKey={selected ?? "__all__"}>
+      <button
+        data-carousel-active={selected === null}
+        onClick={() => onSelect(null)}
+        style={{
+          ...btnBase,
+          border: selected === null ? "2px solid #6b6b8a" : "1.5px solid #e0e0ec",
+          background: selected === null ? "linear-gradient(135deg,#6b6b8a 0%,#4a4a6a 100%)" : "#fff",
+          color: selected === null ? "#fff" : "#6b6b8a",
+          transform: selected === null ? "scale(1.08)" : "scale(1)",
+        }}
+      >
+        <span style={{ fontSize: "20px" }}>🔥</span>
+        <span style={{ fontSize: "10px", fontWeight: 800, lineHeight: 1.2 }}>{isHe ? "הכל" : "All"}</span>
+        {(counts["__all__"] || 0) > 0 && <span style={{ fontSize: "9px", opacity: 0.6 }}>{counts["__all__"]}</span>}
+      </button>
+      {TOOL_CATS.map((cat) => {
+        const count = counts[cat.id] || 0;
+        const isActive = selected === cat.id;
+        return (
+          <button
+            key={cat.id}
+            data-carousel-active={isActive}
+            onClick={() => count > 0 && onSelect(isActive ? null : cat.id)}
+            disabled={count === 0}
+            style={{
+              ...btnBase,
+              border: isActive ? `2px solid ${cat.color}` : "1.5px solid #e0e0ec",
+              background: isActive ? `linear-gradient(135deg,${cat.color}28 0%,${cat.color}14 100%)` : "#fff",
+              color: isActive ? cat.color : "#6b6b8a",
+              transform: isActive ? "scale(1.08)" : "scale(1)",
+              opacity: count === 0 ? 0.42 : 1,
+              cursor: count === 0 ? "default" : "pointer",
+            }}
+          >
+            <span style={{ fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center", height: "22px" }}>{cat.icon}</span>
+            <span style={{ fontSize: "10px", fontWeight: 800, lineHeight: 1.2, textAlign: "center" }}>{isHe ? cat.label_he : cat.label}</span>
+            {count > 0 && <span style={{ fontSize: "9px", opacity: 0.6 }}>{count}</span>}
+          </button>
+        );
+      })}
+    </FilterCarousel>
   );
 }
 

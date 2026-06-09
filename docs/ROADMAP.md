@@ -74,7 +74,10 @@ Tier 1 (real risk / has already bitten us) — **4 of 5 DONE 2026-06-07**:
   LATENT BUG — the AUP refusal fix now covers the merger; added a soft_timeout to
   shared (preserves merger's 600→1800s fast-fail) + a merger-level sanitize-retry
   (drops the flagged bio/cyber story and re-merges, so the 06-07 outage class is
-  actually prevented, verified end-to-end).
+  actually prevented, verified end-to-end). [e57598f] also retries TRANSIENT
+  claude -p errors (529 / "stream idle timeout" / socket-closed / 5xx) — added
+  after 06-09 when a stream-idle-timeout hard-failed the merger; one fix covers
+  every agent now (the consolidation payoff).
 - ✅ [552ce43] JSON parse+repair → `shared/json_repair.py` (union of all 5 agents'
   strategies; verified no regressions). All 5 `tools.py` `_parse()` delegate to it.
 - ✅ [2b62810] Anthropic pricing → `shared/pricing.py` (fixed perplexity's drifted

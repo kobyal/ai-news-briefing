@@ -150,11 +150,22 @@ def agent(
             raise RuntimeError(f"[{label}] claude -p timed out after {_timeout}s")
         if r.returncode == 0:
             break
-        # Check for 529 overloaded — always worth retrying with backoff
-        is_529 = "529" in r.stdout or "Overloaded" in r.stdout
-        if is_529 and attempt < 3:
+        # Retry TRANSIENT API errors with backoff — overload (529) and stream
+        # stalls all resolve on a fresh attempt (2026-06-09: the merger hard-failed
+        # on "Stream idle timeout - partial response received"). AUP refusals are
+        # deliberately NOT in this list, so they fall through to the typed
+        # UsagePolicyRefusal below instead of being retried pointlessly.
+        _out = (r.stdout or "") + (r.stderr or "")
+        _ol = _out.lower()
+        is_transient = (
+            "529" in _out or "overloaded" in _ol
+            or "stream idle timeout" in _ol or "partial response received" in _ol
+            or "socket connection was closed" in _ol
+            or "service unavailable" in _ol or "internal server error" in _ol
+        )
+        if is_transient and attempt < 3:
             wait = 30 * (attempt + 1)  # 30s, 60s, 90s
-            print(f"    ⚠  [{label}] API 529 overloaded, retrying in {wait}s (attempt {attempt+1}/3)...")
+            print(f"    ⚠  [{label}] transient API error, retrying in {wait}s (attempt {attempt+1}/3)...")
             time.sleep(wait)
             continue
         # Only retry silent failures (no output to diagnose)

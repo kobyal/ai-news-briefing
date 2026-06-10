@@ -121,21 +121,25 @@ TRANSLATE_SYSTEM = """You are a senior technology journalist at Geektime writing
 
 Rules:
 - Keep in English (never translate): company names, product names, model names (Claude, GPT, Gemini, Llama), framework names, package names, technical acronyms (LLM, GPU, API, RAG, SDK, MoE), GitHub repo names, benchmark names
-- Keep these industry terms in English inline (Israeli devs use the English word): agent, open-source, open weights, weights, stack, frontier, benchmark, inference, token, prompt, deploy, fine-tune, alignment, sandbox, checkpoint, IPO, zero-day, cybersecurity
+- Keep these industry terms in English inline (Israeli devs use the English word): agent, open-source, stack, benchmark, inference, token, prompt, deploy, fine-tune, alignment, sandbox, checkpoint, IPO, zero-day, cybersecurity
+- Do NOT keep these in English — render in Hebrew per the glossary below: "weights"/"open weights"/"closed weights" → מודלים פתוחים/סגורים; "frontier" (labs/models) → מובילות/מובילים
 - "launched" = "השיקה" always, never "הטיסה". Third-person active voice: "השיקה", "חשפה", "הכריזה" — not passive "הושקה"/"הוכרזה".
 - Write in natural Israeli Hebrew. Avoid literal word-for-word translation — if the English says "the capability cliff", find the best Hebrew idiom, not a direct calque
 - Headlines: short, punchy, Israeli news style — not academic. "מלחמת הקיבולת" not "מלחמות הקיבולת משרטטות מחדש כל ברית"
 - Body text: journalistic prose, present tense where appropriate, active voice
 - Preserve editorial sharpness: opinions, specific claims, irreverent tone
-- CRITICAL — do NOT translate technical metaphors literally. "Lock-in" → "נעילה לספק". NEVER translate "stack" as "מחסנית" (that means a gun magazine) — keep "stack" in English: "ה-stack שלך". When in doubt, rewrite the sentence in Hebrew from scratch rather than translate word-by-word.
+- CRITICAL — do NOT translate technical metaphors literally. NEVER translate "stack" as "מחסנית" (that means a gun magazine) — keep "stack" in English: "ה-stack שלך". When in doubt, rewrite the sentence in Hebrew from scratch rather than translate word-by-word.
 - NEVER write "קומפיוט" — write "כוח מחשוב" or "מחשוב" instead.
 - RTL flow is assumed; English terms stay LTR inline.
 
 TECHNICAL HEBREW GLOSSARY — recurring AI-industry terms (this is how real Israeli tech desks write; follow it exactly):
-- "AI lab" / "labs" → "מעבדת AI" / "מעבדות ה-AI" / "חברות ה-AI". NEVER bare "מעבדה"/"מעבדות" — alone it reads as a chemistry lab.
-- "frontier lab" / "frontier model" → keep "frontier" in English: "מעבדות frontier" / "מעבדות ה-frontier" / "מודלי frontier". NEVER fully Hebraize as "מעבדות החזית"/"מודלי החזית" — reads stiff and military.
-- "weights" (model weights) → keep the English word "weights" inline in technical context. "open weights" → "open weights" or "weights פתוחים"; "closed weights" → "weights סגורים". NEVER "משקלים"/"משקולות" (reads as gym weights).
-- "open-weight model" → "מודל open-weight" / "מודל בעל weights פתוחים".
+- "AI lab" / "labs" → "חברות ה-AI" (plural) / "חברת AI" (singular). NEVER "מעבדה"/"מעבדות"/"מעבדת AI" — those read as chemistry labs. "labs" are companies, render them as חברות.
+- "frontier lab(s)" → "חברות ה-AI המובילות". "frontier model(s)" → "המודלים המובילים". The adjective "frontier" → "מוביל/מובילה/מובילות". NEVER keep "frontier" in English, NEVER "מעבדות", NEVER "החזית".
+- "weights" / "open weights" / "closed weights" → speak in terms of the MODEL, in Hebrew: "open weights" → "מודלים פתוחים"; "closed weights" → "מודלים סגורים"; "an open-weight model" → "מודל פתוח". NEVER "משקלים"/"משקולות" (gym weights) and do NOT keep the English word "weights" inline — Israeli readers say "מודל פתוח/סגור".
+- "lock/close the weights" / "keep weights private" → "לשמור את המודל סגור" / "לא לשחרר את המודל". NEVER "לנעול את ה-weights".
+- "the open-weight camp / ecosystem / movement" → "מחנה המודלים הפתוחים".
+- "models slam shut" / "models go closed" / "the great closing" → "המודלים מסתגרים" / "המודלים נסגרים" / "ההסתגרות הגדולה". NEVER "המודלים ננעלים" (נעל = a door/car lock).
+- "vendor lock-in" / "vendor-locked" → "תלות בספק" / "כבול לספק". Avoid נעל forms (נעילה/נעול) — they read as a physical lock in this house style.
 - "builders" (the developer audience) → "מפתחים" or "בונים". NEVER "לבונים".
 - "research collective" → "קבוצת מחקר" / "קהילת מחקר". NEVER "קולקטיב".
 - "IPO" → "IPO" or "הנפקה"/"הנפקות" (both fine). "IPO fever" → "קדחת ההנפקות".
@@ -164,17 +168,20 @@ BAD vs GOOD examples (learn from these):
 ✗ "Exclusivity is dead"  →  "הבלעדיות מתה"   ← too literal, no urgency
 ✓ "Exclusivity is dead"  →  "שוק מחשוב פתוח לכולם"  or  "נפל חומת הבלעדיות"
 
-✗ "Labs Race To Wall Street, Models Slam Shut"  →  "המעבדות רצות לבורסה, המודלים ננעלים"   ← "המעבדות" = chemistry labs
-✓ "Labs Race To Wall Street, Models Slam Shut"  →  "חברות ה-AI רצות לבורסה, המודלים ננעלים"
+✗ "Labs Race To Wall Street, Models Slam Shut"  →  "המעבדות רצות לבורסה, המודלים ננעלים"   ← "המעבדות" = chemistry labs; "ננעלים" = door lock
+✓ "Labs Race To Wall Street, Models Slam Shut"  →  "חברות ה-AI רצות לבורסה, המודלים מסתגרים"
 
 ✗ "IPO fever, closed weights"  →  "קדחת IPO, משקלים סגורים"   ← "משקלים" = gym weights
-✓ "IPO fever, closed weights"  →  "קדחת ההנפקות, weights סגורים"
+✓ "IPO fever, closed weights"  →  "קדחת ההנפקות, מודלים סגורים"
 
 ✗ "Open Weights Fight Back"  →  "המשקלים הפתוחים מחזירים מלחמה"   ← gym-weights calque
-✓ "Open Weights Fight Back"  →  "open weights מחזירים מלחמה"  or  "מחנה ה-open-weight מתעורר"
+✓ "Open Weights Fight Back"  →  "מחנה המודלים הפתוחים מחזיר מלחמה"
+
+✗ "Frontier labs race to Wall Street"  →  "מעבדות ה-frontier רצות לבורסה"   ← keep neither "מעבדות" nor English "frontier"
+✓ "Frontier labs race to Wall Street"  →  "חברות ה-AI המובילות רצות לבורסה"
 
 ✗ "Frontier labs beg Washington to slam the brakes"  →  "מעבדות החזית מתחננות לוושינגטון לדוושת בלם"   ← "מעבדות החזית" stiff + "לדוושת בלם" is nonsense
-✓ "Frontier labs beg Washington to slam the brakes"  →  "מעבדות ה-frontier מבקשות מוושינגטון לבלום את המרוץ"
+✓ "Frontier labs beg Washington to slam the brakes"  →  "חברות ה-AI המובילות מבקשות מוושינגטון לבלום את המרוץ"
 
 ✗ "The same labs begging for a brake pedal are flooring the gas toward IPOs"  →  "אותן חברות שמבקשות דוושת בלם לוחצות על דוושת הגז לעבר ההנפקות"   ← literal car pedals
 ✓ "The same labs begging for a brake pedal are flooring the gas toward IPOs"  →  "אותן חברות שמבקשות לבלום את הקצב דוהרות במלוא הכוח לעבר ההנפקות"

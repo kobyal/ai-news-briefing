@@ -129,6 +129,20 @@ Rules:
 - NEVER write "קומפיוט" — write "כוח מחשוב" or "מחשוב" instead.
 - RTL flow is assumed; English terms stay LTR inline.
 
+TECHNICAL HEBREW GLOSSARY — recurring AI-industry terms (this is how real Israeli tech desks write; follow it exactly):
+- "AI lab" / "labs" → "מעבדת AI" / "מעבדות ה-AI" / "חברות ה-AI". NEVER bare "מעבדה"/"מעבדות" — alone it reads as a chemistry lab.
+- "frontier lab" / "frontier model" → "מעבדות החזית" / "מודלי החזית" (established) — or "המעבדות המובילות". Never "מעבדות קדמיות".
+- "weights" (model weights) → keep the English word "weights" inline in technical context. "open weights" → "open weights" or "weights פתוחים"; "closed weights" → "weights סגורים". NEVER "משקלים"/"משקולות" (reads as gym weights).
+- "open-weight model" → "מודל open-weight" / "מודל בעל weights פתוחים".
+- "builders" (the developer audience) → "מפתחים" or "בונים". NEVER "לבונים".
+- "research collective" → "קבוצת מחקר" / "קהילת מחקר". NEVER "קולקטיב".
+- "IPO" → "IPO" or "הנפקה"/"הנפקות" (both fine). "IPO fever" → "קדחת ההנפקות".
+- "slam the brakes" / "hit the brakes" → "ללחוץ על הבלם". NEVER "לדוושת בלם".
+- "the money opens up" / "capital floods in" → "הכסף זורם" / "ההון נשפך פנימה". Never "הכסף נפתח".
+- "hardened against X" → "מחוזק מפני X" / "ערוך מפני X". Never the clinical "מחוסן בכוונה תחילה".
+- "the hot-vendor index" / "who's hot" → "מי בולט השבוע" / "הספקים שבולטים". Avoid "ספקים חמים" (reads literal).
+- "the pipeline is leaking" (talent/data) → "צינור ה[כישרון/נתונים] מאבד אחיזה" / "דליפה בצינור". Keep the metaphor only if it reads naturally in Hebrew.
+
 CRITICAL RULE FOR SHORT LABELS (theme headline, lens labels — 2–6 word phrases):
 These are editorial BRAND NAMES, not sentences to translate. For each short label, ask yourself: "what is the underlying drama, tension, or conflict here?" then write a punchy Israeli news phrase that captures THAT — not the English words.
 
@@ -147,6 +161,21 @@ BAD vs GOOD examples (learn from these):
 
 ✗ "Exclusivity is dead"  →  "הבלעדיות מתה"   ← too literal, no urgency
 ✓ "Exclusivity is dead"  →  "שוק מחשוב פתוח לכולם"  or  "נפל חומת הבלעדיות"
+
+✗ "Labs Race To Wall Street, Models Slam Shut"  →  "המעבדות רצות לבורסה, המודלים ננעלים"   ← "המעבדות" = chemistry labs
+✓ "Labs Race To Wall Street, Models Slam Shut"  →  "חברות ה-AI רצות לבורסה, המודלים ננעלים"
+
+✗ "IPO fever, closed weights"  →  "קדחת IPO, משקלים סגורים"   ← "משקלים" = gym weights
+✓ "IPO fever, closed weights"  →  "קדחת ההנפקות, weights סגורים"
+
+✗ "Open Weights Fight Back"  →  "המשקלים הפתוחים מחזירים מלחמה"   ← gym-weights calque
+✓ "Open Weights Fight Back"  →  "open weights מחזירים מלחמה"  or  "מחנה ה-open-weight מתעורר"
+
+✗ "Frontier labs beg Washington to slam the brakes"  →  "מעבדות החזית מתחננות לוושינגטון לדוושת בלם"   ← "לדוושת בלם" is nonsense
+✓ "Frontier labs beg Washington to slam the brakes"  →  "מעבדות החזית מבקשות מוושינגטון ללחוץ על הבלם"
+
+✗ "research collectives"  →  "קולקטיבים מחקריים"   ← transliteration
+✓ "research collectives"  →  "קבוצות מחקר"  or  "קהילות מחקר"
 
 Return ONLY a JSON object with the translated fields. No markdown. No explanation."""
 

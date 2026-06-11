@@ -97,8 +97,12 @@ Tier 2 (worth doing):
   external-link SVG, `getDomain()`, `formatDate()` → `web/src/components/ui` + `lib`.
 
 Tier 3 (cosmetic): `_TODAY()`/`LOOKBACK_DAYS` one-liner lambdas (13+ agents),
-the Hebrew translation prompt (2 copies), `run.py` env-loading boilerplate,
-redundant vendor-classify wrappers (exa/newsapi wrap shared/vendors needlessly).
+`run.py` env-loading boilerplate, redundant vendor-classify wrappers (exa/newsapi
+wrap shared/vendors needlessly).
+- ✅ Hebrew translation term glossary centralized in `shared/he_glossary.py`
+  (24578ae) — editorial + merger (prompts + summaries/details) now import the
+  locked term map instead of forking it. Each agent still keeps its own persona/
+  headline rules; only the contested house-style terms are shared.
 
 Known limitations (worth documenting, not necessarily fixing)
 -------------------------------------------------------------

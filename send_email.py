@@ -409,32 +409,54 @@ def _check_apis() -> list[dict]:
     # User-Agent (Python-urllib/3.x) gets blocked by Jina's bot filter with
     # 403, even for valid keys. Passing a browser-like UA is enough to pass
     # the probe reliably.
+    # Probe both keys, then emit ONE aggregate status. article_reader.py rotates
+    # key #1 → key #2 on 402/403/429, so an exhausted key #1 (402, every run once
+    # its paid credits run out) is fully covered if key #2 works. Flagging each key
+    # independently produced a permanent false "❌ Jina #1 402" even though articles
+    # read fine (2026-06-11: jina=35). Only a real failure = BOTH keys down AND zero
+    # jina reads today.
     firecrawl_present = bool(os.environ.get("FIRECRAWL_API_KEY", ""))
-    for i, key_name in enumerate(["JINA_API_KEY", "JINA_API_KEY2"], 1):
-        key = os.environ.get(key_name, "")
-        if not key:
-            continue
+    jina_keys = [(n, os.environ.get(n, "")) for n in ("JINA_API_KEY", "JINA_API_KEY2")]
+    jina_keys = [(n, k) for n, k in jina_keys if k]
+    if jina_keys:
+        probe = {}  # short label ("#1"/"#2") -> "ok" | "<err>"
+        for i, (key_name, key) in enumerate(jina_keys, 1):
+            try:
+                req = urllib.request.Request("https://r.jina.ai/https://example.com")
+                req.add_header("Authorization", f"Bearer {key}")
+                req.add_header("Accept", "text/markdown")
+                req.add_header("User-Agent", "ai-news-briefing/1.0")  # bypass bot filter
+                with urllib.request.urlopen(req, timeout=8):
+                    probe[f"#{i}"] = "ok"
+            except Exception as e:
+                probe[f"#{i}"] = str(e)[:40]
+
+        ok_keys   = [lbl for lbl, r in probe.items() if r == "ok"]
+        dead_keys = [(lbl, r) for lbl, r in probe.items() if r != "ok"]
+        # How many articles actually read via Jina today (rotation/unauth/cache)?
+        jina_reads = 0
         try:
-            req = urllib.request.Request("https://r.jina.ai/https://example.com")
-            req.add_header("Authorization", f"Bearer {key}")
-            req.add_header("Accept", "text/markdown")
-            req.add_header("User-Agent", "ai-news-briefing/1.0")  # bypass bot filter
-            with urllib.request.urlopen(req, timeout=8):
-                checks.append({"name": f"Jina #{i}", "status": "ok", "detail": "Reader · free tier",
-                               "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
-        except Exception as e:
-            err = str(e)
-            if "403" in err or "429" in err:
-                # Key genuinely rejected. Firecrawl (or unauth Reader) can still serve article reads.
-                if firecrawl_present:
-                    detail = f"{err[:40]} · Firecrawl covers"
-                else:
-                    detail = f"{err[:40]} · unauth Reader fallback"
-                checks.append({"name": f"Jina #{i}", "status": "warn", "detail": detail,
-                               "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
-            else:
-                checks.append({"name": f"Jina #{i}", "status": "error", "detail": err[:60],
-                               "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
+            _ar = sorted(glob.glob(f"article-reader-agent/output/{datetime.now().strftime('%Y-%m-%d')}/articles_*.json"))
+            if _ar:
+                jina_reads = int((_load_json(_ar[-1]).get("stats", {}) or {}).get("jina", 0))
+        except Exception:
+            pass
+
+        if ok_keys:
+            detail = "Reader · free tier"
+            if dead_keys:
+                detail = f"key {ok_keys[0]} ok · key {dead_keys[0][0]} exhausted ({dead_keys[0][1]}) — rotation covers"
+            checks.append({"name": "Jina", "status": "ok", "detail": detail,
+                           "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
+        elif jina_reads > 0 or firecrawl_present:
+            cover = f"{jina_reads} reads via unauth/cache" if jina_reads > 0 else "Firecrawl covers"
+            checks.append({"name": "Jina", "status": "warn",
+                           "detail": f"both keys down ({dead_keys[0][1]}) · {cover}",
+                           "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
+        else:
+            checks.append({"name": "Jina", "status": "error",
+                           "detail": f"both keys failed: {dead_keys[0][1]}",
+                           "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
 
     # ── FREE: X/Twitter scrape — surfaces auth-cookie expiry as ⚠️ ─────
     today = datetime.now().strftime("%Y-%m-%d")

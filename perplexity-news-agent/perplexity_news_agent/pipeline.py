@@ -203,15 +203,27 @@ def _agent(
     _RETRY_DELAYS = [5, 15, 30]
     resp = None
     for _attempt in range(len(_RETRY_DELAYS) + 1):
-        resp = requests.post(
-            f"{_BASE_URL}/v1/responses",
-            headers={
-                "Authorization": f"Bearer {_API_KEY()}",
-                "Content-Type":  "application/json",
-            },
-            json=payload,
-            timeout=120,
-        )
+        try:
+            resp = requests.post(
+                f"{_BASE_URL}/v1/responses",
+                headers={
+                    "Authorization": f"Bearer {_API_KEY()}",
+                    "Content-Type":  "application/json",
+                },
+                json=payload,
+                timeout=120,
+            )
+        except (requests.Timeout, requests.ConnectionError) as e:
+            # The Sonar API sometimes stalls past the 120s read timeout. A raised
+            # ReadTimeout/ConnectionError must be retried like a 5xx — otherwise it
+            # propagates and kills the whole agent (2026-06-11: uncaught ReadTimeout
+            # → perplexity wrote no output → "agent didn't run today").
+            if _attempt < len(_RETRY_DELAYS):
+                delay = _RETRY_DELAYS[_attempt]
+                print(f"    ⟳  [{label}] Perplexity API network timeout ({type(e).__name__}) — retrying in {delay}s (attempt {_attempt + 1}/{len(_RETRY_DELAYS)})...")
+                time.sleep(delay)
+                continue
+            raise RuntimeError(f"[{label}] Perplexity API network timeout after {len(_RETRY_DELAYS)} retries: {e}")
         if resp.ok:
             break
         if resp.status_code in _RETRYABLE and _attempt < len(_RETRY_DELAYS):

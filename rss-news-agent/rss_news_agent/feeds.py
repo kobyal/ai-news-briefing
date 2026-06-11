@@ -224,7 +224,13 @@ def _clean_html(text: str) -> str:
 
 def _fetch_rss(url: str, vendor_tag: str, since: datetime) -> List[dict]:
     try:
-        feed = feedparser.parse(url)
+        # Fetch with requests (hard 15s timeout) then hand the bytes to feedparser.
+        # feedparser.parse(url) does its OWN urllib fetch with NO timeout, so a feed
+        # server that accepts the connection but never responds blocks the worker
+        # thread forever — and as_completed() has no timeout either, so the whole
+        # agent hung >1200s and got force-killed (2026-06-11: rss "didn't run today").
+        resp = _requests.get(url, timeout=15, headers={"User-Agent": "ai-news-briefing/1.0"})
+        feed = feedparser.parse(resp.content)
         articles = []
         for entry in feed.entries[:20]:
             pub = _parse_date(entry)

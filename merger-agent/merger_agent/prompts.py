@@ -1,6 +1,7 @@
 """Prompt strings for the Merger pipeline."""
 import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
 from shared.vendors import VENDOR_ENUM
+from shared.he_glossary import HE_TERM_GLOSSARY
 
 MERGER_PROMPT = """\
 You are the EDITOR of a daily AI industry briefing — not a wire service. Your reader has been
@@ -294,6 +295,8 @@ TRANSLATOR_PROMPT = """\
 - ❌ "מואצת דרמטית את לוחות הזמנים" → ✅ "מקצרת משמעותית את זמני הפיתוח"
 - ❌ "שומרי שער ביטחוניים" → ✅ "מנגנוני בטיחות"
 - ❌ "צבר חיובי" → ✅ "קיבל תגובות חיוביות" או "זכה להתלהבות"
+
+""" + HE_TERM_GLOSSARY + """
 
 כותרות (headlines_he) — כללים ספציפיים:
 כותרת טובה = מגנטית + מדויקת. לא clickbait, לא ויקיפדיה. שלוש שניות לגרום לקורא לרצות לקרוא.

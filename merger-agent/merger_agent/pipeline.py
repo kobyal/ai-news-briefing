@@ -32,6 +32,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.pricing import estimate_cost  # noqa: E402
 from shared import anthropic_cc  # noqa: E402
+from shared.he_glossary import HE_TERM_GLOSSARY  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Config — Two execution paths (mutually exclusive, selected at call time):
@@ -525,6 +526,7 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
                 "- launched = 'השיקה' תמיד. לעולם לא 'הטיסה'.\n"
                 "- כתוב בגוף שלישי פעיל: 'השיקה', 'חשפה', 'הכריזה' (לא 'הושקה', 'הוכרזה')\n"
                 "- אם המשפט נשמע מתורגם — כתוב אותו מחדש. אם מפתח ישראלי היה מגלגל עיניים — כתוב מחדש.\n\n"
+                + HE_TERM_GLOSSARY + "\n\n"
                 + summaries_input
                 + '\n\nהחזר JSON בלבד: {"summaries_he": ["סיכום 1", "סיכום 2", ...]}'
             ),
@@ -563,6 +565,7 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
                 "- כתוב בגוף שלישי פעיל: 'השיקה', 'חשפה', 'הכריזה' (לא 'הושקה', 'הוכרזה')\n"
                 "- שמור על 2-3 פסקאות לכל ניתוח — אל תקצר.\n"
                 "- אם המשפט נשמע מתורגם — כתוב אותו מחדש.\n\n"
+                + HE_TERM_GLOSSARY + "\n\n"
                 + details_input
                 + '\n\nהחזר JSON בלבד: {"details_he": ["ניתוח 1", "ניתוח 2", ...]}'
             ),

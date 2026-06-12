@@ -447,6 +447,12 @@ def _step2_merge(adk_briefing: dict, px_briefing: dict, rss_briefing: dict,
         prompt = prompt.replace("{extra_sources}", extra_context)
         prompt = prompt.replace("{vendor_enum}", VENDOR_ENUM)
         prompt = prompt.replace("{recent_headlines}", _recent_headlines(5))
+        # Anchor "today" so the §3.0 freshness ranking is operable — without this the
+        # LLM sees per-story published_dates but has no reference for "today/yesterday"
+        # and falls back to importance, surfacing 3-day-old launches over fresh items
+        # (2026-06-12: 8 Jun-9 stories in a Jun-12 briefing despite 14 fresh Jun-11 ones).
+        _today = datetime.now()
+        prompt = prompt.replace("{today}", f"{_today.strftime('%B %d, %Y').replace(' 0', ' ')} ({_today.strftime('%Y-%m-%d')})")
         return f"{prompt}\n\nJSON SCHEMA:\n{schema_desc}"
 
     def _call(input_text: str) -> str:

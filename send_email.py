@@ -901,6 +901,31 @@ def _add_sidedata_rows(rows: list) -> None:
     rows.append(_sidedata_row("podcasts",     repo / "docs/data/_podcasts_runs.jsonl",      today, _podcasts))
     rows.append(_sidedata_row("search index", repo / "docs/data/_search_index_runs.jsonl", today, _search_index))
 
+    # Editorial agent (/main weekly). Runs at [3d], BEFORE this email — but it lives
+    # outside run_all.py's source-agent loop, so it was never monitored. A silent
+    # editorial failure leaves /main serving stale data with zero signal. Check the
+    # canonical editorial.json: present, parseable, and dated today.
+    def _editorial_row() -> dict:
+        p = repo / "docs/data/editorial.json"
+        if not p.exists():
+            return {"agent": "editorial (/main)", "raw": "—", "json": "✗", "site": "✗",
+                    "status": "error", "note": "editorial.json missing — /main has no fresh data"}
+        try:
+            ed = json.loads(p.read_text())
+        except Exception as e:
+            return {"agent": "editorial (/main)", "raw": "—", "json": "✗", "site": "✗",
+                    "status": "error", "note": f"editorial.json unparseable: {str(e)[:40]}"}
+        edate = ed.get("date", "")
+        nlenses = len(ed.get("lenses", []) or [])
+        theme = (ed.get("theme", {}).get("headline", "") or "")[:50]
+        if edate == today:
+            return {"agent": "editorial (/main)", "raw": f"{nlenses} lenses", "json": "✓", "site": "✓",
+                    "status": "ok", "note": theme}
+        return {"agent": "editorial (/main)", "raw": f"{nlenses} lenses",
+                "json": f"stale {edate}", "site": f"stale {edate}", "status": "error",
+                "note": f"date={edate}, expected {today} — editorial didn't run / /main stale"}
+    rows.append(_editorial_row())
+
 
 def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dict]:
     """Top-of-email banner: roll up every issue across delivery + freshness + API

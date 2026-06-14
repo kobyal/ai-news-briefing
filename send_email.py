@@ -1054,16 +1054,17 @@ def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dic
     out = []
     for r in agent_delivery:
         if r.get("status") in ("error", "warn"):
-            out.append({"label": r["agent"], "detail": r["note"] or "issue", "severity": r["status"]})
+            out.append({"label": r["agent"], "detail": r["note"] or "issue", "severity": r["status"],
+                        "category": "pipeline" if r.get("group") == "pipeline" else "delivery"})
     for r in freshness_signals:
         if r.get("status") in ("error", "warn"):
             d = f"{r['value']} ({r['note']})" if r.get("note") else r["value"]
-            out.append({"label": r["label"], "detail": d, "severity": r["status"]})
+            out.append({"label": r["label"], "detail": d, "severity": r["status"], "category": "freshness"})
     for c in api_checks:
         s = c.get("status")
         if s in ("error", "exhausted", "warn"):
             sev = "error" if s in ("error", "exhausted") else "warn"
-            out.append({"label": c["name"], "detail": c.get("detail", ""), "severity": sev})
+            out.append({"label": c["name"], "detail": c.get("detail", ""), "severity": sev, "category": "api"})
 
     # Data-quality issues from publish_data.py audit — silent bugs (orphan EN/HE
     # translations, all-Chinese-only-source stories, GitHub-org-image misfires
@@ -1075,7 +1076,7 @@ def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dic
         try:
             jd = _load_json(json_path)
             for issue in (jd.get("data_quality_issues") or []):
-                out.append({"label": "data quality", "detail": issue, "severity": "warn"})
+                out.append({"label": "data quality", "detail": issue, "severity": "warn", "category": "data"})
         except Exception:
             pass
 
@@ -1531,34 +1532,56 @@ for f in fallback_events:
     fallback_rows += f'<tr><td style="padding:3px 8px;font-size:12px;color:#d97706">🟡 {f["agent"]}</td><td style="padding:3px 8px;font-size:12px;color:#64748b;font-family:monospace">{f["from"]} → {f["to"]}</td><td style="padding:3px 8px;font-size:12px;font-family:monospace;color:#d97706">×{f["count"]}</td></tr>\n'
 
 problems = _collect_problems(agent_delivery, freshness_signals, api_checks)
-problems_banner = ""
-if problems:
-    n_err = sum(1 for p in problems if p["severity"] in ("error", "exhausted"))
-    n_warn = sum(1 for p in problems if p["severity"] == "warn")
-    severity_label = []
-    if n_err: severity_label.append(f"{n_err} error{'s' if n_err != 1 else ''}")
-    if n_warn: severity_label.append(f"{n_warn} warning{'s' if n_warn != 1 else ''}")
-    border_color = "#dc2626" if n_err else "#d97706"
-    bg_color = "#fef2f2" if n_err else "#fffbeb"
-    title_icon = "🔴" if n_err else "🟡"
-    items_html = ""
-    for p in problems:
-        bullet_color = "#dc2626" if p["severity"] in ("error", "exhausted") else "#d97706"
-        detail_clean = (p.get("detail") or "").replace("<", "&lt;").replace(">", "&gt;")
-        label_clean = (p.get("label") or "").replace("<", "&lt;").replace(">", "&gt;")
-        items_html += (
-            f'<li style="margin:3px 0;color:#374151;font-size:13px">'
-            f'<span style="color:{bullet_color};font-weight:700">●</span> '
-            f'<b>{label_clean}</b> — <span style="color:#6b7280">{detail_clean}</span>'
-            f'</li>'
-        )
-    problems_banner = (
-        f'<div style="border:2px solid {border_color};background:{bg_color};border-radius:10px;padding:14px 18px;margin:0 0 16px 0">\n'
-        f'<p style="margin:0 0 8px 0;font-weight:800;font-size:14px;color:{border_color}">'
-        f'{title_icon} PROBLEMS DETECTED — {", ".join(severity_label)}</p>\n'
-        f'<ul style="margin:0;padding-left:18px;list-style:none">{items_html}</ul>\n'
-        f'</div>\n'
+# ── Verdict-first header (redesign 2026-06-14) ───────────────────────────────
+# One unmistakable top line + an actionable "NEEDS YOU" list (delivery/pipeline/
+# API failures + anything error-severity). Freshness/data warnings roll up as
+# "N minor notes". Full tables are demoted below a "Details" divider. Replaces the
+# old cram-everything PROBLEMS banner that mixed agents, steps, and freshness.
+def _needs_you(p):
+    # Actionable = anything that hard-failed (error/exhausted, any category) OR a
+    # source agent that delivered degraded data (delivery warn, e.g. LinkedIn stale).
+    # Benign warnings (ingest skipped, freshness 1-2d, API fallbacks that recovered)
+    # roll up as "minor notes" so the top stays the few things that truly need you.
+    return p["severity"] in ("error", "exhausted") or (p.get("category") == "delivery" and p["severity"] == "warn")
+def _esc(s):
+    return (s or "").replace("<", "&lt;").replace(">", "&gt;")
+
+needs = [p for p in problems if _needs_you(p)]
+minor = [p for p in problems if not _needs_you(p)]
+_src = [r for r in agent_delivery if r.get("group") != "pipeline" and r.get("status") != "off"]
+_src_ok = sum(1 for r in _src if r.get("status") == "ok")
+_pipe = [r for r in agent_delivery if r.get("group") == "pipeline"]
+_pipe_ok = sum(1 for r in _pipe if r.get("status") == "ok")
+
+if needs:
+    _hard = any(p["severity"] in ("error", "exhausted") for p in needs)
+    accent, bg = ("#dc2626", "#fef2f2") if _hard else ("#d97706", "#fffbeb")
+    n = len(needs)
+    head = f"{'🔴' if _hard else '⚠️'} {n} THING{'S' if n != 1 else ''} NEED{'' if n != 1 else 'S'} YOU"
+    items = ""
+    for p in needs:
+        dot = "🔴" if p["severity"] in ("error", "exhausted") else "🟡"
+        items += (f'<li style="margin:5px 0;font-size:14px;color:#374151">{dot} '
+                  f'<b>{_esc(p.get("label"))}</b> — {_esc(p.get("detail"))}</li>')
+    verdict_block = (
+        f'<div style="border-left:4px solid {accent};background:{bg};border-radius:6px;padding:12px 16px;margin:0 0 14px">'
+        f'<p style="margin:0 0 6px;font-weight:800;font-size:16px;color:{accent}">{head}</p>'
+        f'<ul style="margin:0;padding-left:20px;list-style:none">{items}</ul></div>'
     )
+else:
+    verdict_block = (
+        '<div style="border-left:4px solid #16a34a;background:#f0fdf4;border-radius:6px;padding:12px 16px;margin:0 0 14px">'
+        '<p style="margin:0;font-weight:800;font-size:16px;color:#16a34a">✅ ALL HEALTHY — nothing needs you</p></div>'
+    )
+
+_minor_tail = (f' · <span style="color:#d97706">{len(minor)} minor note'
+               f'{"s" if len(minor) != 1 else ""} below</span>') if minor else ""
+verdict_block += (
+    f'<p style="margin:0 0 3px;font-size:14px;color:#16a34a;font-weight:600">✅ Everything else OK</p>'
+    f'<p style="margin:0 0 16px;font-size:13px;color:#64748b">'
+    f'{_src_ok}/{len(_src)} news sources delivered · {_pipe_ok}/{len(_pipe)} build steps ok · '
+    f'${total_run_cost:.2f} spent{_minor_tail}</p>'
+)
 
 delivery_rows = ""
 _pipeline_header_emitted = False
@@ -1596,7 +1619,9 @@ for r in freshness_signals:
 
 status_section = ""
 if paid_rows or free_rows or usage_rows or fallback_rows or delivery_rows or freshness_rows:
-    status_section = '<hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0">\n'
+    status_section = ('<hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0">\n'
+                      '<p style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;'
+                      'letter-spacing:.05em;margin:0 0 10px">▾ Full details</p>\n')
     if delivery_rows:
         status_section += (
             f'<p style="font-size:11px;font-weight:700;color:#374151;margin-bottom:4px">AGENT DELIVERY (raw → JSON → site)</p>\n'
@@ -1650,8 +1675,7 @@ github.com/kobyal/ai-news-briefing
 body_html = f"""\
 <html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
 <h2 style="color:#1e3a5f">🤖 AI Daily Briefing — {date}</h2>
-{problems_banner}<p>Your multi-source AI news briefing is ready.</p>
-<p>
+{verdict_block}<p>
   <a href="{WEBSITE_URL}" style="display:inline-block;background:#d97706;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-right:12px">Open Web App →</a>
   <a href="{report_url}" style="display:inline-block;background:#1e3a5f;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Raw Report →</a>
 </p>

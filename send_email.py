@@ -924,6 +924,7 @@ def _add_sidedata_rows(rows: list) -> None:
         return {"agent": "editorial (/main)", "raw": f"{nlenses} lenses",
                 "json": f"stale {edate}", "site": f"stale {edate}", "status": "error",
                 "note": f"date={edate}, expected {today} — editorial didn't run / /main stale"}
+    _pipeline_start = len(rows)   # rows from here on are build/publish steps, not content agents
     rows.append(_editorial_row())
 
     # QA evaluator — runs LAST (after this email) and sends no notification of its
@@ -1040,6 +1041,10 @@ def _add_sidedata_rows(rows: list) -> None:
         return {"agent": "ingest (lambda)", "raw": "ok", "json": "✓", "site": "—",
                 "status": "ok", "note": "last invoke returned without error (prior run)"}
     rows.append(_ingest_row())
+    # Mark the build/publish steps so the email renders them under their own
+    # sub-header instead of mixed into the content-agent raw→JSON→site table.
+    for _r in rows[_pipeline_start:]:
+        _r["group"] = "pipeline"
 
 
 def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dict]:
@@ -1556,7 +1561,15 @@ if problems:
     )
 
 delivery_rows = ""
+_pipeline_header_emitted = False
 for r in agent_delivery:
+    if r.get("group") == "pipeline" and not _pipeline_header_emitted:
+        delivery_rows += (
+            '<tr><td colspan="5" style="padding:8px 8px 3px;font-size:11px;font-weight:700;'
+            'color:#64748b;text-transform:uppercase;letter-spacing:.04em;border-top:1px solid #e2e8f0">'
+            '⚙ Build &amp; publish steps</td></tr>\n'
+        )
+        _pipeline_header_emitted = True
     icon = {"ok": "🟢", "warn": "🟡", "error": "❌", "off": "⚪"}.get(r["status"], "⚪")
     color = {"ok": "#16a34a", "warn": "#d97706", "error": "#dc2626", "off": "#9ca3af"}.get(r["status"], "#64748b")
     delivery_rows += (

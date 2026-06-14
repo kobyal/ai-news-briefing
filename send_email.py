@@ -926,6 +926,82 @@ def _add_sidedata_rows(rows: list) -> None:
                 "note": f"date={edate}, expected {today} — editorial didn't run / /main stale"}
     rows.append(_editorial_row())
 
+    # QA evaluator — runs LAST (after this email) and sends no notification of its
+    # own, so its findings were entirely silent. Surface the most recent report.md
+    # available at email time (today's email shows the prior run's QA — accepted
+    # day-delay, user decision 2026-06-14).
+    def _qa_row() -> dict:
+        reports = sorted(glob.glob(str(repo / "private/qa-evaluator-agent/output/*/report.md")))
+        if not reports:
+            return {"agent": "qa-evaluator", "raw": "—", "json": "—", "site": "—",
+                    "status": "warn", "note": "no QA report found yet"}
+        rp = Path(reports[-1]); rdate = rp.parent.name
+        try:
+            txt = rp.read_text()
+        except Exception as e:
+            return {"agent": "qa-evaluator", "raw": "—", "json": rdate, "site": "—",
+                    "status": "warn", "note": f"report unreadable: {str(e)[:40]}"}
+        m = re.search(r"P0=(\d+),\s*P1=(\d+),\s*P2=(\d+)", txt)
+        p0, p1, p2 = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (0, 0, 0)
+        p0checks, cap = [], False
+        for line in txt.splitlines():
+            if line.startswith("## P0"):
+                cap = True; continue
+            if line.startswith("## ") and not line.startswith("## P0"):
+                cap = False
+            if cap and line.startswith("### "):
+                mm = re.search(r"`([^`]+)`", line)
+                if mm and mm.group(1) not in p0checks:
+                    p0checks.append(mm.group(1))
+        status = "error" if p0 > 0 else ("warn" if p1 > 0 else "ok")
+        note = f"last run {rdate}: {p0} P0 · {p1} P1 · {p2} P2"
+        if p0checks:
+            note += " — " + ", ".join(p0checks[:3])
+        return {"agent": "qa-evaluator", "raw": f"{p0}P0/{p1}P1", "json": rdate, "site": "—",
+                "status": status, "note": note}
+    rows.append(_qa_row())
+
+    # og-image mirror — repoints story-card images to first-party S3 mirrors so cards
+    # / WhatsApp previews don't hotlink (often-broken) source images. Signal: share of
+    # today's search-index stories whose og_image is a /data/img/ mirror.
+    def _ogmirror_row() -> dict:
+        try:
+            si = json.loads((repo / "docs/data/search-index.json").read_text())
+        except Exception as e:
+            return {"agent": "og-mirror", "raw": "—", "json": "—", "site": "—",
+                    "status": "warn", "note": f"search-index unreadable: {str(e)[:40]}"}
+        today_stories = [s for s in si.get("stories", []) if s.get("date") == today]
+        n = len(today_stories)
+        if n == 0:
+            return {"agent": "og-mirror", "raw": "—", "json": "—", "site": "—",
+                    "status": "warn", "note": "no today stories in search-index"}
+        fp = sum(1 for s in today_stories if "/data/img/" in str(s.get("og_image") or s.get("image") or ""))
+        pct = fp / n
+        status = "ok" if pct >= 0.8 else ("warn" if pct >= 0.4 else "error")
+        note = f"{fp}/{n} cards on first-party mirrors"
+        if pct < 0.8:
+            note += " — rest hotlink source (broken-card risk)"
+        return {"agent": "og-mirror", "raw": f"{fp}/{n}", "json": f"{fp}/{n}", "site": f"{fp}/{n}",
+                "status": status, "note": note}
+    rows.append(_ogmirror_row())
+
+    # frontend build/sync — Next.js build + S3 sync of /story/[id] pages. Signal: build
+    # log has no failure marker AND web/out was rebuilt today.
+    def _frontend_row() -> dict:
+        log = Path(f"/tmp/web-build-{today}.log")
+        out = repo / "web/out/index.html"
+        out_today = out.exists() and datetime.fromtimestamp(out.stat().st_mtime, timezone.utc).date().isoformat() == today
+        if not log.exists() and not out_today:
+            return {"agent": "frontend", "raw": "—", "json": "—", "site": "—",
+                    "status": "warn", "note": "no build today (--no-push run?)"}
+        if log.exists() and re.search(r"Failed to compile|Build error|error during build|npm ERR", log.read_text(), re.I):
+            return {"agent": "frontend", "raw": "—", "json": "✗", "site": "✗",
+                    "status": "error", "note": "npm build failed — story pages may be stale/404"}
+        return {"agent": "frontend", "raw": "built", "json": "✓" if out_today else "—",
+                "site": "✓" if out_today else "—", "status": "ok" if out_today else "warn",
+                "note": "Next.js built + synced" if out_today else "build log ok but web/out not today"}
+    rows.append(_frontend_row())
+
 
 def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dict]:
     """Top-of-email banner: roll up every issue across delivery + freshness + API

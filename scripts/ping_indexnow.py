@@ -77,6 +77,17 @@ def main() -> int:
     print(f"[indexnow] HTTP {status} — submitted {len(urls)} URL(s) for {date_str}")
     if body.strip():
         print(f"[indexnow] response: {body[:500]}")
+    # Run-log so the daily health email can monitor this step (mirrors the
+    # _*_runs.jsonl pattern used by hot_tools/podcasts/search_index).
+    try:
+        import json as _json
+        from pathlib import Path as _Path
+        _log = _Path(__file__).resolve().parent.parent / "docs" / "data" / "_indexnow_runs.jsonl"
+        with _log.open("a") as fh:
+            fh.write(_json.dumps({"date": date_str, "http": status, "urls": len(urls),
+                                  "ok": status in (200, 202)}) + "\n")
+    except Exception:
+        pass
     return 0 if status in (200, 202) else 1
 
 

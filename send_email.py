@@ -1002,6 +1002,45 @@ def _add_sidedata_rows(rows: list) -> None:
                 "note": "Next.js built + synced" if out_today else "build log ok but web/out not today"}
     rows.append(_frontend_row())
 
+    # IndexNow ping ([3e], before email) — reads the run-log ping_indexnow.py now writes.
+    def _indexnow_row() -> dict:
+        p = repo / "docs/data/_indexnow_runs.jsonl"
+        if not p.exists():
+            return {"agent": "indexnow", "raw": "—", "json": "—", "site": "—",
+                    "status": "warn", "note": "no run-log yet (first run after this change)"}
+        try:
+            last = json.loads(p.read_text().strip().splitlines()[-1])
+        except Exception as e:
+            return {"agent": "indexnow", "raw": "—", "json": "—", "site": "—",
+                    "status": "warn", "note": f"run-log unreadable: {str(e)[:40]}"}
+        ok = last.get("ok"); ld = last.get("date", "")
+        status = "ok" if (ok and ld == today) else ("warn" if ok else "error")
+        note = f"HTTP {last.get('http')} · {last.get('urls')} URLs ({ld})"
+        if ld != today:
+            note += " — not today's run"
+        return {"agent": "indexnow", "raw": str(last.get("urls", "—")), "json": f"HTTP {last.get('http')}",
+                "site": "—", "status": status, "note": note}
+    rows.append(_indexnow_row())
+
+    # ingest lambda ([5b], AFTER email) — best-effort: read the last lambda response
+    # file. Like QA, the email reflects the PRIOR run since ingest runs after send.
+    def _ingest_row() -> dict:
+        p = Path("/tmp/ingest_response.json")
+        if not p.exists():
+            return {"agent": "ingest (lambda)", "raw": "—", "json": "—", "site": "—",
+                    "status": "warn", "note": "no recent response (skipped / --no-ingest / GH-Pages timeout)"}
+        try:
+            resp = json.loads(p.read_text())
+        except Exception:
+            resp = {}
+        err = resp.get("errorMessage") or resp.get("FunctionError")
+        if err:
+            return {"agent": "ingest (lambda)", "raw": "—", "json": "✗", "site": "—",
+                    "status": "error", "note": f"last invoke errored: {str(err)[:50]}"}
+        return {"agent": "ingest (lambda)", "raw": "ok", "json": "✓", "site": "—",
+                "status": "ok", "note": "last invoke returned without error (prior run)"}
+    rows.append(_ingest_row())
+
 
 def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dict]:
     """Top-of-email banner: roll up every issue across delivery + freshness + API

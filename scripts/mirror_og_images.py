@@ -141,12 +141,14 @@ def main() -> int:
         todo.append((sid, og, it.get("headline", "")[:45]))
 
     if not todo:
-        print(f"[og-mirror] {args.date}: nothing to mirror "
-              f"({len(items)} stories, {len(have)} already mirrored)")
-        return 0
-
-    print(f"[og-mirror] {args.date}: mirroring {len(todo)}/{len(items)} stories…")
+        # Not an early exit: even with nothing NEW to mirror, the day JSON may still
+        # point at raw URLs while mirrors already exist on S3 — fall through to repoint.
+        print(f"[og-mirror] {args.date}: nothing new to mirror "
+              f"({len(items)} stories, {len(have)} already mirrored) — checking repoint…")
+    else:
+        print(f"[og-mirror] {args.date}: mirroring {len(todo)}/{len(items)} stories…")
     done = 0
+    newly: set[str] = set()
     for sid, og, headline in todo:
         try:
             resp = requests.get(og, headers=_UA, timeout=20)
@@ -158,12 +160,52 @@ def main() -> int:
                 continue
             if _upload(args.date, sid, jpeg):
                 done += 1
+                newly.add(sid)
                 print(f"  ✓ [{headline}] {len(jpeg)//1024} KB → "
                       f"{CF}/data/img/{args.date}/{sid}.jpg")
         except Exception as e:           # noqa: BLE001
             print(f"  ✗ [{headline}] {e}")
 
     print(f"[og-mirror] {args.date}: mirrored {done}/{len(todo)}")
+
+    # ── Repoint the day-JSON og_image to the first-party mirror ───────────────
+    # The homepage cards render news_items[].og_image straight from this day JSON.
+    # Mirroring used to update ONLY the search-index (via build_search_index), so
+    # cards kept hotlinking raw third-party URLs that 403/serve tiny → broken cards
+    # (2026-06-14 QA P0: 19/20 cards). Repoint every story that HAS a mirror (newly
+    # uploaded OR already on S3) and re-upload the day JSON so cards use the mirror.
+    mirrored = set(have) | newly
+    repointed = 0
+    for it in items:
+        sid = it.get("story_id") or ""
+        if sid not in mirrored:
+            continue
+        og = it.get("og_image") or ""
+        if any(fp in og for fp in _FIRST_PARTY):
+            continue                     # already points at a mirror
+        it["og_image"] = f"{CF}/data/img/{args.date}/{sid}.jpg"
+        repointed += 1
+    if repointed:
+        data_path.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+        key = f"data/{args.date}.json"
+        up = subprocess.run(
+            ["aws", "s3", "cp", str(data_path), f"s3://{BUCKET}/{key}",
+             "--content-type", "application/json",
+             "--cache-control", "public, max-age=300, s-maxage=300",
+             "--profile", AWS_PROFILE, "--quiet"],
+            capture_output=True, text=True,
+        )
+        if up.returncode == 0:
+            subprocess.run(
+                ["aws", "cloudfront", "create-invalidation",
+                 "--distribution-id", "E1TSW76SSEILK4", "--paths", f"/{key}",
+                 "--profile", AWS_PROFILE],
+                capture_output=True, text=True,
+            )
+            print(f"[og-mirror] {args.date}: repointed {repointed} card image(s) "
+                  f"to first-party mirrors + re-uploaded day JSON")
+        else:
+            print(f"[og-mirror] {args.date}: ✗ day-JSON re-upload failed: {up.stderr.strip()[:120]}")
     return 0
 
 

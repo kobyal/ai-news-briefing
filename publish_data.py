@@ -163,8 +163,9 @@ def _generate_per_story_audio(
 def _translate_he(texts: list) -> list:
     """Translate a batch of texts to Hebrew.
 
-    Prefers the Claude Code subscription path (claude -p) when
-    MERGER_VIA_CLAUDE_CODE=1, falls back to direct API key call.
+    Subscription (claude -p) FIRST — free, no credit ceiling — then the
+    pay-per-use API key as fallback (CI / no claude -p). Order matters: API-first
+    silently blanked all post_he once the key ran out of credits (2026-06-15).
     """
     if not texts:
         return []
@@ -185,40 +186,44 @@ def _translate_he(texts: list) -> list:
         print(f"  Claude translate: got {len(lines)} lines for {len(texts)} texts — padding")
         return lines + [""] * (len(texts) - len(lines))
 
-    # Subscription path (local runs with MERGER_VIA_CLAUDE_CODE=1)
-    if os.environ.get("MERGER_VIA_CLAUDE_CODE") == "1":
-        try:
-            sys.path.insert(0, str(Path(__file__).parent))
-            from shared.anthropic_cc import agent as _cc_agent
-            raw = _cc_agent(prompt,
-                            instructions="You are a Hebrew translator. Return only the numbered translations.",
-                            label="publish-translate-he")
-            return _parse(raw)
-        except Exception as e:
-            print(f"  Claude translate (sub) error: {e}")
-            return [""] * len(texts)
+    def _via_subscription() -> list:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from shared.anthropic_cc import agent as _cc_agent
+        raw = _cc_agent(prompt,
+                        instructions="You are a Hebrew translator. Return only the numbered translations.",
+                        label="publish-translate-he")
+        return _parse(raw)
 
-    # API key path (CI / pipeline with ANTHROPIC_API_KEY / IMAGE_VISION_API_KEY)
-    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("IMAGE_VISION_API_KEY", "")
-    if not api_key:
-        return [""] * len(texts)
+    # Subscription FIRST — it's free and has no credit ceiling, so it's the right
+    # primary everywhere claude -p is available (local). The pay-per-use API key is
+    # the fallback, used only when the subscription path is unavailable (e.g. CI).
+    # (Was API-first: when the API key ran out of credits it returned HTTP 400 and
+    # silently blanked every social/LinkedIn/X post_he — 2026-06-15 root cause.)
     try:
-        payload = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 4096,
-            "messages": [{"role": "user", "content": prompt}],
-        }).encode()
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages", data=payload,
-            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            result = json.loads(resp.read())
-        return _parse(result["content"][0]["text"])
+        return _via_subscription()
     except Exception as e:
-        print(f"  Claude translate error: {e}")
-        return [""] * len(texts)
+        print(f"  Claude translate (sub) error: {e} — falling back to API key")
+
+    # API key fallback (CI / pipeline with ANTHROPIC_API_KEY / IMAGE_VISION_API_KEY)
+    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("IMAGE_VISION_API_KEY", "")
+    if api_key:
+        try:
+            payload = json.dumps({
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 4096,
+                "messages": [{"role": "user", "content": prompt}],
+            }).encode()
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/messages", data=payload,
+                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                         "content-type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                result = json.loads(resp.read())
+            return _parse(result["content"][0]["text"])
+        except Exception as e:
+            print(f"  Claude translate (API) error: {e}")
+    return [""] * len(texts)
 
 date_str = datetime.utcnow().strftime("%Y-%m-%d")
 

@@ -53,9 +53,6 @@ function XAvatar({ name, handle, avatarUrl, size = 36 }: { name: string; handle?
 interface TwitterSectionProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any;
-  descsHe?: string[];
-  /** Hebrew translations for people_highlights (twitter.people), 1-to-1 by index. */
-  peopleDescsHe?: { post_he?: string; why_he?: string }[];
   /** X-source community_pulse_items merged in as "trending" entries.
    *  Adapted into the TwitterSection item shape so they sort + render
    *  alongside people_highlights instead of in a duplicate card. */
@@ -211,7 +208,7 @@ function XIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-export function TwitterSection({ data, descsHe = [], peopleDescsHe = [], pulseItems = [], vendorFilter }: TwitterSectionProps) {
+export function TwitterSection({ data, pulseItems = [], vendorFilter }: TwitterSectionProps) {
   const { isHe } = useLang();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -242,10 +239,13 @@ export function TwitterSection({ data, descsHe = [], peopleDescsHe = [], pulseIt
     if (seen.has(key)) continue;
     seen.add(key);
     if (p.url) seenUrls.add(dedupUrl(p.url));
-    const heEntry = peopleDescsHe[idx];
     allItems.push({
       ...p,
-      post_he: p.post_he || heEntry?.post_he || "",
+      // HE comes ONLY from the per-object embedded post_he (identity-safe). The old
+      // peopleDescsHe parallel array was positionally zipped against twitter.people
+      // and misaligned when lengths differed → wrong author's text (2026-06-15:
+      // Google's post shown under @satyanadella). English fallback if untranslated.
+      post_he: p.post_he || "",
       _type: "following",
       _eng: parseEngagement(p.engagement || ""),
     });
@@ -375,7 +375,7 @@ export function TwitterSection({ data, descsHe = [], peopleDescsHe = [], pulseIt
           const author = item.name || item.author || "";
           const handle = item.handle || "";
           const rawPost = (item.post || item.text || "").replace(/<grok:render[\s\S]*?<\/grok:render>/g, "").replace(/<\/?(?:grok:[^>]*|argument[^>]*)>/g, "");
-          const postHe = item.post_he || (item._type === "trending" ? (descsHe[i] || "") : "");
+          const postHe = item.post_he || "";  // embedded only — no positional parallel array
           const post = isHe && postHe ? postHe : rawPost;
           const url = item.url || "";
           const date = formatPostDate(item.date, isHe);

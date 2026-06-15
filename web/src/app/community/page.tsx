@@ -564,8 +564,6 @@ function CommunityDayBlock({ data, hideEmptyTwitterMessage, vendorFilter }: { da
       {showTwitterCard ? (
         <TwitterSection
           data={data.twitter}
-          descsHe={vendorFilter ? undefined : data.twitter_descs_he}
-          peopleDescsHe={vendorFilter ? undefined : data.people_highlights_he}
           pulseItems={xPulsePairs}
           vendorFilter={vendorFilter}
         />

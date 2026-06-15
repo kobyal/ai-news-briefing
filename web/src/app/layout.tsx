@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { LangProvider } from "@/context/LangContext";
 import { SwipeNavigator } from "@/components/SwipeNavigator";
+import { AnalyticsEvents } from "@/components/AnalyticsEvents";
 
 const GA_ID = "G-9XQE5GN7FT";
 
@@ -16,8 +17,13 @@ const spaceGrotesk = Space_Grotesk({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://aibriefing.dev"),
-  title: "AI Briefing — Daily AI Intelligence",
-  description: "Your daily digest of AI news from Anthropic, OpenAI, Google, and more",
+  // Homepage / default title — targets the head terms a daily AI-news site
+  // should own ("AI news today", "AI briefing"). Section and story pages set
+  // their own titles (story pages append " — AI Briefing" branding directly,
+  // see story/[id]/page.tsx).
+  title: "AI News Today — Daily AI Briefing on OpenAI, Anthropic, Google & More",
+  description:
+    "The day's most important AI news in one briefing — model releases, research, and product launches from OpenAI, Anthropic, Google DeepMind, Meta and more. Updated every day.",
   // Without an explicit canonical, WhatsApp/iMessage/Slack unfurlers were
   // showing the CloudFront origin (d2p40aowelo4td.cloudfront.net) when the
   // user shared an aibriefing.dev/story?id=… link — they fall back to the
@@ -30,8 +36,8 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "AI Briefing — Daily AI Intelligence",
-    description: "Your daily digest of AI news from Anthropic, OpenAI, Google, and more",
+    title: "AI News Today — Daily AI Briefing",
+    description: "The day's most important AI news in one briefing — releases, research and launches from OpenAI, Anthropic, Google DeepMind, Meta and more.",
     url: "https://aibriefing.dev",
     siteName: "AI Briefing",
     type: "website",
@@ -39,8 +45,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Briefing — Daily AI Intelligence",
-    description: "Your daily digest of AI news from Anthropic, OpenAI, Google, and more",
+    title: "AI News Today — Daily AI Briefing",
+    description: "The day's most important AI news in one briefing — releases, research and launches from OpenAI, Anthropic, Google DeepMind, Meta and more.",
     images: ["/og.png"],
   },
 };
@@ -91,6 +97,7 @@ export default function RootLayout({
       <body className={`${inter.variable} ${spaceGrotesk.variable} ${inter.className} min-h-screen flex flex-col`}>
         <LangProvider>
           <SwipeNavigator />
+          <AnalyticsEvents />
           {children}
         </LangProvider>
       </body>

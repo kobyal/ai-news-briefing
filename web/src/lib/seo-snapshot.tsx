@@ -71,7 +71,7 @@ export function SeoSnapshotBlock({ snapshot, lang = "en" }: { snapshot: SeoSnaps
         vendorLabel: "ספק",
       }
     : {
-        h1: "AI Briefing — Daily AI Intelligence",
+        h1: "AI News Today — Your Daily AI Briefing",
         intro:
           "The day's most important AI news: breakthroughs, releases, funding, and policy — curated for developers, founders, and investors.",
         tldrLabel: "TL;DR",

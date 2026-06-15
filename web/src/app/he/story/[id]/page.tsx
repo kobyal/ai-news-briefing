@@ -95,7 +95,8 @@ export async function generateMetadata(
     const img = (story.og_image || "/og.png")
       .replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/");
     return {
-      title: headline,
+      // Branded <title> for SERP CTR; OG/Twitter keep the bare headline.
+      title: `${headline} — AI Briefing`,
       description: summary,
       alternates: {
         canonical: heUrl,

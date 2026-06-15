@@ -262,12 +262,19 @@ async def _run_async():
 
 
 def run_pipeline():
+    import time as _time
     last_err: Exception | None = None
-    for attempt in (1, 2):
+    # 3 attempts: content-quality retries (existing) PLUS transient network/transport
+    # errors. A ConnectionResetError / aiohttp.ClientOSError mid-Gemini-call used to
+    # propagate uncaught and kill the whole agent → no ADK output (2026-06-15:
+    # "[Errno 54] Connection reset by peer" → adk didn't run). OSError covers
+    # ClientOSError + ConnectionResetError; ConnectionError covers the rest.
+    for attempt in (1, 2, 3):
         try:
             asyncio.run(_run_async())
             return
-        except (_DegenerateGeminiOutput, _PydValidationError, _NoBriefingWritten) as e:
+        except (_DegenerateGeminiOutput, _PydValidationError, _NoBriefingWritten,
+                ConnectionError, OSError) as e:
             # _DegenerateGeminiOutput: Gemini's grounding cycle (n-gram repetition,
             #   first observed 2026-05-02 in VendorResearcher).
             # _PydValidationError: Gemini truncates BriefingWriter output mid-JSON,
@@ -284,10 +291,13 @@ def run_pipeline():
                 kind = "repetition loop"
             elif isinstance(e, _PydValidationError):
                 kind = "schema validation (likely Gemini truncation)"
-            else:
+            elif isinstance(e, _NoBriefingWritten):
                 kind = "no briefing produced (silent stage failure)"
-            print(f"[ADK] attempt {attempt}/2 hit {kind}: {e}")
-            if attempt < 2:
+            else:
+                kind = f"network/transport error ({type(e).__name__})"
+            print(f"[ADK] attempt {attempt}/3 hit {kind}: {str(e)[:200]}")
+            if attempt < 3:
+                _time.sleep(5 * attempt)  # brief backoff — transient resets clear quickly
                 print("[ADK] Retrying entire chain with a fresh session...")
     assert last_err is not None
     raise last_err

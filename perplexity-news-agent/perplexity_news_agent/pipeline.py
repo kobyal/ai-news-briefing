@@ -277,7 +277,10 @@ def _step1_vendor_research() -> str:
         model=_SEARCH_MODEL(),
         tools=[{
             "type": "web_search",
-            "search_recency_filter": "week",
+            # "day" not "week": week-old results were ranking into news_items and
+            # making the briefing read stale (2026-06-15: newest item 3 days old).
+            # News must be fresh; CommunityResearcher keeps "week" (reactions lag).
+            "search_recency_filter": "day",
         }],
         max_steps=3,
         label="VendorResearcher",

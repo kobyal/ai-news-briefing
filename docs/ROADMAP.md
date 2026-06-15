@@ -1,10 +1,32 @@
 AI Briefing — Roadmap & Improvement Ideas
 ==========================================
 Created: 2026-04-09
-Last updated: 2026-06-07
+Last updated: 2026-06-15
 
 Shipped (since 2026-04-09)
 --------------------------
+
+Agent resilience + monitoring + community fixes (2026-06-09 → 06-15):
+- ✅ Transient-network-error retry across all source agents — perplexity (`c872364`),
+  rss (per-feed `requests` timeout, `c872364`), adk (`ConnectionResetError`/`ClientOSError`
+  → retry, `9e93901`); merger wrapper retry was e57598f. Uncaught network errors had
+  been crashing whole agents → "didn't run today".
+- ✅ Twitter SearchTimeline query-ID refresh (`48c06c1`) — X rotates it; pull current id
+  from `abs.twimg.com/.../main.*.js` (`operationName:"SearchTimeline"`). Also note_tweet
+  text parsing (`cdb1c36`) — but UserTweets response omits note_tweet without a feature
+  flag (long-form tweets still show t.co stub — open).
+- ✅ Community Hebrew: dropped misaligned parallel arrays (`people_highlights_he`/
+  `twitter_descs_he`) — frontend now uses ONLY per-object embedded `post_he` (`8b93ee3`).
+  `_translate_he` reordered **subscription-first, API key fallback** (API-first silently
+  blanked all post_he when the pay key ran out of credits).
+- ✅ og-mirror now repoints the **day-JSON** `og_image` to first-party mirrors + re-uploads
+  (`7bf98b6`) — homepage cards read the day JSON, not the search-index → fixed 19/20 broken cards.
+- ✅ Perplexity VendorResearcher recency week→day (`e3e0f31`) — partial; deeper freshness
+  still the merger date-anchor issue (`a26d863` made §3.0 operable but big prior-day still dominates).
+- ✅ Email redesign — verdict-first layout (NEEDS YOU + "everything else OK" + demoted detail
+  tables) and FULL pipeline-step monitoring coverage: editorial, qa-evaluator (prior run),
+  og-mirror, frontend, IndexNow, ingest (`84dacd8`, `8d27720`, `d411ef3`, `634425a`).
+- ✅ HE house-style glossary centralized in `shared/he_glossary.py` (`fba5623`); merger + editorial import it.
 
 Community + Media (2026-05-10):
 - ✅ Community page redesign — 3-card layout (Twitter / Reddit / Pulse), vendor clustering, infinite scroll

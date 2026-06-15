@@ -123,7 +123,7 @@ _X_USER_BY_SCREEN_NAME_QUERY_ID = (os.environ.get("X_USER_BY_SCREEN_NAME_QUERY_I
 _X_USER_TWEETS_QUERY_ID         = (os.environ.get("X_USER_TWEETS_QUERY_ID")
                                    or "QWF3SzpHmykQHsQMixG0cg")
 _X_SEARCH_QUERY_ID              = (os.environ.get("X_SEARCH_QUERY_ID")
-                                   or "xrS3h-srT2mQT-g3lKsUjA")
+                                   or "yIphfmxUO-hddQHKIOk9tA")  # refreshed 2026-06-15 (prev xrS3h… → 404)
 
 EP_USER_BY_SCREEN_NAME = f"https://x.com/i/api/graphql/{_X_USER_BY_SCREEN_NAME_QUERY_ID}/UserByScreenName"
 EP_USER_TWEETS         = f"https://x.com/i/api/graphql/{_X_USER_TWEETS_QUERY_ID}/UserTweets"

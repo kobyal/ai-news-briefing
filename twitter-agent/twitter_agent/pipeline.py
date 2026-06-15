@@ -129,6 +129,16 @@ EP_USER_BY_SCREEN_NAME = f"https://x.com/i/api/graphql/{_X_USER_BY_SCREEN_NAME_Q
 EP_USER_TWEETS         = f"https://x.com/i/api/graphql/{_X_USER_TWEETS_QUERY_ID}/UserTweets"
 EP_SEARCH              = f"https://x.com/i/api/graphql/{_X_SEARCH_QUERY_ID}/SearchTimeline"
 
+
+def _tweet_full_text(tweet: dict, legacy: dict) -> str:
+    """Long-form 'note tweets' truncate legacy.full_text to a t.co stub — the full
+    body lives in note_tweet.note_tweet_results.result.text. Prefer that when present.
+    (2026-06-15: Satya Nadella's long thread rendered as just a t.co link on /community.)"""
+    note = (((tweet.get("note_tweet") or {})
+             .get("note_tweet_results") or {})
+             .get("result") or {}).get("text")
+    return note or legacy.get("full_text", "")
+
 TRACKED_HANDLES = [
     # ── OpenAI ────────────────────────────────────────────────────────────────
     {"name": "Sam Altman",          "handle": "sama",           "org": "OpenAI",      "role": "CEO"},
@@ -293,7 +303,7 @@ def _parse_tweets(data: dict, cutoff_ts: float, handle: str, allow_rt: bool = Fa
             if not tweet or tweet.get("__typename") != "Tweet":
                 continue
             legacy = tweet.get("legacy", {})
-            text = legacy.get("full_text", "")
+            text = _tweet_full_text(tweet, legacy)
             likes = legacy.get("favorite_count", 0)
             retweets = legacy.get("retweet_count", 0)
             created = legacy.get("created_at", "")
@@ -438,7 +448,7 @@ def _parse_search_tweets(data: dict, cutoff_ts: float) -> list[dict]:
             user_legacy = user_result.get("legacy", {}) if isinstance(user_result, dict) else {}
             screen_name = user_core.get("screen_name") or user_legacy.get("screen_name", "")
             name = user_core.get("name") or user_legacy.get("name", "")
-            text = legacy.get("full_text", "")
+            text = _tweet_full_text(tweet, legacy)
             if text.startswith("RT @"):
                 continue
             # Skip orphan replies (text starts with @mention) — out of context

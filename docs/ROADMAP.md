@@ -6,6 +6,19 @@ Last updated: 2026-06-15
 Shipped (since 2026-04-09)
 --------------------------
 
+SEO CTR push + Google News + GA4 conversions (2026-06-15):
+- ✅ Diagnosis from GSC (3mo): 4.4k impressions / avg pos ~8.9 but **0.4% CTR** —
+  visibility fine, click-through dead; ranking for niche tokens (model names) not head terms.
+- ✅ Google News sitemap — `web/scripts/gen-news-sitemap.mjs` (npm `prebuild`) emits
+  `/news-sitemap.xml` (`<news:>` tags, last-2-day window, EN+HE); in robots.txt; submitted
+  in GSC (verified live). Unlocks Top Stories eligibility. (`c4a5a03`)
+- ✅ Titles/head-terms — homepage title→"AI News Today — Daily AI Briefing…"; story
+  `<title>`s (EN+HE) append " — AI Briefing"; homepage H1 aligned. (`c4a5a03`)
+- ✅ GA4 `outbound_click` tracking — one centralized capture-phase listener
+  (`web/src/components/AnalyticsEvents.tsx`), verified live end-to-end. (`c4a5a03`)
+- ⏳ PENDING (scheduled ~2026-06-16): mark `outbound_click` as a GA4 Key Event —
+  blocked only by GA4 admin Events-table propagation lag (event seeded 06-15).
+
 Agent resilience + monitoring + community fixes (2026-06-09 → 06-15):
 - ✅ Transient-network-error retry across all source agents — perplexity (`c872364`),
   rss (per-feed `requests` timeout, `c872364`), adk (`ConnectionResetError`/`ClientOSError`

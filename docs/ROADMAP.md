@@ -53,7 +53,7 @@ Tools + Search + UX polish (2026-05-11):
 Near-term (easy wins, still open)
 ---------------------------------
 
-- Add email subscription (Mailchimp/Buttondown) — the pipeline already sends email, just need a signup form
+- Email subscription / reader list → see "Reader email / newsletter — phased plan" below (NB: `send_email.py` is ops-only, not a subscriber sender)
 - Add "Share this story" buttons (X/LinkedIn/copy link) on each card
 - Show reading time on all cards (currently only on featured)
 - Add a "What's Hot" score based on `source_count` + community mentions
@@ -76,12 +76,60 @@ Medium-term (meaningful upgrades)
 Longer-term (big impact)
 ------------------------
 
-- Custom-domain email newsletter — daily@aibriefing.dev powered by the existing pipeline
-- Weekly digest — Saturday summary of the whole week's top stories
+- Email newsletter (daily digest + weekly editorial) → see "Reader email / newsletter — phased plan" section below
 - Reader engagement — upvote/save stories, personalized feed by vendor interest
 - Mobile app (PWA) — the site already works on mobile, just needs a manifest + service worker for "Add to Home Screen"
 - Slack/Discord bot — push the daily briefing to team channels
 - Per-vendor RSS feeds — let readers subscribe to just Anthropic stories (or just OpenAI, etc.)
+
+Reader email / newsletter — phased plan (planned 2026-06-15)
+------------------------------------------------------------
+Goal: build a subscriber list. Daily digest = core product (daily inbox touch
+= habit/retention); the weekly `/main` editorial = signature "why subscribe"
+piece. The "email agent" reads the structured JSON the pipeline ALREADY writes
+(`latest.json` / `editorial.json`) — NOT HTML scraping. Send-infra choice
+(managed service vs DIY) deliberately left open; default lean = managed.
+
+NB: `send_email.py` is an OPS/health email to kobyal@gmail.com via Gmail SMTP —
+NOT a newsletter system. Do NOT reuse it to send subscriber mail (deliverability
++ Gmail-account risk at volume).
+
+Phase 0 — unblock `/main` (do regardless of path):
+- Publish `editorial.json` to the CDN — today it's local-only (S3 sync excludes
+  `data/*`), so `/main` renders blank in prod. Add to the `[3b/6]` data-upload step.
+- Link `/main` in `Header.tsx` navItems — currently ORPHANED (nav has only
+  Stories/Community/Media/Tools/Search/About). Gives a public, shareable premium page.
+
+Phase 1 — capture demand before building send-infra:
+- Signup form on `/` and `/main` (static site → posts to managed-service endpoint
+  or a small Lambda; form built once, path-agnostic).
+- GA4 `subscribe` key event — ties into the conversion-tracking work; validates
+  demand before a single email is sent.
+
+Phase 2 — content → email (reads JSON, never scrapes):
+- Generator reads `latest.json` (daily) + `editorial.json` (weekly), renders email.
+  Mirrors the `gen-news-sitemap.mjs` pattern. Managed path → emit an RSS `feed.xml`,
+  service's RSS-to-email sends it. DIY path → render HTML (optionally compose via
+  `shared/anthropic_cc`), SES sends.
+
+Phase 3 — sending + compliance (the underestimated part):
+- Domain auth on `aibriefing.dev`: SPF + DKIM + DMARC — critical path for inbox
+  placement, and the reason not to use Gmail SMTP.
+- Unsubscribe + double opt-in + CAN-SPAM footer (free w/ managed, manual w/ DIY).
+- Daily send after the pipeline finishes (new `local-cycle.sh` step or service
+  pulls feed on schedule); weekly editorial on a fixed day.
+
+Phase 4 — grow + measure:
+- The Google Ads "spend ₪1,500 get ₪1,500" credit (new-advertiser only; verified
+  pending at ads.google.com 2026-06-15) finally has a real conversion (`subscribe`)
+  to optimize against → revisit paid spend HERE, not before. Organic SEO + the new
+  Google News sitemap (shipped 2026-06-15) is the zero-cost compounding play to
+  exhaust first.
+
+Decision gate (when ready): managed (Buttondown recommended — clean API +
+RSS-to-email + cheap; gives compliance/deliverability/signup-form ~free) vs DIY
+(Lambda + SES + DynamoDB — full control but own SES sandbox-exit + compliance).
+Default: managed.
 
 Code health — DRY / centralization backlog (2026-06-07 audit)
 -------------------------------------------------------------

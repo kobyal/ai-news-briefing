@@ -1854,7 +1854,10 @@ def _pair_explainer_videos(news_items: list, videos: list) -> int:
         "A pair is valid ONLY if the video discusses the same specific news event "
         "or directly explains the story's subject. Same vendor alone is NOT enough — "
         "an Anthropic product-engineering tutorial does NOT pair with an Anthropic "
-        "research-bias story. When in doubt, return null. Each video can pair with "
+        "research-bias story. Multi-topic 'daily AI roundup' videos that cover several "
+        "unrelated stories are NOT a focused explainer for any single one — return null "
+        "for them unless one story is clearly the video's central, dominant subject. "
+        "When in doubt, return null. Each video can pair with "
         "at most one story. Cover every story in the output (use null for no match)."
     )
     prompt = (

@@ -183,7 +183,7 @@ Produce ONE merged briefing as a JSON object. Rules:
      "date": "exact date of the discussion/post (e.g. 'April 10, 2026'). Extract from the source data.",
      "source_url": "direct URL to the discussion/post/thread. MUST NOT be empty.",
      "source_label": "e.g. 'r/LocalLLaMA (2.3K upvotes)', '@karpathy on X', 'HN (890 pts)', 'lobste.rs', 'dev.to'",
-     "related_vendor": "vendor name if related to a news_item, or empty string",
+     "related_vendor": "vendor the discussion is ABOUT (its subject), or empty string. Same subject-not-actor rule as news_items below: tag the company whose product/decision the thread centers on, NOT a company merely criticized or named in passing (e.g. a thread about Anthropic suspending Claude is 'Anthropic', even if it blames AWS). When the discussion is a general/industry topic with no single dominant vendor, use 'Other' — do not grab the first vendor mentioned.",
      "related_person": "person name if referencing someone from people_highlights, or empty string"
    }
 
@@ -215,6 +215,9 @@ Produce ONE merged briefing as a JSON object. Rules:
        * Bio context: "founded by former Google DeepMind researchers" — vendor is NOT Google.
        * Investors/partners: "Jeff Bezos-backed startup Taurus" — vendor is NOT AWS or Amazon.
        * Former roles: "ex-Anthropic CEO launches..." — vendor is the new company, not Anthropic.
+       * Actor vs. affected: "Amazon's Jassy flags Anthropic's Fable jailbreak; govt suspends it" —
+         the story's SUBJECT is the suspended product, so vendor is Anthropic, NOT AWS/Amazon (the actor).
+         The company being acted UPON (whose product/model is restricted, sued, banned) is the subject.
      If the subject company doesn't match any known vendor (e.g. Moonshot AI, Cohere, Inflection,
      Taurus, Project Prometheus, a new research lab), use "Other". Better to say Other than to
      grab-bag into a wrong vendor because of a keyword in the summary.

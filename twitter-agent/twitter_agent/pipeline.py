@@ -354,9 +354,26 @@ def _fetch_person(person: dict, auth_token: str, ct0: str, cutoff_ts: float) -> 
         if not tweets:
             return None
 
-        # Best tweet = most liked
-        best = max(tweets, key=lambda t: t["likes"])
-        print(f"    ✓ @{handle:<20} {len(tweets)} tweets, best={best['likes']}♥")
+        # Topic gate: individuals tweet about all sorts of things (sports,
+        # politics, personal) — a viral off-topic post (e.g. Elon's "This is
+        # nuts") must NOT crowd out their AI signal. So for non-official
+        # handles, keep only AI-relevant tweets and pick the most-liked among
+        # those; skip the person entirely if none qualify. Official vendor
+        # accounts (@xai, @awscloud, …) are on-topic by definition — keep their
+        # best, preferring a relevant one when present.
+        is_official = person.get("role") == "Official"
+        relevant = [t for t in tweets if _AI_RELEVANCE_RE.search(t["text"])]
+        if relevant:
+            pool = relevant
+        elif is_official:
+            pool = tweets
+        else:
+            print(f"    – @{handle:<20} {len(tweets)} tweets, none AI-relevant — skipped")
+            return None
+
+        # Best tweet = most liked (within the AI-relevant pool for individuals)
+        best = max(pool, key=lambda t: t["likes"])
+        print(f"    ✓ @{handle:<20} {len(tweets)} tweets ({len(relevant)} AI), best={best['likes']}♥")
         return {
             "name":       person["name"],
             "handle":     handle,
@@ -388,8 +405,9 @@ _AI_RELEVANCE_RE = re.compile(
     r"openai|anthropic|claude|chatgpt|gpt-?\d|sora|codex|"
     r"gemini|deepmind|llama|bedrock|copilot|"
     r"nvidia|grok|xai|mistral|cohere|deepseek|qwen|huggingface|perplexity|"
-    r"llm|llms|agi|transformer|multimodal|fine[- ]?tun|embedding|"
-    r"ai (?:model|agent|tool|coding|safety|alignment|race|race|chip)|"
+    r"llm|llms|agi|ai|artificial intelligence|machine learning|"
+    r"transformer|multimodal|fine[- ]?tun|embedding|inference|"
+    r"agent|agentic|reasoning model|model release|open[- ]?(?:source|weight)s?|"
     r"ml model|neural net|frontier model|foundation model"
     r")\b",
     re.IGNORECASE,

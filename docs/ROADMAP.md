@@ -1,7 +1,7 @@
 AI Briefing — Roadmap & Improvement Ideas
 ==========================================
 Created: 2026-04-09
-Last updated: 2026-06-15
+Last updated: 2026-06-17
 
 Shipped (since 2026-04-09)
 --------------------------
@@ -171,6 +171,21 @@ Tier 1 (real risk / has already bitten us) — **4 of 5 DONE 2026-06-07**:
   scripts + local-cycle.sh with inconsistent var names (BUCKET vs S3_BUCKET, etc.)
   — wrong bucket string = silent deploy to wrong place. → one `scripts/aws_config.py`.
   (local-cycle.sh is gitignored — touch carefully.)
+
+Tier 2 (quality / dedup — added 2026-06-17):
+- ⏳ Person-tweet data lives in TWO copies: `twitter.people` AND `social.people_highlights`
+  in the day JSON. /community + homepage + search-index all read `twitter.people`; the
+  other is near-dead. Cleaning one and not the other caused a wasted fix this session.
+  → collapse to one source.
+- ⏳ Reddit ranking is engagement-only (comment count) → stale-but-popular posts win
+  (8× `reddit_stale` recurring in QA). Blend recency + engagement (decay older posts)
+  while respecting "freshness ranks, doesn't filter". ArcticShift indexing lag bounds how
+  fresh the pool can be, so this is ranking-only, not a hard freshness filter.
+- ⏳ Historical search-index backlog holds off-topic person tweets from past days
+  (e.g. Elon Starlink/SpaceX) — affects search results, not the /community day view. The
+  06-17 twitter relevance gate (branch `fix/qa-2026-06-16-…`, commit 7850a1a) prevents
+  future accumulation but doesn't retro-clean. Re-filter past days' `twitter.people` if
+  search quality matters.
 
 Tier 2 (worth doing):
 - `_step4_publish` output-saving + usage-log aggregation duplicated across 5 / 4 agents.

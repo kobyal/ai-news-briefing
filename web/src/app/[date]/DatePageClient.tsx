@@ -39,37 +39,70 @@ export default function DatePageClient({
   //      landed scroll back to the top for ~2-3s.
   //   3. On a CLIENT-SIDE nav from /search the hash isn't present at first
   //      render — so we can't capture it once; we must re-read it live.
-  // Fix: a 250ms interval for ~4s that (re)reads window.location.hash until it
-  // sees a #story- target, then does an INSTANT scroll, re-acquiring the element
-  // each tick and only re-firing while it has drifted out of the upper viewport
-  // (so we never fight a user who scrolled away). Verified live 2026-06-05.
+  // Fix: re-assert an INSTANT scroll to the #story- target until layout settles.
+  // The old 4s/250ms interval was too short on a COLD load (images above the
+  // target stream in for >4s, reflowing the page and pushing the freshly-landed
+  // target back below the fold — interval ends before it settles, so the jump
+  // silently fails; warm/cached loads worked, masking it). 2026-06-19 fix: keep
+  // a longer interval (~12s) AND re-fire on every reflow via a ResizeObserver on
+  // <body> (each late image load changes body height), re-acquiring the element
+  // and only re-scrolling while it has drifted out of the upper viewport. We stop
+  // the instant the user scrolls/touches/keys (userMoved) so we never fight them.
   useEffect(() => {
     if (loading || !data) return;
     let target = "";
-    let ticks = 0;
     let highlighted = false;
-    const iv = setInterval(() => {
+    let userMoved = false;
+
+    const onUserMove = () => { userMoved = true; };
+    window.addEventListener("wheel", onUserMove, { passive: true });
+    window.addEventListener("touchmove", onUserMove, { passive: true });
+    window.addEventListener("keydown", onUserMove);
+
+    const tryScroll = () => {
       if (!target) {
         const h = window.location.hash;
         if (h.startsWith("#story-")) target = h.slice(1);
       }
       const el = target ? document.getElementById(target) : null;
-      if (el) {
+      if (!el) return;
+      if (!userMoved) {
         const top = el.getBoundingClientRect().top;
         if (top < -60 || top > window.innerHeight * 0.6) {
           el.scrollIntoView({ behavior: "instant", block: "start" });
         }
-        if (!highlighted) {
-          highlighted = true;
-          el.style.transition = "background 0.4s ease";
-          const prev = el.style.background;
-          el.style.background = "rgba(124, 58, 237, 0.10)";
-          setTimeout(() => { el.style.background = prev; }, 1800);
-        }
       }
-      if (++ticks >= 16) clearInterval(iv);   // ~4s of re-assertion
+      if (!highlighted) {
+        highlighted = true;
+        el.style.transition = "background 0.4s ease";
+        const prev = el.style.background;
+        el.style.background = "rgba(124, 58, 237, 0.10)";
+        setTimeout(() => { el.style.background = prev; }, 1800);
+      }
+    };
+
+    // Re-assert whenever the page reflows (late image loads grow <body>).
+    const ro = new ResizeObserver(() => tryScroll());
+    ro.observe(document.body);
+    window.addEventListener("load", tryScroll);
+
+    let ticks = 0;
+    const iv = setInterval(() => {
+      tryScroll();
+      if (++ticks >= 48) {        // ~12s safety cap
+        clearInterval(iv);
+        ro.disconnect();
+      }
     }, 250);
-    return () => clearInterval(iv);
+
+    return () => {
+      clearInterval(iv);
+      ro.disconnect();
+      window.removeEventListener("load", tryScroll);
+      window.removeEventListener("wheel", onUserMove);
+      window.removeEventListener("touchmove", onUserMove);
+      window.removeEventListener("keydown", onUserMove);
+    };
   }, [loading, data]);
 
   if (loading) {

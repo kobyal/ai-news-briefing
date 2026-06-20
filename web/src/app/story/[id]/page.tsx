@@ -103,10 +103,14 @@ export async function generateMetadata(
     // host — cross-domain CloudFront URLs render as the site logo instead.
     const img = (story.og_image || "/og.png")
       .replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/");
+    // SERP <title>: lead with the entity-first headline (Google truncates ~60
+    // chars / 600px). Only append " — AI Briefing" when it fits inside ~60 chars
+    // — otherwise the suffix truncates away anyway and risks cutting the headline.
+    // Long headlines stand alone. OG/Twitter keep the bare headline (social cards).
+    const BRAND = " — AI Briefing";
+    const seoTitle = (headline.length + BRAND.length) <= 60 ? `${headline}${BRAND}` : headline;
     return {
-      // Branded <title> for SERP CTR; OG/Twitter keep the bare headline (better
-      // for social cards). 70-char SERP truncation still shows the headline first.
-      title: `${headline} — AI Briefing`,
+      title: seoTitle,
       description: summary,
       alternates: {
         canonical: url,

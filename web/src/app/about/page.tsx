@@ -8,6 +8,8 @@ const EN = {
   intro: "AI Briefing is a daily intelligence service for developers, founders, investors, and technical leaders who track the AI industry.",
   coverageTitle: "What we cover",
   coverageBody: "The full AI ecosystem — not just the big labs. Model releases and benchmarks, funding rounds and valuations, regulatory and legal developments, open-source releases, community reactions, infrastructure and chips, enterprise deployments, and safety incidents. If it moves the AI industry forward (or backward), it's in the briefing.",
+  methodTitle: "How we report",
+  methodBody: "Each briefing is assembled by an AI editorial pipeline that gathers, de-duplicates, and synthesizes reporting from named primary sources — vendor blogs and newsrooms, wire services, research papers, GitHub, and community signals (Hacker News, Reddit, X) — and is curated and reviewed under human editorial oversight before publishing. Every story links its original sources so you can verify the reporting yourself. Summaries aim to add context — what an announcement means and why it matters — rather than restate a press release. We correct errors when we find them.",
   principlesTitle: "Editorial principles",
   principles: [
     { bold: "Not vendor-locked.", text: " We cover the full ecosystem — labs, infrastructure, policy, and the industries being disrupted." },
@@ -37,6 +39,8 @@ const HE = {
   intro: "AI Briefing הוא הבריפינג היומי לאנשי AI — מפתחים, מייסדים, משקיעים ומנהלים שרוצים להישאר בחזית.",
   coverageTitle: "מה מכסים",
   coverageBody: "את כל תעשיית ה-AI, לא רק הנפשות הגדולות. שחרורי מודלים ובנצ'מרקים, סבבי גיוס, רגולציה ומשפט, קוד פתוח, מה שהקהילה מדברת עליו, חומרה ותשתיות, פריסות ארגוניות ואירועי אבטחה. אם זה זז בתעשייה — זה אצלנו.",
+  methodTitle: "איך אנחנו מסקרים",
+  methodBody: "כל בריפינג נבנה על ידי מערך עריכה מבוסס-AI שאוסף, מנכה כפילויות ומסכם דיווחים ממקורות ראשוניים מזוהים — בלוגים ואתרי חדשות של החברות, סוכנויות ידיעות, מאמרי מחקר, GitHub ואותות קהילה (Hacker News, Reddit, X) — ועובר אצירה ובקרה תחת פיקוח עריכתי אנושי לפני הפרסום. כל כתבה מקשרת למקורות המקוריים כדי שתוכלו לאמת בעצמכם. התקצירים נועדו להוסיף הקשר — מה המשמעות של ההכרזה ולמה היא חשובה — ולא לחזור על הודעה לעיתונות. אנחנו מתקנים טעויות כשאנחנו מוצאים אותן.",
   principlesTitle: "עקרונות עריכה",
   principles: [
     { bold: "לא נעולים על ספק אחד.", text: " מכסים את כל התמונה — מעבדות, תשתיות, מדיניות והתעשיות שה-AI משנה." },
@@ -110,6 +114,12 @@ export default function AboutPage() {
         <section style={{ marginBottom: 36 }}>
           <h2 style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#6b6b8a", margin: "0 0 10px" }}>{t.coverageTitle}</h2>
           <p style={{ fontSize: 15, color: "#3d3d5a", lineHeight: 1.75, margin: 0 }}>{t.coverageBody}</p>
+        </section>
+
+        {/* Methodology — E-E-A-T + transparency (how the briefing is produced) */}
+        <section style={{ marginBottom: 36 }}>
+          <h2 style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#6b6b8a", margin: "0 0 10px" }}>{t.methodTitle}</h2>
+          <p style={{ fontSize: 15, color: "#3d3d5a", lineHeight: 1.75, margin: 0 }}>{t.methodBody}</p>
         </section>
 
         {/* Principles */}

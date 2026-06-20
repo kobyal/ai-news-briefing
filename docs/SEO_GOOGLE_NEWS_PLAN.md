@@ -38,40 +38,60 @@ the **HE market**, where the bar is lower than competing head-on with Ynet/CNBC.
 | Requirement | Status | Action |
 |---|---|---|
 | Comply with Google News content policies | partial | review policies; AI-content transparency (below) |
-| **Clear author bylines** | ❌ **MISSING** — schema author is `Organization`, no named human | **decision needed (below)** |
-| Comprehensive About page (publication, company, authors) | ⚠️ has /about + NewsMediaOrganization schema; no named editor | add editorial identity + contact |
+| Authorship transparency | ✅ org author + AI-disclosure (recommended approach — NOT a fake byline; see reframe below) | done |
+| Comprehensive About page (publication, company, authors) | ✅ /about + NewsMediaOrganization + named creator + "How we report" methodology | done |
 | Topical authority (consistent coverage of a topic) | ✅ strong — daily AI coverage | keep |
 | Freshness | ✅ strong — daily, fast | keep |
 | Technical (few redirects, crawlable, news-sitemap) | ✅ done | keep |
 | Publisher Center *publication* (branding/verify, not a submission) | ❌ not set up | set up (manual, Koby) |
 
-## The one decision only Koby can make: editorial identity / bylines
+## REFRAME 2026-06-21 — no fake byline; honesty is the correct posture
 
-Google News wants **clear authorship**. Our content is AI-generated. We must NOT
-fake a human byline (deceptive + against Google policy, and risks a manual action).
-Honest options:
-1. **Named human editor-in-chief byline** ("Edited by <Koby>") + an editorial-process
-   disclosure on /about ("synthesized by AI, curated/edited by …"). Most aligned with
-   Google News authorship + honest. Recommended.
-2. **Transparent AI-authorship**: author = a named, disclosed AI editorial system + a
-   human accountable editor on /about. Honest; Google's stance on pure-AI authorship
-   in News is stricter — pairs best with a human editor of record.
-3. Leave as Organization author — simplest, but weakest for News eligibility.
+Earlier this doc pushed a named-human-editor byline for Google News. **Walked back
+after research** ([Google's AI-content guidance](https://developers.google.com/search/blog/2023/02/google-search-and-ai-content)):
+- Google does **NOT require AI bylines** and explicitly says *"giving AI an author
+  byline is probably not the best way"* to disclose. No official disclosure mandate.
+- Google **does not penalize or down-rank AI content** — it judges **quality of the
+  outcome**, not how it was produced.
+- The **recommended** honest move is an **AI/automation disclosure** when a reader
+  would reasonably ask "how was this made?" — which is exactly the **/about "How we
+  report" methodology** section we shipped (commit d32a839). DONE.
+- So: keep `author` = `Organization` ("AI Briefing") + the AI-disclosure. **Do not
+  fabricate a human editor** — it's dishonest, Koby objected, and Google can infer
+  AI-generated content anyway. Top Stories may favor bylined human journalism, but
+  contorting honesty to chase it is the wrong trade.
 
-→ Once chosen, I implement: `NewsArticle.author` (named Person/editor), visible
-dateline byline on story pages, and an expanded /about with editorial standards.
+## The real levers given our status (AI-generated, low-authority, honest)
 
-## Prioritized actions
+**1. GEO (Generative Engine Optimization) — our actual lane; we already win here.**
+AI search engines now serve ~12–18% of informational queries. Our `/tools/` 2,096
+impressions are AI engines (Perplexity/SearchGPT) retrieving us — real traction.
+- **Bing Webmaster Tools verification = non-negotiable**: ChatGPT Search is
+  Bing-powered, so Bing indexing gates ChatGPT citations. NOT verified yet
+  (`/BingSiteAuth.xml` 200 is a SPA catch-all false positive). Fastest path: Bing WMT
+  → "Import from Google Search Console" (GSC already verified) → one click, no code.
+- Story pages are **already GEO-strong** (1,959-char articleBody in NewsArticle
+  schema, front-loaded summary, sources + detail in static HTML, llms.txt). No thin
+  FAQ/boilerplate needed. Keep front-loading the answer + specific sourced claims.
 
-**P0 — News eligibility (highest leverage)**
-- [ ] Koby: pick editorial-identity option above.
-- [ ] Then (code): add named byline to story pages + NewsArticle schema; expand /about
-      with editorial standards + AI-transparency + a contact.
-- [ ] Koby: create a Publisher Center *publication* (login → Add Publication → verify via GSC).
+**2. Long-tail aggregation, not head terms.** Small/low-authority sites win by
+aggregating hundreds of low-competition long-tail queries (KD<30), not "AI news."
+We have 1,600+ story pages + /tools/ = a long-tail asset. Specific queries (model
+names, exact announcements) are winnable; "AI news today" is not.
 
-**P1 — Title/CTR (modest; story titles truncate)**
-- Story `<title>`s run long (headline + " — AI Briefing") → SERP truncation. Tighten:
-  keep the headline's first ~55 chars meaningful; consider dropping/condensing the
+**3. Hebrew niche** — less saturated for some AI sub-topics; native /he/ pages differentiate.
+
+## Prioritized actions (reframed)
+
+**P0 — GEO / Bing (highest leverage, honest)**
+- [ ] Koby: verify Bing WMT via "Import from Google Search Console" (1 click, no code).
+      → unlocks ChatGPT Search citations.
+- [x] /about AI-disclosure methodology shipped (d32a839).
+- [ ] Optional: Publisher Center *publication* for branding (algorithmic inclusion;
+      do NOT expect Top Stories without authority — low priority now).
+
+**P1 — Title/CTR (shipped)**
+- [x] Story `<title>` truncation fixed (d32a839): brand suffix only when ≤60 chars.
   suffix on long headlines. Keyword/entity already leads (good).
 
 **P2 — Lean into what's working (GEO)**

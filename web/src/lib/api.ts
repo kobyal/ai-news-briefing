@@ -152,6 +152,10 @@ export interface SearchResult {
   headline_he?: string;
   summary?: string;
   summary_he?: string;
+  /** Article body — indexed for SEARCH MATCHING only (not rendered on result
+   *  cards). Body-only terms like "graviton" are unsearchable without it. */
+  detail?: string;
+  detail_he?: string;
   og_image?: string | null;
   url?: string;
   urls?: string[];
@@ -198,8 +202,8 @@ export function searchIndex(items: SearchResult[], q: string, isHe = false, limi
   const matches: SearchResult[] = [];
   for (const s of items) {
     const fields = isHe
-      ? [s.headline_he || s.headline, s.summary_he || s.summary, s.vendor, s.channel, s.subreddit]
-      : [s.headline, s.summary, s.vendor, s.channel, s.subreddit, s.explainer];
+      ? [s.headline_he || s.headline, s.summary_he || s.summary, s.detail_he || s.detail, s.vendor, s.channel, s.subreddit]
+      : [s.headline, s.summary, s.detail, s.vendor, s.channel, s.subreddit, s.explainer];
     const haystack = fields.filter(Boolean).join(" ").toLowerCase();
     if (haystack.includes(trimmed)) {
       matches.push(s);

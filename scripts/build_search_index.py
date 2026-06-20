@@ -164,6 +164,7 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
     # though the May 6 Microsoft-OpenAI alliance story has it in headline_he.
     headlines_he_arr = briefing_he.get("headlines_he") or []
     summaries_he_arr = briefing_he.get("summaries_he") or []
+    details_he_arr = briefing_he.get("details_he") or []
     # ── Articles ─────────────────────────────────────────────
     for idx, s in enumerate(briefing.get("news_items") or []):
         urls = s.get("urls") or []
@@ -185,6 +186,7 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
         )
         headline_he = s.get("headline_he") or (headlines_he_arr[idx] if idx < len(headlines_he_arr) else "")
         summary_he = s.get("summary_he") or (summaries_he_arr[idx] if idx < len(summaries_he_arr) else "")
+        detail_he = s.get("detail_he") or (details_he_arr[idx] if idx < len(details_he_arr) else "")
         # Prefer the lambda's first-party S3 mirror (e.g. aibriefing.dev/data/img/...)
         # over the raw third-party article URL. See _first_party_image_map().
         og_image = FIRST_PARTY_OG.get((date, story_id)) or s.get("og_image")
@@ -197,6 +199,12 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
             "headline_he":  headline_he,
             "summary":      s.get("summary"),
             "summary_he":   summary_he,
+            # detail/detail_he are indexed for SEARCH MATCHING only (body text like
+            # "graviton" often lives only here). The frontend renders headline+summary;
+            # the search matcher must include these fields. Added 2026-06-20 after
+            # "graviton" returned 12/29 stories — body-only mentions were unsearchable.
+            "detail":       s.get("detail") or "",
+            "detail_he":    detail_he,
             "og_image":     og_image,
         })
     # IMPORTANT: `date` MUST be the date of the JSON file the item is

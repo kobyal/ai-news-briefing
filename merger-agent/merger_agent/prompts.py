@@ -78,6 +78,18 @@ Produce ONE merged briefing as a JSON object. Rules:
    - Keep ONE story, not duplicates
    - Merge the summaries into a richer, more complete paragraph (best details from all sources)
    - Combine ALL source URLs from all versions (deduplicated)
+   - SOURCE ORDER — urls[0] is the PRIMARY (what the card links to). Lead with the FIRST-PARTY
+     vendor announcement when one exists among the sources: a specific post on the vendor's own
+     domain (e.g. aws.amazon.com/blogs/..., openai.com/index/..., anthropic.com/news/<slug>,
+     blog.google/..., news.microsoft.com/..., huggingface.co/blog/..., mistral.ai/news/...).
+     Put third-party coverage (TechCrunch, CNBC, aboutamazon recaps, aggregators) AFTER it.
+     This matters most for ROUND-UP / summit / event stories: if the vendor published an official
+     "top announcements" or product-launch post, that is the primary source — do NOT lead with a
+     third-party recap when the official post is in your sources.
+     GUARDRAIL: only treat a SPECIFIC article/post URL as first-party-primary. Do NOT promote a
+     generic vendor INDEX or landing page (e.g. anthropic.com/news, nvidianews.../latest,
+     openai.com/blog with no slug) — those read as off-topic and fail link-quality checks; if the
+     only vendor URL is a bare index, prefer a specific third-party article instead.
    - published_date: use the LATEST date among the merged sources (not the earliest)
    - ONLY merge when stories describe the SAME specific announcement (e.g. two articles about "Bedrock Agent Registry launch").
      Do NOT merge different announcements from the same vendor (e.g. "Agent Registry" and "Project Houdini" are separate stories even though both are AWS).

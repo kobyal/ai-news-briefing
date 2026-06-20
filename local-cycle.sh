@@ -278,19 +278,28 @@ aws s3 cp "docs/data/${DATE}.json" "s3://${S3_BUCKET}/data/${DATE}.json" \
   --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
   && echo "  ✓ ${DATE}.json uploaded to S3" \
   || echo "  ⚠ ${DATE}.json S3 upload failed"
-# Regenerate archive.json: fetch current from S3, add today's date, re-upload.
-# This keeps the date list current for the local pipeline (Lambda does this
-# automatically on ingest, but local runs bypass Lambda).
-_ARCHIVE_UPDATED=$(aws s3 cp "s3://${S3_BUCKET}/data/archive.json" - \
-  --profile "$S3_PROFILE" --region us-east-1 2>/dev/null | \
+# Regenerate archive.json by DERIVING the date list from the actual DATE.json
+# day files on S3 (self-healing) — unioned with the existing archive + today.
+# The old approach (union existing-archive + today only) silently LOST dates
+# whenever something overwrote archive.json with a stale list (the ingest lambda
+# regenerates it from its own source) — by 2026-06-20 the archive had drifted to
+# 52 dates while 78 day files existed, so infinite-scroll skipped 06-18/06-19
+# (jumped 06-20 → 06-17). Deriving from the S3 listing can never skip a date
+# that has a published day file. (Lambda also writes archive on ingest, but the
+# post-ingest re-derive below + this listing keep it authoritative.)
+_ARCHIVE_UPDATED=$( { aws s3 ls "s3://${S3_BUCKET}/data/" --profile "$S3_PROFILE" --region us-east-1 2>/dev/null;
+                      aws s3 cp "s3://${S3_BUCKET}/data/archive.json" - --profile "$S3_PROFILE" --region us-east-1 2>/dev/null; } | \
   python3 -c "
-import json,sys
-try:
-    a = json.load(sys.stdin)
-    dates = sorted(set(a.get('dates',[]) + ['${DATE}']), reverse=True)[:90]
-    print(json.dumps({'dates': dates}))
-except Exception:
-    pass
+import json,sys,re
+text = sys.stdin.read()
+# day files: data/<YYYY-MM-DD>.json
+dates = set(re.findall(r'(20\d{2}-\d{2}-\d{2})\.json', text))
+# also union any dates already listed in an existing archive.json blob
+for m in re.finditer(r'\"(20\d{2}-\d{2}-\d{2})\"', text):
+    dates.add(m.group(1))
+dates.add('${DATE}')
+out = sorted(dates, reverse=True)[:90]
+print(json.dumps({'dates': out}))
 " 2>/dev/null || true)
 if [ -n "$_ARCHIVE_UPDATED" ]; then
   echo "$_ARCHIVE_UPDATED" | aws s3 cp - "s3://${S3_BUCKET}/data/archive.json" \

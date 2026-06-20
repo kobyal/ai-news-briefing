@@ -174,17 +174,36 @@ def _translate_he(texts: list) -> list:
               "Return ONLY the translations, numbered the same way, no explanations:\n\n" + numbered)
 
     def _parse(text: str) -> list:
-        lines = []
+        # Place each translation at the index given by its OWN leading number
+        # ("3. ...") rather than by append-order. Append-order silently shifted
+        # ALL later items whenever a translation spanned two lines or a
+        # continuation line began with a digit (e.g. "2.9K לייקים", a year),
+        # and the len==len guard missed it when a spurious line offset a merged
+        # one (net count unchanged). Number-keyed placement + continuation
+        # appends is robust to multi-line output. (2026-06-20 root-cause fix:
+        # Greg Brockman's X post showed bcherny's "Artifacts in Claude Code"
+        # Hebrew — the whole people array was off by one.)
+        re = __import__("re")
+        out = [""] * len(texts)
+        cur = None  # current 1-based item index we're filling
         for line in text.strip().split("\n"):
             line = line.strip()
-            if line and line[0].isdigit():
-                m = __import__("re").match(r"^\d+\.\s*(.+)$", line)
-                if m:
-                    lines.append(m.group(1))
-        if len(lines) == len(texts):
-            return lines
-        print(f"  Claude translate: got {len(lines)} lines for {len(texts)} texts — padding")
-        return lines + [""] * (len(texts) - len(lines))
+            if not line:
+                continue
+            m = re.match(r"^(\d+)\.\s*(.*)$", line)
+            if m:
+                n = int(m.group(1))
+                if 1 <= n <= len(texts):
+                    cur = n - 1
+                    out[cur] = m.group(2).strip()
+                    continue
+            # Non-numbered (or out-of-range) line → continuation of current item.
+            if cur is not None:
+                out[cur] = (out[cur] + " " + line).strip()
+        filled = sum(1 for t in out if t)
+        if filled != len(texts):
+            print(f"  Claude translate: filled {filled}/{len(texts)} numbered translations")
+        return out
 
     def _via_subscription() -> list:
         sys.path.insert(0, str(Path(__file__).parent))

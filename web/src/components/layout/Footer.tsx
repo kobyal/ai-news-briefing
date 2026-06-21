@@ -1,6 +1,10 @@
+"use client";
+
 import { Logo } from "./Logo";
+import { useLang } from "@/context/LangContext";
 
 export function Footer() {
+  const { isHe } = useLang();
   return (
     <footer
       dir="ltr"
@@ -27,6 +31,13 @@ export function Footer() {
               AI Briefing
             </span>
           </div>
+          <span style={{ color: "#d0d0e8", fontSize: "10px" }}>&middot;</span>
+          <a
+            href={isHe ? "/he/vendors/" : "/vendors/"}
+            style={{ fontSize: "11px", fontWeight: 600, color: "#6b6b8a", textDecoration: "none" }}
+          >
+            {isHe ? "ספקים" : "Vendors"}
+          </a>
           <span style={{ color: "#d0d0e8", fontSize: "10px" }}>&middot;</span>
           <span style={{ fontSize: "10px", color: "#9a9ab8" }}>
             Curated by AI agents &middot; Updated daily &middot; {new Date().getFullYear()}

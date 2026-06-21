@@ -3,6 +3,7 @@ export const dynamic = "force-static";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { MetadataRoute } from "next";
+import { getHubVendors, vendorSlug } from "@/lib/vendor-hub";
 
 type IndexEntry = { story_id: string; date?: string; type?: string };
 type SearchIndex = { stories?: IndexEntry[]; extras?: IndexEntry[] };
@@ -33,7 +34,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
       alternates: { languages: { en: `${base}/`, he: `${base}/he/` } } },
     { url: `${base}/he/stories/`,         changeFrequency: "daily",   priority: 0.8,
       alternates: { languages: { en: `${base}/stories/`, he: `${base}/he/stories/` } } },
+    { url: `${base}/vendors/`,            changeFrequency: "daily",   priority: 0.8,
+      alternates: { languages: { en: `${base}/vendors/`, he: `${base}/he/vendors/` } } },
+    { url: `${base}/he/vendors/`,         changeFrequency: "daily",   priority: 0.7,
+      alternates: { languages: { en: `${base}/vendors/`, he: `${base}/he/vendors/` } } },
   ];
+
+  // Per-vendor hub pages (EN + HE) — aggregate all stories for a company.
+  const vendorPages: MetadataRoute.Sitemap = getHubVendors().flatMap((v) => {
+    const slug = vendorSlug(v);
+    const enUrl = `${base}/vendor/${slug}/`;
+    const heUrl = `${base}/he/vendor/${slug}/`;
+    return [
+      { url: enUrl, changeFrequency: "daily" as const, priority: 0.8,
+        alternates: { languages: { en: enUrl, he: heUrl } } },
+      { url: heUrl, changeFrequency: "daily" as const, priority: 0.7,
+        alternates: { languages: { en: enUrl, he: heUrl } } },
+    ];
+  });
 
   const storyPages: MetadataRoute.Sitemap = allStories.flatMap((s) => {
     const enUrl = `${base}/story/${s.story_id}/`;
@@ -53,5 +71,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     return [{ url: enUrl, lastModified, changeFrequency: "never" as const, priority: 0.8 }];
   });
 
-  return [...staticPages, ...storyPages];
+  return [...staticPages, ...vendorPages, ...storyPages];
 }

@@ -51,6 +51,7 @@ export function Header({ date }: HeaderProps) {
 
   const navItems = [
     { href: "/", label: isHe ? "כתבות" : "Stories" },
+    { href: "/main/", label: isHe ? "מערכת" : "Editorial" },
     { href: "/community/", label: isHe ? "חברתי" : "Community" },
     { href: "/media/", label: isHe ? "מדיה" : "Media" },
     { href: "/tools/", label: isHe ? "כלים" : "Tools" },

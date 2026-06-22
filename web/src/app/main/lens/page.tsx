@@ -62,7 +62,7 @@ const TYPE_META: Record<string, { icon: string; label: string; label_he: string 
   tool:      { icon: "🔧", label: "Tools",     label_he: "כלים" },
 };
 
-const SHOW_LIMIT = 5;
+const SHOW_LIMIT = 12;
 
 function SourceCard({ src, isHe, today }: { src: LensSource; isHe: boolean; today: string }) {
   const resolvedUrl = (() => {

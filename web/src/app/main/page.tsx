@@ -30,6 +30,7 @@ interface Lens {
   body_he: string;
   post_body: string;
   post_body_he: string;
+  og_image?: string;
   sources?: LensSource[];
 }
 
@@ -341,12 +342,27 @@ function LensCard({ lens, isHe }: { lens: Lens; isHe: boolean }) {
           e.currentTarget.style.boxShadow   = "none";
         }}
       >
-        <span style={{
-          fontSize: 32, lineHeight: 1, flexShrink: 0,
-          width: 52, height: 52, borderRadius: 12,
-          background: "linear-gradient(135deg, #eef2ff, #e0e7ff)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>{lens.icon}</span>
+        {(() => {
+          // Real article photo instead of an emoji (emoji read as amateur).
+          const GENERIC = ["arxiv-logo", "placeholder", "default-og", "twitter_card_default"];
+          const og = lens.og_image || "";
+          const img = og && !GENERIC.some(g => og.includes(g))
+            ? og.replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/")
+            : "";
+          return (
+            <div style={{
+              flexShrink: 0, width: 64, height: 64, borderRadius: 12, overflow: "hidden",
+              background: "linear-gradient(135deg, #eef2ff, #e0e7ff)",
+            }}>
+              {img && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={img} alt="" referrerPolicy="no-referrer"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              )}
+            </div>
+          );
+        })()}
         <div style={{ minWidth: 0 }}>
           <p style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 800, color: "#0f172a", lineHeight: 1.3 }}>
             {label}

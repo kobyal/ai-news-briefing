@@ -275,40 +275,28 @@ function VendorContent() {
 
         {/* Bullets — editorial notes for editorial vendors; all-source headlines for others */}
         {(() => {
-          if (editorialNotes.length > 0) {
-            const bullets = editorialNotes.map(s => isHe ? (s.editorial_note_he || s.editorial_note) : s.editorial_note);
-            return (
-              <div style={{ marginBottom: 36 }}>
-                <p style={{ margin: "0 0 12px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase" as const, color: "#111827" }}>
-                  {isHe ? "עיקרי העריכה" : "Editorial Highlights"}
-                </p>
-                <div style={{ background: "#fff", border: `1px solid ${vendorInfo.color}20`, borderRadius: 12, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10, boxShadow: `0 2px 12px ${vendorInfo.color}10` }}>
-                  {bullets.map((note, i) => (
-                    <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: vendorInfo.color, flexShrink: 0, marginTop: 7 }} />
-                      <span style={{ fontSize: 13, color: "#1f2937", lineHeight: 1.6 }}>{note}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          }
-
-          // Combine articles + pulse items; in Hebrew mode skip untranslated items.
+          // Editorial notes (prose) first, then fill with the vendor's article +
+          // pulse headlines so the highlights reflect the FULL week — not just the
+          // 1-2 stories editorial featured in its small global list.
           const seen: string[] = [];
-          const allSources = [
+          const bullets: string[] = [];
+          for (const s of editorialNotes) {
+            const note = isHe ? (s.editorial_note_he || s.editorial_note) : s.editorial_note;
+            if (!note || nearDup(note, seen)) continue;
+            seen.push(note); bullets.push(note);
+          }
+          const more = [
             ...articles.map(a => ({ headline: a.headline || "", headline_he: a.headline_he })),
             ...pulseItems,
           ];
-          const bullets = allSources
-            .filter(item => {
-              if (!item.headline) return false;
-              if (isHe && !item.headline_he) return false;
-              if (nearDup(item.headline, seen)) return false;
-              seen.push(item.headline);
-              return true;
-            })
-            .map(item => isHe && item.headline_he ? item.headline_he : item.headline);
+          for (const item of more) {
+            if (bullets.length >= 12) break;
+            if (!item.headline) continue;
+            if (isHe && !item.headline_he) continue; // HE mode stays 100% Hebrew
+            if (nearDup(item.headline, seen)) continue;
+            seen.push(item.headline);
+            bullets.push(isHe && item.headline_he ? item.headline_he : item.headline);
+          }
 
           if (bullets.length === 0) return null;
           return (
@@ -317,7 +305,7 @@ function VendorContent() {
                 {isHe ? "עיקרי העריכה" : "Editorial Highlights"}
               </p>
               <div style={{ background: "#fff", border: `1px solid ${vendorInfo.color}20`, borderRadius: 12, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10, boxShadow: `0 2px 12px ${vendorInfo.color}10` }}>
-                {bullets.slice(0, 12).map((note, i) => (
+                {bullets.map((note, i) => (
                   <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: vendorInfo.color, flexShrink: 0, marginTop: 7 }} />
                     <span style={{ fontSize: 13, color: "#1f2937", lineHeight: 1.6 }}>{note}</span>
@@ -337,8 +325,6 @@ function VendorContent() {
               {isHe ? "אין כתבות לספק זה ב-4 ימים האחרונים" : "No articles for this vendor in the last 4 days"}
             </div>
           );
-          const [hero, ...rest] = listArticles;
-          const heroImg = hero.story_id ? ogImageMap.get(hero.story_id) : undefined;
           return (
             <div style={{ marginBottom: 40 }}>
               <p style={{ margin: "0 0 12px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase" as const, color: "#111827" }}>
@@ -346,37 +332,8 @@ function VendorContent() {
                 <span style={{ fontWeight: 400, color: "#9ca3af", marginInlineStart: 6 }}>({listArticles.length})</span>
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {/* Hero article — full-width with image if available */}
-                <a href={`/story/${hero.story_id}`} target="_blank" rel="noopener noreferrer"
-                  style={{ display: "block", borderRadius: 14, background: "#fff", border: `1px solid ${vendorInfo.color}25`, textDecoration: "none", overflow: "hidden", boxShadow: `0 2px 12px ${vendorInfo.color}15`, transition: "box-shadow .15s, transform .15s" }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.boxShadow = `0 6px 24px ${vendorInfo.color}28`;
-                    (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.boxShadow = `0 2px 12px ${vendorInfo.color}15`;
-                    (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-                  }}
-                >
-                  {heroImg && (
-                    <div style={{ height: 160, overflow: "hidden", background: "#f3f4f6" }}>
-                      <img src={heroImg} alt="" referrerPolicy="no-referrer"
-                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                        onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = "none"; }} />
-                    </div>
-                  )}
-                  <div style={{ padding: "14px 18px" }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: vendorInfo.color, textTransform: "uppercase" as const, letterSpacing: ".1em" }}>
-                      {isHe ? "מומלץ" : "Featured"} · {hero.date}
-                    </span>
-                    <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 700, color: "#111827", lineHeight: 1.45 }}>
-                      {isHe && hero.headline_he ? hero.headline_he : hero.headline}
-                    </p>
-                  </div>
-                </a>
-
-                {/* Remaining articles with thumbnail */}
-                {rest.map((article) => {
+                {/* Uniform article rows — no enlarged hero (every story equal weight) */}
+                {listArticles.map((article) => {
                   const title = isHe && article.headline_he ? article.headline_he : article.headline;
                   const thumb = article.story_id ? ogImageMap.get(article.story_id) : undefined;
                   return (

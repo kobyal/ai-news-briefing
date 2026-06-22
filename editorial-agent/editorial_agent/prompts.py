@@ -27,7 +27,7 @@ EDITORIAL PRINCIPLES:
 
 5. GROUNDED. Every specific claim in your prose must trace back to an item in the catalog provided. Do not add facts, statistics, or events from your training data. Write only from the data you were given.
 
-6. JUICY. Would a smart, curious non-technical person forward this to a friend? If not, dig for the real angle.
+6. CLEAR OVER CLEVER. The `theme` is a WEEKLY SUMMARY that readers skim to catch up on the whole week in AI — make it accurate, plain, and informative, covering the several biggest threads. It is NOT a dramatic single-thesis headline and must NOT crown one storyline as if it were the entire week (that reads as misleading). Save the sharper, opinionated voice for the lens deep-dives (`post_body`). Lens labels must be plain topic names, never puns — they get translated to Hebrew and clever English wordplay becomes unreadable Hebrew.
 
 7. NEVER MISS THESE — scan explicitly for: funding rounds and valuations (a $30B raise changes the whole competitive picture), pricing wars (one lab cutting 67% forces every other lab's hand), legal rulings (copyright, antitrust, safety liability), direct head-to-head competition between labs (Anthropic vs OpenAI Codex on agent coding, Google vs everyone on search AI), government bets (sovereign funds, national AI initiatives, grid bills), and SECURITY/SAFETY INCIDENTS across ALL labs — if one lab has a jailbreak or model exploit story AND another lab has a separate security incident in the same week, cover BOTH. Never let one lab's security story crowd out another's.
 
@@ -72,10 +72,10 @@ Return a single JSON object:
 
 {{
   "theme": {{
-    "headline": "5-9 words. Captures a SHIFT across the industry, not a single vendor announcement.",
-    "subheadline": "2-5 words — the twist or tension.",
-    "body": "Exactly 3 paragraphs of flowing editorial prose. NO bullets. DO NOT use the word 'delve'. Paragraph 1: what shifted across the industry this week. Paragraph 2: the deeper dynamic or tension. Paragraph 3: practical implication for developers or builders. Only reference events from the catalog above.",
-    "pull_quote": "One sentence, 15-28 words, in quotation marks. The sharpest insight — the kind of line someone screenshots.",
+    "headline": "A clear, accurate SUMMARY OF THE WEEK IN AI in 6-11 words — name what the week was actually about across the whole industry, spanning its several biggest threads (e.g. 'Talent wars escalate while open-weight models and agent security surge'). NOT a single dramatic thesis, NOT one company's announcement, NOT clickbait. Plain and informative beats clever — it will be read in Hebrew too, where wordplay breaks.",
+    "subheadline": "One short, plain clause naming the week's 2-3 biggest threads.",
+    "body": "Exactly 3 paragraphs that SUMMARIZE the week across the industry — a balanced digest a reader skims to catch up. NO bullets. DO NOT use the word 'delve'. Paragraph 1: the 2-3 biggest developments this week, named plainly. Paragraph 2: the other notable threads (funding, launches, research, policy, security, hardware). Paragraph 3: what it adds up to and what to watch next. Do NOT force a single-thesis narrative; cover the breadth. Only reference events from the catalog above.",
+    "pull_quote": "One sentence, 15-28 words, in quotation marks — a sharp, accurate observation about the week (not an overclaim about one story).",
     "vendor_signals": ["every organization mentioned in your body — companies, labs, agencies, governments"],
     "juiciness_check": "Complete this: 'This matters to someone who doesn't follow AI because...' — one specific sentence."
   }},
@@ -83,7 +83,7 @@ Return a single JSON object:
     {{
       "id": "short-slug",
       "icon": "single emoji",
-      "label": "2-4 word angle name",
+      "label": "2-4 word PLAIN topic name in everyday language naming this thread's subject (e.g. 'Talent moves', 'Open-weight models', 'Agent security', 'Compute spending'). NOT a pun, metaphor, headline, or dramatic phrase — clever English wordplay becomes unreadable Hebrew when translated.",
       "body": "2 sentences. Sentence 1: what is happening in this angle. Sentence 2: what is at stake.",
       "post_body": "4-5 paragraphs of blog-post prose for this lens angle. Open with a hook. Build the argument. Close with implication. 400-600 words. Only reference events from the catalog.",
       "source_ids": ["S-ID", "S-ID", "C-ID", "V-ID", "T-ID"]

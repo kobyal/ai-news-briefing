@@ -1,10 +1,41 @@
 AI Briefing — Roadmap & Improvement Ideas
 ==========================================
 Created: 2026-04-09
-Last updated: 2026-06-17
+Last updated: 2026-06-22
+
+ACTIVE FOCUS (2026-06-22) — traffic = DISTRIBUTION, not more SEO
+---------------------------------------------------------------
+Full reasoning: `docs/TRAFFIC_AND_GROWTH.md`. The painful truth: technical SEO is MAXED
+(~5.7k impr / 17 clicks / 0.3% CTR / pos ~10 / no Top Stories). Hot news is the WORST bet
+for a low-authority site (we lose head terms to Reuters/Verge). Growth lever = owned
+channels that don't gate on Google authority + content a new site can rank for. Priorities:
+1. **Email newsletter / weekly digest** — owned, compounding audience. START NOW.
+   DECIDED 2026-06-22: **Hebrew-first**, **weekly** digest first (daily later),
+   **Buttondown** (managed) for sending/compliance/signup. See phased plan below.
+2. **`/main` editorial split into 2** — (a) a public on-site "main" page (link it in Header
+   nav + publish editorial.json to CDN — Phase 0, doing now), and (b) the **weekly "special
+   stories" product** that feeds the Hebrew email. DECIDED 2026-06-22: not just links — the
+   weekly piece (i) curates the week's most-interesting stories, (ii) adds an **original
+   editorial layer** that talks about / explains / analyzes them (our voice, not a summary),
+   and (iii) **creates net-new original content/articles NOT on the site** (the "why
+   subscribe" delight). This is a real editorial product, not a reformatted feed.
+3. **Auto-publish to social** (X / LinkedIn / Telegram) — pipeline already makes the content;
+   add a publish step. Hebrew variant via `israeli-social-content` skill. (Overlaps with the
+   publishing-as-a-service idea — see Longer-term.)
+4. **Evergreen comparison/guide pages** (vendor-vs-vendor, "best AI X 2026") layered on the
+   new vendor hubs (shipped 06-21) — durable organic a new site CAN rank for.
+5. Finish GA4 `outbound_click` Key Event (Tier 3 — stop flying blind).
+
+Removed 2026-06-22: `/social-lady` demo page (client pitch declined — cost, not quality).
 
 Shipped (since 2026-04-09)
 --------------------------
+
+Vendor hub pages + internal linking (2026-06-21):
+- ✅ Static `/vendor/[slug]` (EN) + `/he/vendor/[slug]` (HE) + `/vendors` + `/he/vendors`
+  indexes — aggregate ALL stories per company (Anthropic 172, OpenAI 167, …) as real `<a>`
+  links; CollectionPage/ItemList/BreadcrumbList JSON-LD; sibling cross-links; sitemap +
+  hreflang; site-wide Footer "Vendors" link. Deployed + IndexNow-pinged. (`eadf5b7`)
 
 SEO CTR push + Google News + GA4 conversions (2026-06-15):
 - ✅ Diagnosis from GSC (3mo): 4.4k impressions / avg pos ~8.9 but **0.4% CTR** —
@@ -94,6 +125,16 @@ Longer-term (big impact)
 - Mobile app (PWA) — the site already works on mobile, just needs a manifest + service worker for "Add to Home Screen"
 - Slack/Discord bot — push the daily briefing to team channels
 - Per-vendor RSS feeds — let readers subscribe to just Anthropic stories (or just OpenAI, etc.)
+
+- **Publishing-as-a-service / "restyle & post" (potential product → revenue)** — idea seeded
+  2026-06-22 from the social-lady episode. We already turn the firehose into clean structured
+  stories; the reusable engine is "take an article/story and re-render it in style X (LinkedIn
+  thought-leadership, X thread, punchy newsletter, exec summary, Hebrew) and optionally
+  auto-post." Two value props: (a) DISTRIBUTION for us (drives our own traffic — Tier 1 above),
+  (b) a standalone SERVICE others pay for (give us a URL/topic → get on-brand posts across
+  channels). Start as our own internal auto-poster (Tier-1 distribution), then generalize the
+  styler into a product if it proves out. Build on `shared/anthropic_cc` + the existing
+  per-style prompt patterns; needs X/LinkedIn/Telegram API creds + a scheduling layer.
 
 Reader email / newsletter — phased plan (planned 2026-06-15)
 ------------------------------------------------------------

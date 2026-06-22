@@ -722,7 +722,7 @@ def _synthesize(context: dict) -> dict:
     return _parse_json(raw)
 
 
-def _translate(synthesis: dict) -> dict:
+def _translate(synthesis: dict, community: Optional[list] = None) -> dict:
     from .prompts import TRANSLATE_SYSTEM, TRANSLATE_USER
     to_translate = {
         "theme": {k: synthesis["theme"].get(k, "") for k in
@@ -731,6 +731,10 @@ def _translate(synthesis: dict) -> dict:
                    for l in synthesis.get("lenses", [])],
         "featured_stories": [{"editorial_note": s.get("editorial_note", "")}
                               for s in synthesis.get("featured_stories", [])],
+        # Community items carry NO Hebrew from the resolver — translate them here so
+        # the "מה רוחש ברשת" section renders 100% Hebrew (no English fallback leaks).
+        "community_spotlight": [{"headline": c.get("headline", ""), "body": c.get("body", "")}
+                                for c in (community or [])],
         "editor_picks": [{"why_now": p.get("why_now", "")}
                          for p in synthesis.get("editor_picks", [])],
     }
@@ -805,6 +809,12 @@ def _merge(synthesis: dict, translation: dict, resolved_lenses: list,
         he = featured_he[i] if i < len(featured_he) else {}
         featured.append({**story, "editorial_note_he": he.get("editorial_note", "")})
 
+    community_he = translation.get("community_spotlight") or []
+    community = []
+    for i, item in enumerate(resolved_community):
+        he = community_he[i] if i < len(community_he) else {}
+        community.append({**item, "headline_he": he.get("headline", ""), "body_he": he.get("body", "")})
+
     return {
         "date":                date,
         "generated_at":        datetime.datetime.utcnow().isoformat() + "Z",
@@ -813,7 +823,7 @@ def _merge(synthesis: dict, translation: dict, resolved_lenses: list,
         "theme":               theme,
         "lenses":              lenses,
         "featured_stories":    featured,
-        "community_spotlight": resolved_community,
+        "community_spotlight": community,
         "top_videos":          resolved_videos,
         "theme_refs":          resolved_refs,
         "editor_picks":        picks,
@@ -903,17 +913,18 @@ def run_pipeline(date: Optional[str] = None) -> dict:
           f"{len(synthesis.get('community_spotlight',[]))} community | "
           f"{len(synthesis.get('top_videos',[]))} videos (all validated)")
 
-    # Translate (Sonnet for quality)
-    print("\n[4/4] Translating to Hebrew (Sonnet)...")
-    translation = _translate(synthesis)
-
-    # Resolve IDs → display objects
+    # Resolve IDs → display objects (community resolved BEFORE translate so its
+    # headline/body can be sent to the Hebrew pass).
     resolved_lenses    = _resolve_lens_links(synthesis.get("lenses", []), story_cat, community_cat, video_cat, tool_cat)
     resolved_picks     = _resolve_picks(synthesis.get("editor_picks", []), tool_cat)
     resolved_featured  = _resolve_featured_stories(synthesis.get("featured_stories", []), story_cat)
     resolved_community = _resolve_community_spotlight(synthesis.get("community_spotlight", []), community_cat)
     resolved_videos    = _resolve_top_videos(synthesis.get("top_videos", []), video_cat)
     resolved_refs      = _resolve_theme_refs(synthesis.get("theme_refs", []), story_cat, community_cat)
+
+    # Translate (Sonnet for quality) — pass resolved community so it gets Hebrew too
+    print("\n[4/4] Translating to Hebrew (Sonnet)...")
+    translation = _translate(synthesis, resolved_community)
 
     # Merge + save
     output = _merge(

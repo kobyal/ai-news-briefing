@@ -27,8 +27,11 @@ synthesis = {
                      for p in d.get("editor_picks", [])],
 }
 
+community = [{"headline": c.get("headline", ""), "body": c.get("body", "")}
+             for c in d.get("community_spotlight", [])]
+
 print("[retranslate] Running Hebrew translation with improved prompt...")
-he = _translate(synthesis)
+he = _translate(synthesis, community)
 
 # Merge Hebrew back into the document
 if he.get("theme"):
@@ -47,6 +50,11 @@ for i, lhe in enumerate(he.get("lenses", [])):
 for i, she in enumerate(he.get("featured_stories", [])):
     if i < len(d["featured_stories"]):
         d["featured_stories"][i]["editorial_note_he"] = she.get("editorial_note", d["featured_stories"][i].get("editorial_note_he", ""))
+
+for i, che in enumerate(he.get("community_spotlight", [])):
+    if i < len(d["community_spotlight"]):
+        d["community_spotlight"][i]["headline_he"] = che.get("headline", d["community_spotlight"][i].get("headline_he", ""))
+        d["community_spotlight"][i]["body_he"]     = che.get("body", d["community_spotlight"][i].get("body_he", ""))
 
 for i, phe in enumerate(he.get("editor_picks", [])):
     if i < len(d["editor_picks"]):

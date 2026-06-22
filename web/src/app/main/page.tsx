@@ -5,8 +5,8 @@ import { fetchEditorial, fetchSearchIndex, fetchDayData, type SearchResult } fro
 import { getVendorLogo } from "@/lib/vendors";
 import { useLang } from "@/context/LangContext";
 import { Header } from "@/components/layout/Header";
+import { BackToTopButton } from "@/components/ui/BackToTopButton";
 import { inSiteHref } from "@/lib/anchors";
-import { VENDOR_ALIASES } from "@/components/briefing/VendorResources";
 import type { DayData } from "@/lib/types";
 
 // ── types ─────────────────────────────────────────────────────────────────────
@@ -35,7 +35,9 @@ interface Lens {
 
 interface CommunityItem {
   headline: string;
+  headline_he?: string;
   body: string;
+  body_he?: string;
   source_label: string;
   source_url: string;
   heat: string;
@@ -396,6 +398,8 @@ const HEAT_META: Record<string, { emoji: string; color: string }> = {
 function SocialCard({ item, isHe, today }: { item: SocialItem; isHe: boolean; today: string }) {
   const [bodyExpanded, setBodyExpanded] = useState(false);
   const meta = SOURCE_META[item.type];
+  // Localize the only English-word badge ("Pulse") in HE mode; symbols (𝕏, r/, in) are universal.
+  const badgeText = item.type === "pulse" && isHe ? "💬 דיון" : meta.badge;
   const heat = item.heat ? (HEAT_META[item.heat] || HEAT_META.mild) : null;
   const headline = isHe && item.headline_he ? item.headline_he : item.headline;
   const body     = isHe && item.body_he ? item.body_he : item.body;
@@ -438,7 +442,7 @@ function SocialCard({ item, isHe, today }: { item: SocialItem; isHe: boolean; to
           <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to bottom, transparent 40%, ${meta.color}99)` }} />
           <div style={{ position: "absolute", bottom: 8, insetInlineStart: 10, display: "flex", gap: 5, alignItems: "center" }}>
             <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 100,
-              color: "#fff", background: `${meta.color}cc`, letterSpacing: ".04em" }}>{meta.badge}</span>
+              color: "#fff", background: `${meta.color}cc`, letterSpacing: ".04em" }}>{badgeText}</span>
             {heat && <span style={{ fontSize: 12 }}>{heat.emoji}</span>}
           </div>
         </div>
@@ -447,7 +451,7 @@ function SocialCard({ item, isHe, today }: { item: SocialItem; isHe: boolean; to
           borderBottom: `1px solid ${meta.color}18`, display: "flex", alignItems: "center", padding: "0 14px", gap: 8 }}>
           <span style={{ fontSize: 18 }}>{SOURCE_ICON[item.type]}</span>
           <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 100,
-            color: meta.color, background: meta.bg, letterSpacing: ".04em" }}>{meta.badge}</span>
+            color: meta.color, background: meta.bg, letterSpacing: ".04em" }}>{badgeText}</span>
           {heat && <span style={{ fontSize: 12, marginInlineStart: 2 }}>{heat.emoji}</span>}
           <span style={{ fontSize: 11, color: "#9ca3af", flex: 1, overflow: "hidden",
             textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.source_label}</span>
@@ -607,7 +611,7 @@ export default function MainPage() {
       <>
         <Header date={today} archive={[]} />
         <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <p style={{ fontSize: 14, color: "#9090b8" }}>Loading editorial…</p>
+          <p style={{ fontSize: 14, color: "#9090b8" }}>{isHe ? "טוען מערכת…" : "Loading editorial…"}</p>
         </div>
       </>
     );
@@ -619,7 +623,7 @@ export default function MainPage() {
         <Header date={today} archive={[]} />
         <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <p style={{ fontSize: 14, color: "#f87171", background: "#fef2f2", padding: "12px 20px", borderRadius: 10 }}>
-            {error || "No editorial data"}
+            {isHe ? "לא ניתן לטעון את עמוד המערכת" : (error || "No editorial data")}
           </p>
         </div>
       </>
@@ -640,67 +644,50 @@ export default function MainPage() {
     vendorMap.get(s.vendor)!.push(s);
   }
 
-  // Supplement with vendors from the last 3 days that editorial didn't feature.
-  // Uses the search-index so all recent dates are covered (not just today).
+  // Fill EVERY vendor's bucket with that vendor's stories from the week — not
+  // just vendors editorial missed. ROOT-CAUSE FIX: featured_stories is a small
+  // GLOBAL highlight list (~15 across ~13 vendors → ~1 each), so the previous
+  // logic (which SKIPPED any vendor editorial had featured) left almost every
+  // vendor showing a single bullet despite having many stories that week.
+  // Now: editorial's featured notes (with prose) stay first, then the rest of
+  // the vendor's week fills in from the search index.
   if (searchIdx.length > 0) {
     const todayStr = new Date().toISOString().split("T")[0];
     const cutoffDt = new Date(`${todayStr}T00:00:00Z`);
-    cutoffDt.setUTCDate(cutoffDt.getUTCDate() - 3);
+    cutoffDt.setUTCDate(cutoffDt.getUTCDate() - (editorial.days_analyzed || 7) + 1);
     const cutoff = cutoffDt.toISOString().split("T")[0];
+    const CAP = 12;
 
-    const editorialVendors = new Set(vendorOrder.map(v => v.toLowerCase()));
-    const suppMap = new Map<string, FeaturedStory[]>();
-    const suppHeadlines = new Map<string, string[]>();
+    // Seed per-vendor dedup lists from the featured notes already grouped above.
+    const headlinesByVendor = new Map<string, string[]>();
+    for (const [v, ss] of vendorMap) headlinesByVendor.set(v.toLowerCase(), ss.map(s => s.headline));
 
-    for (const item of searchIdx) {
-      if (item.type !== "article") continue;
-      if (!item.date || item.date < cutoff || item.date > todayStr) continue;
+    const recent = searchIdx
+      .filter(it => it.type === "article" && it.date && it.date >= cutoff && it.date <= todayStr)
+      .sort((a, b) => (b.date || "").localeCompare(a.date || "")); // newest first
+
+    for (const item of recent) {
       const vKey = (item.vendor || "").toLowerCase();
-      const vLabel = item.vendor || "Other";
-      if (!vKey || vKey === "other" || editorialVendors.has(vKey)) continue;
-      if (!suppMap.has(vLabel)) { suppMap.set(vLabel, []); suppHeadlines.set(vLabel, []); }
-      const bucket = suppMap.get(vLabel)!;
-      const headlines = suppHeadlines.get(vLabel)!;
-      if (bucket.length < 12 && !nearDup(item.headline, headlines)) {
-        headlines.push(item.headline);
-        bucket.push({
-          headline: item.headline,
-          headline_he: item.headline_he,
-          editorial_note: item.headline,
-          editorial_note_he: item.headline_he || item.headline,
-          vendor: vLabel,
-          story_id: item.story_id,
-          date: item.date,
-        });
-      }
-    }
-    // Augment supplemental vendors with pulse items (translated-only in Hebrew mode)
-    const esc2 = (s: string) => s.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
-    for (const d of allDays) {
-      ((d.community_pulse_items || []) as unknown as Array<Record<string, unknown>>).forEach((item, i) => {
-        const relatedVendor = String(item.related_vendor || "").toLowerCase();
-        if (!relatedVendor) return;
-        for (const vLabel of suppMap.keys()) {
-          const vKey = vLabel.toLowerCase();
-          const aliases = VENDOR_ALIASES[vKey] || [vKey];
-          if (!aliases.some((a: string) => a === relatedVendor || new RegExp("\\b" + esc2(a) + "\\b", "i").test(relatedVendor))) continue;
-          const bucket = suppMap.get(vLabel)!;
-          const headlines = suppHeadlines.get(vLabel)!;
-          const headline = String(item.headline || "");
-          if (!headline || bucket.length >= 12 || nearDup(headline, headlines)) break;
-          const heItem = (d.community_pulse_items_he || [])[i] as { headline_he?: string } | undefined;
-          const headline_he = heItem?.headline_he;
-          if (isHe && !headline_he) break;
-          headlines.push(headline);
-          bucket.push({ headline, headline_he, editorial_note: headline, editorial_note_he: headline_he || headline, vendor: vLabel });
-          break;
-        }
+      if (!vKey || vKey === "other") continue;
+      if (isHe && !item.headline_he) continue; // HE mode stays 100% Hebrew
+      let label = vendorOrder.find(v => v.toLowerCase() === vKey);
+      if (!label) { label = item.vendor!; vendorOrder.push(label); vendorMap.set(label, []); }
+      const bucket = vendorMap.get(label)!;
+      if (bucket.length >= CAP) continue;
+      if (item.story_id && bucket.some(s => s.story_id === item.story_id)) continue;
+      let headlines = headlinesByVendor.get(vKey);
+      if (!headlines) { headlines = []; headlinesByVendor.set(vKey, headlines); }
+      if (nearDup(item.headline, headlines)) continue;
+      headlines.push(item.headline);
+      bucket.push({
+        headline: item.headline,
+        headline_he: item.headline_he,
+        editorial_note: item.headline,
+        editorial_note_he: item.headline_he || item.headline,
+        vendor: label,
+        story_id: item.story_id,
+        date: item.date,
       });
-    }
-
-    for (const [vLabel, stories] of suppMap.entries()) {
-      vendorOrder.push(vLabel);
-      vendorMap.set(vLabel, stories);
     }
   }
 
@@ -843,7 +830,9 @@ export default function MainPage() {
               u.includes("x.com/") || u.includes("twitter.com/") ? "x" :
               u.includes("reddit.com/") ? "reddit" : "pulse";
             const heItem = pulseHeByUrl.get(u);
-            feed.push({ type, headline: item.headline, headline_he: heItem?.headline_he, body: item.body, body_he: heItem?.body_he, source_label: item.source_label, source_url: u, heat: item.heat, date: item.date, og_image: item.og_image || undefined, _pri: 0 });
+            // Prefer the editorial agent's own Hebrew (now emitted per community item),
+            // fall back to URL-matched pulse HE only if missing.
+            feed.push({ type, headline: item.headline, headline_he: item.headline_he || heItem?.headline_he, body: item.body, body_he: item.body_he || heItem?.body_he, source_label: item.source_label, source_url: u, heat: item.heat, date: item.date, og_image: item.og_image || undefined, _pri: 0 });
           }
 
           // Pulse from allDays — prioritised by heat
@@ -881,13 +870,17 @@ export default function MainPage() {
               const u = r.url || "";
               if (seen.has(u)) continue;
               seen.add(u);
-              const score = r.score ? `${r.score} pts` : "";
+              const score = r.score ? `${r.score}${isHe ? " נק׳" : " pts"}` : "";
               feed.push({ type: "reddit", headline: r.title || "", headline_he: r.title_he, source_label: `r/${r.subreddit || ""}${score ? " · " + score : ""}`, source_url: u, date: d.date, _pri: (r.score || 0) > 1000 ? 1 : 2 });
             }
           }
 
-          // Sort by priority, keep top MAX_SOCIAL
-          const sorted = feed.sort((a, b) => (a._pri ?? 9) - (b._pri ?? 9));
+          // Sort by priority, keep top MAX_SOCIAL.
+          // HE mode: drop any item without a Hebrew headline so the section is
+          // 100% Hebrew — no silent English fallback (the language-mixing bug).
+          const sorted = feed
+            .filter(it => !isHe || !!it.headline_he)
+            .sort((a, b) => (a._pri ?? 9) - (b._pri ?? 9));
           const visible = sorted.slice(0, MAX_SOCIAL);
 
           if (sorted.length === 0) return null;
@@ -940,6 +933,7 @@ export default function MainPage() {
         )}
 
       </div>
+      <BackToTopButton isHe={isHe} labelHe="חזרה לתקציר" label="Back to top" />
     </>
   );
 }

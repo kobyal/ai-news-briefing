@@ -202,6 +202,10 @@ Return JSON with EXACTLY these keys (same structure, Hebrew values):
     {{"editorial_note": "..."}},
     ...
   ],
+  "community_spotlight": [
+    {{"headline": "...", "body": "..."}},
+    ...
+  ],
   "editor_picks": [
     {{"why_now": "..."}},
     ...

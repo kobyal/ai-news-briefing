@@ -648,10 +648,13 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
                 for pi in pulse_items
             ]
         if yt_items:
-            # Cap at 12 — matches the YouTubeSection render limit
+            # Cap at 30 (was 12 — matched only the old /media render limit). The
+            # editorial lenses + /media surface MORE than 12 videos, so a 12-cap left
+            # the rest with English titles. 30 covers the daily pool; output JSON
+            # still stays well under the 32K ceiling (same as the un-capped people list).
             yt_descs = []
             yt_headlines = []
-            for v in yt_items[:12]:
+            for v in yt_items[:30]:
                 # Headline for title translation
                 yt_headlines.append(v.get("headline", ""))
                 # Description for summary translation

@@ -45,6 +45,7 @@ interface Lens {
   body_he: string;
   post_body: string;
   post_body_he: string;
+  og_image?: string;
   sources?: LensSource[];
   links?: EditorialLink[];
 }
@@ -297,17 +298,29 @@ function LensContent() {
             {isHe ? "→ כל הניתוחים" : "← All Lenses"}
           </a>
 
-          {/* Icon + title row */}
+          {/* Image + title row — real photo (matches the /main lens card, not the old emoji) */}
           <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 16 }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: 14, flexShrink: 0,
-              background: "#fff",
-              boxShadow: `0 0 0 3px ${accent}30, 0 4px 16px ${accent}25`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 28,
-            }}>
-              {lens.icon}
-            </div>
+            {(() => {
+              const GENERIC = ["arxiv-logo", "placeholder", "default-og", "twitter_card_default"];
+              const og = lens.og_image || "";
+              const img = og && !GENERIC.some(g => og.includes(g))
+                ? og.replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/")
+                : "";
+              return (
+                <div style={{
+                  width: 56, height: 56, borderRadius: 14, flexShrink: 0, overflow: "hidden",
+                  background: `linear-gradient(135deg, ${accent}22, ${accent}08)`,
+                  boxShadow: `0 0 0 3px ${accent}30, 0 4px 16px ${accent}25`,
+                }}>
+                  {img && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={img} alt="" referrerPolicy="no-referrer"
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  )}
+                </div>
+              );
+            })()}
             <div>
               <span style={{
                 fontSize: 10, fontWeight: 800, letterSpacing: ".14em",

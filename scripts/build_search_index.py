@@ -429,23 +429,30 @@ append_run_log(REPO / "docs/data/_search_index_runs.jsonl", {
 })
 
 # Upload to S3 directly so the live site picks it up without waiting for
-# the ingest Lambda redeploy.
-result = subprocess.run([
-    "aws", "s3", "cp", str(out_path), f"s3://{BUCKET}/{KEY}",
-    "--content-type", "application/json",
-    "--cache-control", "no-cache, public, max-age=300",
-    "--profile", PROFILE, "--region", "us-east-1",
-], capture_output=True, text=True)
-print("Upload stdout:", result.stdout)
-print("Upload stderr:", result.stderr)
-print(f"S3 upload exit code: {result.returncode}")
-
-# CloudFront invalidate for /data/search-index.json
-if result.returncode == 0:
-    inv = subprocess.run([
-        "aws", "cloudfront", "create-invalidation",
-        "--distribution-id", "E1TSW76SSEILK4",
-        "--paths", "/data/search-index.json",
-        "--profile", PROFILE,
+# the ingest Lambda redeploy. SKIP_S3_UPLOAD=1 lets the caller (local-cycle.sh
+# atomic-late deploy) build the index LOCALLY for the frontend's
+# generateStaticParams, then upload it together with the static pages at the end
+# so the article list never goes live before its story pages exist.
+import os as _os
+if _os.environ.get("SKIP_S3_UPLOAD") == "1":
+    print("SKIP_S3_UPLOAD=1 → built locally, upload deferred to caller")
+else:
+    result = subprocess.run([
+        "aws", "s3", "cp", str(out_path), f"s3://{BUCKET}/{KEY}",
+        "--content-type", "application/json",
+        "--cache-control", "no-cache, public, max-age=300",
+        "--profile", PROFILE, "--region", "us-east-1",
     ], capture_output=True, text=True)
-    print("Invalidation stdout:", inv.stdout[:200])
+    print("Upload stdout:", result.stdout)
+    print("Upload stderr:", result.stderr)
+    print(f"S3 upload exit code: {result.returncode}")
+
+    # CloudFront invalidate for /data/search-index.json
+    if result.returncode == 0:
+        inv = subprocess.run([
+            "aws", "cloudfront", "create-invalidation",
+            "--distribution-id", "E1TSW76SSEILK4",
+            "--paths", "/data/search-index.json",
+            "--profile", PROFILE,
+        ], capture_output=True, text=True)
+        print("Invalidation stdout:", inv.stdout[:200])

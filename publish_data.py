@@ -995,6 +995,23 @@ def _find_canonical_vendor_url(item: dict) -> str | None:
     kws = _story_keywords(item) - {vendor.lower()}  # vendor name is already implied
     if len(kws) < 3:
         return None
+    # Require the matched post to share a SUBJECT keyword — not just vendor
+    # aliases ("amazon","bedrock") or generic launch words ("available","now").
+    # Matching on those alone sourced a Grok-4.3 story from an AgentCore post
+    # (both AWS Bedrock) on 2026-06-23. Subject words identify the actual story.
+    _CANON_GENERIC = {
+        "amazon", "bedrock", "aws", "azure", "microsoft", "google", "cloud",
+        "openai", "anthropic", "claude", "gemini", "deepmind", "meta", "llama",
+        "nvidia", "mistral", "apple", "grok", "xai", "qwen", "alibaba",
+        "deepseek", "samsung", "cohere", "huggingface",
+        "available", "generally", "general", "availability", "now", "launch",
+        "launches", "introduces", "introducing", "announces", "announced",
+        "announcement", "new", "update", "updates", "model", "models",
+        "release", "released", "amazon's",
+    }
+    subject_kws = {k for k in kws if k not in _CANON_GENERIC}
+    if not subject_kws:
+        return None  # nothing distinctive to match on → don't risk a generic mis-match
 
     best_url, best_score = None, 0
     for feed_url in feeds:
@@ -1002,6 +1019,9 @@ def _find_canonical_vendor_url(item: dict) -> str | None:
             if entry["age_days"] > 14:
                 continue
             title_lower = entry["title"].lower()
+            # Gate: the post must mention at least one SUBJECT keyword.
+            if not any(k in title_lower for k in subject_kws):
+                continue
             score = sum(1 for k in kws if k in title_lower)
             if score > best_score:
                 best_score = score
@@ -1149,6 +1169,18 @@ def _fetch_og_for_story(item: dict) -> tuple[str, list]:
         # the vendor's own weekly-roundup post is wrong as a source for one
         # specific story buried inside it.
         if _is_aggregator_page(url, title):
+            # Exception: a roundup is the LEGIT source when its own slug names
+            # THIS story's subject (e.g. ".../grok-4-3-in-bedrock/..."). Without
+            # this, the AWS Weekly Roundup that announced Grok 4.3 was dropped and
+            # the canonical-feed fallback mis-attached an AgentCore post — the
+            # 2026-06-23 "Grok story sourced from AgentCore" incident.
+            _agg_specific = {k for k in kws if k != vendor.lower() and len(k) >= 4}
+            if _is_vendor_first_party(url, vendor) and any(k in url.lower() for k in _agg_specific):
+                print(f"  ↳ Aggregator kept (slug names story subject): {url[:70]}")
+                kept_urls.append(url)
+                if not og_image:
+                    og_image = _pick_image(html, url) or og_image
+                continue
             print(f"  ✂ Aggregator URL for '{item.get('headline','?')[:40]}': title='{title[:60]}' url={url[:60]}")
             rejected.append((url, "aggregator", html))
             continue

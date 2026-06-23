@@ -246,7 +246,7 @@ export default function StoryPage({ id, initialStory }: { id: string; initialSto
             article body above is what matters for SEO. */}
         {data && (
           <>
-            <RelatedVideos storyId={story.story_id} headline={story.headline} videos={data.youtube} isHe={isHe} />
+            <RelatedVideos storyId={story.story_id} headline={story.headline} videos={data.youtube} videosHe={data.youtube_headlines_he} isHe={isHe} />
             <CommunityLinks vendor={story.vendor} headline={story.headline} storyUrls={urls} data={data} isHe={isHe} />
           </>
         )}
@@ -285,8 +285,14 @@ const VENDOR_NAMES = new Set([
  *  2. Legacy keyword-overlap fallback (≥2 hits or digit-keyword) — still used
  *     for older data or when Haiku/Opus pairing was skipped (no API key). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function RelatedVideos({ storyId, headline, videos, isHe }: { storyId: string; headline: string; videos: any[]; isHe: boolean }) {
+function RelatedVideos({ storyId, headline, videos, videosHe, isHe }: { storyId: string; headline: string; videos: any[]; videosHe?: string[]; isHe: boolean }) {
   if (!videos || videos.length === 0) return null;
+  // youtube_headlines_he is a parallel array aligned to `videos` by index.
+  const heTitleFor = (v: any) => {
+    if (!isHe || !videosHe) return "";
+    const idx = videos.indexOf(v);
+    return (idx >= 0 && typeof videosHe[idx] === "string") ? videosHe[idx].trim() : "";
+  };
 
   // Pipeline videos use news-item shape: title is in `headline`, channel is parsed from
   // `summary` like "[Fireship · 809K views] ...". Match against title; show channel pill.
@@ -365,7 +371,7 @@ function RelatedVideos({ storyId, headline, videos, isHe }: { storyId: string; h
       </span>
       <div className="flex flex-col gap-2">
         {scored.map(({ v }, i) => {
-          const title = titleOf(v);
+          const title = heTitleFor(v) || titleOf(v);
           const url = urlOf(v);
           const channel = chanOf(v);
           const date = dateOf(v);

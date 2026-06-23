@@ -1,7 +1,7 @@
 AI Briefing — Roadmap & Improvement Ideas
 ==========================================
 Created: 2026-04-09
-Last updated: 2026-06-22
+Last updated: 2026-06-23
 
 ACTIVE FOCUS (2026-06-22) — traffic = DISTRIBUTION, not more SEO
 ---------------------------------------------------------------
@@ -30,6 +30,27 @@ Removed 2026-06-22: `/social-lady` demo page (client pitch declined — cost, no
 
 Shipped (since 2026-04-09)
 --------------------------
+
+Source-relevance defense-in-depth (2026-06-23) — credibility guard:
+- Trigger: `/story/2127eaa27275` showed a Grok-4.3 headline sourced from an AWS
+  AgentCore post (+ mismatched video/community). Source must match the story.
+- ✅ **Prevent** — `_find_canonical_vendor_url` now requires SUBJECT-keyword overlap
+  + aggregator-keep exception for first-party roundups whose slug names the story
+  subject (`4941a70`).
+- ✅ **Auto-fix at publish** — `publish_data._remediate_source_mismatch()` DROPS
+  wrong-source first-party URLs (a surviving trustworthy URL becomes primary) and
+  QUARANTINES the story (rebuilding parallel `briefing_he` arrays by kept-index) if
+  none survive. Gate is higher-precision than the audit: a URL is "wrong source"
+  only if it BOTH lacks any headline subject word AND its slug names a *foreign*
+  subject (distinctive token absent from headline, excl. boilerplate + path noise)
+  — so `/index/sora-update/` on a Sora story is NOT touched. (`226ab97`)
+- ✅ **Report** — inline `_audit_data_quality` issue #3 (shared `_url_misses_subject`
+  gate; `d5278cb`) + QA `url_health.semantic_url_mismatch` rewired to vendor-aware
+  subject overlap so same-vendor mismatches stop scoring as "similar enough"
+  (`d5278cb`, private/). Remediation log surfaced in the email.
+- ⏳ OPEN (my recommendation, not yet done): segment the QA LLM judgment budget so
+  the P0 url-mismatch check isn't starved on busy days; one-time bulk source-audit
+  of the live corpus to clear any existing backlog.
 
 Vendor hub pages + internal linking (2026-06-21):
 - ✅ Static `/vendor/[slug]` (EN) + `/he/vendor/[slug]` (HE) + `/vendors` + `/he/vendors`

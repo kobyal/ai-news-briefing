@@ -248,7 +248,8 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
             "url":          url,
         })
     # ── Community pulse ─────────────────────────────────────
-    pulse_he_arr = briefing.get("community_pulse_items_he") or []
+    # he lives in briefing_he under "pulse_items_he" (Lambda used "community_pulse_items_he").
+    pulse_he_arr = briefing_he.get("pulse_items_he") or briefing_he.get("community_pulse_items_he") or []
     for i, p in enumerate(briefing.get("community_pulse_items") or []):
         url = p.get("source_url") or ""
         if not url or url in seen_urls:

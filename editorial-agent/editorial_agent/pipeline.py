@@ -184,7 +184,10 @@ def _build_community_catalog(days: list) -> dict:
     seq = 1
     seen = set()
     for day in days:
-        pulse_he = (day.get("briefing_he") or {}).get("community_pulse_items_he") or []
+        # briefing_he stores the parallel array as "pulse_items_he"; the Lambda
+        # path used "community_pulse_items_he" (mirror api.ts's dual-key read).
+        _bhe = day.get("briefing_he") or {}
+        pulse_he = _bhe.get("pulse_items_he") or _bhe.get("community_pulse_items_he") or []
         for i, item in enumerate((day.get("briefing") or {}).get("community_pulse_items") or []):
             headline = (item.get("headline") or "").strip()
             url = item.get("source_url") or item.get("url") or ""

@@ -57,7 +57,9 @@ function VendorContent() {
   const [loading, setLoading] = useState(true);
 
   const cutoffDt = new Date(`${today}T00:00:00Z`);
-  cutoffDt.setUTCDate(cutoffDt.getUTCDate() - 3);
+  // 7-day window to match the /main "כיסוי לפי ספק" coverage cards (days_analyzed=7);
+  // a shorter window here caused a bullet-count mismatch between the card and this page.
+  cutoffDt.setUTCDate(cutoffDt.getUTCDate() - 6);
   const cutoff = cutoffDt.toISOString().split("T")[0];
 
   useEffect(() => {

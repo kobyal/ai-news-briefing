@@ -166,6 +166,7 @@ def _build_story_catalog(days: list, search_index: dict) -> dict:
             catalog[key] = {
                 "real_id":  real_id,
                 "headline": headline,
+                "headline_he": (item.get("headline_he") or "").strip(),
                 "date":     date,
                 "url":      f"/story/{real_id}",
                 "source":   item.get("source") or item.get("vendor") or "",
@@ -183,16 +184,19 @@ def _build_community_catalog(days: list) -> dict:
     seq = 1
     seen = set()
     for day in days:
-        for item in (day.get("briefing") or {}).get("community_pulse_items") or []:
+        pulse_he = (day.get("briefing_he") or {}).get("community_pulse_items_he") or []
+        for i, item in enumerate((day.get("briefing") or {}).get("community_pulse_items") or []):
             headline = (item.get("headline") or "").strip()
             url = item.get("source_url") or item.get("url") or ""
             if not headline or url in seen:
                 continue
             seen.add(url)
+            he = pulse_he[i] if i < len(pulse_he) else {}
             key = f"C{seq:03d}"
             seq += 1
             catalog[key] = {
                 "headline": headline,
+                "headline_he": (he.get("headline_he") or "").strip() if isinstance(he, dict) else "",
                 "url":      url,
                 "source":   item.get("source_label") or "",
                 "heat":     item.get("heat") or "",
@@ -212,6 +216,7 @@ def _build_community_catalog(days: list) -> dict:
                 seq += 1
                 catalog[key] = {
                     "headline": post,
+                    "headline_he": (item.get("post_he") or "")[:200].strip(),
                     "url":      url,
                     "source":   f"X @{item.get('handle') or item.get('author', '')}",
                     "heat":     item.get("engagement") or "",
@@ -228,7 +233,8 @@ def _build_video_catalog(days: list) -> dict:
     seq = 1
     seen = set()
     for day in days:
-        for vid in (day.get("youtube") or []):
+        yt_he = day.get("youtube_headlines_he") or []
+        for i, vid in enumerate(day.get("youtube") or []):
             headline = (vid.get("headline") or vid.get("title") or "").strip()
             urls = vid.get("urls") or []
             url = urls[0] if urls else ""
@@ -242,6 +248,7 @@ def _build_video_catalog(days: list) -> dict:
             seq += 1
             catalog[key] = {
                 "headline":      headline,
+                "headline_he":   (yt_he[i].strip() if i < len(yt_he) and isinstance(yt_he[i], str) else ""),
                 "url":           url,
                 "channel":       vid.get("channel") or "",
                 "views":         vid.get("views_text") or str(vid.get("views") or ""),
@@ -556,7 +563,7 @@ def _resolve_lens_links(lenses: list, story_cat: dict, community_cat: dict,
                     "date":     v["date"],
                     "og_image": v["og_image"],
                     "label":    v["headline"],
-                    "label_he": v["headline"],
+                    "label_he": v.get("headline_he") or v["headline"],
                 })
             elif src_id in community_cat:
                 v = community_cat[src_id]
@@ -564,11 +571,12 @@ def _resolve_lens_links(lenses: list, story_cat: dict, community_cat: dict,
                     "type":         "community",
                     "url":          v["url"],
                     "headline":     v["headline"],
+                    "headline_he":  v.get("headline_he") or "",
                     "source_label": v["source"],
                     "heat":         v["heat"],
                     "date":         v.get("date", ""),
                     "label":        v["source"] or "Community",
-                    "label_he":     "קהילה",
+                    "label_he":     v.get("headline_he") or v["headline"],
                 })
             elif src_id in video_cat:
                 v = video_cat[src_id]
@@ -581,7 +589,7 @@ def _resolve_lens_links(lenses: list, story_cat: dict, community_cat: dict,
                     "duration_text": v["duration_text"],
                     "date":          v.get("date", ""),
                     "label":         v["headline"],
-                    "label_he":      v["headline"],
+                    "label_he":      v.get("headline_he") or v["headline"],
                 })
             elif src_id in tool_cat:
                 v = tool_cat[src_id]

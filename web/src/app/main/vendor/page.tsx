@@ -7,6 +7,7 @@ import { useLang } from "@/context/LangContext";
 import { VendorResources, VENDOR_ALIASES } from "@/components/briefing/VendorResources";
 import { Header } from "@/components/layout/Header";
 import { getVendor, getVendorLogo } from "@/lib/vendors";
+import { buildVendorStories, type VendorBullet } from "@/lib/vendor-coverage";
 import type { DayData } from "@/lib/types";
 
 interface EditorialNote {
@@ -16,21 +17,6 @@ interface EditorialNote {
   url?: string;
 }
 
-function sigWords(text: string): Set<string> {
-  const STOP = new Set(["the","a","an","of","in","to","is","on","for","and","or","with","by","its","has","was","are","will","from","year","years","old"]);
-  const clause = text.split(/[;—]/)[0].trim();
-  return new Set((clause.toLowerCase().match(/\b\w{3,}\b/g) || []).filter(w => !STOP.has(w)));
-}
-function nearDup(headline: string, existing: string[]): boolean {
-  const ws = sigWords(headline);
-  if (ws.size === 0) return false;
-  for (const h of existing) {
-    const es = sigWords(h);
-    if (es.size === 0) continue;
-    if ([...ws].filter(w => es.has(w)).length / Math.min(ws.size, es.size) >= 0.25) return true;
-  }
-  return false;
-}
 
 function fmtDateRange(from: string, to: string, isHe: boolean): string {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -275,30 +261,21 @@ function VendorContent() {
           borderRadius: 2, marginBottom: 32,
         }} />
 
-        {/* Bullets — editorial notes for editorial vendors; all-source headlines for others */}
+        {/* Bullets — SAME shared builder as the /main vendor card, so counts match */}
         {(() => {
-          // Editorial notes (prose) first, then fill with the vendor's article +
-          // pulse headlines so the highlights reflect the FULL week — not just the
-          // 1-2 stories editorial featured in its small global list.
-          const seen: string[] = [];
-          const bullets: string[] = [];
-          for (const s of editorialNotes) {
-            const note = isHe ? (s.editorial_note_he || s.editorial_note) : s.editorial_note;
-            if (!note || nearDup(note, seen)) continue;
-            seen.push(note); bullets.push(note);
-          }
-          const more = [
-            ...articles.map(a => ({ headline: a.headline || "", headline_he: a.headline_he })),
-            ...pulseItems,
-          ];
-          for (const item of more) {
-            if (bullets.length >= 12) break;
-            if (!item.headline) continue;
-            if (isHe && !item.headline_he) continue; // HE mode stays 100% Hebrew
-            if (nearDup(item.headline, seen)) continue;
-            seen.push(item.headline);
-            bullets.push(isHe && item.headline_he ? item.headline_he : item.headline);
-          }
+          const feat: VendorBullet[] = editorialNotes.map((n) => {
+            const r = n as unknown as Record<string, string>;
+            return {
+              story_id: n.story_id,
+              headline: r.headline || n.editorial_note,
+              headline_he: r.headline_he,
+              editorial_note: n.editorial_note,
+              editorial_note_he: n.editorial_note_he,
+              vendor: vendorParam,
+            };
+          });
+          const coverage = buildVendorStories({ vendor: vendorParam, featured: feat, searchIdx: articles, days: 7, isHe });
+          const bullets = coverage.map((b) => (isHe ? (b.editorial_note_he || b.editorial_note) : b.editorial_note));
 
           if (bullets.length === 0) return null;
           return (

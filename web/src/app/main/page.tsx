@@ -6,6 +6,7 @@ import { getVendorLogo } from "@/lib/vendors";
 import { useLang } from "@/context/LangContext";
 import { Header } from "@/components/layout/Header";
 import { BackToTopButton } from "@/components/ui/BackToTopButton";
+import { buildVendorStories, vendorOrderFrom, type VendorBullet } from "@/lib/vendor-coverage";
 import { inSiteHref } from "@/lib/anchors";
 import type { DayData } from "@/lib/types";
 
@@ -187,28 +188,6 @@ function ResourceChip({ src, today }: { src: LensSource; today: string }) {
       <span>{label || src.type}</span>
     </a>
   );
-}
-
-// ── Near-duplicate headline dedup ─────────────────────────────────────────────
-
-function sigWords(text: string): Set<string> {
-  const STOP = new Set(["the","a","an","of","in","to","is","on","for","and","or","with","by","its","has","was","are","will","from","year","years","old"]);
-  // Use only first clause (up to first ; or —) so compound daily summaries
-  // are compared on their primary topic only, not all mentioned subjects.
-  const clause = text.split(/[;—]/)[0].trim();
-  return new Set((clause.toLowerCase().match(/\b\w{3,}\b/g) || []).filter(w => !STOP.has(w)));
-}
-
-function nearDup(headline: string, existing: string[]): boolean {
-  const ws = sigWords(headline);
-  if (ws.size === 0) return false;
-  for (const h of existing) {
-    const es = sigWords(h);
-    if (es.size === 0) continue;
-    const inter = [...ws].filter(w => es.has(w)).length;
-    if (inter / Math.min(ws.size, es.size) >= 0.25) return true;
-  }
-  return false;
 }
 
 // ── Vendor card ───────────────────────────────────────────────────────────────
@@ -651,60 +630,18 @@ export default function MainPage() {
   const community = editorial.community_spotlight || [];
   const picks    = editorial.editor_picks || [];
   const featured = editorial.featured_stories || [];
+  const DAYS = editorial.days_analyzed || 7;
 
-  // Group featured stories by vendor (preserve first-occurrence order)
-  const vendorOrder: string[] = [];
+  // Per-vendor coverage via the SHARED builder — identical logic to /main/vendor,
+  // so the bullet counts on the card and the detail page always match.
+  const vendorOrder = vendorOrderFrom(featured.map(s => s.vendor), searchIdx, DAYS);
   const vendorMap = new Map<string, FeaturedStory[]>();
-  for (const s of featured) {
-    if (!vendorMap.has(s.vendor)) { vendorOrder.push(s.vendor); vendorMap.set(s.vendor, []); }
-    vendorMap.get(s.vendor)!.push(s);
-  }
-
-  // Fill EVERY vendor's bucket with that vendor's stories from the week — not
-  // just vendors editorial missed. ROOT-CAUSE FIX: featured_stories is a small
-  // GLOBAL highlight list (~15 across ~13 vendors → ~1 each), so the previous
-  // logic (which SKIPPED any vendor editorial had featured) left almost every
-  // vendor showing a single bullet despite having many stories that week.
-  // Now: editorial's featured notes (with prose) stay first, then the rest of
-  // the vendor's week fills in from the search index.
-  if (searchIdx.length > 0) {
-    const todayStr = new Date().toISOString().split("T")[0];
-    const cutoffDt = new Date(`${todayStr}T00:00:00Z`);
-    cutoffDt.setUTCDate(cutoffDt.getUTCDate() - (editorial.days_analyzed || 7) + 1);
-    const cutoff = cutoffDt.toISOString().split("T")[0];
-    const CAP = 12;
-
-    // Seed per-vendor dedup lists from the featured notes already grouped above.
-    const headlinesByVendor = new Map<string, string[]>();
-    for (const [v, ss] of vendorMap) headlinesByVendor.set(v.toLowerCase(), ss.map(s => s.headline));
-
-    const recent = searchIdx
-      .filter(it => it.type === "article" && it.date && it.date >= cutoff && it.date <= todayStr)
-      .sort((a, b) => (b.date || "").localeCompare(a.date || "")); // newest first
-
-    for (const item of recent) {
-      const vKey = (item.vendor || "").toLowerCase();
-      if (!vKey || vKey === "other") continue;
-      if (isHe && !item.headline_he) continue; // HE mode stays 100% Hebrew
-      let label = vendorOrder.find(v => v.toLowerCase() === vKey);
-      if (!label) { label = item.vendor!; vendorOrder.push(label); vendorMap.set(label, []); }
-      const bucket = vendorMap.get(label)!;
-      if (bucket.length >= CAP) continue;
-      if (item.story_id && bucket.some(s => s.story_id === item.story_id)) continue;
-      let headlines = headlinesByVendor.get(vKey);
-      if (!headlines) { headlines = []; headlinesByVendor.set(vKey, headlines); }
-      if (nearDup(item.headline, headlines)) continue;
-      headlines.push(item.headline);
-      bucket.push({
-        headline: item.headline,
-        headline_he: item.headline_he,
-        editorial_note: item.headline,
-        editorial_note_he: item.headline_he || item.headline,
-        vendor: label,
-        story_id: item.story_id,
-        date: item.date,
-      });
-    }
+  for (const v of vendorOrder) {
+    const feat: VendorBullet[] = featured
+      .filter(s => (s.vendor || "").toLowerCase() === v.toLowerCase())
+      .map(s => ({ story_id: s.story_id, headline: s.headline, headline_he: s.headline_he,
+        editorial_note: s.editorial_note, editorial_note_he: s.editorial_note_he, vendor: v, date: s.date }));
+    vendorMap.set(v, buildVendorStories({ vendor: v, featured: feat, searchIdx, days: DAYS, isHe }) as FeaturedStory[]);
   }
 
   return (

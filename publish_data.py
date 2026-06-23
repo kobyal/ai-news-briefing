@@ -2093,6 +2093,38 @@ def _audit_data_quality():
         elif all(any(tld in u.lower() for tld in _NON_EN_TLDS) for u in urls):
             issues.append(f"only non-English sources: {(item.get('headline') or '')[:60]} | {urls}")
 
+    # 3. Source relevance — a story whose PRIMARY first-party source URL shares
+    # NO subject keyword with its headline is likely mis-sourced. This is the
+    # inline guard for the 2026-06-23 incident (a Grok-4.3 story sourced from an
+    # AgentCore post). Scoped to vendor first-party blogs (descriptive slugs) and
+    # excludes the story's OWN vendor words + boilerplate — so a cross-vendor
+    # subject like "grok" on an AWS-tagged story still counts as the subject.
+    _VENDOR_WORD_ALIASES = {
+        "aws": {"aws", "amazon", "bedrock", "sagemaker"}, "azure": {"azure", "microsoft", "copilot"},
+        "google": {"google", "gemini", "deepmind", "gemma"}, "anthropic": {"anthropic", "claude"},
+        "openai": {"openai", "chatgpt", "codex", "sora"}, "meta": {"meta", "llama"},
+        "nvidia": {"nvidia"}, "xai": {"xai", "grok"}, "mistral": {"mistral"}, "apple": {"apple", "siri"},
+        "deepseek": {"deepseek"}, "alibaba": {"alibaba", "qwen"}, "cohere": {"cohere"},
+        "samsung": {"samsung"}, "hugging face": {"hugging", "face", "huggingface"},
+    }
+    _GENERIC_WORDS = {"available", "generally", "general", "availability", "launch", "launches",
+        "launched", "introduces", "introducing", "announces", "announced", "announcement",
+        "update", "updates", "model", "models", "release", "released", "weekly", "roundup",
+        "summit", "news", "blog", "post"}
+    for item in _news_items:
+        urls = item.get("urls") or []
+        if not urls:
+            continue
+        primary = urls[0]
+        vendor = item.get("vendor", "")
+        if not _is_vendor_first_party(primary, vendor):
+            continue  # only first-party blogs have descriptive slugs we can trust
+        own = _VENDOR_WORD_ALIASES.get(vendor.lower(), {vendor.lower()})
+        subj = {k for k in _story_keywords(item) if k not in own and k not in _GENERIC_WORDS and len(k) >= 4}
+        if subj and not any(k in primary.lower() for k in subj):
+            issues.append(f"source may not match headline (no subject word in first-party URL): "
+                          f"{(item.get('headline') or '')[:55]} | {primary[:75]}")
+
     if issues:
         print(f"\n  ⚠ DATA QUALITY AUDIT — {len(issues)} issue(s):")
         for i in issues:

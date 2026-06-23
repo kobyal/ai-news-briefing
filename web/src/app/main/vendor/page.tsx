@@ -35,6 +35,7 @@ function VendorContent() {
   const today = new Date().toISOString().split("T")[0];
 
   const [articles, setArticles] = useState<SearchResult[]>([]);
+  const [allIdx, setAllIdx] = useState<SearchResult[]>([]);
   const [dayData, setDayData] = useState<DayData | null>(null);
   const [allDays, setAllDays] = useState<DayData[]>([]);
   const [editorialNotes, setEditorialNotes] = useState<EditorialNote[]>([]);
@@ -109,6 +110,7 @@ function VendorContent() {
         .sort((a, b) => b.date.localeCompare(a.date));
 
       setArticles(related);
+      setAllIdx(idx);
       setLoading(false);
     }
     load();
@@ -274,7 +276,7 @@ function VendorContent() {
               vendor: vendorParam,
             };
           });
-          const coverage = buildVendorStories({ vendor: vendorParam, featured: feat, searchIdx: articles, days: 7, isHe });
+          const coverage = buildVendorStories({ vendor: vendorParam, featured: feat, searchIdx: allIdx, days: 7, isHe });
           const bullets = coverage.map((b) => (isHe ? (b.editorial_note_he || b.editorial_note) : b.editorial_note));
 
           if (bullets.length === 0) return null;

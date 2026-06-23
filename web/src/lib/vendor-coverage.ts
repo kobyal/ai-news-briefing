@@ -52,10 +52,21 @@ export function buildVendorStories(opts: {
   const bucket: VendorBullet[] = [...featured];
   const headlines: string[] = bucket.map(b => b.headline).filter(Boolean);
 
-  const recent = searchIdx
-    .filter(s => (s.type === "article" || !s.type) && (s.vendor || "").toLowerCase() === vKey
-      && !!s.date && s.date >= cutoff && s.date <= today)
-    .sort((a, b) => (b.date || "").localeCompare(a.date || "")); // newest first
+  // Dedup by story_id keeping the NEWEST date (search-index lists a story under
+  // every day it surfaced), then sort with a TOTAL order (date desc, then story_id)
+  // so the output is independent of the caller's input order — otherwise the two
+  // call sites (/main vs /main/vendor) collapse same-date near-dups differently.
+  const byId = new Map<string, SearchResult>();
+  for (const s of searchIdx) {
+    if (!(s.type === "article" || !s.type)) continue;
+    if ((s.vendor || "").toLowerCase() !== vKey) continue;
+    if (!s.date || s.date < cutoff || s.date > today) continue;
+    const key = s.story_id || s.headline || "";
+    const ex = byId.get(key);
+    if (!ex || (s.date || "") > (ex.date || "")) byId.set(key, s);
+  }
+  const recent = [...byId.values()].sort((a, b) =>
+    (b.date || "").localeCompare(a.date || "") || (a.story_id || "").localeCompare(b.story_id || ""));
 
   for (const s of recent) {
     if (bucket.length >= cap) break;

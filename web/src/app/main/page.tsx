@@ -5,6 +5,7 @@ import { fetchEditorial, fetchSearchIndex, fetchDayData, type SearchResult } fro
 import { getVendorLogo } from "@/lib/vendors";
 import { useLang } from "@/context/LangContext";
 import { Header } from "@/components/layout/Header";
+import { Footer } from "@/components/layout/Footer";
 import { BackToTopButton } from "@/components/ui/BackToTopButton";
 import { buildVendorStories, vendorOrderFrom, type VendorBullet } from "@/lib/vendor-coverage";
 import { inSiteHref } from "@/lib/anchors";
@@ -886,6 +887,7 @@ export default function MainPage() {
         )}
 
       </div>
+      <Footer />
       <BackToTopButton isHe={isHe} labelHe="חזרה לתקציר" label="Back to top" />
     </>
   );

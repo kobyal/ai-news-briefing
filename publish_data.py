@@ -891,6 +891,72 @@ def _is_vendor_first_party(url: str, vendor: str) -> bool:
     return any(host == d or host.endswith("." + d) for d in domains)
 
 
+# ── Source-relevance test (shared by remediation + the data-quality audit) ─────
+# A story whose PRIMARY first-party URL's slug shares NO subject word with its
+# headline is very likely mis-sourced (the 2026-06-23 Grok-4.3-on-AgentCore
+# class). We exclude the story's OWN vendor words (so "amazon"/"bedrock" on an
+# AWS story don't count as subject) but KEEP cross-vendor words (so "grok" on an
+# AWS-tagged story still counts) plus launch/announcement boilerplate.
+_VENDOR_WORD_ALIASES = {
+    "aws": {"aws", "amazon", "bedrock", "sagemaker"}, "azure": {"azure", "microsoft", "copilot"},
+    "google": {"google", "gemini", "deepmind", "gemma"}, "anthropic": {"anthropic", "claude"},
+    "openai": {"openai", "chatgpt", "codex", "sora"}, "meta": {"meta", "llama"},
+    "nvidia": {"nvidia"}, "xai": {"xai", "grok"}, "mistral": {"mistral"}, "apple": {"apple", "siri"},
+    "deepseek": {"deepseek"}, "alibaba": {"alibaba", "qwen"}, "cohere": {"cohere"},
+    "samsung": {"samsung"}, "hugging face": {"hugging", "face", "huggingface"},
+}
+_SUBJECT_GENERIC_WORDS = {"available", "generally", "general", "availability", "launch", "launches",
+    "launched", "introduces", "introducing", "announces", "announced", "announcement",
+    "update", "updates", "model", "models", "release", "released", "weekly", "roundup",
+    "summit", "news", "blog", "post"}
+# Structural URL path segments — never a story subject. Excluded from the
+# foreign-subject test so a path like /index/ or /blogs/ isn't read as a topic.
+_URL_PATH_NOISE = {"index", "blog", "blogs", "news", "press", "article", "articles",
+    "story", "stories", "page", "pages", "content", "html", "default", "home",
+    "archive", "posts", "entry", "entries", "detail", "details", "newsroom",
+    "insights", "resources", "products", "product"}
+
+def _story_subject_words(item: dict) -> set:
+    """Headline subject words: drop the story's own vendor aliases + boilerplate."""
+    own = _VENDOR_WORD_ALIASES.get((item.get("vendor") or "").lower(),
+                                   {(item.get("vendor") or "").lower()})
+    return {k for k in _story_keywords(item)
+            if k not in own and k not in _SUBJECT_GENERIC_WORDS and len(k) >= 4}
+
+def _url_misses_subject(url: str, item: dict) -> bool:
+    """True if `url` is a vendor first-party blog whose slug contains none of the
+    headline's subject words → likely the wrong source for this story. Returns
+    False (can't judge) for non-first-party URLs or subject-less headlines."""
+    if not url or not _is_vendor_first_party(url, item.get("vendor", "")):
+        return False
+    subj = _story_subject_words(item)
+    if not subj:
+        return False
+    return not any(k in url.lower() for k in subj)
+
+def _url_names_foreign_subject(url: str, item: dict) -> bool:
+    """Precision guard for AUTO-REMEDIATION (stricter than the audit's report):
+    True only if the URL slug contains a distinctive product/topic token (≥5 chars,
+    not boilerplate) that appears NOWHERE in the headline — i.e. the page is
+    demonstrably about something else (e.g. '/bedrock-agentcore-available/' on a
+    Grok story → 'agentcore' is foreign). This is what separates a genuinely wrong
+    source from a legit story whose subject just isn't slugified — so we never
+    drop/quarantine a story merely because its slug omits the headline subject."""
+    head = (item.get("headline") or "").lower()
+    try:
+        slug = urllib.parse.urlsplit(url).path.lower()
+    except Exception:
+        return False
+    slug_toks = [t for t in re.findall(r"[a-z][a-z0-9]+", slug)
+                 if len(t) >= 5 and t not in _SUBJECT_GENERIC_WORDS and t not in _URL_PATH_NOISE]
+    return any(t not in head for t in slug_toks)
+
+def _url_is_wrong_source(url: str, item: dict) -> bool:
+    """Auto-remediation drop condition: the URL both lacks any headline subject
+    word AND positively names a foreign subject. Subset of the audit's gate."""
+    return _url_misses_subject(url, item) and _url_names_foreign_subject(url, item)
+
+
 # Aggregator pages list many launches at once. They commonly land in URL lists
 # because the merger sees "AWS Weekly Roundup: ... Bedrock AgentCore ... and
 # more" and treats it as a source for an AgentCore story. The first-party
@@ -2050,6 +2116,59 @@ def _realign_youtube_he():
 _realign_youtube_he()
 
 
+# ── Source-relevance auto-remediation ─────────────────────────────────────────
+# Detection alone still ships the bad story (the audit only REPORTS, and the QA
+# evaluator runs as a separate post-publish process). This pass PREVENTS a
+# mis-sourced story from going live, so the fix lands on the site, not just in an
+# email. Two conservative actions, both keyed off the shared _url_misses_subject()
+# gate so they cover exactly the class the audit flags:
+#   1. DROP every mis-matched first-party URL from a story. If a trustworthy URL
+#      survives, it becomes primary → the source now matches the headline.
+#   2. QUARANTINE the story (omit it from publish) if dropping leaves it with no
+#      trustworthy URL — better to lose one story than ship a wrong source
+#      (credibility > coverage). Quarantine rebuilds the parallel briefing_he
+#      arrays from the same kept-index list so they stay aligned with news_items
+#      (the positionally-parallel-array gotcha — see feedback_briefing_he_structure).
+# NOTE: when remediation reorders urls[0], the story_id (sha256(urls[0])) changes.
+# That only matters for a same-day re-run of an already-published mis-sourced
+# story (rare); we log it so it's visible.
+def _remediate_source_mismatch():
+    bh = merger.get("briefing_he", {}) or {}
+    he_keys = ("headlines_he", "summaries_he", "details_he")
+    orig_len = len(_news_items)
+    actions, q_idx = [], []
+    for idx, item in enumerate(_news_items):
+        urls = list(item.get("urls") or [])
+        if not urls or not _url_is_wrong_source(urls[0], item):
+            continue
+        bad = urls[0]
+        good = [u for u in urls if not _url_is_wrong_source(u, item)]
+        head = (item.get("headline") or "?")[:50]
+        if good:
+            reordered = good[0] != bad
+            item["urls"] = good
+            actions.append(f"  ✂ FIXED source: '{head}' — dropped mis-matched "
+                           f"{'primary ' if reordered else ''}{bad[:55]} → primary now {good[0][:55]}")
+        else:
+            q_idx.append(idx)
+            actions.append(f"  ⊘ QUARANTINED (sourceless after drop): '{head}' | bad={bad[:55]}")
+    if q_idx:
+        keep = [i for i in range(orig_len) if i not in set(q_idx)]
+        _news_items[:] = [_news_items[i] for i in keep]   # mutate in place → _briefing stays in sync
+        for k in he_keys:
+            arr = bh.get(k)
+            if isinstance(arr, list) and len(arr) == orig_len:
+                bh[k] = [arr[i] for i in keep]
+    if actions:
+        print(f"\n  🛠 SOURCE-RELEVANCE REMEDIATION — {len(actions)} action(s):")
+        for a in actions:
+            print(a)
+    return actions
+
+
+_remediation_actions = _remediate_source_mismatch()
+
+
 # ── Data-quality audit ────────────────────────────────────────────────────────
 # Surface silent degradations the email PROBLEMS banner would otherwise miss.
 # Each issue we flag here corresponds to a real bug that bit us in production
@@ -2094,36 +2213,16 @@ def _audit_data_quality():
             issues.append(f"only non-English sources: {(item.get('headline') or '')[:60]} | {urls}")
 
     # 3. Source relevance — a story whose PRIMARY first-party source URL shares
-    # NO subject keyword with its headline is likely mis-sourced. This is the
-    # inline guard for the 2026-06-23 incident (a Grok-4.3 story sourced from an
-    # AgentCore post). Scoped to vendor first-party blogs (descriptive slugs) and
-    # excludes the story's OWN vendor words + boilerplate — so a cross-vendor
-    # subject like "grok" on an AWS-tagged story still counts as the subject.
-    _VENDOR_WORD_ALIASES = {
-        "aws": {"aws", "amazon", "bedrock", "sagemaker"}, "azure": {"azure", "microsoft", "copilot"},
-        "google": {"google", "gemini", "deepmind", "gemma"}, "anthropic": {"anthropic", "claude"},
-        "openai": {"openai", "chatgpt", "codex", "sora"}, "meta": {"meta", "llama"},
-        "nvidia": {"nvidia"}, "xai": {"xai", "grok"}, "mistral": {"mistral"}, "apple": {"apple", "siri"},
-        "deepseek": {"deepseek"}, "alibaba": {"alibaba", "qwen"}, "cohere": {"cohere"},
-        "samsung": {"samsung"}, "hugging face": {"hugging", "face", "huggingface"},
-    }
-    _GENERIC_WORDS = {"available", "generally", "general", "availability", "launch", "launches",
-        "launched", "introduces", "introducing", "announces", "announced", "announcement",
-        "update", "updates", "model", "models", "release", "released", "weekly", "roundup",
-        "summit", "news", "blog", "post"}
+    # NO subject word with its headline is likely mis-sourced (the 2026-06-23
+    # Grok-4.3-on-AgentCore class). Most of this class is now auto-remediated by
+    # _remediate_source_mismatch() before publish; anything that reaches here is a
+    # backstop report (e.g. a primary that survives because a sibling URL also
+    # mismatched). Uses the shared _url_misses_subject() gate.
     for item in _news_items:
         urls = item.get("urls") or []
-        if not urls:
-            continue
-        primary = urls[0]
-        vendor = item.get("vendor", "")
-        if not _is_vendor_first_party(primary, vendor):
-            continue  # only first-party blogs have descriptive slugs we can trust
-        own = _VENDOR_WORD_ALIASES.get(vendor.lower(), {vendor.lower()})
-        subj = {k for k in _story_keywords(item) if k not in own and k not in _GENERIC_WORDS and len(k) >= 4}
-        if subj and not any(k in primary.lower() for k in subj):
+        if urls and _url_misses_subject(urls[0], item):
             issues.append(f"source may not match headline (no subject word in first-party URL): "
-                          f"{(item.get('headline') or '')[:55]} | {primary[:75]}")
+                          f"{(item.get('headline') or '')[:55]} | {urls[0][:75]}")
 
     if issues:
         print(f"\n  ⚠ DATA QUALITY AUDIT — {len(issues)} issue(s):")
@@ -2176,6 +2275,9 @@ published = {
     # silent issues (orphan translations, mistagged stories, source diversity
     # collapses) don't slip past the user.
     "data_quality_issues": _data_quality_issues,
+    # Source-relevance auto-remediation log (drops/quarantines applied before
+    # publish) — surfaced so an auto-fix is visible, not silent.
+    "remediation_actions": _remediation_actions,
 }
 
 # ── TLDR audio ──────────────────────────────────────────────────────────────

@@ -1077,6 +1077,11 @@ def _collect_problems(agent_delivery, freshness_signals, api_checks) -> list[dic
             jd = _load_json(json_path)
             for issue in (jd.get("data_quality_issues") or []):
                 out.append({"label": "data quality", "detail": issue, "severity": "warn", "category": "data"})
+            # Source-relevance auto-remediation — an auto-fix (URL drop / story
+            # quarantine) is a notable event, surfaced as info-level so it's
+            # visible without reading as a failure.
+            for act in (jd.get("remediation_actions") or []):
+                out.append({"label": "auto-fixed source", "detail": act.strip(), "severity": "warn", "category": "data"})
         except Exception:
             pass
 

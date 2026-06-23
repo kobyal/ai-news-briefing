@@ -236,7 +236,8 @@ def _build_video_catalog(days: list) -> dict:
     seq = 1
     seen = set()
     for day in days:
-        yt_he = day.get("youtube_headlines_he") or []
+        # youtube items are top-level, but their he lives under briefing_he.
+        yt_he = (day.get("briefing_he") or {}).get("youtube_headlines_he") or day.get("youtube_headlines_he") or []
         for i, vid in enumerate(day.get("youtube") or []):
             headline = (vid.get("headline") or vid.get("title") or "").strip()
             urls = vid.get("urls") or []

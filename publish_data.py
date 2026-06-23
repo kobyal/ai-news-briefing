@@ -1981,30 +1981,41 @@ def _cap_per_channel(videos: list, cap: int = 2) -> list:
 youtube_items = _cap_per_channel(youtube_items, cap=2)
 
 
-def _realign_youtube_descs_he():
-    """Per-channel cap reorders youtube_items vs the merger's view. Rebuild
-    `briefing_he.youtube_descs_he` so descs[i] aligns with `youtube_items[i]`
-    by URL. Slots without a HE translation (phase-1/2 enriched videos that
-    the merger never saw) get an empty string — frontend falls back to EN."""
-    bh = merger.get("briefing_he") or {}
-    descs = bh.get("youtube_descs_he") or []
-    if not descs or not _youtube_initial_urls:
+def _realign_youtube_he():
+    """Per-channel cap reorders youtube_items vs the merger's view. Rebuild BOTH
+    `briefing_he.youtube_descs_he` AND `youtube_headlines_he` so [i] aligns with
+    `youtube_items[i]` by URL. Slots without a HE translation (phase-1/2 enriched
+    videos the merger never saw) get an empty string — frontend falls back to EN.
+    NOTE: youtube_headlines_he was previously DROPPED entirely here (publish_data
+    never carried it), so video titles had no Hebrew anywhere — /media + /main
+    lens video sources. This now carries it through."""
+    if not _youtube_initial_urls:
         return
-    url_to_desc = {}
-    for i in range(min(len(_youtube_initial_urls), len(descs))):
-        u = _youtube_initial_urls[i]
-        if u:
-            url_to_desc[u] = descs[i]
-    new_descs = []
-    for v in youtube_items:
-        u = ((v.get("urls") or [None])[0]) or v.get("url") or ""
-        new_descs.append(url_to_desc.get(u, ""))
+    bh = merger.get("briefing_he") or {}
     if "briefing_he" not in merger or not merger["briefing_he"]:
         merger["briefing_he"] = {}
-    merger["briefing_he"]["youtube_descs_he"] = new_descs
+
+    def _realign(arr):
+        url_to_val = {}
+        for i in range(min(len(_youtube_initial_urls), len(arr))):
+            u = _youtube_initial_urls[i]
+            if u:
+                url_to_val[u] = arr[i]
+        out = []
+        for v in youtube_items:
+            u = ((v.get("urls") or [None])[0]) or v.get("url") or ""
+            out.append(url_to_val.get(u, ""))
+        return out
+
+    descs = bh.get("youtube_descs_he") or []
+    if descs:
+        merger["briefing_he"]["youtube_descs_he"] = _realign(descs)
+    headlines = bh.get("youtube_headlines_he") or []
+    if headlines:
+        merger["briefing_he"]["youtube_headlines_he"] = _realign(headlines)
 
 
-_realign_youtube_descs_he()
+_realign_youtube_he()
 
 
 # ── Data-quality audit ────────────────────────────────────────────────────────

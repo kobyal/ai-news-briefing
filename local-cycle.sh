@@ -482,13 +482,12 @@ if [ "$DO_PUSH" -eq 1 ]; then
   echo
   echo "[4/6] git add + commit + push..."
   push_ok=1
-  for agent in merger-agent perplexity-news-agent rss-news-agent tavily-news-agent \
-               exa-news-agent newsapi-agent youtube-news-agent github-trending-agent \
-               twitter-agent article-reader-agent; do
-    if [ -d "${agent}/output/${DATE}" ]; then
-      git add -f "${agent}/output/${DATE}" 2>/dev/null || true
-    fi
-  done
+  # NOTE: agent output/ dirs are intentionally NOT committed. They're per-run
+  # scratch (gitignored; consumed once by that morning's merger, never read
+  # again) and force-adding them daily bloated the repo to ~80 days deep across
+  # 14 agents — pruned 2026-06-25. Only the published site content (docs/) is
+  # committed below. If you ever need a day's raw agent output in git, add it
+  # manually for that one day.
   git add -f docs/ 2>/dev/null || true
   if git diff --staged --quiet; then
     echo "  (nothing new to commit — skipping push)"

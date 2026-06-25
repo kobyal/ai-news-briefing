@@ -60,6 +60,17 @@ def _first_party_image_map() -> dict[tuple[str, str], str]:
         print(f"First-party image map build failed: {e}")
     return out
 
+# Everything below runs at module load: it builds the index AND (unless
+# SKIP_S3_UPLOAD=1) uploads to S3 + invalidates CloudFront. So importing this
+# module would trigger a full deploy. It's a script, not a library (nothing
+# imports it) — guard against accidental import. (2026-06-25: an import during
+# the aws_config refactor ran a full rebuild+deploy.)
+if __name__ != "__main__":
+    raise SystemExit(
+        "build_search_index.py is an executable script, not an importable "
+        "module — running it triggers a rebuild + S3 deploy. Run it directly."
+    )
+
 FIRST_PARTY_OG = _first_party_image_map()
 print(f"Loaded {len(FIRST_PARTY_OG)} first-party og:image mirrors from S3")
 

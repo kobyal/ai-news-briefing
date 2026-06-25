@@ -15,6 +15,21 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
+# ── Keep the Mac awake for the whole run ─────────────────────────────────────
+# ROOT CAUSE of the 2026-06-25 "super slow" run (06:07→08:58, ~2h51m): the Mac
+# was on battery, sleep timer = 120s, so 43s after the 06:07 cron launch it went
+# "Sleep Service Back to Sleep" and stayed asleep until ~08:00. The network-bound
+# source agents (tavily/github/rss) hung on their open sockets the entire time —
+# tavily logged 2 LLM calls (~1min of work) but its process spanned 1h46m. Proof
+# it's not the code: tavily standalone = 172s; 8 concurrent claude -p calls = 6s;
+# pmset log shows the sleep. Lid open ≠ awake — on battery macOS idle-sleeps anyway.
+# Fix: re-exec under caffeinate so no idle/system/disk sleep can happen mid-run.
+# (-i works on battery; -s is AC-only/no-op on battery; -d/-m/-u for good measure.)
+if [ -z "${_CAFFEINATED:-}" ] && command -v caffeinate >/dev/null 2>&1; then
+  export _CAFFEINATED=1
+  exec caffeinate -dimsu "$ROOT/local-cycle.sh" "$@"
+fi
+
 # Pin Python — `pip` and `python3` resolve to DIFFERENT interpreters on this
 # Homebrew install (today: pip→3.11, python3→3.14). pip installs land in 3.11
 # site-packages; run_all.py runs under 3.14 and ModuleNotFoundError-s on

@@ -5,7 +5,33 @@
 > This doc records what was (and was NOT) the cause, and the logging added so
 > the next run answers it definitively.
 
-## TL;DR
+## RESOLVED 2026-06-25 — root cause was the Mac sleeping mid-run (not code)
+
+The 2026-06-25 "super slow" run (06:07→08:58, ~2h51m) was caused by the **Mac
+sleeping on battery during the run**. `pmset -g log` shows
+`06:07:43 Sleep — 'Sleep Service Back to Sleep' Using Batt` — 43s after the 06:07
+cron launch, with system sleep timer = 120s. The machine stayed asleep until ~08:00;
+the network-bound source agents (tavily/github/rss) hung on their open sockets the
+whole time and all completed within 2 min of each other when it woke. **Lid open ≠
+awake — on battery macOS idle-sleeps anyway.**
+
+Proof it was NOT the code/model/concurrency:
+- tavily in-run = 1h46m, but **tavily standalone = 172s**.
+- **8 concurrent `claude -p` calls = 6s** (mean 5.5s) — no contention, no 529.
+- 1 call = 3.6s.
+- `pmset` sleep log lines up exactly with the stall window.
+
+**Fix:** `local-cycle.sh` now re-execs under `caffeinate -dimsu` so no idle/system/
+disk sleep can happen mid-run. This prevents the entire class.
+
+Everything below was the investigation BEFORE the sleep log was found — kept for the
+record, but the timeout/retry/concurrency theories were **wrong** for this incident
+(they describe real worst-case behavior, just not what happened here). The
+instrumentation added is still useful for future diagnosis.
+
+---
+
+## TL;DR (original investigation — superseded by the sleep finding above)
 
 - A ~2–2.5h run is **not acceptable** and **not** explained by "it's a lot of work."
 - It is **not** the model. Per-item calls run on `claude-opus-4-8` **every day**

@@ -48,8 +48,10 @@ import requests
 from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-BUCKET = "ai-news-briefing-web2"
-AWS_PROFILE = os.environ.get("S3_PROFILE", "koby-personal")
+sys.path.insert(0, str(REPO_ROOT))
+from shared.aws_config import (  # noqa: E402
+    S3_BUCKET as BUCKET, AWS_PROFILE, CLOUDFRONT_DIST_ID,
+)
 CF = "https://aibriefing.dev"
 
 _MAX_DIM = 1200          # longest side; OG sweet spot is 1200x630, this caps it
@@ -198,7 +200,7 @@ def main() -> int:
         if up.returncode == 0:
             subprocess.run(
                 ["aws", "cloudfront", "create-invalidation",
-                 "--distribution-id", "E1TSW76SSEILK4", "--paths", f"/{key}",
+                 "--distribution-id", CLOUDFRONT_DIST_ID, "--paths", f"/{key}",
                  "--profile", AWS_PROFILE],
                 capture_output=True, text=True,
             )

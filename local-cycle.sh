@@ -296,9 +296,13 @@ echo "[3/6] Building docs/data/${DATE}.json (publish_data.py)..."
 # Established 2026-05-11. fail-soft: never blocks the email path.
 echo
 echo "[3b/6] Uploading daily data JSON + refreshing side-data on S3..."
-S3_BUCKET="ai-news-briefing-web2"
-S3_PROFILE="koby-personal"
-CF_DIST="E1TSW76SSEILK4"
+# Exported so the Python deploy scripts (build_search_index, mirror_og_images,
+# etc.) inherit them via shared/aws_config.py's env-overrides — local-cycle is
+# the single authoritative source for the deploy target when the pipeline runs;
+# the module defaults (same values) cover standalone script invocations.
+export S3_BUCKET="ai-news-briefing-web2"
+export S3_PROFILE="koby-personal"
+export CF_DIST="E1TSW76SSEILK4"
 # ATOMIC-LATE: today's briefing JSON is written locally by publish_data.py; its
 # UPLOAD is deferred to the single atomic data-publish block after the frontend
 # build (see [3c/6]) so the article list never goes live before its story pages.

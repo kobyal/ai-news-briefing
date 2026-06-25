@@ -31,9 +31,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-S3_BUCKET = "ai-news-briefing-web2"
-CF_DIST = "E1TSW76SSEILK4"
-AWS_PROFILE = "koby-personal"
+from shared.aws_config import (  # noqa: E402
+    S3_BUCKET, CLOUDFRONT_DIST_ID as CF_DIST, AWS_PROFILE,
+)
 PUBLIC_BASE = "https://aibriefing.dev"  # CloudFront alias — used for audio URLs in JSON
 VOICE_EN = os.environ.get("TLDR_TTS_VOICE_EN", "en-US-GuyNeural")
 VOICE_HE = os.environ.get("TLDR_TTS_VOICE_HE", "he-IL-AvriNeural")

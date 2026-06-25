@@ -15,14 +15,15 @@ from pathlib import Path
 
 REPO = Path("/Users/kobyalmog/vscode/projects/ai-news-briefing")
 DATA_DIR = REPO / "docs/data"
-BUCKET = "ai-news-briefing-web2"
 KEY = "data/search-index.json"
-PROFILE = "koby-personal"
 
 sys.path.insert(0, str(REPO / "scripts"))
 sys.path.insert(0, str(REPO))
 from _run_log import append_run_log  # noqa: E402
 from shared.story_id import hash_primary  # noqa: E402
+from shared.aws_config import (  # noqa: E402
+    S3_BUCKET as BUCKET, AWS_PROFILE as PROFILE, CLOUDFRONT_DIST_ID,
+)
 
 # Map (date, story_id) -> first-party og_image URL by listing the lambda's
 # S3 image mirrors. The ingest lambda uploads each story's og:image to
@@ -452,7 +453,7 @@ else:
     if result.returncode == 0:
         inv = subprocess.run([
             "aws", "cloudfront", "create-invalidation",
-            "--distribution-id", "E1TSW76SSEILK4",
+            "--distribution-id", CLOUDFRONT_DIST_ID,
             "--paths", "/data/search-index.json",
             "--profile", PROFILE,
         ], capture_output=True, text=True)

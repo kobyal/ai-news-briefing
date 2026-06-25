@@ -25,14 +25,17 @@ import json
 import os
 import re
 import subprocess
+import sys
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
-BUCKET = "ai-news-briefing-web2"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from shared.aws_config import (  # noqa: E402
+    S3_BUCKET as BUCKET, AWS_PROFILE, CLOUDFRONT_DIST_ID,
+)
 PREFIX = "data/img/fallback/prewarmed"
 CF = "https://aibriefing.dev"
-AWS_PROFILE = "koby-personal"
 
 # Subjects to pre-warm. key = slug (used as lookup key + filename), value = Wikipedia title.
 # Keep slugs lowercase, space-separated so matching against headlines is easy.
@@ -154,7 +157,7 @@ def main():
     # Invalidate the index.json + prewarmed dir so CloudFront picks up changes
     subprocess.run(
         ["aws", "cloudfront", "create-invalidation",
-         "--distribution-id", "E1TSW76SSEILK4",
+         "--distribution-id", CLOUDFRONT_DIST_ID,
          "--paths", f"/{PREFIX}/*",
          "--profile", AWS_PROFILE, "--query", "Invalidation.Id", "--output", "text"],
         capture_output=True, text=True,

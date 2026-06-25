@@ -7,6 +7,7 @@ import { useLang } from "@/context/LangContext";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { BackToTopButton } from "@/components/ui/BackToTopButton";
+import { NewsletterSignup } from "@/components/ui/NewsletterSignup";
 import { buildVendorStories, vendorOrderFrom, type VendorBullet } from "@/lib/vendor-coverage";
 import { inSiteHref } from "@/lib/anchors";
 import type { DayData } from "@/lib/types";
@@ -886,6 +887,10 @@ export default function MainPage() {
           </section>
         )}
 
+      </div>
+      {/* Primary newsletter CTA — reader just finished the weekly editorial = peak intent */}
+      <div className="max-w-3xl mx-auto px-4 mb-10 mt-4">
+        <NewsletterSignup variant="feature" />
       </div>
       <Footer />
       <BackToTopButton isHe={isHe} labelHe="חזרה לתקציר" label="Back to top" />

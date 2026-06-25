@@ -12,6 +12,7 @@ import { useLang } from "@/context/LangContext";
 import type { DayData, NewsItem } from "@/lib/types";
 import { VENDOR_LIST } from "@/lib/vendors";
 import { LoadingSpinner, DaySeparator, INFINITE_SCROLL_ROOT_MARGIN, withMinDelay } from "@/components/ui/InfiniteScroll";
+import { NewsletterSignup } from "@/components/ui/NewsletterSignup";
 
 interface BriefingPageProps {
   data: DayData;
@@ -474,6 +475,14 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
               </div>
             )}
           </section>
+        )}
+
+        {/* Newsletter CTA — after today's stories, before the endless older feed
+            (reader has engaged; not buried in infinite scroll). */}
+        {!activeVendor && (
+          <div className="max-w-3xl mx-auto mb-14 px-1">
+            <NewsletterSignup variant="feature" />
+          </div>
         )}
 
         {/* ── INFINITE SCROLL: OLDER DAYS ─────────────────── */}

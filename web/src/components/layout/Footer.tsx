@@ -2,6 +2,7 @@
 
 import { Logo } from "./Logo";
 import { useLang } from "@/context/LangContext";
+import { NewsletterSignup } from "@/components/ui/NewsletterSignup";
 
 export function Footer() {
   const { isHe } = useLang();
@@ -14,6 +15,11 @@ export function Footer() {
         borderTop: "1px solid #e0e0ec",
       }}
     >
+      {/* Newsletter signup (Phase 1 — capture demand) */}
+      <div className="max-w-7xl mx-auto pb-5 mb-5" style={{ borderBottom: "1px solid #e0e0ec" }}>
+        <NewsletterSignup />
+      </div>
+
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
         {/* Left: Brand + meta */}
         <div className="flex items-center gap-4">

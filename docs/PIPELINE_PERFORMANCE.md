@@ -77,6 +77,29 @@ tail -f logs/local-cycle-<DATE>.log
 #           "⚠ transient API error, retrying"; "⟳ soft … timed out"; "✗ TIMEOUT".
 ```
 
+## Source agents that weren't producing output (investigated 2026-06-25)
+
+While diagnosing, several agents were producing no output. Findings:
+
+- **perplexity — was broken every day, now FIXED.** It proxies Anthropic models
+  through Perplexity's `/v1/responses` API, which now rejects requests missing
+  `max_output_tokens` (`400 "max_output_tokens is required when using Anthropic
+  models"`). Step 1 400'd → agent crashed → no output → looked "dormant". Fix:
+  add `max_output_tokens` to the payload (`perplexity_news_agent/pipeline.py`).
+  Verified: full run ~131s, output written.
+- **adk — works; today's miss was transient.** Standalone: 4m34s, rc=0, 14 items.
+  Also produced output 06-24. Intermittent concurrent-run failure (Gemini
+  rate-limit / network under parallel load), not a code break. The new live
+  child-streaming in `run_all.py` will surface its real error if it recurs.
+  (Separate quality issue: adk source URLs are all
+  `vertexaisearch.cloud.google.com/grounding-api-redirect/...` Google redirects.)
+- **exa + newsapi — not wired in.** Neither is in the `run_all.py` `AGENTS`
+  registry, so they never run (dirs exist, keys present). Wiring them is a
+  registry addition + merger read — left out pending a value decision.
+
+The `run_all.py` registry (= what actually runs): adk, perplexity, rss, tavily,
+article, youtube, github, xai (disabled), twitter, linkedin, merger.
+
 ## Candidate fixes (after the instrumented run confirms the culprit)
 
 - **Cut concurrency / stagger** source-agent `claude -p` calls to avoid 529 contention.

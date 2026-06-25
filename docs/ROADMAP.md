@@ -213,7 +213,7 @@ multiple places = lockstep edits + drift bugs. Convention going forward in
 the root CLAUDE.md: shared logic lives in `shared/` (Python) or
 `web/src/components/ui/` + `web/src/lib/` (frontend) — reuse/extend, don't copy.
 
-Tier 1 (real risk / has already bitten us) — **4 of 5 DONE 2026-06-07**:
+Tier 1 (real risk / has already bitten us) — **5 of 5 DONE (last: 2026-06-25)**:
 - ✅ [c7c1cbe] LLM-call wrapper: `merger` + `perplexity` now DELEGATE to
   `shared/anthropic_cc.agent()` (was their own `claude -p` copies). Closed the
   LATENT BUG — the AUP refusal fix now covers the merger; added a soft_timeout to
@@ -229,10 +229,14 @@ Tier 1 (real risk / has already bitten us) — **4 of 5 DONE 2026-06-07**:
   haiku=(1.0,5.0) → (0.80,4.0)). 4 agents import it.
 - ✅ [e2847ef] story_id → `shared/story_id.py` (hash_primary + derive_story_id);
   publish_data + build_search_index delegate. Verified byte-identical to stored ids.
-- ⏳ TODO #3: S3 bucket / CF dist id / AWS profile + invalidation hardcoded in 5+
-  scripts + local-cycle.sh with inconsistent var names (BUCKET vs S3_BUCKET, etc.)
-  — wrong bucket string = silent deploy to wrong place. → one `scripts/aws_config.py`.
-  (local-cycle.sh is gitignored — touch carefully.)
+- ✅ [7c792d7] AWS deploy targets → `shared/aws_config.py` (S3_BUCKET /
+  CLOUDFRONT_DIST_ID / AWS_PROFILE / AWS_REGION + s3_uri, env-overridable). The 4
+  deploy scripts (build_search_index, backfill_per_story_audio, mirror_og_images,
+  prewarm_fallback_images) import it; inline "E1TSW76SSEILK4" literals removed;
+  local-cycle.sh exports S3_BUCKET/S3_PROFILE/CF_DIST so the scripts inherit one
+  authoritative source. Verified resolved values byte-match originals.
+  FOLLOW-UP: `build_search_index.py` has NO `__main__` guard — importing it runs
+  a full rebuild+deploy (bit me once during this work). Wrap its body in a guard.
 
 Tier 2 (quality / dedup — added 2026-06-17):
 - ⏳ Person-tweet data lives in TWO copies: `twitter.people` AND `social.people_highlights`

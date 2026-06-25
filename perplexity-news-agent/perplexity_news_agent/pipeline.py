@@ -177,6 +177,7 @@ def _agent(
     instructions: str = None,
     json_mode: bool = False,
     label: str = "",
+    max_output_tokens: int = 16000,
 ) -> str:
     """POST /v1/responses — returns the output text.
 
@@ -187,9 +188,14 @@ def _agent(
         raise RuntimeError("PERPLEXITY_API_KEY not set — add it to .env")
 
     payload: dict = {
-        "model":     model,
-        "input":     input_text,
-        "max_steps": max_steps,
+        "model":             model,
+        "input":             input_text,
+        "max_steps":         max_steps,
+        # Required by the Perplexity /responses API when proxying Anthropic
+        # models ("max_output_tokens is required when using Anthropic models",
+        # 400 otherwise) — this silently killed the agent on step 1 every day
+        # (2026-06-25). Valid for Sonar models too, so set it unconditionally.
+        "max_output_tokens": max_output_tokens,
     }
     if tools:
         payload["tools"] = tools

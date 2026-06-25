@@ -133,6 +133,11 @@ def agent(
     }
 
     t0 = time.time()
+    # Start marker — paired with the "✓ ... elapsed" line below, this makes a
+    # stalled/throttled call visible in the timestamped run log (2026-06-25: a
+    # single call could silently burn up to ~2h via the 1800s timeout × retries
+    # with no trace of when it began). flush so it lands in real time.
+    print(f"    ▶  {label:<22} start   model={_cc_model()} effort={_cc_effort()}", flush=True)
     last_err: Exception | None = None
     _HARD_TIMEOUT = 1800
     _timeout = soft_timeout or _HARD_TIMEOUT
@@ -144,7 +149,7 @@ def agent(
             if _timeout < _HARD_TIMEOUT:
                 # Soft window timed out — retry once on the full window before
                 # giving up (cold-start / transient throttle).
-                print(f"    ⟳  [{label}] soft {_timeout}s timed out, falling back to {_HARD_TIMEOUT}s")
+                print(f"    ⟳  [{label}] soft {_timeout}s timed out, falling back to {_HARD_TIMEOUT}s", flush=True)
                 _timeout = _HARD_TIMEOUT
                 continue
             raise RuntimeError(f"[{label}] claude -p timed out after {_timeout}s")
@@ -165,7 +170,7 @@ def agent(
         )
         if is_transient and attempt < 3:
             wait = 30 * (attempt + 1)  # 30s, 60s, 90s
-            print(f"    ⚠  [{label}] transient API error, retrying in {wait}s (attempt {attempt+1}/3)...")
+            print(f"    ⚠  [{label}] transient API error, retrying in {wait}s (attempt {attempt+1}/3)...", flush=True)
             time.sleep(wait)
             continue
         # Only retry silent failures (no output to diagnose)
@@ -217,7 +222,7 @@ def agent(
     out_tok = usage.get("output_tokens", 0)
     stop = (result_event or {}).get("stop_reason", "unknown")
     n_msgs = len(assistant_texts)
-    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={_cc_model()} (sub)  in={in_tok} out={out_tok}  stop={stop}  msgs={n_msgs}")
+    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={_cc_model()} (sub)  in={in_tok} out={out_tok}  stop={stop}  msgs={n_msgs}", flush=True)
     if n_msgs > 1:
         print(f"    ⚠  [{label}] Claude Code auto-continued — using first turn only")
 

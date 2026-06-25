@@ -11,6 +11,7 @@ import argparse
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -67,37 +68,53 @@ def _run_parallel(agents: list[tuple[Path, str]]) -> dict[str, bool]:
     print(f"  Launching {len(agents)} agents in parallel...")
     print("=" * 60)
 
+    # Stream each child's output LIVE with a [label] prefix instead of buffering
+    # it until the agent exits (the old communicate() approach hid in-flight
+    # hangs — 2026-06-25: a source agent ran 1h46m and we couldn't see which
+    # call was stalling until it was over). A reader thread per child pumps its
+    # stdout line-by-line; paired with local-cycle.sh's per-line wall-clock
+    # timestamper, a stalled agent is now visible in real time.
+    def _pump(label, proc):
+        try:
+            for line in proc.stdout:
+                print(f"  [{label}] {line}", end="", flush=True)
+        except Exception:
+            pass
+
     procs = []
+    t0 = time.time()
     for script, label in agents:
         proc = subprocess.Popen(
             [sys.executable, str(script)],
             cwd=script.parent,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            bufsize=1,  # line-buffered so streaming is prompt
         )
-        procs.append((label, proc))
-        print(f"  ▶  {label}  (pid {proc.pid})")
+        t = threading.Thread(target=_pump, args=(label, proc), daemon=True)
+        t.start()
+        procs.append((label, proc, t))
+        print(f"  ▶  {label}  (pid {proc.pid})  +{time.time()-t0:.0f}s", flush=True)
 
-    print()
-    t0 = time.time()
+    print(flush=True)
     TIMEOUT = int(os.environ.get("AGENT_TIMEOUT", "1200"))
 
     results = {}
-    for label, proc in procs:
+    for label, proc, t in procs:
         try:
-            stdout, _ = proc.communicate(timeout=TIMEOUT)
+            proc.wait(timeout=TIMEOUT)
             ok = proc.returncode == 0
             status = "✓" if ok else "✗ FAILED"
         except subprocess.TimeoutExpired:
             proc.kill()
-            stdout, _ = proc.communicate()
+            proc.wait()
             ok = False
             status = f"✗ TIMEOUT (>{TIMEOUT}s)"
+        t.join(timeout=10)  # let the pump drain remaining buffered lines
         elapsed = time.time() - t0
         results[label] = ok
-        print(f"\n{'='*60}")
-        print(f"  {status}  {label}  (+{elapsed:.0f}s wall clock)")
-        print("=" * 60)
-        print(stdout, end="")
+        print(f"\n{'='*60}", flush=True)
+        print(f"  {status}  {label}  (+{elapsed:.0f}s wall clock)", flush=True)
+        print("=" * 60, flush=True)
 
     return results
 

@@ -44,6 +44,19 @@ for arg in "$@"; do
   esac
 done
 
+# ── Run logging — capture EVERYTHING with per-line wall-clock timestamps ──────
+# 2026-06-25: a source phase ran ~2h with zero visibility into what was waiting
+# (tavily made 2 LLM calls / ~1min of generation but its process took 1h46m —
+# stalled `claude -p` calls burning the 1800s timeout + retry backoffs, invisible
+# because nothing was logged). Prefixing every line with HH:MM:SS makes the gaps
+# self-evident: a 40-min jump between two lines = that's where the time went.
+# Command substitutions ($(...)) are unaffected — they capture their own stdout,
+# so the existing _ARCHIVE_UPDATED / _YT_VIDEOS parsing keeps working.
+mkdir -p "$ROOT/logs"
+RUN_LOG="$ROOT/logs/local-cycle-${DATE}.log"
+exec > >(perl -MPOSIX -pe 'BEGIN{$|=1} $_=strftime("%H:%M:%S ",localtime).$_' | tee -a "$RUN_LOG") 2>&1
+echo "▶ RUN START $(date '+%Y-%m-%d %H:%M:%S')  args:[$*]  log:$RUN_LOG"
+
 # ── Today-already-done guard ──────────────────────────────────────────────
 # Goal: 1 run per day, 1 email per day. The launchd job at 06:00 sends
 # email #1; any manual `./local-cycle.sh` after that would re-merge and
@@ -271,13 +284,9 @@ echo "[3b/6] Uploading daily data JSON + refreshing side-data on S3..."
 S3_BUCKET="ai-news-briefing-web2"
 S3_PROFILE="koby-personal"
 CF_DIST="E1TSW76SSEILK4"
-# Upload today's briefing JSON — critical: must happen before editorial/frontend
-# so the live site serves fresh data even if later steps fail.
-aws s3 cp "docs/data/${DATE}.json" "s3://${S3_BUCKET}/data/${DATE}.json" \
-  --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
-  --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
-  && echo "  ✓ ${DATE}.json uploaded to S3" \
-  || echo "  ⚠ ${DATE}.json S3 upload failed"
+# ATOMIC-LATE: today's briefing JSON is written locally by publish_data.py; its
+# UPLOAD is deferred to the single atomic data-publish block after the frontend
+# build (see [3c/6]) so the article list never goes live before its story pages.
 # Regenerate archive.json by DERIVING the date list from the actual DATE.json
 # day files on S3 (self-healing) — unioned with the existing archive + today.
 # The old approach (union existing-archive + today only) silently LOST dates
@@ -301,23 +310,12 @@ dates.add('${DATE}')
 out = sorted(dates, reverse=True)[:90]
 print(json.dumps({'dates': out}))
 " 2>/dev/null || true)
+# ATOMIC-LATE: write archive.json LOCALLY here; its upload is deferred to the
+# atomic data-publish block after the frontend build (no early S3 cp / invalidate).
 if [ -n "$_ARCHIVE_UPDATED" ]; then
-  echo "$_ARCHIVE_UPDATED" | aws s3 cp - "s3://${S3_BUCKET}/data/archive.json" \
-    --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
-    --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
-    && echo "  ✓ archive.json updated + uploaded to S3" \
-    || echo "  ⚠ archive.json S3 upload failed"
-elif [ -f docs/data/archive.json ]; then
-  aws s3 cp docs/data/archive.json "s3://${S3_BUCKET}/data/archive.json" \
-    --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
-    --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
-    && echo "  ✓ archive.json uploaded to S3" \
-    || echo "  ⚠ archive.json S3 upload failed"
+  echo "$_ARCHIVE_UPDATED" > docs/data/archive.json \
+    && echo "  ✓ archive.json derived locally (upload deferred to atomic publish)"
 fi
-aws cloudfront create-invalidation --distribution-id "$CF_DIST" \
-  --paths "/data/${DATE}.json" "/data/archive.json" \
-  --profile "$S3_PROFILE" >/dev/null 2>&1 \
-  && echo "  ✓ CloudFront invalidated for daily data files"
 if "$PYTHON_BIN" scripts/fetch_podcasts.py >/dev/null 2>&1; then
   aws s3 cp docs/data/podcasts.json "s3://${S3_BUCKET}/data/podcasts.json" \
     --content-type "application/json" --cache-control "no-cache, public, max-age=300" \
@@ -340,16 +338,21 @@ fi
 # Search-index rebuild runs AFTER podcasts + hot_tools so it can index the
 # fresh HF entries from hot_tools.json.
 if [ -f scripts/build_search_index.py ]; then
-  if "$PYTHON_BIN" scripts/build_search_index.py >/dev/null 2>&1; then
-    echo "  ✓ search-index.json rebuilt + uploaded"
+  # SKIP_S3_UPLOAD=1: build LOCALLY (the frontend build reads it for
+  # generateStaticParams); the upload is deferred to the atomic publish so the
+  # article list never goes live before its story pages exist.
+  if SKIP_S3_UPLOAD=1 "$PYTHON_BIN" scripts/build_search_index.py >/dev/null 2>&1; then
+    echo "  ✓ search-index.json rebuilt locally (upload deferred to atomic publish)"
   else
     echo "  ⚠ search-index.json rebuild failed (skipping)"
   fi
 fi
+# Only podcasts/hot_tools were uploaded above (side-data); invalidate just those.
+# search-index is deferred and covered by the final /* invalidation.
 aws cloudfront create-invalidation --distribution-id "$CF_DIST" \
-  --paths "/data/podcasts.json" "/data/hot_tools.json" "/data/search-index.json" \
+  --paths "/data/podcasts.json" "/data/hot_tools.json" \
   --profile "$S3_PROFILE" >/dev/null 2>&1 && \
-  echo "  ✓ CloudFront invalidated"
+  echo "  ✓ CloudFront invalidated (side-data)"
 
 # Editorial synthesis — reads last 7 days of data, calls Opus for cross-vendor
 # theme + 3 thematic lenses + editor picks. Output: docs/data/editorial.json
@@ -357,16 +360,7 @@ aws cloudfront create-invalidation --distribution-id "$CF_DIST" \
 echo
 echo "[3d/6] Editorial synthesis + S3 upload..."
 if "$PYTHON_BIN" editorial-agent/run.py --date "$DATE" 2>&1 | sed 's/^/  /'; then
-  echo "  ✓ docs/data/editorial.json written"
-  if [ "$DO_PUSH" -eq 1 ]; then
-    aws s3 cp docs/data/editorial.json "s3://${S3_BUCKET}/data/editorial.json" \
-      --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
-      --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
-      && echo "  ✓ editorial.json uploaded to S3" \
-      || echo "  ⚠ editorial.json S3 upload failed (non-blocking)"
-    aws cloudfront create-invalidation --distribution-id "$CF_DIST" \
-      --paths "/data/editorial.json" --profile "$S3_PROFILE" >/dev/null 2>&1 || true
-  fi
+  echo "  ✓ docs/data/editorial.json written (upload deferred to atomic publish)"
 else
   echo "  ⚠ Editorial agent failed (non-blocking — pipeline continues)"
 fi
@@ -385,12 +379,43 @@ if [ "$DO_PUSH" -eq 1 ]; then
   echo "[3c/6] Rebuilding Next.js + syncing /story/[id]/ to S3..."
   WEB_BUILD_LOG="/tmp/web-build-${DATE}.log"
   if (cd web && npm run build) >"$WEB_BUILD_LOG" 2>&1; then
+    # NOTE: do NOT trim the __next*.txt RSC payloads — removing them makes
+    # router.replace()/router.push() hard-reload (the RSC fetch 404s/returns the
+    # SPA catch-all), which put /search into an infinite reload loop (its mount
+    # effect calls router.replace to sync ?q=). Link clicks survive a trim but
+    # programmatic navigation does not — so the payloads stay. (2026-06-23)
+    # CHUNK-ORDER-SAFE deploy: upload immutable hashed assets (_next/) FIRST,
+    # without --delete, so freshly-built HTML never references a JS chunk that
+    # isn't on S3 yet (that skew made pages hang on "Loading…" during the ~8-min
+    # sync window). THEN the full sync (with --delete) flips the HTML + removes
+    # stale files — by which point every new chunk already exists on S3.
+    aws s3 sync web/out/_next "s3://${S3_BUCKET}/_next" \
+      --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 || true
     if aws s3 sync web/out "s3://${S3_BUCKET}" --delete \
          --exclude "data/*" --exclude "audio/*" --exclude "img/*" \
          --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1; then
+      # ── ATOMIC DATA PUBLISH ────────────────────────────────────────────────
+      # The static story pages are now on S3. Push the data files they reference
+      # (deferred from [3b]/[3d]) NOW, immediately before the single /* invalidation
+      # — so the article list, editorial, and archive flip live AT THE SAME TIME
+      # as their pages. No more "article appears but its page 404s" / stale editorial.
+      for _pair in \
+        "docs/data/${DATE}.json|data/${DATE}.json" \
+        "docs/data/archive.json|data/archive.json" \
+        "docs/data/search-index.json|data/search-index.json" \
+        "docs/data/editorial.json|data/editorial.json"; do
+        _src="${_pair%%|*}"; _dst="${_pair##*|}"
+        if [ -f "$_src" ]; then
+          aws s3 cp "$_src" "s3://${S3_BUCKET}/${_dst}" \
+            --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
+            --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
+            && echo "  ✓ ${_dst} published" \
+            || echo "  ⚠ ${_dst} upload failed"
+        fi
+      done
       aws cloudfront create-invalidation --distribution-id "$CF_DIST" \
         --paths "/*" --profile "$S3_PROFILE" >/dev/null 2>&1 && \
-        echo "  ✓ frontend rebuilt + synced + CloudFront /* invalidated"
+        echo "  ✓ frontend + data published ATOMICALLY + CloudFront /* invalidated"
 
       # Post-deploy health check: homepage + 5 random story pages
       echo "  → health check..."

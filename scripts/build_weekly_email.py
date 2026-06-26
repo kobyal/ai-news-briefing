@@ -46,12 +46,12 @@ def _date_label(iso, lang):
 STR = {
     "en": {"dir": "ltr", "wk": "Weekly Brief", "hook": "✦ The week in AI",
            "mattered": "What mattered this week", "watching": "🔭 What we're watching next week",
-           "worth": "Worth your time", "cta": "Read the full editorial →",
+           "worth": "Editor's picks", "community": "What the community's saying", "cta": "Read the full editorial →",
            "foot": "You're getting the weekly AI Briefing because you subscribed at aibriefing.dev. Curated by AI agents.",
            "unsub": "Unsubscribe", "read": "Read →"},
     "he": {"dir": "rtl", "wk": "התקציר השבועי", "hook": "✦ השבוע ב-AI",
            "mattered": "מה היה חשוב השבוע", "watching": "🔭 על מה אנחנו שמים עין בשבוע הבא",
-           "worth": "שווה את הזמן שלך", "cta": "לקריאת המערכת המלאה →",
+           "worth": "בחירות המערכת", "community": "מה הקהילה אומרת", "cta": "לקריאת המערכת המלאה →",
            "foot": "קיבלת את התקציר השבועי של AI Briefing כי נרשמת ב-aibriefing.dev. נאצר על ידי סוכני AI.",
            "unsub": "להסרה מהרשימה", "read": "לקריאה →"},
 }
@@ -79,15 +79,65 @@ def whats_next(ed, lang):
         return ""
 
 def section_header(label):
-    return f"""<tr><td style="padding:26px 30px 4px;">
-      <div style="font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#b45309;">{esc(label)}</div></td></tr>"""
+    return f"""<tr><td style="padding:28px 30px 8px;">
+      <div style="font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#b45309;">{esc(label)}</div>
+      <div style="height:2px;width:38px;background:{ACCENT_BAR};margin-top:6px;border-radius:2px;font-size:0;">&nbsp;</div></td></tr>"""
+
+def _img(url, alt="", h=180, radius=10):
+    if not url:
+        return ""
+    return (f'<img src="{esc(url)}" alt="{esc(alt)}" width="500" '
+            f'style="width:100%;max-width:500px;height:{h}px;object-fit:cover;'
+            f'border-radius:{radius}px;display:block;" />')
+
+def lens_card(l, lang):
+    body = (L(l, "body", lang) or "")
+    body = body[:230].rsplit(" ", 1)[0] + "…" if len(body) > 230 else body
+    img = _img(l.get("og_image"), L(l, "label", lang), h=150)
+    return f"""<tr><td style="padding:8px 30px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #ececf4;border-radius:12px;overflow:hidden;">
+        {f'<tr><td>{img}</td></tr>' if img else ''}
+        <tr><td style="padding:14px 16px;">
+          <div style="font-size:17px;font-weight:800;color:#0f0f1a;">{esc(l.get('icon',''))} {esc(L(l,'label',lang))}</div>
+          <div style="font-size:14px;line-height:1.55;color:#3d3d5a;margin-top:5px;">{esc(body)}</div>
+        </td></tr></table></td></tr>"""
+
+def story_card(st, lang):
+    img = _img(st.get("og_image"), st.get("headline"), h=200)
+    title = esc(st.get("headline")) if lang == "en" else esc(L(st, "editorial_note", "he") or st.get("headline"))
+    note = "" if lang == "he" else esc(st.get("editorial_note") or st.get("summary") or "")
+    return f"""<tr><td style="padding:8px 30px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #ececf4;border-radius:12px;overflow:hidden;">
+        {f'<tr><td><a href="{esc(st.get("url"))}">{img}</a></td></tr>' if img else ''}
+        <tr><td style="padding:15px 17px;">
+          <div style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#7c3aed;">{esc(st.get('vendor'))}</div>
+          <a href="{esc(st.get('url'))}" style="text-decoration:none;"><div style="font-size:17px;font-weight:800;line-height:1.3;color:#0f0f1a;margin:4px 0 6px;">{title}</div></a>
+          {f'<div style="font-size:14px;line-height:1.55;color:#3d3d5a;">{note}</div>' if note else ''}
+          <a href="{esc(st.get('url'))}" style="display:inline-block;margin-top:9px;font-size:13px;font-weight:700;color:#4f46e5;text-decoration:none;">{esc(STR[lang]['read'])}</a>
+        </td></tr></table></td></tr>"""
+
+def community_card(c, lang):
+    body = (L(c, "body", lang) or "")
+    body = body[:200].rsplit(" ", 1)[0] + "…" if len(body) > 200 else body
+    img = _img(c.get("og_image"), L(c, "headline", lang), h=140)
+    return f"""<tr><td style="padding:8px 30px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #ececf4;border-radius:12px;overflow:hidden;">
+        {f'<tr><td>{img}</td></tr>' if img else ''}
+        <tr><td style="padding:13px 16px;">
+          <a href="{esc(c.get('source_url'))}" style="text-decoration:none;"><div style="font-size:15px;font-weight:700;color:#0f0f1a;">{esc(L(c,'headline',lang))}</div></a>
+          <div style="font-size:11px;color:#9a9ab8;margin:2px 0 4px;">{esc(c.get('source_label'))}</div>
+          <div style="font-size:13px;line-height:1.5;color:#3d3d5a;">{esc(body)}</div>
+        </td></tr></table></td></tr>"""
 
 def render(ed, lang, next_text):
     s = STR[lang]; d = s["dir"]
     th = ed.get("theme", {})
     lenses = (ed.get("lenses") or [])[:3]
-    featured = (ed.get("featured_stories") or [])[:4]
+    featured = (ed.get("featured_stories") or [])[:5]
+    community = (ed.get("community_spotlight") or [])[:2]
     date_label = _date_label(ed.get("date", ""), lang)
+    # hero image — first featured story's image (visual punch up top)
+    hero_url = next((f.get("og_image") for f in (ed.get("featured_stories") or []) if f.get("og_image")), "")
 
     p = [f"""<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f4f8;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f8;padding:24px 10px;"><tr><td align="center">
@@ -97,43 +147,40 @@ def render(ed, lang, next_text):
     <div style="font-size:14px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#0f0f1a;">AI BRIEFING</div>
     <div style="font-size:12px;color:#9a9ab8;margin-top:2px;">{esc(s['wk'])} · {esc(date_label)}</div>
   </td></tr>
+  {f'<tr><td style="padding:14px 30px 0;"><a href="{SITE}/main/">{_img(hero_url, "this week in AI", h=210, radius=12)}</a></td></tr>' if hero_url else ''}
   <!-- HOOK -->
   <tr><td style="padding:16px 30px 4px;">
     <div style="font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#b45309;">{esc(s['hook'])}</div>
-    <div style="font-size:23px;font-weight:800;line-height:1.25;letter-spacing:-.01em;color:#0f0f1a;margin-top:6px;">{esc(L(th,'headline',lang))}</div>
+    <div style="font-size:24px;font-weight:800;line-height:1.25;letter-spacing:-.01em;color:#0f0f1a;margin-top:6px;">{esc(L(th,'headline',lang))}</div>
     <div style="font-size:15px;line-height:1.55;color:#5c5c5c;margin-top:8px;">{esc(L(th,'subheadline',lang))}</div>
     <div style="border-{'right' if lang=='he' else 'left'}:3px solid #7c3aed;padding:2px 14px;margin-top:14px;">
       <div style="font-size:16px;font-style:italic;font-weight:600;color:#4f46e5;">{esc(L(th,'pull_quote',lang))}</div>
     </div>
   </td></tr>"""]
 
-    # WHAT MATTERED — the 3 threads (lenses; fully translated → single-language)
-    p.append(section_header(s["mattered"]))
-    for l in lenses:
-        body = (L(l, "body", lang) or "")
-        body = body[:240].rsplit(" ", 1)[0] + "…" if len(body) > 240 else body
-        p.append(f"""<tr><td style="padding:6px 30px;">
-          <div style="font-size:16px;font-weight:800;color:#0f0f1a;">{esc(l.get('icon',''))} {esc(L(l,'label',lang))}</div>
-          <div style="font-size:14px;line-height:1.55;color:#3d3d5a;margin-top:2px;">{esc(body)}</div></td></tr>""")
-
-    # 🔭 EMAIL-EXCLUSIVE forward-look
+    # 🔭 EMAIL-EXCLUSIVE forward-look — up high, it's the differentiator
     if next_text:
-        p.append(f"""<tr><td style="padding:20px 30px 6px;">
+        p.append(f"""<tr><td style="padding:20px 30px 2px;">
           <table role="presentation" width="100%" style="background:#faf8ff;border:1px solid #e9e3ff;border-radius:12px;"><tr><td style="padding:16px 18px;">
             <div style="font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#7c3aed;">{esc(s['watching'])}</div>
             <div style="font-size:15px;line-height:1.6;color:#2d2d4a;margin-top:6px;">{esc(next_text)}</div>
           </td></tr></table></td></tr>""")
 
-    # WORTH YOUR TIME — compact links (HE: use Hebrew note as text; EN: headline)
-    p.append(section_header(s["worth"]))
-    for st in featured:
-        text = esc(st.get("headline")) if lang == "en" else esc(L(st, "editorial_note", "he") or st.get("headline"))
-        p.append(f"""<tr><td style="padding:5px 30px;">
-          <a href="{esc(st.get('url'))}" style="text-decoration:none;font-size:15px;font-weight:700;color:#0f0f1a;">{text}</a>
-          <span style="font-size:11px;color:#9a9ab8;"> · {esc(st.get('vendor'))}</span></td></tr>""")
+    # WHAT MATTERED — 3 thread cards WITH images (lenses; fully translated)
+    p.append(section_header(s["mattered"]))
+    p += [lens_card(l, lang) for l in lenses]
 
-    p.append(f"""<tr><td style="padding:24px 30px 10px;text-align:center;">
-      <a href="{SITE}/main/" style="display:inline-block;background:#0f0f1a;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 26px;border-radius:10px;">{esc(s['cta'])}</a></td></tr>
+    # EDITOR'S PICKS — story cards WITH images
+    p.append(section_header(s["worth"]))
+    p += [story_card(st, lang) for st in featured]
+
+    # COMMUNITY — cards with images
+    if community:
+        p.append(section_header(STR[lang].get("community", "Community" if lang == "en" else "מהקהילה")))
+        p += [community_card(c, lang) for c in community]
+
+    p.append(f"""<tr><td style="padding:26px 30px 12px;text-align:center;">
+      <a href="{SITE}/main/" style="display:inline-block;background:#0f0f1a;color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:13px 28px;border-radius:10px;">{esc(s['cta'])}</a></td></tr>
   <tr><td style="padding:10px 30px 26px;border-top:1px solid #eee;">
     <div style="font-size:12px;line-height:1.6;color:#9a9ab8;">{esc(s['foot'])}<br><a href="{{{{ unsubscribe_url }}}}" style="color:#b8b8cc;">{esc(s['unsub'])}</a></div></td></tr>
 </table></td></tr></table></body></html>""")

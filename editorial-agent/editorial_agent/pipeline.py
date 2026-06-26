@@ -70,28 +70,16 @@ def _call_llm(input_text: str, system: str, *, label: str, model: str) -> str:
 
 
 def _parse_json(text: str) -> dict:
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        end = len(lines) - 1 if lines[-1].strip() == "```" else len(lines)
-        text = "\n".join(lines[1:end]).strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        m = re.search(r"\{.*\}", text, re.DOTALL)
-        if m:
-            try:
-                return json.loads(m.group(0))
-            except json.JSONDecodeError:
-                pass
-        # Last resort: truncate to last valid JSON boundary
-        for end in range(len(text), 0, -1):
-            if text[end - 1] in ('}', ']'):
-                try:
-                    return json.loads(text[:end])
-                except json.JSONDecodeError:
-                    continue
-        raise
+    # Delegate to the shared canonical parser (markdown-fence stripping, Hebrew-
+    # quote repair, strict=False control-char tolerance, etc.) instead of a naive
+    # json.loads — this was the lone un-patched copy that crashed on an unescaped
+    # control character (2026-06-26). See shared/json_repair.py + ROADMAP Tier-1 #2.
+    sys.path.insert(0, str(_ROOT / "shared"))
+    import json_repair
+    result = json_repair.parse_json(text)
+    if not result:
+        raise ValueError("editorial: could not parse JSON from synthesis output")
+    return result
 
 
 # ── Data loading ──────────────────────────────────────────────────────────────

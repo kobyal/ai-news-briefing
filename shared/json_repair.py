@@ -34,6 +34,14 @@ def parse_json(value):
         return json.loads(value)
     except json.JSONDecodeError:
         pass
+    # Tolerate raw control characters (unescaped newlines/tabs inside strings) —
+    # a common LLM failure surfacing as "Invalid control character at...".
+    # strict=False lets json.loads accept them. (2026-06-26: an unescaped control
+    # char in the Opus output crashed the editorial agent's naive json.loads.)
+    try:
+        return json.loads(value, strict=False)
+    except json.JSONDecodeError:
+        pass
     try:
         return ast.literal_eval(value)
     except Exception:

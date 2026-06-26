@@ -451,6 +451,14 @@ function _storyKeywords(headline: string): string[] {
     // to a Google Cloud Tech video, and Bedrock AgentCore (AWS) to a Claude
     // Code video. See web/src/app/media/page.tsx for full rationale.
     "agent","agents","agentic",
+    // 2026-06-26: "house" coincidentally bled Altman-IPO Reddit posts ("House
+    // Oversight committee", 298 upvotes) onto a GPT-5.6 "White House request"
+    // story — those posts' ONLY non-vendor overlap was "house", so vendor+1-weak-
+    // token passed. Verified against the day data: dropping just "house" removes
+    // both off-topic items while KEEPING the relevant "White House" post (still
+    // matches on "white") and the "GPT-5.6" posts. Only "house" — NOT "white"/
+    // "government"/"access", which carry the real relevance for the delay posts.
+    "house",
   ]);
   return Array.from(new Set(
     (headline || "").toLowerCase()

@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
 """Weekly newsletter — render the editorial (docs/data/editorial.json) into a
-rich, branded HTML email and send it.
+tight, email-native, SINGLE-LANGUAGE email and send via Buttondown (free API).
+
+Design (per 2026-06-26 product call): NOT a clone of the on-site /main editorial.
+It's a fast scan with a net-new, email-EXCLUSIVE hook:
+  hook (theme + pull-quote) → "what mattered this week" (the 3 threads, fully
+  translated so no language mixing) → 🔭 "What we're watching next week"
+  (generated fresh — not on the site, the reason to subscribe) → a few "worth
+  your time" links → CTA to the full editorial.
+
+Single language per edition: subscribers are tagged metadata.lang at signup
+(he if they subscribed on the Hebrew site, en otherwise), so EN subscribers get
+the English edition and HE subscribers the Hebrew one — no mixing, no toggle.
 
 Usage:
-  python scripts/build_weekly_email.py                 # render → docs/data/_weekly_email.html
-  python scripts/build_weekly_email.py --send EMAIL    # also send to EMAIL via Gmail SMTP
-
-Design matches the site: white cards on lavender, the signature amber→indigo→
-violet accent bar, ink text + ink CTA buttons. Hebrew-first audience → the
-editorial theme + section labels are shown in Hebrew with English alongside.
-Production sender will be Buttondown (this reads the same editorial.json).
+  python scripts/build_weekly_email.py                       # render both → docs/data/_weekly_email_{en,he}.html
+  python scripts/build_weekly_email.py --send EMAIL          # email both editions to EMAIL (preview, via Gmail)
+  python scripts/build_weekly_email.py --buttondown-draft    # create both editions in Buttondown as DRAFTS (lang-filtered)
+  python scripts/build_weekly_email.py --buttondown-send     # create AND send both editions to their language segments
 """
-import argparse, html, json, os, re, smtplib, ssl
+import argparse, html, json, os, smtplib, ssl, sys, urllib.request
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -23,165 +31,179 @@ ACCENT_BAR = "linear-gradient(90deg,#b45309,#d97706,#4f46e5,#7c3aed)"
 
 def esc(s): return html.escape(str(s or ""))
 
-def _date_label(iso):
+def L(d, field, lang):
+    """Pick the language-appropriate field: 'foo' for en, 'foo_he' for he."""
+    return d.get(field + "_he" if lang == "he" else field) or d.get(field) or ""
+
+def _date_label(iso, lang):
     try:
         d = datetime.strptime(iso, "%Y-%m-%d")
-        return d.strftime("%B %-d, %Y")
+        return d.strftime("%-d.%-m.%Y") if lang == "he" else d.strftime("%B %-d, %Y")
     except Exception:
         return iso
 
-def section_header(en, he):
-    return f"""
-    <tr><td style="padding:28px 30px 6px;">
-      <div style="font-size:11px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#b45309;">{esc(en)}</div>
-      <div dir="rtl" style="font-size:13px;font-weight:700;color:#9a9ab8;margin-top:2px;">{esc(he)}</div>
-    </td></tr>"""
+# ── strings per language ──────────────────────────────────────────────────────
+STR = {
+    "en": {"dir": "ltr", "wk": "Weekly Brief", "hook": "✦ The week in AI",
+           "mattered": "What mattered this week", "watching": "🔭 What we're watching next week",
+           "worth": "Worth your time", "cta": "Read the full editorial →",
+           "foot": "You're getting the weekly AI Briefing because you subscribed at aibriefing.dev. Curated by AI agents.",
+           "unsub": "Unsubscribe", "read": "Read →"},
+    "he": {"dir": "rtl", "wk": "התקציר השבועי", "hook": "✦ השבוע ב-AI",
+           "mattered": "מה היה חשוב השבוע", "watching": "🔭 על מה אנחנו שמים עין בשבוע הבא",
+           "worth": "שווה את הזמן שלך", "cta": "לקריאת המערכת המלאה →",
+           "foot": "קיבלת את התקציר השבועי של AI Briefing כי נרשמת ב-aibriefing.dev. נאצר על ידי סוכני AI.",
+           "unsub": "להסרה מהרשימה", "read": "לקריאה →"},
+}
 
-def story_card(s):
-    img = s.get("og_image") or ""
-    img_html = (f'<a href="{esc(s.get("url"))}"><img src="{esc(img)}" width="540" '
-                f'style="width:100%;max-width:540px;border-radius:10px;display:block;margin-bottom:10px;" /></a>'
-                if img else "")
-    note = s.get("editorial_note") or s.get("summary") or ""
-    note_he = s.get("editorial_note_he") or ""
-    vendor = s.get("vendor") or ""
-    return f"""
-    <tr><td style="padding:10px 30px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #ececf4;border-radius:12px;overflow:hidden;">
-        <tr><td style="padding:16px 18px;">
-          {img_html}
-          <div style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#7c3aed;">{esc(vendor)}</div>
-          <a href="{esc(s.get('url'))}" style="text-decoration:none;">
-            <div style="font-size:17px;font-weight:800;line-height:1.3;color:#0f0f1a;margin:4px 0 8px;">{esc(s.get('headline'))}</div>
-          </a>
-          <div style="font-size:14px;line-height:1.55;color:#3d3d5a;">{esc(note)}</div>
-          {f'<div dir="rtl" style="font-size:14px;line-height:1.6;color:#5c5c5c;margin-top:6px;">{esc(note_he)}</div>' if note_he else ''}
-          <a href="{esc(s.get('url'))}" style="display:inline-block;margin-top:10px;font-size:13px;font-weight:700;color:#4f46e5;text-decoration:none;">Read →</a>
-        </td></tr>
-      </table>
-    </td></tr>"""
+def whats_next(ed, lang):
+    """Email-EXCLUSIVE forward-look — generated fresh, not on the site. Graceful:
+    returns '' if the LLM call isn't available so the section is simply omitted."""
+    try:
+        sys.path.insert(0, str(ROOT / "shared"))
+        import anthropic_cc
+        th = ed.get("theme", {})
+        signals = ", ".join((th.get("vendor_signals") or [])[:8])
+        lang_name = "Hebrew" if lang == "he" else "English"
+        prompt = (
+            f"This week's AI theme: {th.get('headline')}\n{th.get('subheadline')}\n"
+            f"Active vendors: {signals}\n\n"
+            f"Write a punchy 'what to watch next week' forward-look for a newsletter — "
+            f"2-3 sentences, in {lang_name}. Concrete (name the threads likely to develop), "
+            f"opinionated, no preamble, no markdown. In Hebrew keep brand/product names in Latin."
+        )
+        out = anthropic_cc.agent(prompt, instructions="You are the editor of a sharp weekly AI newsletter.", label=f"email-whatsnext-{lang}")
+        return (out or "").strip()
+    except Exception as e:
+        print(f"  ⚠ whats_next ({lang}) skipped: {e}")
+        return ""
 
-def lens_row(l):
-    return f"""
-    <tr><td style="padding:8px 30px;">
-      <div style="font-size:15px;font-weight:800;color:#0f0f1a;">{esc(l.get('icon',''))} {esc(l.get('label'))}</div>
-      <div dir="rtl" style="font-size:13px;font-weight:700;color:#6b6b8a;margin:1px 0 5px;">{esc(l.get('label_he'))}</div>
-      <div style="font-size:14px;line-height:1.55;color:#3d3d5a;">{esc((l.get('body') or '')[:300])}</div>
-    </td></tr>"""
+def section_header(label):
+    return f"""<tr><td style="padding:26px 30px 4px;">
+      <div style="font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#b45309;">{esc(label)}</div></td></tr>"""
 
-def tool_row(t):
-    return f"""
-    <tr><td style="padding:8px 30px;">
-      <a href="{esc(t.get('url'))}" style="text-decoration:none;"><span style="font-size:15px;font-weight:800;color:#0f0f1a;">{esc(t.get('name'))}</span></a>
-      <span style="font-size:11px;color:#9a9ab8;"> · {esc(t.get('stats') or t.get('source_type') or '')}</span>
-      <div style="font-size:13px;line-height:1.5;color:#3d3d5a;margin-top:3px;">{esc((t.get('why_now') or t.get('description') or '')[:200])}</div>
-    </td></tr>"""
-
-def community_row(c):
-    return f"""
-    <tr><td style="padding:8px 30px;">
-      <a href="{esc(c.get('source_url'))}" style="text-decoration:none;"><div style="font-size:15px;font-weight:700;color:#0f0f1a;">{esc(c.get('headline'))}</div></a>
-      <div style="font-size:12px;color:#9a9ab8;">{esc(c.get('source_label'))}</div>
-      <div style="font-size:13px;line-height:1.5;color:#3d3d5a;margin-top:3px;">{esc((c.get('body') or '')[:220])}</div>
-    </td></tr>"""
-
-def render(ed):
+def render(ed, lang, next_text):
+    s = STR[lang]; d = s["dir"]
     th = ed.get("theme", {})
-    date_label = _date_label(ed.get("date", ""))
-    body_excerpt = (th.get("body") or "")
-    body_excerpt = body_excerpt[:480].rsplit(" ", 1)[0] + "…" if len(body_excerpt) > 480 else body_excerpt
     lenses = (ed.get("lenses") or [])[:3]
-    featured = (ed.get("featured_stories") or [])[:5]
-    tools = (ed.get("editor_picks") or [])[:3]
-    community = (ed.get("community_spotlight") or [])[:2]
+    featured = (ed.get("featured_stories") or [])[:4]
+    date_label = _date_label(ed.get("date", ""), lang)
 
-    parts = []
-    parts.append(f"""<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f4f8;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f8;padding:24px 10px;">
-<tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border:1px solid #e6e6f0;border-radius:16px;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    p = [f"""<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f4f8;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f8;padding:24px 10px;"><tr><td align="center">
+<table role="presentation" dir="{d}" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border:1px solid #e6e6f0;border-radius:16px;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;text-align:{'right' if lang=='he' else 'left'};">
   <tr><td style="height:4px;background:{ACCENT_BAR};font-size:0;line-height:0;">&nbsp;</td></tr>
-  <tr><td style="padding:26px 30px 4px;">
-    <div style="font-size:15px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:#0f0f1a;">AI Briefing</div>
-    <div style="font-size:12px;color:#9a9ab8;margin-top:2px;">Weekly Brief · {esc(date_label)} · {esc(ed.get('story_count'))} stories from the past {esc(ed.get('days_analyzed'))} days</div>
-  </td></tr>""")
-
-    # Theme (the editorial centerpiece) — English + Hebrew
-    parts.append(f"""
-  <tr><td style="padding:18px 30px 6px;">
-    <div style="font-size:11px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#b45309;">✦ The week in AI</div>
-    <div style="font-size:24px;font-weight:800;line-height:1.22;letter-spacing:-.02em;color:#0f0f1a;margin-top:6px;">{esc(th.get('headline'))}</div>
-    <div dir="rtl" style="font-size:21px;font-weight:800;line-height:1.3;color:#0f0f1a;margin-top:6px;">{esc(th.get('headline_he'))}</div>
-    <div style="font-size:15px;line-height:1.6;color:#3d3d5a;margin-top:12px;">{esc(body_excerpt)}</div>
-    <div dir="rtl" style="font-size:15px;line-height:1.7;color:#3d3d5a;margin-top:10px;">{esc((th.get('body_he') or '')[:480])}…</div>
-    <table role="presentation" width="100%" style="margin-top:14px;"><tr>
-      <td style="border-{('right' if True else 'left')}:3px solid #7c3aed;padding:2px 14px;">
-        <div style="font-size:16px;font-style:italic;font-weight:600;color:#4f46e5;">{esc(th.get('pull_quote'))}</div>
-        <div dir="rtl" style="font-size:15px;font-style:italic;color:#6d5fd0;margin-top:4px;">{esc(th.get('pull_quote_he'))}</div>
-      </td></tr></table>
+  <tr><td style="padding:24px 30px 2px;">
+    <div style="font-size:14px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#0f0f1a;">AI BRIEFING</div>
+    <div style="font-size:12px;color:#9a9ab8;margin-top:2px;">{esc(s['wk'])} · {esc(date_label)}</div>
   </td></tr>
-  <tr><td style="padding:14px 30px;"><a href="{SITE}/main/" style="display:inline-block;background:#0f0f1a;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 22px;border-radius:10px;">Read the full editorial →</a></td></tr>""")
+  <!-- HOOK -->
+  <tr><td style="padding:16px 30px 4px;">
+    <div style="font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#b45309;">{esc(s['hook'])}</div>
+    <div style="font-size:23px;font-weight:800;line-height:1.25;letter-spacing:-.01em;color:#0f0f1a;margin-top:6px;">{esc(L(th,'headline',lang))}</div>
+    <div style="font-size:15px;line-height:1.55;color:#5c5c5c;margin-top:8px;">{esc(L(th,'subheadline',lang))}</div>
+    <div style="border-{'right' if lang=='he' else 'left'}:3px solid #7c3aed;padding:2px 14px;margin-top:14px;">
+      <div style="font-size:16px;font-style:italic;font-weight:600;color:#4f46e5;">{esc(L(th,'pull_quote',lang))}</div>
+    </div>
+  </td></tr>"""]
 
-    parts.append(section_header("This week's threads", "הצירים של השבוע"))
-    parts += [lens_row(l) for l in lenses]
+    # WHAT MATTERED — the 3 threads (lenses; fully translated → single-language)
+    p.append(section_header(s["mattered"]))
+    for l in lenses:
+        body = (L(l, "body", lang) or "")
+        body = body[:240].rsplit(" ", 1)[0] + "…" if len(body) > 240 else body
+        p.append(f"""<tr><td style="padding:6px 30px;">
+          <div style="font-size:16px;font-weight:800;color:#0f0f1a;">{esc(l.get('icon',''))} {esc(L(l,'label',lang))}</div>
+          <div style="font-size:14px;line-height:1.55;color:#3d3d5a;margin-top:2px;">{esc(body)}</div></td></tr>""")
 
-    parts.append(section_header("Editor's picks", "בחירות המערכת"))
-    parts += [story_card(s) for s in featured]
+    # 🔭 EMAIL-EXCLUSIVE forward-look
+    if next_text:
+        p.append(f"""<tr><td style="padding:20px 30px 6px;">
+          <table role="presentation" width="100%" style="background:#faf8ff;border:1px solid #e9e3ff;border-radius:12px;"><tr><td style="padding:16px 18px;">
+            <div style="font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#7c3aed;">{esc(s['watching'])}</div>
+            <div style="font-size:15px;line-height:1.6;color:#2d2d4a;margin-top:6px;">{esc(next_text)}</div>
+          </td></tr></table></td></tr>""")
 
-    if tools:
-        parts.append(section_header("On the radar — tools", "על הרדאר — כלים"))
-        parts += [tool_row(t) for t in tools]
-    if community:
-        parts.append(section_header("What the community's saying", "מה הקהילה אומרת"))
-        parts += [community_row(c) for c in community]
+    # WORTH YOUR TIME — compact links (HE: use Hebrew note as text; EN: headline)
+    p.append(section_header(s["worth"]))
+    for st in featured:
+        text = esc(st.get("headline")) if lang == "en" else esc(L(st, "editorial_note", "he") or st.get("headline"))
+        p.append(f"""<tr><td style="padding:5px 30px;">
+          <a href="{esc(st.get('url'))}" style="text-decoration:none;font-size:15px;font-weight:700;color:#0f0f1a;">{text}</a>
+          <span style="font-size:11px;color:#9a9ab8;"> · {esc(st.get('vendor'))}</span></td></tr>""")
 
-    parts.append(f"""
-  <tr><td style="padding:24px 30px;text-align:center;">
-    <a href="{SITE}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 26px;border-radius:10px;">See everything on aibriefing.dev →</a>
-  </td></tr>
-  <tr><td style="padding:8px 30px 28px;border-top:1px solid #eee;">
-    <div style="font-size:12px;line-height:1.6;color:#9a9ab8;">You're getting the weekly AI Briefing because you subscribed at aibriefing.dev. Curated by AI agents · English & Hebrew.<br>
-    <a href="{{{{ unsubscribe_url }}}}" style="color:#b8b8cc;">Unsubscribe</a></div>
-  </td></tr>
-</table>
-<div style="max-width:600px;margin-top:12px;font-size:11px;color:#b8b8cc;font-family:-apple-system,Arial,sans-serif;">AI Briefing — the week in AI, minus the noise.</div>
-</td></tr></table></body></html>""")
-    return "".join(parts)
+    p.append(f"""<tr><td style="padding:24px 30px 10px;text-align:center;">
+      <a href="{SITE}/main/" style="display:inline-block;background:#0f0f1a;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 26px;border-radius:10px;">{esc(s['cta'])}</a></td></tr>
+  <tr><td style="padding:10px 30px 26px;border-top:1px solid #eee;">
+    <div style="font-size:12px;line-height:1.6;color:#9a9ab8;">{esc(s['foot'])}<br><a href="{{{{ unsubscribe_url }}}}" style="color:#b8b8cc;">{esc(s['unsub'])}</a></div></td></tr>
+</table></td></tr></table></body></html>""")
+    return "".join(p)
+
+# ── Buttondown ────────────────────────────────────────────────────────────────
+def _env(key):
+    if os.environ.get(key):
+        return os.environ[key]
+    for line in (ROOT / "private/.env").read_text().splitlines():
+        if line.startswith(key + "="):
+            return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return None
+
+def buttondown_post(subject, body_html, lang, *, send):
+    key = _env("BUTTONDOWN_API_KEY")
+    if not key:
+        raise SystemExit("BUTTONDOWN_API_KEY not in private/.env (Buttondown → API → Keys).")
+    payload = json.dumps({
+        "subject": subject, "body": body_html,
+        "status": "about_to_send" if send else "draft",
+        # only send to this language segment
+        "filters": {"predicate": "and", "groups": [{"predicate": "and", "filters": [
+            {"field": "metadata", "operator": "equals", "value": f"lang:{lang}"}]}]},
+    }).encode()
+    req = urllib.request.Request("https://api.buttondown.com/v1/emails", data=payload,
+        headers={"Authorization": f"Token {key}", "Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req) as r:
+            out = json.loads(r.read())
+        print(f"✓ Buttondown [{lang}] (status={out.get('status')}, id={out.get('id')})")
+    except urllib.error.HTTPError as e:
+        print(f"✗ Buttondown [{lang}] API {e.code}: {e.read()[:300]!r}")
+
+def gmail_send(to, subject, body_html):
+    pw = _env("GMAIL_APP_PASSWORD"); me = "kobyal@gmail.com"
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject; msg["From"] = f"AI Briefing <{me}>"; msg["To"] = to
+    msg.attach(MIMEText("Open in an HTML client. " + SITE, "plain", "utf-8"))
+    msg.attach(MIMEText(body_html.replace("{{ unsubscribe_url }}", SITE), "html", "utf-8"))
+    ctx = ssl.create_default_context()
+    with smtplib.SMTP("smtp.gmail.com", 587) as srv:
+        srv.starttls(context=ctx); srv.login(me, pw); srv.sendmail(me, [to], msg.as_string())
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--send", metavar="EMAIL", help="send the rendered email to this address via Gmail SMTP")
-    ap.add_argument("--subject")
+    ap.add_argument("--send", metavar="EMAIL", help="email both editions to EMAIL via Gmail (preview)")
+    ap.add_argument("--buttondown-draft", action="store_true")
+    ap.add_argument("--buttondown-send", action="store_true")
     args = ap.parse_args()
 
     ed = json.load(open(ROOT / "docs/data/editorial.json"))
-    htmlmail = render(ed)
-    out = ROOT / "docs/data/_weekly_email.html"
-    out.write_text(htmlmail, encoding="utf-8")
-    print(f"✓ rendered → {out}  ({len(htmlmail)} bytes)")
+    editions = {}
+    for lang in ("en", "he"):
+        nxt = whats_next(ed, lang)
+        h = render(ed, lang, nxt)
+        (ROOT / f"docs/data/_weekly_email_{lang}.html").write_text(h, encoding="utf-8")
+        editions[lang] = h
+        print(f"✓ rendered {lang}  ({len(h)} bytes){'  +🔭 whats-next' if nxt else '  (no whats-next)'}")
 
-    if not args.send:
-        return
-    # load GMAIL_APP_PASSWORD
-    env = ROOT / "private/.env"
-    for line in env.read_text().splitlines():
-        if line.startswith("GMAIL_APP_PASSWORD="):
-            os.environ["GMAIL_APP_PASSWORD"] = line.split("=", 1)[1].strip().strip('"').strip("'")
-    pw = os.environ["GMAIL_APP_PASSWORD"]
-    me = "kobyal@gmail.com"
-    subj = args.subject or f"The week in AI — {_date_label(ed.get('date',''))}"
-    # the {{ unsubscribe_url }} placeholder is for Buttondown; for the Gmail preview, neutralize it
-    preview_html = htmlmail.replace("{{ unsubscribe_url }}", SITE)
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subj
-    msg["From"] = f"AI Briefing <{me}>"
-    msg["To"] = args.send
-    msg.attach(MIMEText("Your weekly AI Briefing — open in an HTML-capable client. " + SITE, "plain", "utf-8"))
-    msg.attach(MIMEText(preview_html, "html", "utf-8"))
-    ctx = ssl.create_default_context()
-    with smtplib.SMTP("smtp.gmail.com", 587) as s:
-        s.starttls(context=ctx); s.login(me, pw); s.sendmail(me, [args.send], msg.as_string())
-    print(f"✓ sent '{subj}' → {args.send}")
+    subj = {"en": f"The week in AI — {_date_label(ed.get('date',''),'en')}",
+            "he": f"השבוע ב-AI — {_date_label(ed.get('date',''),'he')}"}
+
+    if args.buttondown_draft or args.buttondown_send:
+        for lang in ("en", "he"):
+            buttondown_post(subj[lang], editions[lang], lang, send=args.buttondown_send)
+    elif args.send:
+        for lang in ("en", "he"):
+            gmail_send(args.send, f"[{lang.upper()} preview] {subj[lang]}", editions[lang])
+            print(f"✓ sent {lang} preview → {args.send}")
 
 if __name__ == "__main__":
     main()

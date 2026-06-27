@@ -233,6 +233,20 @@ def main():
     args = ap.parse_args()
 
     ed = json.load(open(ROOT / "docs/data/editorial.json"))
+    # Dedup images across the whole edition so no picture repeats (2026-06-27:
+    # editorial.json reused 5 source images across lenses/stories/community →
+    # the email looked repetitive). Keep the first use; blank later duplicates
+    # (those cards render cleanly without an image rather than a repeat).
+    _seen = set()
+    for group in ("lenses", "featured_stories", "community_spotlight"):
+        for it in (ed.get(group) or []):
+            u = it.get("og_image")
+            if not u:
+                continue
+            if u in _seen:
+                it["og_image"] = ""
+            else:
+                _seen.add(u)
     editions = {}
     for lang in ("en", "he"):
         nxt = whats_next(ed, lang)

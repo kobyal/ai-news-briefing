@@ -282,6 +282,17 @@ echo
 echo "[3/6] Building docs/data/${DATE}.json (publish_data.py)..."
 "$PYTHON_BIN" publish_data.py
 
+# Mirror story-card og:images to first-party S3 + repoint the day JSON at them.
+# 2026-06-27 root cause: this step (scripts/mirror_og_images.py — the replacement
+# for the Lambda mirror that died 05-27) was NEVER wired into the pipeline, so
+# every day cards hotlinked raw third-party URLs that 403/serve-tiny → "0/N cards
+# on first-party mirrors" + missing photos. Runs after publish_data (og_images
+# exist) and before build_search_index (so the index gets the mirrored URLs too);
+# SKIP_S3_UPLOAD defers the day-JSON upload to the atomic publish (images upload now).
+echo "  → mirroring og:images to first-party S3..."
+SKIP_S3_UPLOAD=1 "$PYTHON_BIN" scripts/mirror_og_images.py --date "$DATE" 2>&1 | sed 's/^/  /' \
+  || echo "  ⚠ og-mirror failed (non-blocking — cards will hotlink sources)"
+
 # Refresh static side-data the ingest lambda doesn't (yet) build:
 #   - docs/data/${DATE}.json    (daily briefing — must be on S3 so frontend can
 #     serve it without Lambda; also ensures static aggregates override Lambda's

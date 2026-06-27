@@ -189,6 +189,15 @@ def main() -> int:
         repointed += 1
     if repointed:
         data_path.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+        # In the pipeline the day-JSON upload is deferred to the single atomic
+        # publish after the frontend build (SKIP_S3_UPLOAD=1) — we've already
+        # written the repointed og_images into the LOCAL day JSON, which the
+        # build reads and the atomic block uploads. The mirrored IMAGES above
+        # were uploaded directly (they're assets, not the article list).
+        if os.environ.get("SKIP_S3_UPLOAD") == "1":
+            print(f"[og-mirror] {args.date}: repointed {repointed} card image(s) "
+                  f"locally (day-JSON upload deferred to atomic publish)")
+            return 0
         key = f"data/{args.date}.json"
         up = subprocess.run(
             ["aws", "s3", "cp", str(data_path), f"s3://{BUCKET}/{key}",

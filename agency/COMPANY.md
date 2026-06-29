@@ -32,6 +32,9 @@ Two jobs, one company:
 ## How Koby works with the agents
 - **The room** — run `/strategy` (discovery) or `/standup` (ops): the department's agents
   debate together and produce decisions. (Most Tom-like.)
+- **Reflect** — run `/retro` weekly: the company reviews outcomes, distills learnings, and
+  recalibrates its own scoring rubric + benchmarks against reality. This is the learning loop.
+- **Investigate** — run `/investigate` for a confusing bug: prove the root cause before fixing.
 - **1:1** — talk to any single agent for depth (just address them in a session).
 - You can dictate direction anytime; the agents reply in writing and do the work.
 
@@ -48,7 +51,10 @@ Two jobs, one company:
    git identity, browser-verify, branch guard, etc.). Read them before touching the site.
 
 ## Where things live
-- Agent personas → `.claude/agents/`  ·  Skills (the room/standup) → `.claude/skills/`
-- Shared brain → `knowledge/`  ·  Discovery output → `opportunities/` (+ `BOARD.md`)
+- **Operating guide → `GUIDE.md`** (how Koby runs it)  ·  Visual map → `org-chart.html`
+- Agent personas → `.claude/agents/`  ·  Skills (cos/strategy/standup/retro/investigate) → `.claude/skills/`
+- Safety gate → `.claude/hooks/guard.py` (+ `settings.json`) — mechanically enforces the ceiling
+- Shared brain → `knowledge/` (`assets.md` edge+focus · `scoring.md` rubric · `metrics.md`
+  benchmarks · `guardrails.md` site rules)  ·  Discovery output → `opportunities/` (+ `BOARD.md`)
 - Test plans → `experiments/`  ·  Ops queue → `ops/backlog.md`
 - Meeting transcripts → `meetings/`  ·  Schedules → `routines/cron.md`

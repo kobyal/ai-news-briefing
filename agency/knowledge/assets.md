@@ -27,3 +27,16 @@
 
 ## Cost posture
 - Runs on a Claude subscription → marginal cost per task ≈ $0. Favor ideas that exploit this.
+
+## Focus filter — what we WON'T chase (saves everyone time)
+An opportunity is **out of scope** (kill `out-of-scope`) if it needs any of these:
+- **Outside funding, a team, or upfront capital** — we are solo + ~$0 marginal cost by design.
+- **A big existing audience to work at all** — we are cold-start; ideas must bootstrap from the
+  site/data/HE-niche, not assume reach we don't have.
+- **Months before first revenue or first signal** — time-to-first-dollar is a hard gate.
+- **A regulated/high-liability surface** (handling others' money, health/legal advice, scraping
+  that breaks ToS at scale) — not worth the risk for a solo brand.
+- **Pure "ride the hype" plays** with no buyer (an "AI X" with nobody who'd pay).
+
+Wide scope is encouraged *within* these rails: any AI / Israeli-market bet that a solo builder
+with these assets can turn into signal in weeks is fair game — the site is a channel, not a fence.

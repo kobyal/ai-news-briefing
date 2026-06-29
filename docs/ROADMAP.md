@@ -1,7 +1,7 @@
 AI Briefing — Roadmap & Improvement Ideas
 ==========================================
 Created: 2026-04-09
-Last updated: 2026-06-23
+Last updated: 2026-06-29
 
 ACTIVE FOCUS (2026-06-22) — traffic = DISTRIBUTION, not more SEO
 ---------------------------------------------------------------
@@ -30,6 +30,28 @@ Removed 2026-06-22: `/social-lady` demo page (client pitch declined — cost, no
 
 Shipped (since 2026-04-09)
 --------------------------
+
+Reliability + newsletter + photos (2026-06-25 → 27):
+- ✅ **Pipeline ~2.5h slowness ROOT CAUSE = the Mac slept mid-run** (on battery, 120s
+  sleep timer). `local-cycle.sh` re-execs under `caffeinate -dimsu` (`f3cb410`). Also
+  added a timestamped run log + per-call markers + live run_all streaming. See
+  `docs/PIPELINE_PERFORMANCE.md`.
+- ✅ **Story-card photos ROOT CAUSE = `scripts/mirror_og_images.py` was never wired into
+  the pipeline** (only in comments) → cards hotlinked raw URLs that 403 → recurring "0/N
+  first-party" + missing photos. Now wired after publish_data, SKIP_S3_UPLOAD (`d1acdde`).
+- ✅ **Editorial JSON-repair** — editorial's `_parse_json` was the last copy NOT using
+  `shared/json_repair`; an unescaped control char crashed it (`/main` went stale).
+  Now delegates + `json_repair` got `strict=False` (`7673e22`). **DRY Tier-1 now 5/5.**
+- ✅ **DRY Tier-1 #3** — `shared/aws_config.py` centralizes S3 bucket/CF/profile (`7c792d7`).
+- ✅ **perplexity** 400'd daily until `max_output_tokens` added (`d502538`).
+- ✅ **Newsletter Phase 1 LIVE on Buttondown** — signup (single-language by site,
+  double opt-in) + `scripts/build_weekly_email.py` weekly generator (email-exclusive
+  forward-look, single-lang editions, image-deduped). NOT auto-sending yet (needs API
+  key + weekly schedule). `/main` editorial published to CDN + linked in nav (Phase 0 done).
+- ✅ Community-bleed stopword fix; build_search_index import guard; stop committing output/.
+- ⏳ OPEN root cause: **ingest skipped daily** — pipeline waits on GitHub Pages freshness
+  (3-min timeout) before ingest, but the site is S3/CloudFront-primary → DDB goes stale.
+  Re-gate on S3/CF (or drop the wait).
 
 Source-relevance defense-in-depth (2026-06-23) — credibility guard:
 - Trigger: `/story/2127eaa27275` showed a Grok-4.3 headline sourced from an AWS

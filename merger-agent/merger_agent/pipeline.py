@@ -937,20 +937,42 @@ def run_pipeline() -> dict:
             try:
                 resp = requests.head(url, timeout=8, allow_redirects=True,
                     headers={"User-Agent": "Mozilla/5.0 (compatible; ai-news-briefing/1.0)"})
-                # Accept 2xx/3xx + 403/405 (many news sites block HEAD but URL is valid)
-                if resp.status_code < 400 or resp.status_code in (403, 405):
-                    valid_urls.append(url)
-                else:
+                # Only strip on a DEFINITIVE dead-link status (404/410). Everything
+                # else — 400/403/405/429/5xx — is almost always a bot-block, rate
+                # limit, or HEAD-unsupported server, NOT a missing page. Stripping
+                # those false-negatives is what left 3 real stories sourceless on
+                # 2026-07-01 (blog.google + businesswire HEAD-timed-out and
+                # techcommunity 400'd, yet all three articles existed).
+                if resp.status_code in (404, 410):
                     stripped_urls += 1
-                    print(f"  ✂ URL {resp.status_code}: {url[:60]}")
+                    print(f"  ✂ URL {resp.status_code} (dead): {url[:60]}")
+                else:
+                    valid_urls.append(url)
             except Exception:
-                stripped_urls += 1
-                print(f"  ✂ URL timeout: {url[:60]}")
+                # Timeout / connection error ≠ dead link. Many live articles block
+                # or rate-limit HEAD; keep the URL (publish_data re-validates on GET).
+                valid_urls.append(url)
+                print(f"  ↻ URL HEAD failed, kept (transient): {url[:60]}")
         item["urls"] = valid_urls
         item["source_count"] = len(valid_urls)
     if stripped_urls:
         merged_json = json.dumps(parsed, ensure_ascii=False)
         print(f"  URL validation: {total_urls - stripped_urls}/{total_urls} passed, {stripped_urls} stripped")
+
+    # Backstop — never emit a sourceless story. If the whitelist / cross-day /
+    # HEAD-validation passes above stripped every URL from a story, drop the whole
+    # story rather than ship a card with no sources (2026-07-01 incident: 3 stories
+    # went live with urls:[]). Runs before _step3_translate so the Hebrew arrays
+    # are built from surviving items only — no index drift.
+    _items = parsed.get("news_items", []) or []
+    _sourced = [it for it in _items if it.get("urls")]
+    if len(_sourced) != len(_items):
+        for it in _items:
+            if not it.get("urls"):
+                print(f"  ✂ Sourceless story dropped: {it.get('headline', '?')[:70]}")
+        parsed["news_items"] = _sourced
+        merged_json = json.dumps(parsed, ensure_ascii=False)
+        print(f"  Sourceless drop: {len(_sourced)}/{len(_items)} stories kept")
 
     # Validate community pulse URLs — drop items with broken source_url.
     # Runs before _step3_translate so Hebrew variants are only generated for

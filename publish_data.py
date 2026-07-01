@@ -2139,11 +2139,19 @@ def _remediate_source_mismatch():
     actions, q_idx = [], []
     for idx, item in enumerate(_news_items):
         urls = list(item.get("urls") or [])
-        if not urls or not _url_is_wrong_source(urls[0], item):
+        head = (item.get("headline") or "?")[:50]
+        # Empty-source backstop (2026-07-01): a story that arrived — or was
+        # stripped down — to zero URLs must never publish. The old `not urls`
+        # short-circuit SKIPPED these, so 3 sourceless stories shipped; now they
+        # are quarantined via the same kept-index machinery (rebuilds briefing_he).
+        if not urls:
+            q_idx.append(idx)
+            actions.append(f"  ⊘ QUARANTINED (no sources): '{head}'")
+            continue
+        if not _url_is_wrong_source(urls[0], item):
             continue
         bad = urls[0]
         good = [u for u in urls if not _url_is_wrong_source(u, item)]
-        head = (item.get("headline") or "?")[:50]
         if good:
             reordered = good[0] != bad
             item["urls"] = good

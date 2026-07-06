@@ -975,9 +975,22 @@ _AGGREGATOR_PATTERNS = [
 ]
 _AGGREGATOR_RE = re.compile("|".join(_AGGREGATOR_PATTERNS), re.I)
 
+# AI-news digest aggregators that publish per-vendor / per-day roundup pages whose
+# URL slugs embed the vendor name (e.g. my2cents.ai/news/2026-07-03-aws/). Those
+# slugs PASS the subject-word relevance gate and carry no "weekly/roundup" phrase,
+# so the pattern check above misses them — they shipped as the sole "source" for
+# real stories (2026-07-06: AWS $1B FDE + Apple Siri). Match by domain so they're
+# rejected as sources; a story left sourceless is then quarantined downstream.
+_AGGREGATOR_DOMAINS = (
+    "my2cents.ai",
+)
+
 
 def _is_aggregator_page(url: str, title: str) -> bool:
     """True if the page is a multi-topic roundup, not a story-specific article."""
+    u = (url or "").lower()
+    if any(d in u for d in _AGGREGATOR_DOMAINS):
+        return True
     return bool(_AGGREGATOR_RE.search((url or "") + " " + (title or "")))
 
 
@@ -1561,7 +1574,7 @@ def _tavily_search_first_alive(query: str, api_key: str, max_results: int = 5) -
         "youtube.com", "youtu.be", "twitter.com", "x.com",
         "instagram.com", "tiktok.com", "facebook.com", "linkedin.com",
         "pinterest.com", "reddit.com",  # reddit handled separately, not a primary source
-    )
+    ) + _AGGREGATOR_DOMAINS  # don't rescue a story back onto an aggregator (2026-07-06)
     for hit in data.get("results", []):
         url = hit.get("url", "")
         if not url or not url.startswith("http"):

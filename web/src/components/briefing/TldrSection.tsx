@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/context/LangContext";
-import { getVendor } from "@/lib/vendors";
+import { getVendor, expandVendorWords } from "@/lib/vendors";
 import type { NewsItem } from "@/lib/types";
 
 const VENDOR_NAMES = [
@@ -86,8 +86,10 @@ const SUBJECT_WINDOW = 35;
 // this, a HE IPO-CFO bullet that just happens to contain "OpenAI" wins the
 // OpenAI voice story on vendor alone (100 pts) when its actual topic
 // (IPO, CFO, Friar) has no overlap with the headline (voice, latency, scale).
-const ALL_VENDOR_WORDS = new Set(
-  Object.keys(NAME_TO_VENDOR).concat(Object.values(NAME_TO_VENDOR).map((v) => v.toLowerCase()))
+// expandVendorWords lowercases + splits multi-word vendor names ("Hugging Face"
+// → "hugging","face") so they're recognized as vendor words, not subject words.
+const ALL_VENDOR_WORDS = expandVendorWords(
+  Object.keys(NAME_TO_VENDOR).concat(Object.values(NAME_TO_VENDOR))
 );
 
 export function scoreBulletAgainstStory(bullet: string, story: NewsItem): number {

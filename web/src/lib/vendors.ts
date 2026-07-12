@@ -65,3 +65,27 @@ export function getVendorLogo(name: string, size = 32): string {
   if (!d) return "";
   return `https://www.google.com/s2/favicons?domain=${d}&sz=${size}`;
 }
+
+/** Build a lowercase set of "vendor words" for relevance gates, expanding any
+ *  multi-word vendor name into its component tokens too.
+ *
+ *  Root cause of a vendor-bleed class (2026-07-11): a space-containing vendor
+ *  name like "Hugging Face" was only ever stored as the joined token
+ *  ("hugging face"/"huggingface"), so headline/candidate tokenizers that split
+ *  on whitespace produced "hugging" + "face" — words NOT in the set — which
+ *  then counted as story-SUBJECT overlap. Result: every Hugging Face post/bullet
+ *  matched every Hugging Face story on the vendor name alone. Adding the split
+ *  components makes the gate recognize them as vendor (not subject) words.
+ *
+ *  Used by the community-match gate (story page) and the TLDR bullet→story
+ *  scorer — same mechanism, different vocabularies. */
+export function expandVendorWords(words: Iterable<string>): Set<string> {
+  const out = new Set<string>();
+  for (const w of words) {
+    const lw = w.toLowerCase();
+    if (!lw) continue;
+    out.add(lw);
+    for (const part of lw.split(/\s+/)) if (part) out.add(part);
+  }
+  return out;
+}

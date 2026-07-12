@@ -7,7 +7,7 @@ import { ShareButton } from "@/components/briefing/ShareButton";
 import { StoryListenButton } from "@/components/briefing/StoryCard";
 import { useLang } from "@/context/LangContext";
 import { fetchDayData, fetchArchive, fetchSearchIndex } from "@/lib/api";
-import { getVendor } from "@/lib/vendors";
+import { getVendor, expandVendorWords } from "@/lib/vendors";
 import type { DayData, NewsItem, CommunityPulseItem } from "@/lib/types";
 
 const GENERIC_LOGOS = ["arxiv-logo-twitter", "placeholder", "default-og"];
@@ -532,7 +532,9 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
   // Flat set of all vendor aliases — used to identify "generic vendor keywords"
   // like "google", "openai", "claude" that shouldn't count as subject overlap
   // on their own (every vendor post mentions the vendor).
-  const ALL_VENDOR_WORDS = new Set(
+  // expandVendorWords also splits multi-word vendor names ("hugging face" →
+  // "hugging","face") so they aren't miscounted as story-subject tokens.
+  const ALL_VENDOR_WORDS = expandVendorWords(
     Object.values(vendorAliases).flat().concat(["claude","codex","gpt"])
   );
   const strongMatch = (text: string): boolean => {

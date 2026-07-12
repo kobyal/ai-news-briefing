@@ -459,6 +459,15 @@ function _storyKeywords(headline: string): string[] {
     // matches on "white") and the "GPT-5.6" posts. Only "house" — NOT "white"/
     // "government"/"access", which carry the real relevance for the delay posts.
     "house",
+    // 2026-07-12: "open"/"source" bled generic Hugging Face brand tweets onto
+    // the "HF CEO: companies are done renting AI, shifting to open models"
+    // story — a Netflix-datasets tweet ("open-source more") and an NVIDIA-
+    // robotics RT ("open source gives dev…") each shared ONLY "open" with the
+    // headline (their real subjects: Netflix, robotics). Verified against the
+    // day data: dropping "open"/"source" removes both while KEEPING the real
+    // business-thesis match (still hits "companies"/"renting"). "open source"
+    // is generic AI vocabulary, not a subject anchor.
+    "open","source","sources","open-source","opensource","openweight","openweights",
   ]);
   return Array.from(new Set(
     (headline || "").toLowerCase()

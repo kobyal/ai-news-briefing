@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -230,10 +231,21 @@ def _translate_via_cli(text: str) -> str:
         return ""
 
 
+# Wall-clock budget for ALL Hebrew translation in one run. Without an API key
+# (local-cycle unsets ANTHROPIC_API_KEY to force subscription) every description
+# goes through the `claude -p` CLI (~15-60s each); ~30 tools sequentially stalled
+# the pipeline ~10 min at local-cycle's [3b] with no output, looking hung
+# (2026-07-14). Cap it — tools past the budget keep English descriptions, which
+# the frontend already falls back to. Generous enough to translate the top tools.
+_TRANSLATE_DEADLINE = time.monotonic() + 240
+
+
 def deepl_translate(text: str, target: str = "HE") -> str:
     """Translate a single text to Hebrew via Claude Haiku API, with CLI fallback."""
     if not text:
         return ""
+    if time.monotonic() > _TRANSLATE_DEADLINE:
+        return ""  # over budget — leave English (frontend falls back to `description`)
     if _ANTHROPIC_KEY:
         try:
             payload = json.dumps({

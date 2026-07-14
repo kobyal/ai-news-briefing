@@ -2298,22 +2298,56 @@ def _audit_data_quality():
 _data_quality_issues = _audit_data_quality()
 
 
-# Resolve bullet_story_ids now that urls[] are final. We hash urls[0] for each
-# item whose _merger_idx matches a tldr_story_index; if the item was dropped
-# (e.g. by same-day union) or didn't survive, the slot becomes "" (frontend
-# falls back to scorer per-bullet). Strips _merger_idx tags after.
-if _pending_tldr_indices:
+# Resolve bullet_story_ids now that urls[] are final. One entry PER TL;DR bullet,
+# ALWAYS length-aligned with `tldr` — this is the safety net that keeps same-day
+# re-runs from shipping broken TL;DR links (2026-07-14: _regen_tldr_over_union
+# replaced the bullets but left tldr_story_indices stale → every bullet mapped to
+# the wrong story). Primary source is the merger's index (accurate — the writer
+# knew the source story), but we TRUST it only if the indexed story actually
+# matches the bullet; otherwise we keyword-match the bullet to the best story.
+_tldr_bullets_final = _briefing.get("tldr") or []
+if _tldr_bullets_final:
     from shared.story_id import derive_story_id as _final_sid_for_bullet
+    import re as _re_bsi
     _idx_to_item = {}
     for _it in _news_items:
         _midx = _it.get("_merger_idx")
         if isinstance(_midx, int):
             _idx_to_item[_midx] = _it
+    _BSI_STOP = {
+        "the","a","an","and","or","but","for","with","on","in","at","to","of","is","are","was",
+        "were","be","been","its","it","by","has","have","new","now","its","that","this","from",
+        "into","over","as","up","out","after","amid","via","per","ai","model","models","launch",
+        "launches","launched","adds","brings","gets","week","today","first","its",
+    }
+    def _bsi_toks(_s):
+        return {_w for _w in _re_bsi.findall(r"[a-z0-9][a-z0-9.+-]{2,}", (_s or "").lower())
+                if _w not in _BSI_STOP}
+    def _bsi_overlap(_bullet_toks, _it):
+        return len(_bullet_toks & _bsi_toks(f"{_it.get('headline','')} {(_it.get('summary','') or '')[:200]}"))
+    def _bsi_best(_bullet_toks):
+        _best, _sc = None, 1  # require ≥2 shared distinctive tokens
+        for _it in _news_items:
+            _o = _bsi_overlap(_bullet_toks, _it)
+            if _o > _sc:
+                _sc, _best = _o, _it
+        return _best
     _bullet_sids = []
-    for _i in _pending_tldr_indices:
-        _it = _idx_to_item.get(_i)
-        _bullet_sids.append(_final_sid_for_bullet(_it) if _it else "")
+    for _bi, _bullet in enumerate(_tldr_bullets_final):
+        _bt = _bsi_toks(_bullet)
+        _idx_item = _idx_to_item.get(_pending_tldr_indices[_bi]) if _bi < len(_pending_tldr_indices) else None
+        # Trust the explicit index only if it plausibly matches the bullet.
+        if _idx_item is not None and _bt and _bsi_overlap(_bt, _idx_item) >= 2:
+            _chosen = _idx_item
+        else:
+            _chosen = _bsi_best(_bt) if _bt else None
+            if _chosen is None:
+                _chosen = _idx_item  # last resort: keep the merger's pick
+        _bullet_sids.append(_final_sid_for_bullet(_chosen) if _chosen else "")
     _briefing["bullet_story_ids"] = _bullet_sids
+    _n_bad = sum(1 for _s in _bullet_sids if not _s)
+    print(f"  bullet_story_ids: {len(_bullet_sids)} resolved for {len(_tldr_bullets_final)} bullets "
+          f"({_n_bad} unresolved → frontend scorer fallback)")
     for _it in _news_items:
         _it.pop("_merger_idx", None)
 

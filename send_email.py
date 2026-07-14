@@ -1256,8 +1256,8 @@ def _collect_freshness() -> list[dict]:
         ("tavily-news-agent",     "tavily_*.json",      "Tavily",     2, 3),
         ("adk-news-agent",        "briefing_*.json",    "ADK",        2, 3),
         ("github-trending-agent", "github_*.json",      "GitHub",     3, 5),
-        ("exa-news-agent",        "exa_*.json",         "Exa",        2, 3),
-        ("newsapi-agent",         "newsapi_*.json",     "NewsAPI",    2, 3),
+        ("inactive/exa-news-agent",     "exa_*.json",     "Exa",        2, 3),
+        ("inactive/newsapi-agent",      "newsapi_*.json", "NewsAPI",    2, 3),
     ]
     for agent_dir, pat, label, warn_days, err_days in _news_agents:
         files = sorted(glob.glob(f"{agent_dir}/output/{today_str}/{pat}"))

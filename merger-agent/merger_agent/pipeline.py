@@ -6,7 +6,8 @@ Steps
 2. Find latest JSON from perplexity-news-agent/output/ (source: "perplexity")
 3. Find latest JSON from rss-news-agent/output/        (source: "rss")
 4. Find latest JSON from tavily-news-agent/output/     (source: "tavily")
-5. Load social data from xai-twitter-agent/output/     (people + trending)
+5. Load social data from twitter-agent/output/ (people + trending); falls
+   back to inactive/xai-twitter-agent/output/ if present
 6. Call Claude Sonnet via Perplexity Agent API to merge + deduplicate stories
 7. Call Claude Haiku to translate the merged briefing to Hebrew
 8. Build and save HTML with a distinct gold/combined theme
@@ -297,7 +298,7 @@ def _step1_load_sources() -> tuple:
     social_briefing = {}
     xai_raw = (
         _find_latest_json(_ROOT / "twitter-agent" / "output")
-        or _find_latest_json(_ROOT / "xai-twitter-agent" / "output")
+        or _find_latest_json(_ROOT / "inactive" / "xai-twitter-agent" / "output")
     )
     if xai_raw:
         xai_briefing = xai_raw.get("briefing", xai_raw)

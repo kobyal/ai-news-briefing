@@ -26,7 +26,7 @@ AGENTS = {
     "article":    ("article-reader-agent/run.py",     "cheap", "Jina (free tier)"),
     "youtube":    ("youtube-news-agent/run.py",       "free",  "YouTube Data API (free quota)"),
     "github":     ("github-trending-agent/run.py",    "free",  "GitHub API (free)"),
-    "xai":        ("xai-twitter-agent/run.py",        "paid",  "xAI Grok-4 (~$0.35/run) — disabled"),
+    "xai":        ("inactive/xai-twitter-agent/run.py", "paid", "xAI Grok-4 — parked in inactive/ (disabled)"),
     "twitter":    ("twitter-agent/run.py",             "free",  "X GraphQL direct (no API key)"),
     "linkedin":   ("linkedin-agent/run.py",            "paid",  "Apify HarvestAPI (~$0.04/day for 31 profiles)"),
     # Merger (always runs last)

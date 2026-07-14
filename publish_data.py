@@ -319,7 +319,7 @@ youtube_raw = _latest("youtube-news-agent/output/**/*.json")
 github_raw = _latest("github-trending-agent/output/**/*.json")
 rss_raw = _best_rss("rss-news-agent/output/**/*.json")
 # twitter-agent is the active social source; fall back to xai-twitter-agent
-twitter_raw = _latest("twitter-agent/output/**/*.json") or _latest("xai-twitter-agent/output/**/*.json")
+twitter_raw = _latest("twitter-agent/output/**/*.json") or _latest("inactive/xai-twitter-agent/output/**/*.json")
 linkedin_raw = _latest("linkedin-agent/output/**/*.json")
 
 # Extract news_items from standard agent format

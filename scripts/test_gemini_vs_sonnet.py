@@ -37,7 +37,7 @@ sources["adk"]        = load_briefing(f"adk-news-agent/output/{DATE}/*.json")
 sources["perplexity"] = load_briefing(f"perplexity-news-agent/output/{DATE}/*.json")
 sources["rss"]        = load_briefing(f"rss-news-agent/output/{DATE}/*.json")
 sources["tavily"]     = load_briefing(f"tavily-news-agent/output/{DATE}/*.json")
-sources["exa"]        = load_briefing(f"exa-news-agent/output/{DATE}/*.json")
+sources["exa"]        = load_briefing(f"inactive/exa-news-agent/output/{DATE}/*.json")
 
 print("Input source counts:")
 for k, v in sources.items():
@@ -105,7 +105,7 @@ print(f"  tokens: {in_tok:,} in + {out_tok:,} out")
 print(f"  cost:   ${cost:.4f}")
 
 # Parse & save
-out_dir = Path(f"shadow_eval/{DATE}")
+out_dir = Path(f"archive/shadow_eval/{DATE}")
 out_dir.mkdir(parents=True, exist_ok=True)
 (out_dir / "gemini_flash_output.json").write_text(text)
 try:

@@ -35,7 +35,7 @@ Each step has its own log line (`✂ URL mismatch...`, `✚ Canonical URL added.
 python3 publish_data.py
 ```
 
-Reads `merger-agent/output/<today>/merged_*.json` (latest), plus the latest from `youtube`, `github`, `twitter`, `rss`. Writes `docs/data/<today>.json` and `docs/data/latest.json`.
+Reads `agents/active/merger-agent/output/<today>/merged_*.json` (latest), plus the latest from `youtube`, `github`, `twitter`, `rss`. Writes `docs/data/<today>.json` and `docs/data/latest.json`.
 
 ## Key environment variables
 

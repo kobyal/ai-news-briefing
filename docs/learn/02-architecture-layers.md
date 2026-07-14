@@ -24,8 +24,8 @@ The system has six distinct responsibilities. Each is a layer; each has its own 
 ┌──────────────────────────────────────────────────────────────┐
 │ 3. SYNTHESIS                                                 │
 │    LLM-merge raw content into ranked stories + Hebrew        │
-│    Output: merger-agent/output/<date>/merged_*.{html,json}   │
-│    Files: merger-agent/, shared/anthropic_cc.py              │
+│    Output: agents/active/merger-agent/output/<date>/merged_*.{html,json}   │
+│    Files: agents/active/merger-agent/, shared/anthropic_cc.py              │
 └──────────────────────────────────────────────────────────────┘
                           │
 ┌──────────────────────────────────────────────────────────────┐
@@ -55,7 +55,7 @@ The system has six distinct responsibilities. Each is a layer; each has its own 
 
 Three paths exist:
 
-1. **GitHub Actions `workflow_dispatch`.** Operator manually clicks "Run workflow" in the UI, or the `ai-news-trigger` Lambda dispatches it on EventBridge cron. The workflow has a built-in 5-hour skip-window that checks `merger-agent/output/<today>/.via_subscription.done` and short-circuits if the marker is fresh.
+1. **GitHub Actions `workflow_dispatch`.** Operator manually clicks "Run workflow" in the UI, or the `ai-news-trigger` Lambda dispatches it on EventBridge cron. The workflow has a built-in 5-hour skip-window that checks `agents/active/merger-agent/output/<today>/.via_subscription.done` and short-circuits if the marker is fresh.
 
 2. **`./local-cycle.sh` (maintainer's wrapper, gitignored).** Sources `private/.env`, unsets `ANTHROPIC_API_KEY`, sets `MERGER_VIA_CLAUDE_CODE=1`, runs the full chain end-to-end including AWS Lambda ingest.
 

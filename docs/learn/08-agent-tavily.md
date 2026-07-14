@@ -60,7 +60,7 @@ python3 run.py
 Tavily's free tier is generous but not unlimited (~1000 searches per key per month on the Researcher plan). The maintainer has 3 keys total: 2 from kobyal@gmail.com and 1 from a secondary Google account. They rotate as one fills:
 
 ```python
-# tavily-news-agent/tavily_news_agent/searcher.py — abridged
+# agents/active/tavily-news-agent/tavily_news_agent/searcher.py — abridged
 def search(query, ...):
     for attempt in range(3):
         try:
@@ -93,8 +93,8 @@ DDG's ~30 queries-per-IP-per-minute limit is the bottleneck. With 11 topics + se
 
 ## Output
 
-- `tavily-news-agent/output/<date>/tavily_<HHMMSS>.{html,json}`
-- `tavily-news-agent/output/<date>/usage_<HHMMSS>.json`
+- `agents/active/tavily-news-agent/output/<date>/tavily_<HHMMSS>.{html,json}`
+- `agents/active/tavily-news-agent/output/<date>/usage_<HHMMSS>.json`
 
 JSON shape: standard core-agent.
 

@@ -54,7 +54,7 @@ SKIP_ARTICLE_READING=true python3 run_all.py
 
 ## Output
 
-- `article-reader-agent/output/<date>/articles_<HHMMSS>.json`
+- `agents/active/article-reader-agent/output/<date>/articles_<HHMMSS>.json`
 
 Shape:
 
@@ -127,7 +127,7 @@ Firecrawl has a small free tier (500 credits/month). Current usage is ~0 because
 
 ## Why this isn't a newsletter agent
 
-Unlike the core 4 (ADK / Perplexity / RSS / Tavily), Article Reader doesn't render its own HTML. It only writes JSON. The merger's prompt loader (`merger-agent/.../pipeline.py`) reads the latest `articles_*.json` and includes the `{url, title, body}` for each as additional context inside the merge prompt.
+Unlike the core 4 (ADK / Perplexity / RSS / Tavily), Article Reader doesn't render its own HTML. It only writes JSON. The merger's prompt loader (`agents/active/merger-agent/.../pipeline.py`) reads the latest `articles_*.json` and includes the `{url, title, body}` for each as additional context inside the merge prompt.
 
 That makes Article Reader **enrichment-only**. Its value is felt only in the merger's output quality.
 
@@ -135,8 +135,8 @@ That makes Article Reader **enrichment-only**. Its value is felt only in the mer
 
 | File | What it does |
 |------|---------------|
-| `article-reader-agent/run.py` | Entry point. |
-| `article-reader-agent/article_reader_agent/pipeline.py` | URL collection from peers; Tavily/DDG widening; calls `shared/article_reader.read_article` per URL; saves `articles_*.json`. |
+| `agents/active/article-reader-agent/run.py` | Entry point. |
+| `agents/active/article-reader-agent/article_reader_agent/pipeline.py` | URL collection from peers; Tavily/DDG widening; calls `shared/article_reader.read_article` per URL; saves `articles_*.json`. |
 | `shared/article_reader.py` | The fallback chain (`_fetch_jina`, `_fetch_firecrawl`, cache lookup). |
 | `shared/article_cache.py` | Per-URL cache with hash-based filenames. |
 

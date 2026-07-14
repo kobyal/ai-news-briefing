@@ -78,14 +78,14 @@ python3 run_all.py --merge-only
 
 ## Output
 
-- `merger-agent/output/<date>/merged_<HHMMSS>.html` — full bilingual newsletter
-- `merger-agent/output/<date>/merged_<HHMMSS>.json` — structured output (`briefing`, `briefing_he`)
-- `merger-agent/output/<date>/usage_<HHMMSS>.json` — per-call token + cost
-- `merger-agent/output/<date>/.via_subscription.done` — marker (only on subscription path)
+- `agents/active/merger-agent/output/<date>/merged_<HHMMSS>.html` — full bilingual newsletter
+- `agents/active/merger-agent/output/<date>/merged_<HHMMSS>.json` — structured output (`briefing`, `briefing_he`)
+- `agents/active/merger-agent/output/<date>/usage_<HHMMSS>.json` — per-call token + cost
+- `agents/active/merger-agent/output/<date>/.via_subscription.done` — marker (only on subscription path)
 
 ## The merge prompt structure
 
-`merger-agent/merger_agent/prompts.py` defines `MERGER_SYSTEM_PROMPT`. Highlights:
+`agents/active/merger-agent/merger_agent/prompts.py` defines `MERGER_SYSTEM_PROMPT`. Highlights:
 
 - **SOURCE A–E mapping.** SOURCE A = ADK, B = Perplexity, C = RSS, D = Tavily News + Perplexity, E = Social (X / Reddit). The prompt explicitly forbids quoting "(per SOURCE X)" in the output — we filter for this in `publish_data.py` to catch fabricated pulse items. (SOURCE F = Exa and SOURCE G = NewsAPI were dropped on 2026-05-03; older merger prompts in git history still reference them.)
 - **No URL invention.** The prompt forbids the model from generating URLs not in the source briefings. Layer (b) of the three-layer URL defense.
@@ -111,7 +111,7 @@ Translator-D is the slowest call (~7 min on Opus). Translators A/B/C all finish 
 ## Output schema
 
 ```python
-# merger-agent/merger_agent/schemas.py
+# agents/active/merger-agent/merger_agent/schemas.py
 class NewsItem(BaseModel):
     vendor: str
     headline: str
@@ -150,7 +150,7 @@ The merger writes the marker file (`.via_subscription.done` with `completed_at` 
 
 ## URL validation (layer b of 3)
 
-After the merge call returns, `merger-agent/.../pipeline.py` runs:
+After the merge call returns, `agents/active/merger-agent/.../pipeline.py` runs:
 
 ```python
 # whitelist of all URLs that appeared in source briefings
@@ -180,11 +180,11 @@ The merger globs `<agent>/output/<today>/*.json` and silently uses what's availa
 
 | File | What it does |
 |------|---------------|
-| `merger-agent/run.py` | Entry point; writes the marker on success. |
-| `merger-agent/merger_agent/pipeline.py` | `_step1_load`, `_step2_merge`, `_step3_translate` (4 parallel), `_step4_publish`. Implements the URL whitelist filter. |
-| `merger-agent/merger_agent/prompts.py` | MERGER_SYSTEM_PROMPT, MERGER_USER_PROMPT, TRANSLATOR_*_PROMPT. |
-| `merger-agent/merger_agent/schemas.py` | Pydantic models (`NewsItem`, `CommunityPulseItem`, `MergerOutput`, `HebrewBriefing`). |
-| `merger-agent/merger_agent/tools.py` | `publish()` — HTML render with full bilingual layout. |
+| `agents/active/merger-agent/run.py` | Entry point; writes the marker on success. |
+| `agents/active/merger-agent/merger_agent/pipeline.py` | `_step1_load`, `_step2_merge`, `_step3_translate` (4 parallel), `_step4_publish`. Implements the URL whitelist filter. |
+| `agents/active/merger-agent/merger_agent/prompts.py` | MERGER_SYSTEM_PROMPT, MERGER_USER_PROMPT, TRANSLATOR_*_PROMPT. |
+| `agents/active/merger-agent/merger_agent/schemas.py` | Pydantic models (`NewsItem`, `CommunityPulseItem`, `MergerOutput`, `HebrewBriefing`). |
+| `agents/active/merger-agent/merger_agent/tools.py` | `publish()` — HTML render with full bilingual layout. |
 | `shared/anthropic_cc.py` | Subscription-path wrapper. Used by the merger and the other 3 LLM-using agents. |
 
 ## Cool tricks

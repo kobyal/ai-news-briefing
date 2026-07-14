@@ -90,10 +90,10 @@ The default `AGENT_TIMEOUT=1200` (20 minutes) is a hard cap. Agents that need mo
 
 Folder convention:
 
-- Outer: kebab-case for the package directory (`adk-news-agent/`).
+- Outer: kebab-case for the package directory (`agents/active/adk-news-agent/`).
 - Inner: snake_case for the importable Python package (`adk_news_agent/`).
 
-This is mandatory — `run_all.py` registers each agent by both names and several scripts assume the layout (e.g., `merger-agent/merger_agent/pipeline.py` globs `adk-news-agent/output/...` directly).
+This is mandatory — `run_all.py` registers each agent by both names and several scripts assume the layout (e.g., `agents/active/merger-agent/merger_agent/pipeline.py` globs `agents/active/adk-news-agent/output/...` directly).
 
 If you add a new agent, mirror the convention.
 
@@ -109,18 +109,18 @@ The merger handles both cases — its prompt accepts zero-source-N inputs and ju
 ## Where the data ends up
 
 ```
-adk-news-agent/output/2026-05-03/briefing_133708.json
-adk-news-agent/output/2026-05-03/usage_133708.json
-perplexity-news-agent/output/2026-05-03/briefing_125211.json
-perplexity-news-agent/output/2026-05-03/usage_125211.json
-rss-news-agent/output/2026-05-03/rss_125351.json
-rss-news-agent/output/2026-05-03/usage_125351.json
-tavily-news-agent/output/2026-05-03/tavily_125211.json
-tavily-news-agent/output/2026-05-03/usage_125211.json
-youtube-news-agent/output/2026-05-03/youtube_124930.json
-github-trending-agent/output/2026-05-03/github_124950.json
-twitter-agent/output/2026-05-03/twitter_124922.json
-article-reader-agent/output/2026-05-03/articles_124959.json
+agents/active/adk-news-agent/output/2026-05-03/briefing_133708.json
+agents/active/adk-news-agent/output/2026-05-03/usage_133708.json
+agents/active/perplexity-news-agent/output/2026-05-03/briefing_125211.json
+agents/active/perplexity-news-agent/output/2026-05-03/usage_125211.json
+agents/active/rss-news-agent/output/2026-05-03/rss_125351.json
+agents/active/rss-news-agent/output/2026-05-03/usage_125351.json
+agents/active/tavily-news-agent/output/2026-05-03/tavily_125211.json
+agents/active/tavily-news-agent/output/2026-05-03/usage_125211.json
+agents/active/youtube-news-agent/output/2026-05-03/youtube_124930.json
+agents/active/github-trending-agent/output/2026-05-03/github_124950.json
+agents/active/twitter-agent/output/2026-05-03/twitter_124922.json
+agents/active/article-reader-agent/output/2026-05-03/articles_124959.json
 ```
 
 The merger globs each of these paths to find the most recent file for today's date. Missing dates / missing files / empty files are tolerated.

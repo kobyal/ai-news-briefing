@@ -43,13 +43,13 @@ python3 run_all.py --skip xai
 Wall-clock: 12–18 min. Expected output:
 
 - `<agent>/output/<today>/*.json` for each enabled agent
-- `merger-agent/output/<today>/merged_<HHMMSS>.{html,json}`
+- `agents/active/merger-agent/output/<today>/merged_<HHMMSS>.{html,json}`
 
 If the merger output looks reasonable, you're ready to publish:
 
 ```bash
 DATE=$(date +%Y-%m-%d)
-LATEST=$(ls -t merger-agent/output/${DATE}/merged_*.html | head -1)
+LATEST=$(ls -t agents/active/merger-agent/output/${DATE}/merged_*.html | head -1)
 mkdir -p docs/report
 cp "$LATEST" docs/index.html
 cp "$LATEST" "docs/report/${DATE}.html"
@@ -117,7 +117,7 @@ The merger is included automatically when using `--only`. To add an agent, mirro
 3. Make sure `run.py` writes to `<your-agent>-news-agent/output/<YYYY-MM-DD>/<file>_<HHMMSS>.json`.
 4. Match the standard JSON shape (see Chapter 21).
 5. Register in `run_all.py::AGENTS`.
-6. Add to `merger-agent/merger_agent/pipeline.py::_step1_load` if you want it in the merger prompt, or to `publish_data.py` if it should render directly.
+6. Add to `agents/active/merger-agent/merger_agent/pipeline.py::_step1_load` if you want it in the merger prompt, or to `publish_data.py` if it should render directly.
 
 That's it. The pattern is uniform; one new agent is ~100 lines.
 
@@ -194,7 +194,7 @@ Things to change for your own deployment:
 | File | What to change |
 |------|----------------|
 | `README.md` | `kobyal/ai-news-briefing` → `your-username/your-fork` |
-| `merger-agent/merger_agent/tools.py` | HTML header / title / styling |
+| `agents/active/merger-agent/merger_agent/tools.py` | HTML header / title / styling |
 | `web/` (if you fork it) | Page title, favicon, color scheme |
 | `send_email.py` | Subject line prefix, signature |
 | `shared/image_fallback.py` | Add your own vendor logos if desired |

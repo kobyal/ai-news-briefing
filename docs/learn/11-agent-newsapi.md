@@ -1,6 +1,6 @@
 # 11 — Agent: NewsAPI
 
-> **⚠️ RETIRED 2026-05-03.** The NewsAPI agent was dropped from `run_all.py` after an audit found its hits were 100% redundant with Tavily / Perplexity / RSS. The directory `newsapi-agent/` and the linked NotebookLM video remain in the repo for historical reference, but NewsAPI is no longer part of the daily pipeline. See [04 — Collection pattern](./04-collection-pattern.md) for the current 8-agent lineup.
+> **⚠️ RETIRED 2026-05-03.** The NewsAPI agent was dropped from `run_all.py` after an audit found its hits were 100% redundant with Tavily / Perplexity / RSS. The directory `agents/inactive/newsapi-agent/` and the linked NotebookLM video remain in the repo for historical reference, but NewsAPI is no longer part of the daily pipeline. See [04 — Collection pattern](./04-collection-pattern.md) for the current 8-agent lineup.
 
 ## TL;DR
 
@@ -54,7 +54,7 @@ python3 run.py
 
 ## Output
 
-- `newsapi-agent/output/<date>/newsapi_<HHMMSS>.json`
+- `agents/inactive/newsapi-agent/output/<date>/newsapi_<HHMMSS>.json`
 
 Shape:
 

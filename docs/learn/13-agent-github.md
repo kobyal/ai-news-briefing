@@ -36,7 +36,7 @@ python3 run.py
 
 ## Output
 
-- `github-trending-agent/output/<date>/github_<HHMMSS>.json`
+- `agents/active/github-trending-agent/output/<date>/github_<HHMMSS>.json`
 
 Shape:
 

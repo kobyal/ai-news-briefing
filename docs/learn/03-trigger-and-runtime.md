@@ -65,7 +65,7 @@ for proc in procs:
     print stdout, mark ✓ or ✗
 
 if merger not in skipped:
-    subprocess.run([python, "merger-agent/run.py"])
+    subprocess.run([python, "agents/active/merger-agent/run.py"])
 ```
 
 Each agent runs as a separate Python process. `subprocess.Popen` lets them all run concurrently; `communicate(timeout=...)` blocks until each one finishes (or hits the per-process cap). Default `AGENT_TIMEOUT=1200` is a per-process cap — the slowest agent (ADK at ~7 min) sets the floor for total wall-clock.
@@ -77,7 +77,7 @@ The merger is **not** parallel with collectors. It runs as a final blocking step
 When the merger finishes successfully on the subscription path, it writes:
 
 ```
-merger-agent/output/<YYYY-MM-DD>/.via_subscription.done
+agents/active/merger-agent/output/<YYYY-MM-DD>/.via_subscription.done
 ```
 
 Contents (one JSON object):
@@ -93,7 +93,7 @@ The workflow's first step reads this:
   id: skip_check
   run: |
     DATE=$(date -u +'%Y-%m-%d')
-    MARKER="merger-agent/output/${DATE}/.via_subscription.done"
+    MARKER="agents/active/merger-agent/output/${DATE}/.via_subscription.done"
     WINDOW_SECONDS=$((5 * 3600))
     if [ ! -f "$MARKER" ]; then
       echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0
@@ -112,7 +112,7 @@ This is the cleanest way to make local + CI coexist without race conditions.
 
 ## Why `python3 run_all.py --skip xai`
 
-`xai-twitter-agent/` is the paid Twitter equivalent of `twitter-agent/`. It uses Grok-4 + xAI's `x_search` tool. The free `twitter-agent/` covers the same use case via direct cookie-based scraping, so xAI is disabled by default to save ~$0.35/run.
+`agents/inactive/xai-agents/active/twitter-agent/` is the paid Twitter equivalent of `agents/active/twitter-agent/`. It uses Grok-4 + xAI's `x_search` tool. The free `agents/active/twitter-agent/` covers the same use case via direct cookie-based scraping, so xAI is disabled by default to save ~$0.35/run.
 
 If the X scrape ever breaks long-term (cookies expire, X changes GraphQL again), removing `--skip xai` from the workflow re-enables the paid alternative.
 
@@ -122,7 +122,7 @@ There are *two* timeouts in the system:
 
 1. **`AGENT_TIMEOUT`** (default 1200s) — `run_all.py`'s per-subprocess cap. If an agent doesn't finish, `subprocess.communicate` kills it with SIGKILL.
 
-2. **Agent-internal timeouts** — for ADK, this is `ADK_TIMEOUT` (default 900s) inside `adk-news-agent/adk_news_agent/pipeline.py`. The internal timeout fires *before* the outer one and gives the agent a chance to clean up gracefully.
+2. **Agent-internal timeouts** — for ADK, this is `ADK_TIMEOUT` (default 900s) inside `agents/active/adk-news-agent/adk_news_agent/pipeline.py`. The internal timeout fires *before* the outer one and gives the agent a chance to clean up gracefully.
 
 Rule: outer ≥ inner. Otherwise the inner timeout is moot. The defaults are 1200 ≥ 900, with 300s of headroom.
 

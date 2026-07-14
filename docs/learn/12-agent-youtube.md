@@ -45,7 +45,7 @@ python3 run.py
 
 ## Output
 
-- `youtube-news-agent/output/<date>/youtube_<HHMMSS>.json`
+- `agents/active/youtube-news-agent/output/<date>/youtube_<HHMMSS>.json`
 
 Shape:
 
@@ -74,7 +74,7 @@ This output **bypasses the merger** — `publish_data.py` reads it directly into
 
 ## Curated channels (~25)
 
-The list lives in `youtube-news-agent/youtube_news_agent/pipeline.py` as `AI_CHANNELS`. Examples:
+The list lives in `agents/active/youtube-news-agent/youtube_news_agent/pipeline.py` as `AI_CHANNELS`. Examples:
 
 - **English educational:** Two Minute Papers, AI Explained, Yannic Kilcher, 3Blue1Brown
 - **Practitioner channels:** Andrej Karpathy, Sebastian Raschka, Maxime Labonne, Tina Huang

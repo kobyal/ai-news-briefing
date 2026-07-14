@@ -48,8 +48,8 @@ python3 run.py
 
 ## Output
 
-- `rss-news-agent/output/<date>/rss_<HHMMSS>.{html,json}`
-- `rss-news-agent/output/<date>/usage_<HHMMSS>.json`
+- `agents/active/rss-news-agent/output/<date>/rss_<HHMMSS>.{html,json}`
+- `agents/active/rss-news-agent/output/<date>/usage_<HHMMSS>.json`
 
 The JSON has the standard core-agent shape, plus a top-level `reddit_posts` array that's used by `publish_data.py` to render the dedicated Reddit section on the live site.
 
@@ -62,7 +62,7 @@ Originally all RSS feeds used the global `LOOKBACK_DAYS=3` cutoff. Vendor blog p
 Concrete example: AWS Bedrock AgentCore launched on 2026-04-22. The 2026-04-28 publish run with `LOOKBACK_DAYS=3` (Apr 25–28) couldn't see the canonical announcement. The fix:
 
 ```python
-# rss-news-agent/.../feeds.py::fetch_all
+# agents/active/rss-news-agent/.../feeds.py::fetch_all
 since = datetime.now(tz=timezone.utc) - timedelta(days=lookback_days)
 vendor_since = min(since, datetime.now(tz=timezone.utc) - timedelta(days=7))
 # vendor RSS uses vendor_since (≥7 days)

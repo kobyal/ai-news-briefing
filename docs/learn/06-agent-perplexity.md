@@ -46,8 +46,8 @@ python3 run.py
 
 ## Output
 
-- `perplexity-news-agent/output/<date>/briefing_<HHMMSS>.{html,json}`
-- `perplexity-news-agent/output/<date>/usage_<HHMMSS>.json`
+- `agents/active/perplexity-news-agent/output/<date>/briefing_<HHMMSS>.{html,json}`
+- `agents/active/perplexity-news-agent/output/<date>/usage_<HHMMSS>.json`
 
 JSON shape matches the ADK shape (every core agent has the same `briefing.{tldr, news_items, community_pulse}` schema so the merger can read them uniformly).
 

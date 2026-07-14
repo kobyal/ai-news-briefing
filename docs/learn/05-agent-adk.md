@@ -59,8 +59,8 @@ python3 run_all.py --only adk
 
 ## Output
 
-- `adk-news-agent/output/<date>/briefing_<HHMMSS>.json` — structured briefing for the merger
-- `adk-news-agent/output/<date>/usage_<HHMMSS>.json` — per-call Gemini token + cost log
+- `agents/active/adk-news-agent/output/<date>/briefing_<HHMMSS>.json` — structured briefing for the merger
+- `agents/active/adk-news-agent/output/<date>/usage_<HHMMSS>.json` — per-call Gemini token + cost log
 
 (There used to be a per-agent `briefing_<HHMMSS>.html` newsletter as well. It was dropped on 2026-05-03 — nothing read it. The merger writes the only user-facing HTML.)
 
@@ -95,7 +95,7 @@ JSON shape:
 
 ### 1. Internal timeout
 
-`adk-news-agent/adk_news_agent/pipeline.py::_TIMEOUT` (default 900s) bounds the whole `runner.run_async` call. If the internal pipeline takes longer (slow Gemini day, rate limit), the timeout fires. The handler catches `asyncio.TimeoutError` and prints a warning.
+`agents/active/adk-news-agent/adk_news_agent/pipeline.py::_TIMEOUT` (default 900s) bounds the whole `runner.run_async` call. If the internal pipeline takes longer (slow Gemini day, rate limit), the timeout fires. The handler catches `asyncio.TimeoutError` and prints a warning.
 
 After the timeout (or normal completion), pipeline.py runs a **post-completion check**: glob `output/<today>/briefing_*.json` and raise `RuntimeError` if no file exists. This converts the silent-success failure mode (timeout → exit 0 → merger uses yesterday's stale ADK file) into a loud failure (`run_all.py` reports `✗ FAILED`).
 

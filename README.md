@@ -26,6 +26,34 @@ It's intentionally fork-friendly:
 
 ---
 
+## Repository layout
+
+```
+agents/
+  active/      11 agents that run every cycle:
+                 sources → adk · perplexity · rss · tavily · article-reader ·
+                           youtube · github · twitter · linkedin
+                 merger  → merges + dedups all sources into one briefing (+ Hebrew)
+                 editorial → front-page lenses / picks / featured
+  inactive/    parked: exa, newsapi (dead — present, not wired), xai-twitter (disabled)
+concepts/      product ideas, not pipeline code (client-content-agent)
+archive/       retired experiments (shadow_eval)
+shared/        cross-agent helpers — the anti-copy-paste layer
+                 anthropic_cc (the one claude -p wrapper), vendors, story_id,
+                 image_fallback, json_repair, pricing, repo_root, …
+web/           Next.js frontend (static export → S3/CloudFront → aibriefing.dev)
+infra/         AWS CDK (ai-news-ingest Lambda → DynamoDB)
+private/       QA evaluator + auto-fix
+docs/          this documentation (see docs/learn/ for the chapter walkthrough)
+```
+
+Agents are resolved by name via `shared.repo_root.agent_dir()`, so they can be
+moved between `active/` and `inactive/` without editing the launcher or consumers.
+The daily driver is `local-cycle.sh` (orchestrates `run_all.py` → `publish_data.py`
+→ editorial → build → deploy → email → ingest → QA).
+
+---
+
 ## Quick Start
 
 ```bash
@@ -36,8 +64,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # 2. Install per-agent requirements (one file at a time — see "Why per-file?" below)
-for req in adk-news-agent perplexity-news-agent tavily-news-agent \
-           rss-news-agent merger-agent twitter-agent; do
+for req in agents/active/adk-news-agent agents/active/perplexity-news-agent agents/active/tavily-news-agent \
+           agents/active/rss-news-agent agents/active/merger-agent agents/active/twitter-agent; do
   pip install -r "${req}/requirements.txt"
 done
 pip install firecrawl-py exa-py newsapi-python duckduckgo-search
@@ -215,7 +243,7 @@ export MERGER_VIA_CLAUDE_CODE=1 # route via `claude -p`
 python3 run_all.py --skip xai
 ```
 
-The flag is honored by the four LLM-using agents (`merger-agent`, `perplexity-news-agent`, `rss-news-agent`, `tavily-news-agent`) via `shared/anthropic_cc.py`. On success, the merger writes a marker file `merger-agent/output/<date>/.via_subscription.done`; if CI sees that marker dated within 5 hours, it skips the daily run so you don't double-bill.
+The flag is honored by the four LLM-using agents (`merger-agent`, `perplexity-news-agent`, `rss-news-agent`, `tavily-news-agent`) via `shared/anthropic_cc.py`. On success, the merger writes a marker file `agents/active/merger-agent/output/<date>/.via_subscription.done`; if CI sees that marker dated within 5 hours, it skips the daily run so you don't double-bill.
 
 The maintainer wraps this whole flow (subscription run → publish → email → AWS Lambda ingest) in `private/LOCAL_RUN.md` (gitignored). For a fork, the three lines above are enough — wire the rest to your own publish target.
 
@@ -233,7 +261,7 @@ Loads the latest per-agent outputs from disk. Free for collectors, only the merg
 
 Each agent is independent: separate folder, requirements, run.py, output dir. Agents follow the convention `<name>-news-agent/<name>_news_agent/`. Skip any with `--skip <name>`.
 
-### 1. ADK News Agent — `adk-news-agent/`
+### 1. ADK News Agent — `agents/active/adk-news-agent/`
 
 Google Agent Development Kit pipeline. Vendor + community researchers use Gemini with `google_search`, then a URL resolver expands Google grounding redirects, then writer + translator + publisher.
 
@@ -249,7 +277,7 @@ flowchart LR
 **Run:** `cd adk-news-agent && python3 run.py`
 **Env:** `GOOGLE_API_KEY`, `GOOGLE_GENAI_MODEL` (default `gemini-2.5-flash`), `LOOKBACK_DAYS`
 
-### 2. Perplexity News Agent — `perplexity-news-agent/`
+### 2. Perplexity News Agent — `agents/active/perplexity-news-agent/`
 
 Perplexity Sonar for search; writer + translator now call **Anthropic SDK directly** (cost-saving routing change, 2026-04-23). Sonar still does the actual web research.
 
@@ -264,7 +292,7 @@ flowchart LR
 **Run:** `cd perplexity-news-agent && python3 run.py`
 **Env:** `PERPLEXITY_API_KEY`, `ANTHROPIC_API_KEY`, `PERPLEXITY_SEARCH_MODEL`, `PERPLEXITY_WRITER_MODEL`, `PERPLEXITY_TRANSLATOR_MODEL`, `LOOKBACK_DAYS`
 
-### 3. RSS News Agent — `rss-news-agent/`
+### 3. RSS News Agent — `agents/active/rss-news-agent/`
 
 Deterministic fetch — no search LLM. Pulls from 75+ vendor blogs, tech feeds, Hacker News, and Reddit (via [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift), no auth required). LLM only enters at synthesis.
 
@@ -282,7 +310,7 @@ flowchart LR
 **Env:** `ANTHROPIC_API_KEY`, `RSS_WRITER_MODEL`, `RSS_TRANSLATOR_MODEL`, `LOOKBACK_DAYS`
 **Note:** Reddit posts (filtered to score ≥ 20) are also surfaced separately on the live site via `publish_data.py` + DeepL translation.
 
-### 4. Tavily News Agent — `tavily-news-agent/`
+### 4. Tavily News Agent — `agents/active/tavily-news-agent/`
 
 Hits 11 vendor topics through Tavily Search, then Anthropic Haiku writes + translates. Tavily key chain: `TAVILY_API_KEY → KEY2 → KEY3 → DuckDuckGo`.
 
@@ -296,7 +324,7 @@ flowchart LR
 **Run:** `cd tavily-news-agent && python3 run.py`
 **Env:** `TAVILY_API_KEY` (+ `TAVILY_API_KEY2`, `TAVILY_API_KEY3`), `ANTHROPIC_API_KEY`, `TAVILY_WRITER_MODEL`, `TAVILY_TRANSLATOR_MODEL`, `LOOKBACK_DAYS`
 
-### 5. Article Reader Agent — `article-reader-agent/`
+### 5. Article Reader Agent — `agents/active/article-reader-agent/`
 
 Enrichment-only — no newsletter HTML. Collects URLs from the four core agents' outputs, optionally widens with Tavily/DDG search, fetches full body text via Jina Reader (then Firecrawl, then local cache).
 
@@ -311,7 +339,7 @@ flowchart LR
 **Run:** `cd article-reader-agent && python3 run.py`
 **Env:** `JINA_API_KEY` (+ `JINA_API_KEY2`), `FIRECRAWL_API_KEY`, `TAVILY_API_KEY`, `SKIP_ARTICLE_READING=true` to disable, `ARTICLE_READ_TIMEOUT`
 
-### 6. Exa News Agent — `exa-news-agent/`
+### 6. Exa News Agent — `agents/inactive/exa-news-agent/`
 
 Semantic search for niche/technical AI stories that broad search misses. 10 hand-tuned queries.
 
@@ -325,7 +353,7 @@ flowchart LR
 **Run:** `cd exa-news-agent && python3 run.py`
 **Env:** `EXA_API_KEY` (+ `EXA_API_KEY2`), `LOOKBACK_DAYS`
 
-### 7. NewsAPI Agent — `newsapi-agent/`
+### 7. NewsAPI Agent — `agents/inactive/newsapi-agent/`
 
 Structured wire-service feed for mainstream coverage. 8 queries, vendor classification, dedup.
 
@@ -340,7 +368,7 @@ flowchart LR
 **Run:** `cd newsapi-agent && python3 run.py`
 **Env:** `NEWSAPI_KEY` (+ `NEWSAPI_KEY2`), `LOOKBACK_DAYS`
 
-### 8. YouTube News Agent — `youtube-news-agent/`
+### 8. YouTube News Agent — `agents/active/youtube-news-agent/`
 
 Video discovery: ~25 curated channels (Hebrew + vendor) + 4 targeted searches, stats, quality filter, vendor classify. Renders directly in the merged HTML's video section. 7-day lookback (independent of core 3-day default).
 
@@ -356,7 +384,7 @@ flowchart LR
 **Run:** `cd youtube-news-agent && python3 run.py`
 **Env:** `YOUTUBE_API_KEY` + optional `YOUTUBE_API_KEY2` (multi-key rotation on 403/429), `LOOKBACK_DAYS`. `GOOGLE_API_KEY*` is **not** an YT fallback any more — each Google API key is locked to a single service via per-key API restrictions (verified 2026-05-06).
 
-### 9. GitHub Trending Agent — `github-trending-agent/`
+### 9. GitHub Trending Agent — `agents/active/github-trending-agent/`
 
 Open-source AI momentum: 6 trending search queries + 15 tracked repos for release polling. No LLM.
 
@@ -370,7 +398,7 @@ flowchart LR
 **Run:** `cd github-trending-agent && python3 run.py`
 **Env:** `GITHUB_TOKEN` (optional — for higher rate limits), `LOOKBACK_DAYS`
 
-### 10. Twitter Agent — `twitter-agent/` (active, free)
+### 10. Twitter Agent — `agents/active/twitter-agent/` (active, free)
 
 Direct X/Twitter GraphQL scrape using a logged-in session's `auth_token` + `ct0` cookies — no paid API. Pulls recent posts from a curated list of AI leaders (Sam Altman, Yann LeCun, Greg Brockman, François Chollet, Simon Willison, etc.) plus a trending AI search. Output schema matches the xAI agent so the merger and frontend treat them interchangeably.
 
@@ -379,14 +407,14 @@ Direct X/Twitter GraphQL scrape using a logged-in session's `auth_token` + `ct0`
 **Run:** `cd twitter-agent && python3 run.py`
 **Env:** `TWITTER_AUTH_TOKEN`, `TWITTER_CT0` (cookies — see [How to get them](#how-to-get-twitter-cookies)), `LOOKBACK_DAYS`
 
-### 11. xAI Twitter Agent — `xai-twitter-agent/` (disabled by default)
+### 11. xAI Twitter Agent — `agents/inactive/xai-agents/active/twitter-agent/` (disabled by default)
 
 Same role as `twitter-agent` but uses Grok-4 + xAI's `x_search` tool instead of scraping. Disabled in CI (`--skip xai`) because it costs ≈ $0.35/run with no quality advantage over the free scraper. Re-enable by removing `--skip xai` if X cookies become unobtainable.
 
 **Run:** `cd xai-twitter-agent && python3 run.py`
 **Env:** `XAI_API_KEY`, `LOOKBACK_DAYS`
 
-### 12. Merger Agent — `merger-agent/`
+### 12. Merger Agent — `agents/active/merger-agent/`
 
 Final synthesis. Loads the latest of every per-agent JSON output, runs them through Claude (one merge call + three parallel translation calls), and renders the bilingual HTML.
 
@@ -469,14 +497,14 @@ Output: `private/qa-evaluator-agent/output/<DATE>/report.md` + `report.json`. Se
 |------|-------------|
 | `<agent>/output/<YYYY-MM-DD>/briefing_<HHMMSS>.{html,json}` | Standalone briefing per core agent |
 | `<agent>/output/<YYYY-MM-DD>/usage_<HHMMSS>.json` | Per-call token + cost log (LLM agents only) |
-| `article-reader-agent/output/.../articles_*.json` | Full article body text for merger context |
-| `exa-news-agent/output/.../exa_*.json` | Supplemental sources |
-| `newsapi-agent/output/.../newsapi_*.json` | Supplemental sources |
-| `youtube-news-agent/output/.../youtube_*.json` | Direct-render video items |
-| `github-trending-agent/output/.../github_*.json` | Direct-render repo items |
-| `twitter-agent/output/.../briefing_*.json` | People highlights + trending posts |
-| `merger-agent/output/.../merged_*.{html,json}` | Final merged briefing |
-| `merger-agent/output/.../.via_subscription.done` | Marker — written when subscription path was used; signals CI to skip |
+| `agents/active/article-reader-agent/output/.../articles_*.json` | Full article body text for merger context |
+| `agents/inactive/exa-news-agent/output/.../exa_*.json` | Supplemental sources |
+| `agents/inactive/newsapi-agent/output/.../newsapi_*.json` | Supplemental sources |
+| `agents/active/youtube-news-agent/output/.../youtube_*.json` | Direct-render video items |
+| `agents/active/github-trending-agent/output/.../github_*.json` | Direct-render repo items |
+| `agents/active/twitter-agent/output/.../briefing_*.json` | People highlights + trending posts |
+| `agents/active/merger-agent/output/.../merged_*.{html,json}` | Final merged briefing |
+| `agents/active/merger-agent/output/.../.via_subscription.done` | Marker — written when subscription path was used; signals CI to skip |
 
 ### Published (the public contract)
 
@@ -512,7 +540,7 @@ The site at `kobyal.github.io/ai-news-briefing/data/<date>.json` is the maintain
 
 Triggered by **`workflow_dispatch` only** — no cron is currently active in the workflow file. The pipeline runs end-to-end (~18 minutes) and commits outputs back to `main` (which deploys GitHub Pages).
 
-**Skip-window** (added 2026-04-24): step 1 checks for `merger-agent/output/<today>/.via_subscription.done`. If the marker is < 5 hours old, every subsequent step short-circuits with `if: steps.skip_check.outputs.skip != 'true'`. This lets the maintainer run via subscription locally (zero cost) and have CI gracefully no-op the same morning.
+**Skip-window** (added 2026-04-24): step 1 checks for `agents/active/merger-agent/output/<today>/.via_subscription.done`. If the marker is < 5 hours old, every subsequent step short-circuits with `if: steps.skip_check.outputs.skip != 'true'`. This lets the maintainer run via subscription locally (zero cost) and have CI gracefully no-op the same morning.
 
 **Modes** (via workflow_dispatch input):
 | Mode | What runs |
@@ -554,7 +582,7 @@ unset ANTHROPIC_API_KEY
 export MERGER_VIA_CLAUDE_CODE=1
 python3 run_all.py --skip xai
 DATE=$(date +%Y-%m-%d)
-cp $(ls -t merger-agent/output/${DATE}/merged_*.html | head -1) docs/index.html
+cp $(ls -t agents/active/merger-agent/output/${DATE}/merged_*.html | head -1) docs/index.html
 python3 publish_data.py
 git add -f docs/ && git commit -m "briefing: ${DATE}" && git push
 ```
@@ -593,11 +621,11 @@ Common changes a fork might want:
 | Goal | Where |
 |------|-------|
 | Drop an agent | `python3 run_all.py --skip <name>` or remove its block from the workflow |
-| Add an agent | Create `<name>-news-agent/` (mirror an existing one), register in `run_all.py::AGENTS`, add `<name>_*.json` discovery to `merger-agent/merger_agent/pipeline.py` if it should feed the merge prompt, or to `publish_data.py` if it renders directly |
+| Add an agent | Create `<name>-news-agent/` (mirror an existing one), register in `run_all.py::AGENTS`, add `<name>_*.json` discovery to `agents/active/merger-agent/merger_agent/pipeline.py` if it should feed the merge prompt, or to `publish_data.py` if it renders directly |
 | Change the merger model | `MERGER_WRITER_MODEL=claude-haiku-4-5` (saves ~$0.50/run, some quality drop) |
 | Change vendor coverage | `shared/vendors.py` — taxonomy used by all classifiers |
-| Change YouTube channel list | `youtube-news-agent/youtube_news_agent/pipeline.py::AI_CHANNELS` |
-| Change RSS feed list | `rss-news-agent/rss_news_agent/feeds.py` |
+| Change YouTube channel list | `agents/active/youtube-news-agent/youtube_news_agent/pipeline.py::AI_CHANNELS` |
+| Change RSS feed list | `agents/active/rss-news-agent/rss_news_agent/feeds.py` |
 | Disable Hebrew | Skip the translator step or set `MERGER_TRANSLATOR_MODEL=` empty (results in EN-only output) |
 
 ---
@@ -631,7 +659,7 @@ Stories not matching a specific vendor are classified as `Other`.
 
 | Var | Used by |
 |-----|---------|
-| `GOOGLE_API_KEY` (+ `GOOGLE_API_KEY2`) | ADK / Gemini. Each Google Cloud API key is locked to one service via per-key API restrictions; the kobytest secondary acts as the Gemini fallback (subprocess relaunch on quota error — `adk-news-agent/run.py`). |
+| `GOOGLE_API_KEY` (+ `GOOGLE_API_KEY2`) | ADK / Gemini. Each Google Cloud API key is locked to one service via per-key API restrictions; the kobytest secondary acts as the Gemini fallback (subprocess relaunch on quota error — `agents/active/adk-news-agent/run.py`). |
 | `GOOGLE_GENAI_MODEL` | ADK |
 | `PERPLEXITY_API_KEY` | Perplexity (Sonar) |
 | `PERPLEXITY_SEARCH_MODEL` / `_WRITER_MODEL` / `_TRANSLATOR_MODEL` | Perplexity |
@@ -644,7 +672,7 @@ Stories not matching a specific vendor are classified as `Other`.
 | `TAVILY_WRITER_MODEL` / `TAVILY_TRANSLATOR_MODEL` | Tavily |
 | `EXA_API_KEY` (+ `EXA_API_KEY2`) | Exa |
 | `NEWSAPI_KEY` (+ `NEWSAPI_KEY2`) | NewsAPI |
-| `YOUTUBE_API_KEY` (+ `YOUTUBE_API_KEY2`) | YouTube. Multi-key rotation on HTTP 403/429 (`youtube-news-agent/.../pipeline.py::_yt_get`, `publish_data.py::_yt_search`). |
+| `YOUTUBE_API_KEY` (+ `YOUTUBE_API_KEY2`) | YouTube. Multi-key rotation on HTTP 403/429 (`agents/active/youtube-news-agent/.../pipeline.py::_yt_get`, `publish_data.py::_yt_search`). |
 | `GITHUB_TOKEN` | GitHub Trending (optional) |
 | `XAI_API_KEY` | xAI Grok agent |
 | `JINA_API_KEY` (+ `JINA_API_KEY2`) | Article Reader |
@@ -675,7 +703,7 @@ Cookies expire when X invalidates the session (re-login, password change, suspic
 
 - **Per-run cost tracking** — every LLM-using agent appends each call to a usage log and writes `usage_<HHMMSS>.json` to its output dir. Multi-run days preserve every run's data separately.
 - **Fallback tracker** — `shared/fallback_tracker.py` writes one JSON line per key rotation to `/tmp/_fallbacks.jsonl`, persisted to `docs/data/_fallbacks_<date>.jsonl` after the run. The daily email surfaces aggregated counts in a `FALLBACKS FIRED` panel.
-- **Three-layer URL defense** — (a) merger system prompt forbids inventing URLs, (b) `merger-agent/pipeline.py` drops any URL not present in source briefings, (c) `publish_data.py` drops URLs whose page title shares zero keywords with the story headline. Prevents cross-story URL mis-assignment.
+- **Three-layer URL defense** — (a) merger system prompt forbids inventing URLs, (b) `agents/active/merger-agent/pipeline.py` drops any URL not present in source briefings, (c) `publish_data.py` drops URLs whose page title shares zero keywords with the story headline. Prevents cross-story URL mis-assignment.
 - **Data-quality audit** — `publish_data.py::_audit_data_quality()` flags EN/HE-translation mismatches, zero-URL stories, and orphan items; the email's `PROBLEMS` banner surfaces them daily so silent regressions can't hide.
 - **Image fallback** — `shared/image_fallback.py` covers vendor-logo / OG-image / GitHub-org-logo paths with a denylist for generic-looking org pages (universities, big-firm GH orgs).
 - **Dashboard MTD** — `private/dashboard_mtd.json` (gitignored, mirrored to GH secret `DASHBOARD_MTD_JSON`) carries the month-to-date numbers from each provider dashboard. Email displays alongside live today/7-day totals computed from the per-agent usage logs.
@@ -690,8 +718,8 @@ Plain-English definitions of terms that appear throughout the codebase.
 |------|---------|
 | **Agent** | An independent collector or processor — its own folder (`<name>-news-agent/`), own `requirements.txt`, own `run.py`. Agents talk to each other only by writing JSON files to disk. |
 | **Vendor** | A company a story is *about* (Anthropic, OpenAI, Google, AWS, Meta, etc.). Defined in `shared/vendors.py`. The merger uses this for grouping and the UI uses it for badge colors. |
-| **Merger** | The final agent. Reads every other agent's latest JSON output, asks Claude to merge + dedupe + rank into ~20 stories, then runs three parallel translation calls to produce Hebrew copy. Code: `merger-agent/`. |
-| **Marker file** | `merger-agent/output/<date>/.via_subscription.done`. Written by the merger when it ran on the Claude Max subscription path. Read by CI to skip a redundant daily run if a local run already happened in the last 5 hours. |
+| **Merger** | The final agent. Reads every other agent's latest JSON output, asks Claude to merge + dedupe + rank into ~20 stories, then runs three parallel translation calls to produce Hebrew copy. Code: `agents/active/merger-agent/`. |
+| **Marker file** | `agents/active/merger-agent/output/<date>/.via_subscription.done`. Written by the merger when it ran on the Claude Max subscription path. Read by CI to skip a redundant daily run if a local run already happened in the last 5 hours. |
 | **Subscription path** | Setting `MERGER_VIA_CLAUDE_CODE=1` routes all Anthropic calls through the `claude -p` CLI (using Claude Max OAuth credentials). Marginal cost per Anthropic call drops to $0. Implementation: `shared/anthropic_cc.py`. |
 | **`LOOKBACK_DAYS`** | How far back collectors search. Default 3 (with vendor RSS overridden to 7). Affects which stories enter the system. |
 | **Aggregator URL** | A multi-topic blog post (e.g. "AWS Weekly Roundup: ... and more") that mentions a story in passing. The URL filter drops these even when the host matches the vendor's first-party domain. |

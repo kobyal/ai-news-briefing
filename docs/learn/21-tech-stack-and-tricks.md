@@ -40,7 +40,7 @@ Solution: write a marker file at the end of the local run. CI's first step reads
 - name: Check for recent local subscription run
   id: skip_check
   run: |
-    MARKER="merger-agent/output/$(date -u +'%Y-%m-%d')/.via_subscription.done"
+    MARKER="agents/active/merger-agent/output/$(date -u +'%Y-%m-%d')/.via_subscription.done"
     if [ -f "$MARKER" ] && [ "$(age_of $MARKER)" -le "$((5*3600))" ]; then
       echo "skip=true" >> "$GITHUB_OUTPUT"
     else
@@ -268,10 +268,10 @@ For completeness, things that were tried and removed:
 |------|----------------------|
 | `shared/anthropic_cc.py` | The subscription-path wrapper. ~60 lines that make $0/run runs possible. |
 | `shared/fallback_tracker.py` | The visibility layer. Trivially small, hugely valuable. |
-| `merger-agent/merger_agent/prompts.py` | ~200 lines of merger prompt engineering. Every line has a regression story. |
+| `agents/active/merger-agent/merger_agent/prompts.py` | ~200 lines of merger prompt engineering. Every line has a regression story. |
 | `publish_data.py` | The post-processing layer. Each rule corresponds to a real production bug. |
-| `twitter-agent/twitter_agent/pipeline.py` | The cookies-based scrape. Worth reading just to see the GraphQL trick. |
-| `rss-news-agent/rss_news_agent/feeds.py` | The 75+ feed registry + fetcher dispatcher. |
+| `agents/active/twitter-agent/twitter_agent/pipeline.py` | The cookies-based scrape. Worth reading just to see the GraphQL trick. |
+| `agents/active/rss-news-agent/rss_news_agent/feeds.py` | The 75+ feed registry + fetcher dispatcher. |
 | `send_email.py` | The visibility tower. ~1700 lines that protect everything else. |
 
 ## Where to go next

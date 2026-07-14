@@ -1,6 +1,6 @@
 # 10 — Agent: Exa
 
-> **⚠️ RETIRED 2026-05-03.** The Exa agent was dropped from `run_all.py` after an audit found Exa's stories had a ~5% pass-rate through the merger — its niche semantic-search results were almost always already covered by Tavily / Perplexity / RSS. The directory `exa-news-agent/` and the linked NotebookLM video remain in the repo for historical reference, but Exa is no longer part of the daily pipeline. See [04 — Collection pattern](./04-collection-pattern.md) for the current 8-agent lineup.
+> **⚠️ RETIRED 2026-05-03.** The Exa agent was dropped from `run_all.py` after an audit found Exa's stories had a ~5% pass-rate through the merger — its niche semantic-search results were almost always already covered by Tavily / Perplexity / RSS. The directory `agents/inactive/exa-news-agent/` and the linked NotebookLM video remain in the repo for historical reference, but Exa is no longer part of the daily pipeline. See [04 — Collection pattern](./04-collection-pattern.md) for the current 8-agent lineup.
 
 ## TL;DR
 
@@ -57,7 +57,7 @@ python3 run.py
 
 ## Output
 
-- `exa-news-agent/output/<date>/exa_<HHMMSS>.json`
+- `agents/inactive/exa-news-agent/output/<date>/exa_<HHMMSS>.json`
 
 Shape:
 
@@ -102,7 +102,7 @@ The queries are deliberately not vendor-specific. ADK and Tavily already do vend
 Exa's free tier is small — `EXA_API_KEY` (kobyal) and `EXA_API_KEY2` (kobytest) provide two separate quotas. Rotation is handled inline:
 
 ```python
-# exa-news-agent/exa_news_agent/pipeline.py — pattern
+# agents/inactive/exa-news-agent/exa_news_agent/pipeline.py — pattern
 try:
     results = exa.search(query, ...)
 except QuotaError:

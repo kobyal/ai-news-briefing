@@ -56,7 +56,7 @@ The catch: `claude -p` is an interactive-style CLI. It doesn't have a stable "AP
 When the merger finishes successfully on the subscription path, it writes:
 
 ```
-merger-agent/output/<YYYY-MM-DD>/.via_subscription.done
+agents/active/merger-agent/output/<YYYY-MM-DD>/.via_subscription.done
 ```
 
 The CI workflow's first step reads this. If the marker is < 5 hours old, every subsequent step short-circuits — CI no-ops the day. This lets the maintainer run locally on subscription (zero spend) and have CI gracefully skip without manual intervention. Re-explained in [03-trigger-and-runtime](./03-trigger-and-runtime.md).
@@ -133,7 +133,7 @@ In order of size:
 |------|---------------|
 | `shared/anthropic_cc.py` | Subscription-path wrapper. |
 | `shared/fallback_tracker.py` | Logs every rotation event. |
-| `tavily-news-agent/.../searcher.py` | The 3-key cascade implementation. |
+| `agents/active/tavily-news-agent/.../searcher.py` | The 3-key cascade implementation. |
 | `shared/article_reader.py` | The Jina → Firecrawl → cache chain. |
 | `docs/COSTS.md` | Live cost picture, refresh recipe. |
 | `docs/FALLBACKS.md` | Live fallback contract. |

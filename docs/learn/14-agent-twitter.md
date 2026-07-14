@@ -80,7 +80,7 @@ python3 run.py
 
 ## Output
 
-- `twitter-agent/output/<date>/twitter_<HHMMSS>.json`
+- `agents/active/twitter-agent/output/<date>/twitter_<HHMMSS>.json`
 
 Shape (matches xAI agent so they're interchangeable):
 
@@ -112,7 +112,7 @@ The merger reads `people_highlights` and `trending_posts` and renders them direc
 
 ## The curated AI leaders list
 
-In `twitter-agent/twitter_agent/pipeline.py::PEOPLE`. Examples:
+In `agents/active/twitter-agent/twitter_agent/pipeline.py::PEOPLE`. Examples:
 
 - `@sama` (Sam Altman)
 - `@karpathy` (Andrej Karpathy)
@@ -132,7 +132,7 @@ X's search GraphQL endpoint (`SearchTimeline`) has its query_id rotated periodic
 1. Open `x.com` and run a search.
 2. Open DevTools → Network → filter by `SearchTimeline`.
 3. Copy the `query_id` from the URL.
-4. Update the constant in `twitter-agent/twitter_agent/pipeline.py`.
+4. Update the constant in `agents/active/twitter-agent/twitter_agent/pipeline.py`.
 
 History so far: rotation observed twice in 6 months (last 2026-04-27). Both times the people path stayed working — only search broke.
 

@@ -160,16 +160,20 @@ def _generate_per_story_audio(
     return {"generated": generated, "skipped": skipped, "failed": failed, "expected": expected}
 
 
-def _translate_he(texts: list) -> list:
+def _translate_he(texts: list, max_chars: int = 500) -> list:
     """Translate a batch of texts to Hebrew.
 
     Subscription (claude -p) FIRST — free, no credit ceiling — then the
     pay-per-use API key as fallback (CI / no claude -p). Order matters: API-first
     silently blanked all post_he once the key ran out of credits (2026-06-15).
+
+    `max_chars` caps each item's length in the prompt. Default 500 suits short
+    fields (titles/summaries/tweets); pass a larger value for long fields like
+    story details (~1.4k chars) so the HE backfill doesn't clip the body.
     """
     if not texts:
         return []
-    numbered = "\n".join(f"{i+1}. {(t or '')[:500]}" for i, t in enumerate(texts))
+    numbered = "\n".join(f"{i+1}. {(t or '')[:max_chars]}" for i, t in enumerate(texts))
     prompt = (f"Translate these {len(texts)} items to Hebrew. "
               "Return ONLY the translations, numbered the same way, no explanations:\n\n" + numbered)
 
@@ -243,6 +247,37 @@ def _translate_he(texts: list) -> list:
         except Exception as e:
             print(f"  Claude translate (API) error: {e}")
     return [""] * len(texts)
+
+def _backfill_missing_he(news_items: list, merger: dict) -> int:
+    """Fill any missing Hebrew field (headline/summary/detail) whose English
+    source exists — a deterministic backstop against the merger LLM omitting
+    chunks of briefing_he. Updates BOTH the per-item `*_he` field and the
+    parallel `briefing_he.*_he` array so the published JSON and audio stay in
+    sync. Translates ONE item at a time (not a big batch) so a long combined
+    prompt can't re-introduce the same mid-list truncation this guards against.
+    """
+    bhe = merger.setdefault("briefing_he", {})
+    if not isinstance(bhe, dict):
+        bhe = merger["briefing_he"] = {}
+    filled = 0
+    for en_key, he_key, arr_key in (("headline", "headline_he", "headlines_he"),
+                                    ("summary", "summary_he", "summaries_he"),
+                                    ("detail", "detail_he", "details_he")):
+        arr = list(bhe.get(arr_key) or [])
+        if len(arr) < len(news_items):
+            arr += [""] * (len(news_items) - len(arr))
+        for _i, _it in enumerate(news_items):
+            en = (_it.get(en_key) or "").strip()
+            if en and not (_it.get(he_key) or "").strip():
+                he = (_translate_he([en], max_chars=4000) or [""])[0].strip()
+                if he:
+                    _it[he_key] = he
+                    arr[_i] = he
+                    filled += 1
+        bhe[arr_key] = arr
+    if filled:
+        print(f"  HE backfill: translated {filled} missing Hebrew field(s) the merger omitted")
+    return filled
 
 date_str = datetime.utcnow().strftime("%Y-%m-%d")
 
@@ -2363,6 +2398,14 @@ for _i, _item in enumerate(_news_items):
         _item["summary_he"] = _summaries_he[_i]
     if _i < len(_details_he) and not _item.get("detail_he"):
         _item["detail_he"] = _details_he[_i]
+
+# HE completeness backstop: the merger emits briefing_he.*_he as parallel arrays
+# inside its LLM JSON, and occasionally omits a contiguous chunk (2026-07-14:
+# details_he[6:12] came back empty → those /story pages showed a Hebrew headline
+# over an English body). Nothing downstream guaranteed completeness. Translate any
+# remaining gap here — BEFORE audio gen so backfilled items also get HE audio —
+# updating both the per-item field and the parallel briefing_he array (published).
+_backfill_missing_he(_news_items, merger)
 
 _audio_stats = _generate_per_story_audio(
     _news_items, _audio_dir, date_str,

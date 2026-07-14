@@ -488,7 +488,6 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
   // the headline's distinctive words. Vendor name is included automatically since it's
   // in the headline. Falls back to vendor-only match if keyword filter yields <1 item
   // (defensive — if a story headline shares only stop-words with everything else).
-  const kws = _storyKeywords(headline);
   const v = vendor.toLowerCase();
   // Community items have BODY text that often name-drops vendors as side context
   // ("Anthropic's stronger model closes vs DeepSeek..." — that mention of DeepSeek
@@ -532,12 +531,6 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
     "tesla": ["tesla"],
     "cerebras": ["cerebras"],
   };
-  const vendorKey = vendor.toLowerCase();
-  const vAliases = vendorAliases[vendorKey] || [vendorKey];
-  // Story has a known vendor → enforce vendor-anchor on every pulse/X/Reddit
-  // candidate. (Stories tagged "Other" or with an unknown vendor fall back to
-  // the looser keyword-overlap rule, otherwise they'd never match anything.)
-  const STORY_HAS_KNOWN_VENDOR = vendorKey in vendorAliases;
   // Flat set of all vendor aliases — used to identify "generic vendor keywords"
   // like "google", "openai", "claude" that shouldn't count as subject overlap
   // on their own (every vendor post mentions the vendor).
@@ -546,37 +539,37 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
   const ALL_VENDOR_WORDS = expandVendorWords(
     Object.values(vendorAliases).flat().concat(["claude","codex","gpt"])
   );
-  const strongMatch = (text: string): boolean => {
+  // Relevance score of a candidate against a GIVEN story = count of distinctive
+  // subject tokens shared, or -1 if ineligible. Parameterised by (headline,
+  // vendor) — not just the current story — so we can also score the candidate
+  // against every OTHER story that day and keep it only where it fits BEST (see
+  // `bestMatch`). A pulse that merely name-drops this story's product in a list
+  // ("Luna, Terra, Sol") but is really about another story then can't bleed in.
+  // (2026-07-14: the "paradox of choice" pulse matched the price-war story on
+  // the single incidental token "luna" while truly belonging to the ChatGPT-
+  // overhaul story, which it matched on 2 tokens.)
+  const scoreForStory = (text: string, hl: string, vnd: string): number => {
     const t = text.toLowerCase();
-    const matched = kws.filter(k => wordHit(t, k));
-    if (matched.length === 0) return false;
-    // Subject tokens = the story-specific words (not the vendor name itself).
-    // An OpenAI tweet matching only ["openai"] is generic; needs to share an
-    // actual subject token with the story (e.g. "alliance", "voice", "images").
+    const matched = _storyKeywords(hl).filter(k => wordHit(t, k));
+    if (matched.length === 0) return -1;
+    // Subject tokens = story-specific words, excluding the vendor name itself
+    // (every vendor post mentions the vendor; that isn't topical overlap).
     const subjectTokens = matched.filter(k => !ALL_VENDOR_WORDS.has(k));
-    const hasVendor = vAliases.some((a) => wordHit(t, a));
-    // VENDOR-ANCHOR GUARD (2026-05-10): when the story has a known vendor, the
-    // candidate MUST mention that vendor (or one of its aliases). Otherwise an
-    // RSAC cybersecurity pulse with body "Chrome extension / signed-in
-    // sessions / access" rang up 3+ subject hits against an OpenAI Codex
-    // Chrome-extension story and slipped through. Generic story tokens
-    // ("chrome", "extension", "session", "access") collide with whole product
-    // categories — vendor anchor is the only reliable disambiguator.
-    if (STORY_HAS_KNOWN_VENDOR) {
-      if (!hasVendor) return false;
-      // Vendor present AND at least one subject token shared with the story.
-      if (subjectTokens.length >= 1) return true;
-      // Vendor-only mention (no subject overlap) is too weak — every vendor
-      // tweet mentions the vendor. Reject.
-      return false;
+    const vk = vnd.toLowerCase();
+    const va = vendorAliases[vk] || [vk];
+    const hasVendor = va.some((a) => wordHit(t, a));
+    // VENDOR-ANCHOR GUARD (2026-05-10): known-vendor stories require the vendor
+    // (or alias) present AND ≥1 subject token. Generic story tokens ("chrome",
+    // "session", "access") otherwise collide with whole product categories, so
+    // the vendor anchor is the only reliable disambiguator.
+    if (vk in vendorAliases) {
+      return (hasVendor && subjectTokens.length >= 1) ? subjectTokens.length : -1;
     }
-    // Story has no known vendor ("Other" / generic) — fall back to the legacy
-    // keyword-overlap rule so these stories don't end up with empty community
-    // sections every time.
-    if (subjectTokens.length >= 3) return true;
-    if (hasVendor && subjectTokens.length >= 1) return true;
-    if (subjectTokens.some(k => /[0-9]/.test(k))) return true;
-    return false;
+    // "Other"/unknown vendor — looser legacy rule so these aren't always empty.
+    if (subjectTokens.length >= 3) return subjectTokens.length;
+    if (hasVendor && subjectTokens.length >= 1) return subjectTokens.length;
+    if (subjectTokens.some(k => /[0-9]/.test(k))) return subjectTokens.length;
+    return -1;
   };
 
   // Reject items explicitly tagged as a DIFFERENT vendor than this story — they
@@ -612,6 +605,21 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
   // Match all 3 community pools against the story. Used for today's data first;
   // re-used for yesterday's data when today yields nothing.
   const matchPools = (d: DayData) => {
+    // Best-match gate: a candidate shows on THIS story only if its subject-
+    // overlap score here is at least as high as for every other story that day.
+    // Eligibility (score ≥ 1: vendor-anchored + ≥1 subject token) still applies;
+    // the cross-story check just prevents an item whose real home is a different
+    // story from bleeding in on one weak shared token. Ties (equally-good homes)
+    // still show on both — intentional.
+    const dayStories = d.stories || [];
+    const bestMatch = (text: string): boolean => {
+      const here = scoreForStory(text, headline, vendor);
+      if (here < 1) return false;
+      for (const s of dayStories) {
+        if (scoreForStory(text, s.headline || "", s.vendor || "") > here) return false;
+      }
+      return true;
+    };
     // Build x posts first so we can cross-dedup pulse items against them.
     // A pulse item that re-headlines the same tweet as a twitter.people entry
     // would otherwise appear twice: once as 💬 (pulse) and once as 𝕏 (X post).
@@ -627,7 +635,7 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
         const text = `${p.post || p.text || ""} ${p.handle || ""} ${p.org || ""}`;
         // vendorOK uses related_vendor tagged by publish_data — blocks posts that
         // are explicitly single-vendor but wrong vendor (e.g. Google post on Anthropic story).
-        if (vendorOK({ item: p }) && strongMatch(text)) x.push(p);
+        if (vendorOK({ item: p }) && bestMatch(text)) x.push(p);
       }
     }
     const xUrlSet = new Set(x.map(p => stripQuery(p.url || "")));
@@ -638,10 +646,10 @@ function CommunityLinks({ vendor, headline, storyUrls, data, isHe }: { vendor: s
       vendorOK(entry)
       && !storyUrlSet.has(stripQuery((entry.item as { source_url?: string }).source_url || ""))
       && !xUrlSet.has(stripQuery((entry.item as { source_url?: string }).source_url || ""))
-      && strongMatch(`${entry.item.headline} ${entry.item.body || ""}`)
+      && bestMatch(`${entry.item.headline} ${entry.item.body || ""}`)
     );
     const reddit = (d.top_reddit || []).filter(
-      (p: { title?: string; related_vendor?: string }) => vendorOK({ item: p }) && strongMatch(p.title || "")
+      (p: { title?: string; related_vendor?: string }) => vendorOK({ item: p }) && bestMatch(p.title || "")
     );
     return { pulseItems: pulse, xPosts: x, redditPosts: reddit };
   };

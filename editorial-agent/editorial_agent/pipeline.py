@@ -18,7 +18,7 @@ from typing import Optional
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 
-_ROOT = Path(__file__).parent.parent.parent  # repo root
+_ROOT = next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])  # repo root
 _DOCS_DATA = _ROOT / "docs" / "data"
 _OUTPUT_DIR = Path(__file__).parent.parent / "output"
 

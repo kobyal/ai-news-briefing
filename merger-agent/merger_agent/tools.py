@@ -8,7 +8,7 @@ from datetime import datetime
 
 import sys as _sys
 from pathlib import Path as _Path
-_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent.parent))
+_sys.path.insert(0, str(next((_p for _p in __import__("pathlib").Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), __import__("pathlib").Path(__file__).resolve().parents[2])))
 from shared.json_repair import parse_json  # noqa: E402
 
 
@@ -372,7 +372,7 @@ def _build_html(tldr, news_items, community_pulse, topic,
     try:
         import sys as _sys
         from pathlib import Path as _Path
-        _sys.path.insert(0, str(_Path(__file__).parent.parent.parent))
+        _sys.path.insert(0, str(next((_p for _p in __import__("pathlib").Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), __import__("pathlib").Path(__file__).resolve().parents[2])))
         from shared.channels import youtube_channels as _yt_channels, podcasts as _podcasts
     except Exception:
         _yt_channels = lambda: []

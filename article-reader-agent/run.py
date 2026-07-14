@@ -3,8 +3,8 @@
 import sys
 from pathlib import Path
 
-# Add repo root for shared module
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add repo root for shared module (walk up to the dir containing shared/)
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[1])))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from article_reader_agent.pipeline import run_pipeline

@@ -5,10 +5,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Bootstrap repo root so shared/ imports resolve at any depth.
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[1])))
+from shared.repo_root import find_dir  # noqa: E402
+_PX = find_dir("perplexity-news-agent")
+
 
 def _load_env():
-    for candidate in [Path(__file__).parent / ".env",
-                      Path(__file__).parent.parent / "perplexity-news-agent" / ".env"]:
+    for candidate in [Path(__file__).parent / ".env"] + ([_PX / ".env"] if _PX else []):
         if candidate.exists():
             for line in candidate.read_text().splitlines():
                 line = line.strip()

@@ -19,7 +19,7 @@ from .searcher import fetch_all_vendor_news, Article
 from .tools import _parse
 
 # Shared subscription path — shells to `claude -p` when MERGER_VIA_CLAUDE_CODE=1
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
 from shared import anthropic_cc  # noqa: E402
 from shared.pricing import estimate_cost  # noqa: E402
 

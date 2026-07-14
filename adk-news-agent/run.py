@@ -65,7 +65,7 @@ def _run_with_fallback() -> None:
             # Surface the rotation in the daily email's fallback panel.
             try:
                 import sys as _sys
-                _repo_root = Path(__file__).resolve().parent.parent
+                _repo_root = next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[1])
                 if str(_repo_root) not in _sys.path:
                     _sys.path.insert(0, str(_repo_root))
                 from shared.fallback_tracker import track

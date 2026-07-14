@@ -20,7 +20,7 @@ from .feeds import fetch_all, fetch_subreddit_icon, VENDOR_KEYWORDS
 from .tools import _parse
 
 # Shared subscription path — shells to `claude -p` when MERGER_VIA_CLAUDE_CODE=1
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
 from shared import anthropic_cc  # noqa: E402
 from shared.pricing import estimate_cost  # noqa: E402
 
@@ -30,7 +30,7 @@ _TRANSLATOR_MODEL = lambda: os.environ.get("RSS_TRANSLATOR_MODEL", "claude-haiku
 _LOOKBACK_DAYS    = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 _TODAY            = lambda: datetime.now().strftime("%B %d, %Y")
 
-_ROOT = Path(__file__).parent.parent.parent
+_ROOT = next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])
 
 
 # Usage tracking

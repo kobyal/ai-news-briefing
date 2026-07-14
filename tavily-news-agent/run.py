@@ -5,9 +5,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Load .env — check local first, then sibling perplexity-news-agent
+# Bootstrap repo root so shared/ imports resolve at any depth.
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[1])))
+from shared.repo_root import find_dir  # noqa: E402
+
+# Load .env — check local first, then sibling perplexity-news-agent (wherever it lives)
 _here = Path(__file__).parent
-for _candidate in [_here / ".env", _here.parent / "perplexity-news-agent" / ".env"]:
+_px = find_dir("perplexity-news-agent")
+for _candidate in [_here / ".env"] + ([_px / ".env"] if _px else []):
     if _candidate.exists():
         from dotenv import load_dotenv
         load_dotenv(_candidate)

@@ -8,7 +8,7 @@ from pathlib import Path
 
 # Allow imports from repo root (shared/) and this agent's package
 sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[1])))
 
 from editorial_agent import run_pipeline
 

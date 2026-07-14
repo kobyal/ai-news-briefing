@@ -26,7 +26,7 @@ import requests
 # Bootstrap repo root so shared/ is importable.
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
 from shared.pricing import estimate_cost  # noqa: E402
 from shared import anthropic_cc  # noqa: E402
 

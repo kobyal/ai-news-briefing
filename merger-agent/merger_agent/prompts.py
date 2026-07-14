@@ -1,5 +1,5 @@
 """Prompt strings for the Merger pipeline."""
-import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+import sys; sys.path.insert(0, str(next((_p for _p in __import__("pathlib").Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), __import__("pathlib").Path(__file__).resolve().parents[2])))
 from shared.vendors import VENDOR_ENUM
 from shared.he_glossary import HE_TERM_GLOSSARY
 

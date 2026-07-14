@@ -5,9 +5,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Bootstrap repo root so shared/ imports resolve at any depth.
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[1])))
+from shared.repo_root import repo_root, find_dir  # noqa: E402
+
 # Load .env from this directory (or repo root)
 def _load_env():
-    for candidate in [Path(__file__).parent / ".env", Path(__file__).parent.parent / ".env"]:
+    for candidate in [Path(__file__).parent / ".env", repo_root() / ".env"]:
         if candidate.exists():
             for line in candidate.read_text().splitlines():
                 line = line.strip()
@@ -20,8 +24,9 @@ def _load_env():
 
 _load_env()
 
-# Also check perplexity-news-agent/.env for the API key
-_px_env = Path(__file__).parent.parent / "perplexity-news-agent" / ".env"
+# Also check perplexity-news-agent/.env for the API key (wherever it lives)
+_px_dir = find_dir("perplexity-news-agent")
+_px_env = (_px_dir / ".env") if _px_dir else Path(__file__).with_name(".env.__absent__")
 if _px_env.exists() and not os.environ.get("PERPLEXITY_API_KEY"):
     for line in _px_env.read_text().splitlines():
         line = line.strip()

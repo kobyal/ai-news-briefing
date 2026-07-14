@@ -19,14 +19,15 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Add repo root for shared module
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
+from shared.repo_root import agent_dir  # noqa: E402
 
 from shared.article_reader import read_article, ArticleContent, _should_skip_url, _SKIP
 
-_ROOT = Path(__file__).parent.parent.parent
+_ROOT = next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])
 _TODAY = lambda: datetime.now().strftime("%B %d, %Y")
 
-import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+import sys, pathlib as _pl; sys.path.insert(0, str(next((_p for _p in _pl.Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), _pl.Path(__file__).resolve().parents[2])))
 from shared.vendors import VENDOR_QUERIES
 
 _SEARCH_QUERIES = [f"{name} AI news today" for name, _ in VENDOR_QUERIES] + ["AI startup funding news today"]
@@ -36,10 +37,10 @@ def _collect_existing_urls() -> list[str]:
     """Scan other agents' latest outputs to collect article URLs."""
     urls = set()
     agent_dirs = [
-        _ROOT / "adk-news-agent" / "output",
-        _ROOT / "perplexity-news-agent" / "output",
-        _ROOT / "rss-news-agent" / "output",
-        _ROOT / "tavily-news-agent" / "output",
+        agent_dir("adk-news-agent") / "output",
+        agent_dir("perplexity-news-agent") / "output",
+        agent_dir("rss-news-agent") / "output",
+        agent_dir("tavily-news-agent") / "output",
     ]
     today = datetime.now().strftime("%Y-%m-%d")
 

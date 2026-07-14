@@ -523,7 +523,7 @@ def _enrich_and_filter(api_key: str, videos: dict) -> list[dict]:
 # Vendor classification
 # ---------------------------------------------------------------------------
 
-import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+import sys, pathlib as _pl; sys.path.insert(0, str(next((_p for _p in _pl.Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), _pl.Path(__file__).resolve().parents[2])))
 from shared.vendors import classify_vendor as _classify_vendor_shared
 
 

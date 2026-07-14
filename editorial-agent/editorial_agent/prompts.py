@@ -1,6 +1,6 @@
 import sys as _sys
 from pathlib import Path as _Path
-_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent.parent))  # repo root → shared/
+_sys.path.insert(0, str(next((_p for _p in __import__("pathlib").Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), __import__("pathlib").Path(__file__).resolve().parents[2])))  # repo root → shared/
 from shared.he_glossary import HE_TERM_GLOSSARY
 
 

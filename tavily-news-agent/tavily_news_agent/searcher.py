@@ -21,7 +21,7 @@ class Article:
     source: str = ""   # "tavily" | "ddg"
 
 
-import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
+import sys; sys.path.insert(0, str(next((_p for _p in __import__("pathlib").Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), __import__("pathlib").Path(__file__).resolve().parents[2])))
 from shared.vendors import VENDOR_QUERIES
 
 LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
@@ -56,7 +56,7 @@ class TavilySearcher:
             print(f"  [Tavily] Switched to {next_label} (backup {self._key_index})")
             try:
                 import sys, pathlib
-                sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent))
+                sys.path.insert(0, str(next((_p for _p in __import__("pathlib").Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), __import__("pathlib").Path(__file__).resolve().parents[2])))
                 from shared.fallback_tracker import track
                 track("tavily", prev_label, next_label, "quota/rate-limit")
             except Exception:
@@ -98,7 +98,7 @@ class TavilySearcher:
                 print(f"  [Tavily] Error after retries: {e} — falling back to DuckDuckGo")
                 try:
                     import sys, pathlib
-                    sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent))
+                    sys.path.insert(0, str(next((_p for _p in __import__("pathlib").Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), __import__("pathlib").Path(__file__).resolve().parents[2])))
                     from shared.fallback_tracker import track
                     track("tavily", "tavily", "duckduckgo", str(e)[:80])
                 except Exception:

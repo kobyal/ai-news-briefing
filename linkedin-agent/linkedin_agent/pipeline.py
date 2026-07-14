@@ -17,7 +17,7 @@ import urllib.error
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
 
 _TODAY     = lambda: datetime.now().strftime("%B %d, %Y")
 _TODAY_ISO = lambda: datetime.now().strftime("%Y-%m-%d")

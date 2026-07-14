@@ -94,7 +94,7 @@ def _generate_explainer(repo_name: str, description: str, topics: list, cache: d
     try:
         if os.environ.get("MERGER_VIA_CLAUDE_CODE") == "1":
             import sys as _sys
-            _sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+            _sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
             from shared.anthropic_cc import agent as _cc_agent  # noqa: E402
             raw = _cc_agent(
                 input_text=user,

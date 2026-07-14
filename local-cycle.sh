@@ -169,10 +169,10 @@ echo
 DEPS_MARKER="${TMPDIR:-/tmp}/ai-briefing-deps-${DATE}.done"
 deps_stale=0
 if [ -f "$DEPS_MARKER" ]; then
-  for req in adk-news-agent/requirements.txt perplexity-news-agent/requirements.txt \
-             tavily-news-agent/requirements.txt merger-agent/requirements.txt \
-             rss-news-agent/requirements.txt twitter-agent/requirements.txt \
-             linkedin-agent/requirements.txt; do
+  for req in agents/active/adk-news-agent/requirements.txt agents/active/perplexity-news-agent/requirements.txt \
+             agents/active/tavily-news-agent/requirements.txt agents/active/merger-agent/requirements.txt \
+             agents/active/rss-news-agent/requirements.txt agents/active/twitter-agent/requirements.txt \
+             agents/active/linkedin-agent/requirements.txt; do
     [ -f "$req" ] && [ "$req" -nt "$DEPS_MARKER" ] && { deps_stale=1; break; }
   done
 fi
@@ -194,8 +194,8 @@ else
   # Splitting per-file isolates failures: one agent can fail to install
   # without taking down the others. The 2026-04-27 ADK silent failure was
   # caused by the old batched form.
-  for req in adk-news-agent perplexity-news-agent tavily-news-agent \
-             merger-agent rss-news-agent twitter-agent linkedin-agent; do
+  for req in agents/active/adk-news-agent agents/active/perplexity-news-agent agents/active/tavily-news-agent \
+             agents/active/merger-agent agents/active/rss-news-agent agents/active/twitter-agent agents/active/linkedin-agent; do
     # Filter known-harmless 'x-client-transaction' upstream-unreachable error
     # (twitter-agent's git+https dep). Memory: package is already installed
     # locally; the per-requirement loop ensures one failed dep doesn't take
@@ -238,12 +238,12 @@ print("  ✓ All critical imports resolve")
 PYEOF
 then
   echo "  ✗ Critical deps missing — aborting before pipeline (saves 20+ min of partial run)" >&2
-  echo "    Re-install: $PYTHON_BIN -m pip install -r adk-news-agent/requirements.txt \\" >&2
-  echo "                                            -r perplexity-news-agent/requirements.txt \\" >&2
-  echo "                                            -r tavily-news-agent/requirements.txt \\" >&2
-  echo "                                            -r merger-agent/requirements.txt \\" >&2
-  echo "                                            -r rss-news-agent/requirements.txt \\" >&2
-  echo "                                            -r twitter-agent/requirements.txt" >&2
+  echo "    Re-install: $PYTHON_BIN -m pip install -r agents/active/adk-news-agent/requirements.txt \\" >&2
+  echo "                                            -r agents/active/perplexity-news-agent/requirements.txt \\" >&2
+  echo "                                            -r agents/active/tavily-news-agent/requirements.txt \\" >&2
+  echo "                                            -r agents/active/merger-agent/requirements.txt \\" >&2
+  echo "                                            -r agents/active/rss-news-agent/requirements.txt \\" >&2
+  echo "                                            -r agents/active/twitter-agent/requirements.txt" >&2
   exit 1
 fi
 
@@ -252,14 +252,14 @@ echo "[1/6] Running pipeline via subscription (claude -p / Opus 4.7)..."
 "$PYTHON_BIN" run_all.py --skip xai
 
 # Check if YouTube agent hit quota exhaustion (quota resets midnight PT = ~10:00 AM Israel)
-_YT_OUT=$(ls -t "youtube-news-agent/output/${DATE}/"*.json 2>/dev/null | head -1)
+_YT_OUT=$(ls -t "agents/active/youtube-news-agent/output/${DATE}/"*.json 2>/dev/null | head -1)
 if [ -n "$_YT_OUT" ]; then
   _YT_VIDEOS=$("$PYTHON_BIN" -c "import json; d=json.load(open('$_YT_OUT')); print(len((d.get('briefing') or {}).get('news_items', [])))" 2>/dev/null || echo 0)
   _YT_QUOTA=$("$PYTHON_BIN" -c "import json; d=json.load(open('$_YT_OUT')); print(d.get('quota_exhausted','false'))" 2>/dev/null || echo false)
   if [ "$_YT_VIDEOS" = "0" ]; then
     echo "  ⚠ WARNING: YouTube agent returned 0 videos (quota_exhausted=${_YT_QUOTA})."
     echo "  ⚠ YouTube quota resets at midnight PT (~10:00 AM Israel)."
-    echo "  ⚠ Re-run after reset: MERGER_VIA_CLAUDE_CODE=1 python3 youtube-news-agent/youtube_news_agent/pipeline.py"
+    echo "  ⚠ Re-run after reset: MERGER_VIA_CLAUDE_CODE=1 python3 agents/active/youtube-news-agent/youtube_news_agent/pipeline.py"
   else
     echo "  ✓ YouTube agent: ${_YT_VIDEOS} videos"
   fi
@@ -267,7 +267,7 @@ fi
 
 echo
 echo "[2/6] Copying merged HTML to docs/index.html + docs/report/..."
-LATEST=$(ls -t "merger-agent/output/${DATE}/"merged_*.html 2>/dev/null | head -1)
+LATEST=$(ls -t "agents/active/merger-agent/output/${DATE}/"merged_*.html 2>/dev/null | head -1)
 if [ -z "$LATEST" ]; then
   echo "ERROR: no merged HTML produced for ${DATE}" >&2
   exit 1
@@ -389,7 +389,7 @@ aws cloudfront create-invalidation --distribution-id "$CF_DIST" \
 # Auto-uploaded to S3 so /main always shows fresh data. Non-blocking.
 echo
 echo "[3d/6] Editorial synthesis + S3 upload..."
-if "$PYTHON_BIN" editorial-agent/run.py --date "$DATE" 2>&1 | sed 's/^/  /'; then
+if "$PYTHON_BIN" agents/active/editorial-agent/run.py --date "$DATE" 2>&1 | sed 's/^/  /'; then
   echo "  ✓ docs/data/editorial.json written (upload deferred to atomic publish)"
 else
   echo "  ⚠ Editorial agent failed (non-blocking — pipeline continues)"

@@ -313,14 +313,20 @@ def _best_rss(pattern):
             continue
     return best or {}
 
+# Resolve agent output dirs wherever the agents live (agents/active, ...).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from shared.repo_root import agent_dir as _agent_dir  # noqa: E402
+def _out(_name):  # location-independent glob for an agent's JSON outputs
+    return str(_agent_dir(_name) / "output" / "**" / "*.json")
+
 print("Finding latest outputs:")
-merger = _latest("merger-agent/output/**/*.json")
-youtube_raw = _latest("youtube-news-agent/output/**/*.json")
-github_raw = _latest("github-trending-agent/output/**/*.json")
-rss_raw = _best_rss("rss-news-agent/output/**/*.json")
+merger = _latest(_out("merger-agent"))
+youtube_raw = _latest(_out("youtube-news-agent"))
+github_raw = _latest(_out("github-trending-agent"))
+rss_raw = _best_rss(_out("rss-news-agent"))
 # twitter-agent is the active social source; fall back to xai-twitter-agent
-twitter_raw = _latest("twitter-agent/output/**/*.json") or _latest("inactive/xai-twitter-agent/output/**/*.json")
-linkedin_raw = _latest("linkedin-agent/output/**/*.json")
+twitter_raw = _latest(_out("twitter-agent")) or _latest(_out("xai-twitter-agent"))
+linkedin_raw = _latest(_out("linkedin-agent"))
 
 # Extract news_items from standard agent format
 youtube_items = (youtube_raw.get("briefing", {}) if isinstance(youtube_raw, dict) else {}).get("news_items", [])
@@ -328,8 +334,8 @@ youtube_channel_latest = youtube_raw.get("channel_latest", []) if isinstance(you
 # Fallback: if today's agent returned 0 videos/channel_latest (quota/fail), use previous day's data.
 if not youtube_items or not youtube_channel_latest:
     import glob as _glob
-    _prev_files = sorted(_glob.glob("youtube-news-agent/output/**/*.json", recursive=True))
-    _today_prefix = f"youtube-news-agent/output/{date_str}/"
+    _prev_files = sorted(_glob.glob(_out("youtube-news-agent"), recursive=True))
+    _today_prefix = f"{_agent_dir('youtube-news-agent')}/output/{date_str}/"
     _prev_files = [f for f in _prev_files if not f.startswith(_today_prefix)]
     if _prev_files:
         try:

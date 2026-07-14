@@ -28,7 +28,7 @@ WEBSITE_URL  = "https://aibriefing.dev"
 PAGES_BASE   = "https://kobyal.github.io/ai-news-briefing"
 
 # Find latest merged HTML
-files = sorted(glob.glob("merger-agent/output/**/*.html", recursive=True))
+files = sorted(glob.glob("agents/active/merger-agent/output/**/*.html", recursive=True))
 if not files:
     print("No merged output found — skipping email.")
     sys.exit(0)
@@ -85,8 +85,8 @@ def _collect_usage() -> list[dict]:
     today = datetime.now().strftime("%Y-%m-%d")
     results = []
     for agent_dir in [
-        "merger-agent", "rss-news-agent", "tavily-news-agent",
-        "perplexity-news-agent", "adk-news-agent",
+        "agents/active/merger-agent", "agents/active/rss-news-agent", "agents/active/tavily-news-agent",
+        "agents/active/perplexity-news-agent", "agents/active/adk-news-agent",
     ]:
         pattern = f"{agent_dir}/output/{today}/usage*.json"
         files = sorted(glob.glob(pattern))
@@ -138,8 +138,8 @@ def _per_run_breakdown() -> list[dict]:
     from collections import defaultdict
     today = datetime.now().strftime("%Y-%m-%d")
     by_ts: dict = defaultdict(lambda: {"agents": {}, "cost": 0.0, "tokens": 0})
-    for agent_dir in ["merger-agent", "rss-news-agent", "tavily-news-agent",
-                      "perplexity-news-agent", "adk-news-agent"]:
+    for agent_dir in ["agents/active/merger-agent", "agents/active/rss-news-agent", "agents/active/tavily-news-agent",
+                      "agents/active/perplexity-news-agent", "agents/active/adk-news-agent"]:
         for f in sorted(glob.glob(f"{agent_dir}/output/{today}/usage*.json")):
             base = os.path.basename(f)
             # Extract HHMMSS or fall back to 'legacy'
@@ -228,11 +228,11 @@ def _cost_by_provider_since(start_date: str) -> dict:
     from collections import defaultdict
     totals = defaultdict(float)
     for pattern in [
-        "merger-agent/output/*/usage*.json",
-        "rss-news-agent/output/*/usage*.json",
-        "tavily-news-agent/output/*/usage*.json",
-        "perplexity-news-agent/output/*/usage*.json",
-        "adk-news-agent/output/*/usage*.json",
+        "agents/active/merger-agent/output/*/usage*.json",
+        "agents/active/rss-news-agent/output/*/usage*.json",
+        "agents/active/tavily-news-agent/output/*/usage*.json",
+        "agents/active/perplexity-news-agent/output/*/usage*.json",
+        "agents/active/adk-news-agent/output/*/usage*.json",
     ]:
         for f in glob.glob(pattern):
             day = os.path.basename(os.path.dirname(f))
@@ -436,7 +436,7 @@ def _check_apis() -> list[dict]:
         # How many articles actually read via Jina today (rotation/unauth/cache)?
         jina_reads = 0
         try:
-            _ar = sorted(glob.glob(f"article-reader-agent/output/{datetime.now().strftime('%Y-%m-%d')}/articles_*.json"))
+            _ar = sorted(glob.glob(f"agents/active/article-reader-agent/output/{datetime.now().strftime('%Y-%m-%d')}/articles_*.json"))
             if _ar:
                 jina_reads = int((_load_json(_ar[-1]).get("stats", {}) or {}).get("jina", 0))
         except Exception:
@@ -460,7 +460,7 @@ def _check_apis() -> list[dict]:
 
     # ── FREE: X/Twitter scrape — surfaces auth-cookie expiry as ⚠️ ─────
     today = datetime.now().strftime("%Y-%m-%d")
-    twitter_files = sorted(glob.glob(f"twitter-agent/output/{today}/twitter_*.json"))
+    twitter_files = sorted(glob.glob(f"agents/active/twitter-agent/output/{today}/twitter_*.json"))
     if twitter_files:
         try:
             d = _load_json(twitter_files[-1])
@@ -480,7 +480,7 @@ def _check_apis() -> list[dict]:
                            "console_url": "https://x.com/", "tier": "free"})
 
     # ── FREE: Reddit (Arctic Shift no-auth) — surfaces 400/403 as ⚠️ ───
-    rss_files = sorted(glob.glob(f"rss-news-agent/output/{today}/rss_*.json"))
+    rss_files = sorted(glob.glob(f"agents/active/rss-news-agent/output/{today}/rss_*.json"))
     if rss_files:
         try:
             d = _load_json(rss_files[-1])
@@ -640,10 +640,10 @@ def _collect_agent_delivery() -> list[dict]:
 
     rows = []
     for dirname, label in [
-        ("perplexity-news-agent", "perplexity"),
-        ("rss-news-agent",        "rss-news"),
-        ("tavily-news-agent",     "tavily"),
-        ("adk-news-agent",        "adk"),
+        ("agents/active/perplexity-news-agent", "perplexity"),
+        ("agents/active/rss-news-agent",        "rss-news"),
+        ("agents/active/tavily-news-agent",     "tavily"),
+        ("agents/active/adk-news-agent",        "adk"),
     ]:
         d = _latest(dirname)
         items = ((d.get("briefing") or {}).get("news_items") or []) if isinstance(d, dict) else []
@@ -661,11 +661,11 @@ def _collect_agent_delivery() -> list[dict]:
 
     # rss-news-agent ALSO scrapes Reddit — separate row so a Reddit-only
     # failure doesn't hide behind the news_items count being healthy.
-    rss_d = _latest("rss-news-agent")
+    rss_d = _latest("agents/active/rss-news-agent")
     rss_reddit = (rss_d.get("reddit_posts") or []) if isinstance(rss_d, dict) else []
     if rss_d is not None and rss_d != {}:
         if not rss_reddit:
-            streak = _zero_streak("rss-news-agent", ["reddit_posts"])
+            streak = _zero_streak("agents/active/rss-news-agent", ["reddit_posts"])
             note = f"ArcticShift returned 0 ({streak}-day streak)" if streak >= 2 else "ArcticShift returned empty"
             rows.append({"agent": "rss → reddit", "raw": "0", "json": "—", "site": "—",
                          "status": "error" if streak >= 2 else "warn", "note": note})
@@ -674,7 +674,7 @@ def _collect_agent_delivery() -> list[dict]:
                          "json": "(merged)", "site": "(merged)",
                          "status": "ok", "note": "ArcticShift OK"})
 
-    for dirname, label in [("article-reader-agent", "article-reader")]:
+    for dirname, label in [("agents/active/article-reader-agent", "article-reader")]:
         d = _latest(dirname)
         if d and ((d.get("briefing") or {}).get("news_items")):
             n = len(d["briefing"]["news_items"])
@@ -684,7 +684,7 @@ def _collect_agent_delivery() -> list[dict]:
             rows.append({"agent": label, "raw": "—", "json": "—", "site": "—",
                          "status": "off", "note": "off / sub-tool only"})
 
-    merger = _latest("merger-agent")
+    merger = _latest("agents/active/merger-agent")
     m_news = len(((merger.get("briefing") or {}).get("news_items")) or []) if isinstance(merger, dict) else 0
     json_news = len(json_briefing.get("news_items") or [])
     site_news = len(site_stories)
@@ -698,7 +698,7 @@ def _collect_agent_delivery() -> list[dict]:
         "note": "" if site_news == m_news else (f"+{site_news - m_news} preserved from earlier runs" if site_news > m_news else ""),
     })
 
-    tw = _latest("twitter-agent")
+    tw = _latest("agents/active/twitter-agent")
     if tw:
         b = tw.get("briefing", {}) or {}
         n_p = len(b.get("people_highlights") or [])
@@ -710,7 +710,7 @@ def _collect_agent_delivery() -> list[dict]:
         if n_p == 0:
             status, note = "error", "0 people — refresh TWITTER_AUTH_TOKEN/CT0 from x.com"
         elif n_t == 0:
-            t_streak = _zero_streak("twitter-agent", ["briefing", "trending_posts"])
+            t_streak = _zero_streak("agents/active/twitter-agent", ["briefing", "trending_posts"])
             # Read the agent's own diagnostics so we can name the actual
             # cause instead of guessing. Falls back to old heuristic when
             # the field isn't present (running an older agent build).
@@ -765,8 +765,8 @@ def _collect_agent_delivery() -> list[dict]:
                      "status": "error", "note": "no output today"})
 
     for dirname, label, top_key in [
-        ("youtube-news-agent", "youtube", "youtube"),
-        ("github-trending-agent", "github trending", "github"),
+        ("agents/active/youtube-news-agent", "youtube", "youtube"),
+        ("agents/active/github-trending-agent", "github trending", "github"),
     ]:
         d = _latest(dirname)
         n = len(((d.get("briefing") or {}).get("news_items")) or []) if isinstance(d, dict) else 0
@@ -788,13 +788,13 @@ def _collect_agent_delivery() -> list[dict]:
                                           at_least=json_at_least),
                      "status": status, "note": note})
 
-    li = _latest("linkedin-agent")
+    li = _latest("agents/active/linkedin-agent")
     if li:
         li_posts = ((li.get("briefing") or {}).get("linkedin_posts") or [])
         li_fallback = li.get("fallback", False)
         n_li = len(li_posts)
         if n_li == 0:
-            streak = _zero_streak("linkedin-agent", ["briefing", "linkedin_posts"])
+            streak = _zero_streak("agents/active/linkedin-agent", ["briefing", "linkedin_posts"])
             note = f"ran but 0 posts ({streak}-day streak)" if streak >= 2 else "ran but 0 posts"
             status = "error" if streak >= 2 else "warn"
         elif li_fallback:
@@ -1095,7 +1095,7 @@ def _collect_freshness() -> list[dict]:
     today_str = today.strftime("%Y-%m-%d")
     rows = []
 
-    tw_files = sorted(glob.glob(f"twitter-agent/output/{today_str}/twitter_*.json"))
+    tw_files = sorted(glob.glob(f"agents/active/twitter-agent/output/{today_str}/twitter_*.json"))
     if tw_files:
         try:
             d = _load_json(tw_files[-1])
@@ -1125,7 +1125,7 @@ def _collect_freshness() -> list[dict]:
                 streak = 0
                 for offset in range(8):
                     d_check = (today - timedelta(days=offset)).strftime("%Y-%m-%d")
-                    f_check = sorted(glob.glob(f"twitter-agent/output/{d_check}/twitter_*.json"))
+                    f_check = sorted(glob.glob(f"agents/active/twitter-agent/output/{d_check}/twitter_*.json"))
                     if not f_check:
                         continue
                     try:
@@ -1144,7 +1144,7 @@ def _collect_freshness() -> list[dict]:
         except Exception as e:
             rows.append({"label": "X data", "value": "—", "status": "error", "note": str(e)[:60]})
 
-    rss_files = sorted(glob.glob(f"rss-news-agent/output/{today_str}/rss_*.json"))
+    rss_files = sorted(glob.glob(f"agents/active/rss-news-agent/output/{today_str}/rss_*.json"))
     if rss_files:
         try:
             d = _load_json(rss_files[-1])
@@ -1178,7 +1178,7 @@ def _collect_freshness() -> list[dict]:
         except Exception:
             pass
 
-    li_files = sorted(glob.glob(f"linkedin-agent/output/{today_str}/linkedin_*.json"))
+    li_files = sorted(glob.glob(f"agents/active/linkedin-agent/output/{today_str}/linkedin_*.json"))
     if li_files:
         try:
             d = _load_json(li_files[-1])
@@ -1217,7 +1217,7 @@ def _collect_freshness() -> list[dict]:
         except Exception as e:
             rows.append({"label": "LinkedIn data", "value": "—", "status": "error", "note": str(e)[:60]})
 
-    yt_files = sorted(glob.glob(f"youtube-news-agent/output/{today_str}/youtube_*.json"))
+    yt_files = sorted(glob.glob(f"agents/active/youtube-news-agent/output/{today_str}/youtube_*.json"))
     if yt_files:
         try:
             d = _load_json(yt_files[-1])
@@ -1252,12 +1252,12 @@ def _collect_freshness() -> list[dict]:
 
     # Generic news agents: check newest published_date in briefing.news_items
     _news_agents = [
-        ("perplexity-news-agent", "briefing_*.json",    "Perplexity", 2, 3),
-        ("tavily-news-agent",     "tavily_*.json",      "Tavily",     2, 3),
-        ("adk-news-agent",        "briefing_*.json",    "ADK",        2, 3),
-        ("github-trending-agent", "github_*.json",      "GitHub",     3, 5),
-        ("inactive/exa-news-agent",     "exa_*.json",     "Exa",        2, 3),
-        ("inactive/newsapi-agent",      "newsapi_*.json", "NewsAPI",    2, 3),
+        ("agents/active/perplexity-news-agent", "briefing_*.json",    "Perplexity", 2, 3),
+        ("agents/active/tavily-news-agent",     "tavily_*.json",      "Tavily",     2, 3),
+        ("agents/active/adk-news-agent",        "briefing_*.json",    "ADK",        2, 3),
+        ("agents/active/github-trending-agent", "github_*.json",      "GitHub",     3, 5),
+        ("agents/inactive/exa-news-agent",     "exa_*.json",     "Exa",        2, 3),
+        ("agents/inactive/newsapi-agent",      "newsapi_*.json", "NewsAPI",    2, 3),
     ]
     for agent_dir, pat, label, warn_days, err_days in _news_agents:
         files = sorted(glob.glob(f"{agent_dir}/output/{today_str}/{pat}"))
@@ -1335,13 +1335,13 @@ def _active_sources_today() -> list[str]:
     """List sources whose agent produced a non-empty JSON output today."""
     today = datetime.now().strftime("%Y-%m-%d")
     agents = [
-        ("adk-news-agent", "ADK"),
-        ("perplexity-news-agent", "Perplexity"),
-        ("rss-news-agent", "RSS"),
-        ("tavily-news-agent", "Tavily"),
-        ("youtube-news-agent", "YouTube"),
-        ("github-trending-agent", "GitHub"),
-        ("twitter-agent", "X"),
+        ("agents/active/adk-news-agent", "ADK"),
+        ("agents/active/perplexity-news-agent", "Perplexity"),
+        ("agents/active/rss-news-agent", "RSS"),
+        ("agents/active/tavily-news-agent", "Tavily"),
+        ("agents/active/youtube-news-agent", "YouTube"),
+        ("agents/active/github-trending-agent", "GitHub"),
+        ("agents/active/twitter-agent", "X"),
     ]
     out = []
     for dir_name, label in agents:
@@ -1368,9 +1368,9 @@ def _merger_model() -> str:
     today = datetime.now().strftime("%Y-%m-%d")
     # Prefer the newest timestamped file; only fall back to legacy usage.json
     # (which predates the timestamped-files convention) when none exist.
-    ts_files = sorted(glob.glob(f"merger-agent/output/{today}/usage_*.json"))
+    ts_files = sorted(glob.glob(f"agents/active/merger-agent/output/{today}/usage_*.json"))
     candidates = list(reversed(ts_files))
-    legacy = f"merger-agent/output/{today}/usage.json"
+    legacy = f"agents/active/merger-agent/output/{today}/usage.json"
     if not candidates and os.path.exists(legacy):
         candidates = [legacy]
     for path in candidates:

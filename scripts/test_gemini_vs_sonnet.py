@@ -33,11 +33,11 @@ def load_briefing(pattern: str) -> dict:
         d = json.load(f)
     return d.get("briefing", d)
 
-sources["adk"]        = load_briefing(f"adk-news-agent/output/{DATE}/*.json")
-sources["perplexity"] = load_briefing(f"perplexity-news-agent/output/{DATE}/*.json")
-sources["rss"]        = load_briefing(f"rss-news-agent/output/{DATE}/*.json")
-sources["tavily"]     = load_briefing(f"tavily-news-agent/output/{DATE}/*.json")
-sources["exa"]        = load_briefing(f"inactive/exa-news-agent/output/{DATE}/*.json")
+sources["adk"]        = load_briefing(f"agents/active/adk-news-agent/output/{DATE}/*.json")
+sources["perplexity"] = load_briefing(f"agents/active/perplexity-news-agent/output/{DATE}/*.json")
+sources["rss"]        = load_briefing(f"agents/active/rss-news-agent/output/{DATE}/*.json")
+sources["tavily"]     = load_briefing(f"agents/active/tavily-news-agent/output/{DATE}/*.json")
+sources["exa"]        = load_briefing(f"agents/inactive/exa-news-agent/output/{DATE}/*.json")
 
 print("Input source counts:")
 for k, v in sources.items():
@@ -116,7 +116,7 @@ except Exception as e:
     gemini_items = []
 
 # Compare to Sonnet (merger's actual output for that day)
-sonnet_files = sorted(glob.glob(f"merger-agent/output/{DATE}/merged_*.json"))
+sonnet_files = sorted(glob.glob(f"agents/active/merger-agent/output/{DATE}/merged_*.json"))
 sonnet_items = []
 if sonnet_files:
     with open(sonnet_files[-1]) as f:

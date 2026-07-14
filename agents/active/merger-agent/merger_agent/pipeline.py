@@ -31,7 +31,7 @@ from .tools import build_and_save_html, _parse
 # Bootstrap repo root so shared/ is importable (matches rss/tavily).
 import sys
 sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
-from shared.repo_root import agent_dir  # noqa: E402
+from shared.repo_root import agent_dir as _agent_dir  # noqa: E402
 from shared.pricing import estimate_cost  # noqa: E402
 from shared import anthropic_cc  # noqa: E402
 from shared.he_glossary import HE_TERM_GLOSSARY  # noqa: E402
@@ -200,7 +200,7 @@ def _agent_via_claude_code(
 
 def _load_article_reader() -> dict[str, dict]:
     """Load enriched articles from the Article Reader Agent output."""
-    ar_dir = agent_dir("article-reader-agent") / "output"
+    ar_dir = _agent_dir("article-reader-agent") / "output"
     if not ar_dir.exists():
         return {}
     for date_dir in sorted(ar_dir.iterdir(), reverse=True):
@@ -251,10 +251,10 @@ def _step1_load_sources() -> tuple:
     print("\n[1/4] Loading source briefings...")
 
     # Core sources (used in merger prompt with dedicated placeholders)
-    adk_data    = _find_latest_json(agent_dir("adk-news-agent") / "output")
-    px_data     = _find_latest_json(agent_dir("perplexity-news-agent") / "output")
-    rss_data    = _find_latest_json(agent_dir("rss-news-agent") / "output")
-    tavily_data = _find_latest_json(agent_dir("tavily-news-agent") / "output")
+    adk_data    = _find_latest_json(_agent_dir("adk-news-agent") / "output")
+    px_data     = _find_latest_json(_agent_dir("perplexity-news-agent") / "output")
+    rss_data    = _find_latest_json(_agent_dir("rss-news-agent") / "output")
+    tavily_data = _find_latest_json(_agent_dir("tavily-news-agent") / "output")
     if not any([adk_data, px_data, rss_data, tavily_data]):
         raise RuntimeError(
             "No source briefings found. Run at least one source pipeline first."
@@ -279,7 +279,7 @@ def _step1_load_sources() -> tuple:
                 print(f"  Found: {label} ({n} items)")
 
     # YouTube — load for dedicated HTML section (not merged into news items)
-    yt_data = _find_latest_json(agent_dir("youtube-news-agent") / "output")
+    yt_data = _find_latest_json(_agent_dir("youtube-news-agent") / "output")
     if yt_data:
         yt_briefing = yt_data.get("briefing", yt_data)
         youtube_data = yt_briefing.get("news_items", [])
@@ -287,7 +287,7 @@ def _step1_load_sources() -> tuple:
             print(f"  Found: YouTube ({len(youtube_data)} videos)")
 
     # GitHub — load for dedicated HTML section
-    gh_data = _find_latest_json(agent_dir("github-trending-agent") / "output")
+    gh_data = _find_latest_json(_agent_dir("github-trending-agent") / "output")
     if gh_data:
         gh_briefing = gh_data.get("briefing", gh_data)
         github_data = gh_briefing.get("news_items", [])
@@ -298,7 +298,7 @@ def _step1_load_sources() -> tuple:
     xai_data = {}
     social_briefing = {}
     xai_raw = (
-        _find_latest_json(agent_dir("twitter-agent") / "output")
+        _find_latest_json(_agent_dir("twitter-agent") / "output")
         or _find_latest_json(_ROOT / "inactive" / "xai-twitter-agent" / "output")
     )
     if xai_raw:
@@ -326,7 +326,7 @@ def _step1_load_sources() -> tuple:
 
     # LinkedIn posts — inject into social_briefing so the merger can surface
     # LinkedIn discussions as community pulse items and news signals
-    li_raw = _find_latest_json(agent_dir("linkedin-agent") / "output")
+    li_raw = _find_latest_json(_agent_dir("linkedin-agent") / "output")
     if li_raw:
         li_posts = (li_raw.get("briefing") or li_raw).get("linkedin_posts", [])
         if li_posts:

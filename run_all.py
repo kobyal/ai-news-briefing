@@ -15,22 +15,28 @@ import threading
 import time
 from pathlib import Path
 
-# ── Agent registry: name → (script path relative to root, cost tier) ──────
+# Resolve agents wherever they live (agents/active, agents/inactive, ...).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from shared.repo_root import agent_dir  # noqa: E402
+
+# ── Agent registry: name → (agent dir name, cost tier, API) ───────────────
+# The dir name is resolved to its actual location via agent_dir(), so agents
+# can be moved (top level → agents/active/, etc.) without touching this file.
 AGENTS = {
     # Core source agents
-    "adk":        ("adk-news-agent/run.py",          "paid",  "Google Gemini API"),
-    "perplexity": ("perplexity-news-agent/run.py",   "paid",  "Perplexity API"),
-    "rss":        ("rss-news-agent/run.py",           "paid",  "Anthropic (haiku)"),
-    "tavily":     ("tavily-news-agent/run.py",        "paid",  "Tavily + Anthropic (haiku)"),
+    "adk":        ("adk-news-agent",          "paid",  "Google Gemini API"),
+    "perplexity": ("perplexity-news-agent",   "paid",  "Perplexity API"),
+    "rss":        ("rss-news-agent",          "paid",  "Anthropic (haiku)"),
+    "tavily":     ("tavily-news-agent",       "paid",  "Tavily + Anthropic (haiku)"),
     # Supplemental agents
-    "article":    ("article-reader-agent/run.py",     "cheap", "Jina (free tier)"),
-    "youtube":    ("youtube-news-agent/run.py",       "free",  "YouTube Data API (free quota)"),
-    "github":     ("github-trending-agent/run.py",    "free",  "GitHub API (free)"),
-    "xai":        ("inactive/xai-twitter-agent/run.py", "paid", "xAI Grok-4 — parked in inactive/ (disabled)"),
-    "twitter":    ("twitter-agent/run.py",             "free",  "X GraphQL direct (no API key)"),
-    "linkedin":   ("linkedin-agent/run.py",            "paid",  "Apify HarvestAPI (~$0.04/day for 31 profiles)"),
+    "article":    ("article-reader-agent",    "cheap", "Jina (free tier)"),
+    "youtube":    ("youtube-news-agent",      "free",  "YouTube Data API (free quota)"),
+    "github":     ("github-trending-agent",   "free",  "GitHub API (free)"),
+    "xai":        ("xai-twitter-agent",       "paid",  "xAI Grok-4 — parked in agents/inactive/ (disabled)"),
+    "twitter":    ("twitter-agent",           "free",  "X GraphQL direct (no API key)"),
+    "linkedin":   ("linkedin-agent",          "paid",  "Apify HarvestAPI (~$0.04/day for 31 profiles)"),
     # Merger (always runs last)
-    "merger":     ("merger-agent/run.py",             "paid",  "Anthropic Claude"),
+    "merger":     ("merger-agent",            "paid",  "Anthropic Claude"),
 }
 
 AGENT_DISPLAY = {
@@ -131,8 +137,6 @@ def main():
     parser.add_argument("--list", action="store_true", help="List all agents and their cost tiers")
     args = parser.parse_args()
 
-    root = Path(__file__).parent
-
     if args.list:
         print(f"\n{'Agent':<14} {'Tier':<6} {'API Cost'}")
         print("-" * 50)
@@ -142,7 +146,7 @@ def main():
         return
 
     if args.merge_only:
-        _run(root / "merger-agent" / "run.py", "Merger Agent")
+        _run(agent_dir("merger-agent") / "run.py", "Merger Agent")
         return
 
     skip = set(args.skip)
@@ -166,7 +170,7 @@ def main():
         if name == "merger":
             continue
         if name in enabled:
-            script = root / AGENTS[name][0]
+            script = agent_dir(AGENTS[name][0]) / "run.py"
             agents.append((script, AGENT_DISPLAY[name]))
 
     if agents:
@@ -181,7 +185,7 @@ def main():
 
     # Merger always runs (unless explicitly skipped)
     if "merger" not in skip:
-        _run(root / "merger-agent" / "run.py", "Merger Agent")
+        _run(agent_dir("merger-agent") / "run.py", "Merger Agent")
 
 
 if __name__ == "__main__":

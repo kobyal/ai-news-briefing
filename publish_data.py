@@ -2295,6 +2295,47 @@ def _audit_data_quality():
     return issues
 
 
+# ── Story-id collision guard (all paths) ────────────────────────────────────
+# story_id = sha256(urls[0])[:12]. Two stories with the same urls[0] collide →
+# both cards link to ONE /story page (wrong content). The union path de-dups by
+# story_id, but a NORMAL run had no guard: 2026-07-17 shipped a Grok-on-Bedrock
+# story and a Bedrock-KB story both carrying the KB blog as urls[0] (a source-
+# relevance slip) → identical id. Fix: the fewest-urls item keeps the id (rightful
+# owner of that single url); each other collider drops the shared urls[0] and
+# re-primaries off a remaining url yielding an unused id (also shedding the mis-
+# attached source), stamping its story_id to match; if none, the duplicate drops.
+def _dedupe_story_ids(_items):
+    from shared.story_id import derive_story_id as _sid
+    _groups = {}
+    for _it in _items:
+        _groups.setdefault(_sid(_it), []).append(_it)
+    _taken = set(_groups)
+    _drop = set()
+    for _gid, _grp in _groups.items():
+        if len(_grp) < 2:
+            continue
+        for _it in sorted(_grp, key=lambda it: len(it.get("urls") or []))[1:]:
+            _rest = (_it.get("urls") or [])[1:]  # drop the shared urls[0] (keeper owns it)
+            _moved = False
+            for _j in range(len(_rest)):
+                _cand = [_rest[_j]] + [_u for _k, _u in enumerate(_rest) if _k != _j]
+                _nid = _sid({**_it, "urls": _cand})
+                if _nid not in _taken:
+                    _it["urls"] = _cand
+                    _it["source_count"] = len(_cand)
+                    _it["story_id"] = _nid
+                    _taken.add(_nid)
+                    _moved = True
+                    print(f"  story_id de-collide: {(_it.get('headline') or '')[:45]!r} re-primaried ({_gid[:8]}->{_nid[:8]})")
+                    break
+            if not _moved:
+                _drop.add(id(_it))
+                print(f"  story_id de-collide: DROPPED dup {(_it.get('headline') or '')[:45]!r} (no distinct url)")
+    return [_it for _it in _items if id(_it) not in _drop]
+
+_news_items = _dedupe_story_ids(_news_items)
+_briefing["news_items"] = _news_items
+
 _data_quality_issues = _audit_data_quality()
 
 

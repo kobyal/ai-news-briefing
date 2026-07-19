@@ -237,14 +237,18 @@ def _translate_via_cli(text: str) -> str:
 # the pipeline ~10 min at local-cycle's [3b] with no output, looking hung
 # (2026-07-14). Cap it — tools past the budget keep English descriptions, which
 # the frontend already falls back to. Generous enough to translate the top tools.
-_TRANSLATE_DEADLINE = time.monotonic() + 240
+# Wall-clock (time.time), NOT monotonic: monotonic PAUSES while the Mac sleeps,
+# so on a lid-closed/slept run the budget never elapsed in "awake time" and this
+# step stalled the pipeline for many minutes at local-cycle [3b] (2026-07-19).
+# Wall-clock advances through sleep, so the cap actually fires.
+_TRANSLATE_DEADLINE = time.time() + 240
 
 
 def deepl_translate(text: str, target: str = "HE") -> str:
     """Translate a single text to Hebrew via Claude Haiku API, with CLI fallback."""
     if not text:
         return ""
-    if time.monotonic() > _TRANSLATE_DEADLINE:
+    if time.time() > _TRANSLATE_DEADLINE:
         return ""  # over budget — leave English (frontend falls back to `description`)
     if _ANTHROPIC_KEY:
         try:

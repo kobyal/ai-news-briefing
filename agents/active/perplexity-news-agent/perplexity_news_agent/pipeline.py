@@ -19,7 +19,7 @@ import json
 import os
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import requests
 
@@ -57,6 +57,8 @@ _TRANSLATOR_MODEL = lambda: os.environ.get("PERPLEXITY_TRANSLATOR_MODEL", "anthr
 _LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 _TODAY         = lambda: datetime.now().strftime("%B %d, %Y")
 _MONTH_YEAR    = lambda: datetime.now().strftime("%B %Y")
+# Perplexity's date filters want MM/DD/YYYY.
+_SEARCH_AFTER  = lambda: (datetime.now() - timedelta(days=_LOOKBACK_DAYS())).strftime("%m/%d/%Y")
 
 # Track per-call usage/cost across the run — written to usage.json at the end.
 _usage_log: list[dict] = []
@@ -283,10 +285,15 @@ def _step1_vendor_research() -> str:
         model=_SEARCH_MODEL(),
         tools=[{
             "type": "web_search",
-            # "day" not "week": week-old results were ranking into news_items and
-            # making the briefing read stale (2026-06-15: newest item 3 days old).
-            # News must be fresh; CommunityResearcher keeps "week" (reactions lag).
-            "search_recency_filter": "day",
+            # Date filters MUST live under "filters" — a top-level
+            # "search_recency_filter" is silently ignored by /v1/responses, so
+            # from 2026-06-15 to 2026-07-28 this step ran completely unfiltered
+            # and drifted stale (newest item stuck at Jul 24 for four days).
+            # An absolute search_after_date_filter beats "day": it tracks the
+            # lookback window instead of a fixed 24h bucket.
+            "filters": {
+                "search_after_date_filter": _SEARCH_AFTER(),
+            },
         }],
         max_steps=3,
         label="VendorResearcher",
@@ -303,7 +310,8 @@ def _step2_community_research(vendor_news: str) -> str:
         model=_SEARCH_MODEL(),
         tools=[{
             "type": "web_search",
-            "search_recency_filter": "week",
+            # Community reactions lag the news — keep a wider window than step 1.
+            "filters": {"search_recency_filter": "week"},
         }],
         max_steps=2,
         label="CommunityResearcher",

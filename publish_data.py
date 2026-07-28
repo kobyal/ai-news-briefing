@@ -2231,6 +2231,27 @@ def _remediate_source_mismatch():
 _remediation_actions = _remediate_source_mismatch()
 
 
+# The HE TL;DR renders bullet-for-bullet against `bullet_story_ids`, which is
+# length-aligned to the EN `tldr`. The merger's translation prompt asks for
+# "8-10" HE bullets independently of how many EN bullets exist, so a 7-bullet EN
+# TL;DR can come back as 9 HE bullets — the surplus are invented wrap-up lines
+# that match no story and render as dead links (2026-07-28: HE bullets 8 and 9
+# led nowhere). Truncate the surplus; pad a short list with "" so no index shifts.
+def _realign_tldr_he():
+    _he = merger.get("briefing_he")
+    if not isinstance(_he, dict):
+        return
+    _he_bullets = _he.get("tldr_he") or []
+    _en_n = len(_briefing.get("tldr") or [])
+    if not _en_n or not _he_bullets or len(_he_bullets) == _en_n:
+        return
+    print(f"  ⚠️  HE TL;DR has {len(_he_bullets)} bullets vs EN {_en_n} — realigning")
+    _he["tldr_he"] = (_he_bullets + [""] * _en_n)[:_en_n]
+
+
+_realign_tldr_he()
+
+
 # ── Data-quality audit ────────────────────────────────────────────────────────
 # Surface silent degradations the email PROBLEMS banner would otherwise miss.
 # Each issue we flag here corresponds to a real bug that bit us in production
@@ -2242,6 +2263,7 @@ def _audit_data_quality():
     # 1. EN/HE array length parity — translator caps used to orphan items
     _briefing_he = merger.get("briefing_he", {}) or {}
     pairs = [
+        ("tldr",                  "tldr_he"),
         ("community_pulse_items", "pulse_items_he"),
         ("news_items",            "headlines_he"),
         ("news_items",            "summaries_he"),

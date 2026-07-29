@@ -1110,56 +1110,36 @@ def run_pipeline() -> dict:
     # matching story → frontend matcher picked the next Google story →
     # unrelated headline). The contract: bullet text ↔ a SPECIFIC news_item.
     #
-    # We also emit tldr_story_indices[i] = index of the matching news_item.
-    # Prefers the LLM's own indices when present (it knows what each bullet
-    # is ABOUT); falls back to word-overlap when missing or invalid. This
-    # replaces the frontend's brittle vendor+keyword scoring (2026-05-12:
-    # "typosquatted 'OpenAI Privacy Filter' on Hugging Face" was getting
-    # routed to OpenAI's shopping-ads story on a +100 subject-vendor bonus).
+    # We also emit tldr_story_indices[i] = index of the matching news_item,
+    # preferring the LLM's own index (it knows what each bullet is ABOUT) but
+    # only when that index survives shared/tldr_binding's scoring. This replaces
+    # the frontend's brittle vendor+keyword scoring (2026-05-12: "typosquatted
+    # 'OpenAI Privacy Filter' on Hugging Face" was getting routed to OpenAI's
+    # shopping-ads story on a +100 subject-vendor bonus).
+    #
+    # Running BEFORE the translator matters: dropping an orphan bullet here keeps
+    # tldr and tldr_he the same length by construction.
     parsed = _parse(merged_json)
     tldr = parsed.get("tldr", [])
     items = parsed.get("news_items", [])
     if tldr and items:
-        def _shared_words(a: str, b: str) -> int:
-            # Count shared 4+ char tokens (matches TldrSection.tsx scoring).
-            tok_a = {w.lower().strip(".,;:—-") for w in a.split() if len(w) >= 4}
-            tok_b = {w.lower().strip(".,;:—-") for w in b.split() if len(w) >= 4}
-            return len(tok_a & tok_b)
-        # Validate LLM-emitted indices (length + range). Reject silently and
-        # recompute if the LLM hallucinated an index or skipped the field.
-        llm_indices = parsed.get("tldr_story_indices")
-        use_llm = (
-            isinstance(llm_indices, list)
-            and len(llm_indices) == len(tldr)
-            and all(isinstance(x, int) and 0 <= x < len(items) for x in llm_indices)
-        )
+        from shared.tldr_binding import bind_bullets, describe, story_text
+        bound = bind_bullets(tldr, [story_text(it) for it in items],
+                             parsed.get("tldr_story_indices"))
         kept_tldr: list[str] = []
         kept_indices: list[int] = []
-        for i, bullet in enumerate(tldr):
-            if use_llm:
-                idx = llm_indices[i]
-                # Sanity: the bound index should still share SOME content with the
-                # headline. If the LLM bound a random story, fall back per-bullet.
-                if _shared_words(bullet, items[idx].get("headline", "")) >= 3:
-                    kept_tldr.append(bullet)
-                    kept_indices.append(idx)
-                    continue
-            # Per-bullet fallback: pick the news_item with most shared 4+ char
-            # tokens. Threshold 3 mirrors the prior orphan guard.
-            scores = [(_shared_words(bullet, it.get("headline", "")), j) for j, it in enumerate(items)]
-            best_score, best_idx = max(scores, default=(0, -1))
-            if best_score >= 3:
-                kept_tldr.append(bullet)
-                kept_indices.append(best_idx)
-            else:
-                print(f"  ✂ Orphan TLDR bullet dropped (no matching story): {bullet[:80]}")
+        for bullet, (idx, why, score) in zip(tldr, bound):
+            if idx is None:
+                print(f"  ✂ Orphan TLDR bullet dropped (no matching story, best {score:.1f}): {bullet[:80]}")
+                continue
+            if why == "overlap":
+                print(f"  ↻ TLDR bullet re-bound to '{items[idx].get('headline','')[:50]}': {bullet[:60]}")
+            kept_tldr.append(bullet)
+            kept_indices.append(idx)
         parsed["tldr"] = kept_tldr
         parsed["tldr_story_indices"] = kept_indices
         merged_json = json.dumps(parsed, ensure_ascii=False)
-        print(
-            f"  TLDR guard: kept {len(kept_tldr)}/{len(tldr)} bullets; "
-            f"indices source: {'LLM' if use_llm else 'word-overlap'}"
-        )
+        print(f"  TLDR guard: kept {len(kept_tldr)}/{len(tldr)} bullets ({describe(bound)})")
 
     try:
         hebrew_json = _step3_translate(merged_json, social_data=social_briefing, youtube_data=youtube_data, xai_data=xai_data)

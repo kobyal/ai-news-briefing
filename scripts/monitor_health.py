@@ -9,8 +9,9 @@ it just logs — no email, no noise. Never runs the pipeline.
 Checks:
   1. archive.json newest date == today (Asia/Jerusalem) — else pipeline didn't run.
   2. today's day JSON: >=8 news_items; unique story_ids (no collision); bullet_story_ids
-     length == tldr length and every non-empty one resolves to a story (TL;DR links);
-     every story has >=1 url (no sourceless).
+     length == tldr length, every non-empty one resolves to a story, and every bullet's
+     link is supported by the bullet's own text (TL;DR links); every story has >=1 url
+     (no sourceless).
   3. homepage returns 200.
 """
 import json
@@ -25,6 +26,7 @@ from pathlib import Path
 BASE = "https://aibriefing.dev"
 RECIPIENT = SENDER = "kobyal@gmail.com"
 _ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))  # for shared/
 LOG = _ROOT / "logs" / "health-check.log"
 
 
@@ -114,6 +116,22 @@ def main():
         dangling = [x for x in bsi if x and x not in idset]
         if dangling:
             fails.append(f"TL;DR broken: {len(dangling)} bullet_story_ids point at no story.")
+        # A bullet CAN point at a real story that it isn't about — the link
+        # resolves, nothing looks broken, and the reader lands on the wrong
+        # article (2026-07-29). Re-run the binder over what shipped and flag any
+        # link its own text can't support.
+        try:
+            from shared.tldr_binding import bind_bullets, story_text
+            pos = {s.get("story_id"): k for k, s in enumerate(ni)}
+            shipped = [pos.get(bsi[k]) if k < len(bsi) and bsi[k] else None for k in range(len(tldr))]
+            bound = bind_bullets(tldr, [story_text(s) for s in ni],
+                                 [p if p is not None else 0 for p in shipped])
+            bad = [k + 1 for k, (p, why, _s) in enumerate(bound)
+                   if shipped[k] is not None and not (why == "llm" and p == shipped[k])]
+            if bad:
+                fails.append(f"TL;DR mis-bound: bullet(s) {bad} link to a story their text doesn't support.")
+        except Exception as e:
+            fails.append(f"TL;DR binding check failed: {e}")
         sourceless = [s.get("headline", "?")[:50] for s in ni if not (s.get("urls") or [])]
         if sourceless:
             fails.append(f"sourceless stories: {sourceless}")

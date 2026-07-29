@@ -189,9 +189,15 @@ interface TldrSectionProps {
    *  Avoids duplicate claims (bullet #10 falling back to a story that bullet
    *  #3 already owns in the layout). */
   bulletStoryMap?: Map<number, NewsItem>;
+  /** True when bulletStoryMap came from the pipeline's explicit
+   *  bullet_story_ids. A bullet MISSING from an authoritative map has no story
+   *  on purpose — render it unclickable rather than letting matchStory guess
+   *  one (2026-07-29: a guess sent readers to a story the bullet only
+   *  mentioned in passing). */
+  bulletMapAuthoritative?: boolean;
 }
 
-export function TldrSection({ tldr, tldr_he, tldrAudioUrl, tldrAudioUrlHe, stories = [], bulletStoryMap }: TldrSectionProps) {
+export function TldrSection({ tldr, tldr_he, tldrAudioUrl, tldrAudioUrlHe, stories = [], bulletStoryMap, bulletMapAuthoritative = false }: TldrSectionProps) {
   const { isHe } = useLang();
   const rawItems = isHe && tldr_he.length > 0 ? tldr_he : tldr;
   const [expanded, setExpanded] = useState(false);
@@ -295,7 +301,7 @@ export function TldrSection({ tldr, tldr_he, tldrAudioUrl, tldrAudioUrlHe, stori
           {items.map((bullet, i) => {
             const origIdx = itemOrigIdx[i];
             const explicitMatch = bulletStoryMap?.get(origIdx);
-            const matched = explicitMatch ?? matchStory(bullet, stories);
+            const matched = explicitMatch ?? (bulletMapAuthoritative ? null : matchStory(bullet, stories));
             // Use vendor detected from bullet text, not matched story's vendor
             const detectedVendorName = detectVendor(bullet);
             const vendor = detectedVendorName ? getVendor(detectedVendorName) : null;
@@ -312,7 +318,7 @@ export function TldrSection({ tldr, tldr_he, tldrAudioUrl, tldrAudioUrlHe, stori
             return (
               <div
                 key={i}
-                className="group flex gap-3 items-start rounded-xl px-4 py-3 transition-all cursor-pointer"
+                className={`group flex gap-3 items-start rounded-xl px-4 py-3 transition-all ${goodMatch ? "cursor-pointer" : ""}`}
                 style={{
                   background: `linear-gradient(135deg, ${accentColor}06, ${accentColor}03)`,
                   border: `1px solid ${accentColor}12`,

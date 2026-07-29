@@ -260,6 +260,21 @@ Tier 1 (real risk / has already bitten us) — **5 of 5 DONE (last: 2026-06-25)*
   FOLLOW-UP: `build_search_index.py` has NO `__main__` guard — importing it runs
   a full rebuild+deploy (bit me once during this work). Wrap its body in a guard.
 
+- ✅ [2026-07-29] TL;DR bullet→story binding → `shared/tldr_binding.py`. The merger
+  and `publish_data` each had their own shared-token matcher (thresholds 3 and 2),
+  and both accepted a link on the vendors a bullet name-drops in its trailing
+  clause — 3 of 9 bullets mis-bound on 2026-07-29, 31 across 12 published days.
+  One IDF-weighted, head-clause-weighted binder now serves both, treats the
+  writer's index as a default it only overrides on clear evidence, and leaves a
+  bullet UNLINKED rather than guessing. `monitor_health.py` re-runs it against the
+  live day JSON so a regression pages instead of shipping silently.
+  REMAINING COPY: the frontend's `scoreBulletAgainstStory`/`matchStory`
+  (`TldrSection.tsx`) is a third implementation of the same mechanism. It is now
+  fallback-only — reached when `bullet_story_ids` is absent (pre-2026-05-18 day
+  JSONs), and no longer consulted for bullets the pipeline deliberately left
+  unlinked. Port it to the shared scoring (or drop it once legacy days are
+  backfilled) rather than tuning it separately.
+
 Tier 2 (quality / dedup — added 2026-06-17):
 - ⏳ Person-tweet data lives in TWO copies: `twitter.people` AND `social.people_highlights`
   in the day JSON. /community + homepage + search-index all read `twitter.people`; the

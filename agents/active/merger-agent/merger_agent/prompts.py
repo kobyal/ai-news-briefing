@@ -171,6 +171,17 @@ Produce ONE merged briefing as a JSON object. Rules:
 4. tldr — write 8-10 bullets summarising the most important stories from the merged set.
    Each bullet: vendor + what happened + why it matters (15-25 words).
 
+   EVERY bullet must be about a story you are RETURNING in news_items. Do NOT write a
+   bullet about material you dropped as a reword/duplicate, or about a development you
+   saw in the sources but chose not to publish as a story — the reader clicks the bullet
+   expecting that story to be on the page. If it is worth a TL;DR bullet, it is worth a
+   news_item; otherwise leave it out entirely. (2026-07-29: bullets about an "Open Secure
+   AI Alliance" launch and an Anthropic open-weights post were written for stories that
+   were never in news_items, and both got auto-bound to unrelated stories.)
+
+   Lead each bullet with its OWN story. Context about other stories goes in the trailing
+   clause, never first — the binding logic reads the opening clause as the subject.
+
    ALSO return tldr_story_indices: a parallel array of integers where
    tldr_story_indices[i] is the 0-based position in news_items of the story
    that tldr[i] summarizes. Same length as tldr. Choose the SUBJECT story

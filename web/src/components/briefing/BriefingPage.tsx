@@ -331,21 +331,20 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
   // #5 falls to a worse story. Fix: compute ALL (bullet, story) scores and
   // assign in score-descending order, so each pair locks onto its
   // highest-signal partner first.
-  const { tldrRanked, bulletStoryMap } = useMemo(() => {
+  const { tldrRanked, bulletStoryMap, bulletMapAuthoritative } = useMemo(() => {
     const tldr = data.tldr || [];
-    if (!tldr.length) return { tldrRanked: rankedStories, bulletStoryMap: new Map<number, NewsItem>() };
+    if (!tldr.length) return { tldrRanked: rankedStories, bulletStoryMap: new Map<number, NewsItem>(), bulletMapAuthoritative: false };
     const storyById = new Map(rankedStories.map((s) => [s.story_id, s] as const));
 
     // Preferred path: explicit bullet→story binding from the merger pipeline.
-    // Skips the keyword scorer entirely. Accepted when length matches and
-    // every non-empty id resolves to a known story (orphan bullets get ""
-    // in the pipeline; those fall to scorer too as a per-bullet safety net).
+    // Skips the keyword scorer entirely — including for bullets bound to ""
+    // (see bulletMapAuthoritative below: the pipeline decided that bullet has
+    // NO story, and guessing one is how readers got sent to a story the bullet
+    // wasn't about, 2026-07-29).
     // Normalise bullet_story_ids to exactly tldr.length entries (pad "" or
     // truncate). A dedup or QA patch that removes/adds a story can leave
     // explicit.length !== tldr.length — previously that caused the entire
     // explicit path to be skipped and ALL Hebrew bullets lost navigation.
-    // Now: truncate extra trailing IDs; pad missing ones with "" (those
-    // individual bullets fall back to keyword scorer).
     const rawExplicit = data.bullet_story_ids;
     const explicit = Array.isArray(rawExplicit)
       ? Array.from({ length: tldr.length }, (_, i) => rawExplicit[i] || "")
@@ -363,7 +362,7 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
         claimed.add(sid);
       });
       for (const s of rankedStories) if (!claimed.has(s.story_id)) ordered.push(s);
-      return { tldrRanked: ordered, bulletStoryMap: bulletMap };
+      return { tldrRanked: ordered, bulletStoryMap: bulletMap, bulletMapAuthoritative: true };
     }
 
     // Fallback: keyword scorer (brittle on multi-vendor bullets — e.g. on
@@ -398,7 +397,7 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
       if (s) ordered.push(s);
     });
     for (const s of rankedStories) if (!claimedStories.has(s.story_id)) ordered.push(s);
-    return { tldrRanked: ordered, bulletStoryMap: bulletMap };
+    return { tldrRanked: ordered, bulletStoryMap: bulletMap, bulletMapAuthoritative: false };
   }, [rankedStories, data.tldr, data.bullet_story_ids]);
 
   const todayFiltered = useMemo(() => {
@@ -427,6 +426,7 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
               tldrAudioUrlHe={data.tldr_audio_url_he}
               stories={tldrRanked}
               bulletStoryMap={bulletStoryMap}
+              bulletMapAuthoritative={bulletMapAuthoritative}
             />
           </div>
         )}

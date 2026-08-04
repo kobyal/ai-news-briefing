@@ -74,11 +74,35 @@ def _parse_json(text: str) -> dict:
     # quote repair, strict=False control-char tolerance, etc.) instead of a naive
     # json.loads — this was the lone un-patched copy that crashed on an unescaped
     # control character (2026-06-26). See shared/json_repair.py + ROADMAP Tier-1 #2.
+    result = _parse_json_soft(text)
+    if not result:
+        raise ValueError("editorial: could not parse JSON from synthesis output")
+    return result
+
+
+def _parse_json_soft(text: str, *, label: str = "synthesis") -> dict:
+    """parse_json that returns {} instead of raising, and PRESERVES the raw text
+    when it fails.
+
+    The 2026-08-04 failure was near-undiagnosable after the fact: the only trace
+    was a 200-char preview in the run log, so there was no way to tell a
+    truncated response from a malformed one. Dumping the raw body next to the
+    day's output makes the next occurrence a one-file read.
+    """
     sys.path.insert(0, str(_ROOT / "shared"))
     import json_repair
     result = json_repair.parse_json(text)
     if not result:
-        raise ValueError("editorial: could not parse JSON from synthesis output")
+        try:
+            dump_dir = _ROOT / "agents" / "active" / "editorial-agent" / "output" / "_failures"
+            dump_dir.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            path = dump_dir / f"{label}_{stamp}.txt"
+            path.write_text(text or "", encoding="utf-8")
+            print(f"  ↳ raw output saved for diagnosis: {path.relative_to(_ROOT)} "
+                  f"({len(text or '')} chars)")
+        except Exception:
+            pass
     return result
 
 
@@ -714,12 +738,63 @@ def _resolve_top_videos(top_videos: list, video_cat: dict) -> list:
 
 # ── LLM calls ─────────────────────────────────────────────────────────────────
 
+#: Keys the downstream resolvers/_merge need for a usable editorial. `theme` and
+#: `lenses` are load-bearing for the page; the rest degrade gracefully to empty.
+_SYNTHESIS_REQUIRED = ("theme", "lenses")
+
+
 def _synthesize(context: dict) -> dict:
+    """Synthesize the editorial, retrying when the model's JSON doesn't survive.
+
+    Until 2026-08-04 this was a single unguarded `_parse_json(_call_llm(...))`:
+    one bad parse killed the whole agent and the site kept serving the PREVIOUS
+    day's editorial.json with no visible error (that's exactly what happened on
+    2026-08-04 — a ~8.9k-token Opus response arrived truncated). Note the irony
+    that the cheap `_translate` call already had two fallback levels while the
+    expensive 127-second Opus call had none.
+
+    Retry 2 explicitly asks for a tighter response, since truncation — not
+    malformed syntax — is the failure we actually observe.
+    """
     from .prompts import SYNTHESIS_SYSTEM, SYNTHESIS_USER
     prompt = SYNTHESIS_USER.format(**context)
-    print("  → Opus: editorial synthesis (richer output)...")
-    raw = _call_llm(prompt, SYNTHESIS_SYSTEM, label="editorial-synthesis", model="claude-opus-4-8")
-    return _parse_json(raw)
+    attempts = [
+        ("editorial-synthesis", SYNTHESIS_SYSTEM, prompt),
+        ("editorial-synthesis-retry", SYNTHESIS_SYSTEM, prompt),
+        ("editorial-synthesis-compact",
+         SYNTHESIS_SYSTEM + (
+             "\n\nCRITICAL: your previous response was cut off before the JSON closed. "
+             "Return the SAME structure but noticeably more concise — keep every required "
+             "key, trim prose bodies to the shorter end of their allowed length. Output "
+             "ONLY the JSON object, nothing before or after it."),
+         prompt),
+    ]
+    best: dict = {}
+    for i, (label, system, text) in enumerate(attempts, 1):
+        print(f"  → Opus: editorial synthesis (attempt {i}/{len(attempts)})...")
+        try:
+            raw = _call_llm(text, system, label=label, model="claude-opus-4-8")
+        except Exception as e:                       # transport/AUP/timeout
+            print(f"  ⚠ synthesis call failed ({type(e).__name__}: {e})")
+            continue
+        result = _parse_json_soft(raw, label=label)
+        if not result:
+            continue
+        missing = [k for k in _SYNTHESIS_REQUIRED if not result.get(k)]
+        if not missing:
+            if i > 1:
+                print(f"  ✓ synthesis recovered on attempt {i}")
+            return result
+        print(f"  ⚠ synthesis attempt {i} incomplete — missing {missing}")
+        if len(result) > len(best):
+            best = result
+    # Prefer a partial editorial over none, but only if the page's load-bearing
+    # pieces survived; otherwise fail loudly so the health email flags it.
+    if all(best.get(k) for k in _SYNTHESIS_REQUIRED):
+        print(f"  ⚠ using PARTIAL synthesis (keys: {sorted(best)}) after all retries")
+        return best
+    raise ValueError("editorial: could not parse JSON from synthesis output after "
+                     f"{len(attempts)} attempts")
 
 
 def _translate(synthesis: dict, community: Optional[list] = None) -> dict:
@@ -747,7 +822,10 @@ def _translate(synthesis: dict, community: Optional[list] = None) -> dict:
         return {}
     try:
         return _parse_json(raw)
-    except json.JSONDecodeError as e:
+    # _parse_json raises a BARE ValueError, not JSONDecodeError — so this handler
+    # (and the repair retry below) was unreachable dead code until 2026-08-04.
+    # JSONDecodeError subclasses ValueError, so catching ValueError covers both.
+    except ValueError as e:
         print(f"  ⚠ Translation JSON parse failed ({e}), retrying with repair prompt...")
         repair_prompt = (
             f"The following JSON has a syntax error. Fix ONLY the JSON syntax "
@@ -756,7 +834,7 @@ def _translate(synthesis: dict, community: Optional[list] = None) -> dict:
         try:
             raw2 = _call_llm(repair_prompt, "Return only valid JSON. No explanation.", label="editorial-translate-repair", model="claude-sonnet-4-6")
             return _parse_json(raw2)
-        except (json.JSONDecodeError, RuntimeError):
+        except (ValueError, RuntimeError):   # ValueError covers JSONDecodeError
             print("  ⚠ Translation repair also failed — using empty Hebrew fields")
             return {}
 

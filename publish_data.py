@@ -316,6 +316,7 @@ def _best_rss(pattern):
 # Resolve agent output dirs wherever the agents live (agents/active, ...).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shared.repo_root import agent_dir as _agent_dir  # noqa: E402
+from shared import article_date  # noqa: E402
 def _out(_name):  # location-independent glob for an agent's JSON outputs
     return str(_agent_dir(_name) / "output" / "**" / "*.json")
 
@@ -2019,11 +2020,13 @@ def _pair_explainer_videos(news_items: list, videos: list) -> int:
     if not news_items or not videos:
         return 0
     story_lines = [
-        f"S{i}: [{(item.get('vendor') or '?')}] {(item.get('headline') or '')[:140]}"
+        f"S{i}: ({item.get('published_date') or '?'}) [{(item.get('vendor') or '?')}] "
+        f"{(item.get('headline') or '')[:140]}"
         for i, item in enumerate(news_items)
     ]
     video_lines = [
-        f"V{i}: [{(v.get('vendor') or '?')}] {(v.get('headline') or v.get('title') or '')[:140]}"
+        f"V{i}: ({v.get('published_date') or '?'}) [{(v.get('vendor') or '?')}] "
+        f"{(v.get('headline') or v.get('title') or '')[:140]}"
         for i, v in enumerate(videos)
     ]
     instructions = (
@@ -2034,6 +2037,23 @@ def _pair_explainer_videos(news_items: list, videos: list) -> int:
         "research-bias story. Multi-topic 'daily AI roundup' videos that cover several "
         "unrelated stories are NOT a focused explainer for any single one — return null "
         "for them unless one story is clearly the video's central, dominant subject. "
+        # 2026-07-31: "What did Anthropic do?! (Opus 5)" (a July 24 model-launch
+        # reaction video) was paired to a July 31 story about Claude models
+        # breaching three organizations during cyber evals. The title's vague
+        # outrage framing reads like it could be about any Anthropic controversy,
+        # and the pairer had no dates at all — so it could not see that the video
+        # predated the news by a week.
+        "\n\nEach line is prefixed with its publication date: S<i>: (date) ... / V<i>: (date) ...\n"
+        "USE THE DATES. A video published BEFORE the story's event happened cannot be "
+        "explaining that event. When a video predates the story by more than a few days, "
+        "pair it ONLY if it is clearly about the same ongoing subject (e.g. an earlier "
+        "video about the same product's pricing), never merely the same vendor.\n"
+        "BEWARE VAGUE / CLICKBAIT TITLES. Titles like 'What did <vendor> do?!', "
+        "'<vendor> is in trouble', or '<vendor> JUST changed everything' name a vendor "
+        "but no specific event. Do NOT pair those with a specific incident story unless "
+        "the title or its parenthetical names that same event — a title whose only link "
+        "to the story is the vendor name (or one of that vendor's model names) is a "
+        "vendor-only match, which is exactly what this rule forbids.\n\n"
         "When in doubt, return null. Each video can pair with "
         "at most one story. Cover every story in the output (use null for no match)."
     )
@@ -2237,6 +2257,62 @@ def _remediate_source_mismatch():
 _remediation_actions = _remediate_source_mismatch()
 
 
+def _reverify_primary_freshness():
+    """Re-check story freshness against the FINAL primary URL.
+
+    The merger verifies the real article date of urls[0] and drops anything
+    stale — but publish_data then keeps filtering URLs (og-fetch relevance,
+    aggregator blocklist, source-mismatch remediation), and dropping the old
+    urls[0] PROMOTES a different article to primary. So a story can pass the
+    merger's gate on a fresh primary and still ship with a stale one.
+
+    That is exactly how 2026-08-04 published "Amazon Bedrock Cuts OpenAI GPT-5.6
+    Prices" dated August 3: at merge time urls[0] was an Aug-03 AWS roundup, the
+    aggregator filter later dropped that roundup, and an 11-day-old Jul-24 post
+    became the primary — after the freshness check had already run.
+
+    Runs last, so it sees the URLs the reader will actually click.
+    """
+    if not _news_items:
+        return []
+    cutoff = (datetime.now() - timedelta(days=article_date.MAX_STORY_AGE_DAYS)).date()
+    primaries = [(it.get("urls") or [""])[0] for it in _news_items]
+    try:
+        real = article_date.fetch_many([u for u in primaries if u])
+    except Exception as e:
+        print(f"  ⚠ freshness re-verify skipped ({e})")
+        return []
+
+    kept, dropped, corrected = [], [], 0
+    for item, primary in zip(_news_items, primaries):
+        d = real.get(primary)
+        if d is None:
+            kept.append(item)
+            continue
+        claimed = article_date.parse_us(item.get("published_date", ""))
+        if claimed != d:
+            item["published_date"] = article_date.format_us(d)
+            corrected += 1
+        item["date_verified"] = True
+        if d >= cutoff:
+            kept.append(item)
+        else:
+            age = (datetime.now().date() - d).days
+            dropped.append(f"    ✂ {item.get('headline','?')[:62]} "
+                           f"({age}d old after URL filtering — primary is now {primary[:70]})")
+    if corrected:
+        print(f"  📅 Re-verify corrected {corrected} published_date value(s) against the final primary")
+    if dropped:
+        print(f"\n  🕒 FRESHNESS RE-VERIFY — dropped {len(dropped)} story/ies stale on their FINAL primary:")
+        for line in dropped:
+            print(line)
+        _news_items[:] = kept
+    return dropped
+
+
+_freshness_reverify_actions = _reverify_primary_freshness()
+
+
 # The HE TL;DR renders bullet-for-bullet against `bullet_story_ids`, which is
 # length-aligned to the EN `tldr`. The merger's translation prompt asks for
 # "8-10" HE bullets independently of how many EN bullets exist, so a 7-bullet EN
@@ -2295,12 +2371,24 @@ def _audit_data_quality():
     # red flag for an over-aggressive vendor/URL filter (the 2026-04-27 verifier
     # story shipped with only finance.sina.com.cn after the auto-correct mistake).
     _NON_EN_TLDS = (".cn", ".ru", ".jp", ".kr", ".cz")  # extend if needed
+    # A TLD test alone misses PATH-localized editions on English-domain sites —
+    # nytimes.com/es/.../espanol/anthropic-hackeo.html shipped as a story's
+    # PRIMARY source on 2026-07-31 and this audit stayed silent. The merger now
+    # demotes these below English siblings; this reports the ones that remain
+    # primary (i.e. the story had no English source at all).
+    _LOCALIZED_PATH = re.compile(
+        r"/(?:es|fr|de|it|pt|pt-br|ja|ko|ru|ar|he|tr|nl|pl|sv|id|vi|th|hi"
+        r"|zh|zh-hans|zh-hant|espanol|deutsch|francais|portugues|italiano)(?:/|$)", re.I)
     for item in _news_items:
         urls = item.get("urls") or []
         if not urls:
             issues.append(f"story has no URLs: {(item.get('headline') or '')[:60]}")
-        elif all(any(tld in u.lower() for tld in _NON_EN_TLDS) for u in urls):
+            continue
+        if all(any(tld in u.lower() for tld in _NON_EN_TLDS) for u in urls):
             issues.append(f"only non-English sources: {(item.get('headline') or '')[:60]} | {urls}")
+        if _LOCALIZED_PATH.search(urllib.parse.urlsplit(urls[0]).path or ""):
+            issues.append(
+                f"primary source is a translated edition: {(item.get('headline') or '')[:60]} | {urls[0]}")
 
     # 3. Source relevance — a story whose PRIMARY first-party source URL shares
     # NO subject word with its headline is likely mis-sourced (the 2026-06-23

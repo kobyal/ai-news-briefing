@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import time
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -35,6 +36,13 @@ from shared.repo_root import agent_dir as _agent_dir  # noqa: E402
 from shared.pricing import estimate_cost  # noqa: E402
 from shared import anthropic_cc  # noqa: E402
 from shared.he_glossary import HE_TERM_GLOSSARY  # noqa: E402
+from shared import article_date  # noqa: E402
+
+# Freshness/repetition policy (tightened 2026-08-02 after an audit showed 47% of a
+# day's briefing had already run in the prior 3 days and 15% of checkable stories
+# were ≥7 days old). Ship FEWER genuinely-new stories over a padded rerun list.
+_MAX_STORY_AGE_DAYS = article_date.MAX_STORY_AGE_DAYS  # shared with publish_data's re-verify
+_DEDUP_LOOKBACK_DAYS = 7  # was 2 — day-3+ recurrence used to sail through
 
 # ---------------------------------------------------------------------------
 # Config — Two execution paths (mutually exclusive, selected at call time):
@@ -827,26 +835,56 @@ def run_pipeline() -> dict:
         if not parsed or not parsed.get("news_items"):
             raise RuntimeError(f"Merger returned invalid JSON after retry: {repr(merged_json[:200])}")
 
-    # Filter out stale stories (older than 3 days)
-    # Use start-of-day cutoff so stories from exactly N days ago are kept
+    # ── Ground published_date in the ACTUAL article, then filter on it ────────
+    # This filter used to read item["published_date"] — a string the LLM WRITES,
+    # not one it observes. Audited 2026-08-02: the field is essentially always
+    # "yesterday" no matter the truth (an AWS post from 2026-07-16 shipped
+    # claiming "August 01, 2026"; a Mistral post from 07-08 claimed "July 30"),
+    # so a 3-day cutoff was validating a hallucination and 2-3 week old vendor
+    # blogs sailed through as today's news. We now fetch the real date from the
+    # page (shared/article_date.py) and overwrite the claim before gating.
+    #
+    # An UNRESOLVABLE date (paywall, 403, no metadata) is kept — we can't prove
+    # it's stale — but it is NOT silently relabelled as fresh.
     parsed = _parse(merged_json)
-    cutoff = (datetime.now() - timedelta(days=3)).replace(hour=0, minute=0, second=0, microsecond=0)
-    original_count = len(parsed.get("news_items", []))
+    _items = parsed.get("news_items", [])
+    cutoff_date = (datetime.now() - timedelta(days=_MAX_STORY_AGE_DAYS)).date()
+    _primaries = [(it.get("urls") or [""])[0] for it in _items]
+    try:
+        _real = article_date.fetch_many([u for u in _primaries if u])
+    except Exception as e:  # never let date resolution break a run
+        print(f"  ⚠ article-date resolution failed ({e}); falling back to claimed dates")
+        _real = {}
+
+    original_count = len(_items)
     fresh_items = []
-    for item in parsed.get("news_items", []):
-        pub = item.get("published_date", "")
-        try:
-            pub_dt = datetime.strptime(pub, "%B %d, %Y")
-            if pub_dt >= cutoff:
-                fresh_items.append(item)
-            else:
-                print(f"  ✂ Dropped stale story: {item.get('headline', '?')} ({pub})")
-        except ValueError:
-            fresh_items.append(item)  # keep if date can't be parsed
+    corrected = unresolved = 0
+    for item, primary in zip(_items, _primaries):
+        real = _real.get(primary)
+        if real is None:
+            unresolved += 1
+            fresh_items.append(item)          # unknown ≠ stale, and ≠ fresh
+            item["date_verified"] = False
+            continue
+        claimed = article_date.parse_us(item.get("published_date", ""))
+        if claimed != real:
+            corrected += 1
+            item["published_date"] = article_date.format_us(real)
+        item["date_verified"] = True
+        if real >= cutoff_date:
+            fresh_items.append(item)
+        else:
+            age = (datetime.now().date() - real).days
+            print(f"  ✂ Dropped stale story ({age}d old, claimed "
+                  f"{claimed or '?'}): {item.get('headline', '?')[:70]}")
+    if corrected:
+        print(f"  📅 Corrected {corrected} fabricated published_date value(s) to the real article date")
+    if unresolved:
+        print(f"  📅 {unresolved} story/ies had an unresolvable article date (kept, unverified)")
     if len(fresh_items) < original_count:
         parsed["news_items"] = fresh_items
-        merged_json = json.dumps(parsed, ensure_ascii=False)
         print(f"  Kept {len(fresh_items)}/{original_count} stories after freshness filter")
+    merged_json = json.dumps(parsed, ensure_ascii=False)
 
     # Enforce URL whitelist — drop any URL the merger invented that isn't in the source briefings.
     # Prevents cross-story URL assignment (e.g. Grok story linking to an Anthropic article).
@@ -900,8 +938,15 @@ def run_pipeline() -> dict:
     # near-duplicates of yesterday with no new URL. Any genuine continuation
     # adds at least one new source URL, so "every URL is stale" is a high-
     # confidence "this isn't actually a new development" signal.
+    # Widened from 2 → 7 days and from "every URL stale" to "same anchor story".
+    # The old rule let a story return on day 3, and let ANY single new URL
+    # resurrect it — so Claude Opus 5 ran four days straight, the OpenAI sandbox
+    # story five, and 47% of 2026-08-02's briefing had already run in the prior
+    # three days. urls[0] is the story's anchor (it also derives the story_id),
+    # so a repeat primary means "same story", not "a development".
     prior_urls: set[str] = set()
-    for delta in (1, 2):
+    prior_primaries: set[str] = set()
+    for delta in range(1, _DEDUP_LOOKBACK_DAYS + 1):
         day = (datetime.now() - timedelta(days=delta)).strftime("%Y-%m-%d")
         try:
             with open(f"docs/data/{day}.json") as fh:
@@ -909,8 +954,11 @@ def run_pipeline() -> dict:
         except (FileNotFoundError, json.JSONDecodeError):
             continue
         for it in prior.get("briefing", {}).get("news_items", []):
-            for u in it.get("urls", []):
+            urls = it.get("urls") or []
+            for u in urls:
                 prior_urls.add(_norm_url(u))
+            if urls:
+                prior_primaries.add(_norm_url(urls[0]))
 
     if prior_urls:
         parsed = _parse(merged_json)
@@ -918,15 +966,28 @@ def run_pipeline() -> dict:
         suppressed = 0
         for item in parsed.get("news_items", []):
             urls_norm = [_norm_url(u) for u in item.get("urls", [])]
-            if urls_norm and all(u in prior_urls for u in urls_norm):
+            if not urls_norm:
+                kept_items.append(item)
+                continue
+            fresh_urls = [u for u in urls_norm if u not in prior_urls]
+            reason = None
+            if not fresh_urls:
+                reason = "no new sources"
+            elif urls_norm[0] in prior_primaries and len(fresh_urls) < 2:
+                # Same anchor article as an earlier day, with at most one added
+                # link — a re-run, not a genuine follow-up. Two or more new
+                # sources is our bar for "the story actually moved".
+                reason = "same primary source as an earlier day"
+            if reason:
                 suppressed += 1
-                print(f"  ✂ Cross-day dup dropped: {item.get('headline', '?')[:80]}")
+                print(f"  ✂ Cross-day dup dropped ({reason}): {item.get('headline', '?')[:70]}")
             else:
                 kept_items.append(item)
         if suppressed:
             parsed["news_items"] = kept_items
             merged_json = json.dumps(parsed, ensure_ascii=False)
-            print(f"  Cross-day URL dedup: dropped {suppressed} story/ies with no new sources vs prior 2 days")
+            print(f"  Cross-day URL dedup: dropped {suppressed} story/ies already "
+                  f"published in the prior {_DEDUP_LOOKBACK_DAYS} days")
 
     # Validate URLs — strip broken ones (404, timeouts)
     parsed = _parse(merged_json)
@@ -1028,6 +1089,16 @@ def run_pipeline() -> dict:
         "debut","debuts","sale","sales","week","month","year","years","day","days","time",
         "ipo","valuation","stock","stocks","price","prices","report","reports","update","updates",
         "partner","partners","partnership","deal-with","based","amid","over",
+        # Attribution / confirmation verbs — same class as "says"/"reports" above.
+        # On 2026-07-31 the Anthropic cyber-evals story kept a BleepingComputer
+        # link about a completely different event (a worldwide Claude OUTAGE)
+        # because headline and slug both contained "confirms" — that lone
+        # generic verb was the only non-vendor token they shared.
+        "confirm","confirms","confirmed","admit","admits","admitted",
+        "deny","denies","denied","reveal","reveals","revealed",
+        "warn","warns","warned","claim","claims","claimed",
+        "unveil","unveils","unveiled","introduce","introduces","introduced",
+        "announce","announces","announced","announcement",
     }
     _VENDOR_STOP = {
         "claude","anthropic","openai","gpt","chatgpt","codex","sora",
@@ -1103,6 +1174,54 @@ def run_pipeline() -> dict:
     if total_dropped:
         merged_json = json.dumps(parsed, ensure_ascii=False)
         print(f"  URL relevance filter: kept {total_checked - total_dropped}/{total_checked}, dropped {total_dropped}")
+
+    # ── Language / edition ordering ────────────────────────────────────────
+    # urls[0] is the PRIMARY source the card links to, so it must not be a
+    # translated regional edition when an English original is available. On
+    # 2026-07-31 the Anthropic cyber-evals story linked
+    # nytimes.com/es/2026/07/30/espanol/negocios/anthropic-hackeo.html as its
+    # primary — a Spanish edition of an English NYT piece. Nothing anywhere
+    # looked at language: the only language-aware code was a report-only audit
+    # in publish_data.py that tested TLDs (.cn/.ru/.jp/...), which a
+    # path-localized .com edition sails straight past.
+    #
+    # This is a STABLE sort, so the first-party-first ordering the prompt
+    # produces is preserved among URLs of the same tier. Localized editions are
+    # demoted, never dropped — a translated source still beats no source.
+    _LOCALIZED_PATH_RE = re.compile(
+        r"/(?:es|fr|de|it|pt|pt-br|ja|ko|ru|ar|he|tr|nl|pl|sv|id|vi|th|hi"
+        r"|zh|zh-hans|zh-hant|espanol|deutsch|francais|portugues|italiano)(?:/|$)",
+        re.I,
+    )
+    _NON_EN_TLD_RE = re.compile(
+        r"://[^/]*\.(?:cn|ru|jp|kr|de|fr|es|it|br|nl|pl|tr|cz|se|no|fi|dk|gr|il|in|vn|th|id)(?:[:/]|$)",
+        re.I,
+    )
+
+    def _is_localized_edition(u: str) -> bool:
+        try:
+            path = "/" + urllib.parse.urlsplit(u).path.lstrip("/")
+        except Exception:
+            path = u
+        return bool(_LOCALIZED_PATH_RE.search(path) or _NON_EN_TLD_RE.search(u or ""))
+
+    _demoted = 0
+    for item in parsed.get("news_items", []):
+        urls = item.get("urls") or []
+        if len(urls) < 2:
+            continue
+        localized = [u for u in urls if _is_localized_edition(u)]
+        if not localized or len(localized) == len(urls):
+            continue  # nothing to demote, or everything is localized (leave as-is)
+        reordered = [u for u in urls if not _is_localized_edition(u)] + localized
+        if reordered != urls:
+            _demoted += 1
+            print(f"  🌐 Demoted localized edition below English source for "
+                  f"'{item.get('headline','')[:50]}': {urls[0][:70]}")
+            item["urls"] = reordered
+    if _demoted:
+        merged_json = json.dumps(parsed, ensure_ascii=False)
+        print(f"  Language ordering: {_demoted} story/stories re-ordered to an English primary")
 
     # TLDR orphan-bullet guard + index-binding — every tldr bullet must map to
     # a news_item, otherwise a click on the bullet card in the UI lands on the

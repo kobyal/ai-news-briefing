@@ -17,6 +17,7 @@ Models are configurable via .env:
 """
 import json
 import os
+import re
 import subprocess
 import time
 from datetime import datetime, timedelta
@@ -278,6 +279,24 @@ def _agent(
 # Pipeline steps
 # ---------------------------------------------------------------------------
 
+_URL_IN_TEXT = re.compile(r"https?://[^\s\)\]\"'<>]{12,}")
+
+
+def _has_sources(text: str) -> bool:
+    """True if the researcher actually came back with cited source URLs.
+
+    The failure mode this guards is subtle: Perplexity returns a well-formed
+    response that is really just a restatement of the prompt ("supply the
+    SOURCES sections with headlines, dates and links"), containing no URLs. That
+    reads as success to every downstream step, so the agent silently publishes
+    an empty briefing. Requiring ≥2 distinct real links is a cheap, robust test.
+    """
+    if not text:
+        return False
+    links = {m.group(0).rstrip(".,;") for m in _URL_IN_TEXT.finditer(text)}
+    return len(links) >= 2
+
+
 def _step1_vendor_research() -> str:
     print("\n[1/5] VendorResearcher — searching AI news via Perplexity Sonar...")
     return _agent(
@@ -383,10 +402,22 @@ def _step5_publish(briefing_json: str, hebrew_json: str) -> dict:
         if dropped:
             print(f"  ⚠️  Dropped {dropped} stale item(s) older than {_MAX_AGE} days")
 
+    # An empty news_items list is a FAILURE, not a quiet success. Reporting
+    # success:True here is what let 2026-07-29 and 2026-08-02 ship with zero
+    # perplexity stories and no alarm in the daily health email.
+    n_items = len((data or {}).get("news_items") or []) if isinstance(data, dict) else 0
+    ok = n_items > 0
+    payload = {"source": "perplexity", "briefing": data, "briefing_he": he}
+    if not ok:
+        payload["error"] = "no news_items produced — web search returned no sourced content"
     with open(json_path, "w", encoding="utf-8") as f:
-        json.dump({"source": "perplexity", "briefing": data, "briefing_he": he}, f, ensure_ascii=False)
+        json.dump(payload, f, ensure_ascii=False)
     print(f"  Saved → {json_path}")
-    return {"saved_to": json_path, "json_saved_to": json_path, "success": True}
+    if not ok:
+        print("  ❌ Perplexity produced 0 news items — reporting FAILURE so the health email flags it")
+    return {"saved_to": json_path, "json_saved_to": json_path,
+            "success": ok, "item_count": n_items,
+            **({} if ok else {"error": payload["error"]})}
 
 
 # ---------------------------------------------------------------------------
@@ -410,6 +441,16 @@ def run_pipeline() -> dict:
     t_start = time.time()
 
     vendor_news   = _step1_vendor_research()
+    # Retry once when the search comes back without any sources. Previously a
+    # sourceless step 1 flowed straight through: the writer correctly refused to
+    # fabricate and emitted news_items:[], but run_pipeline still returned
+    # success:True, so the agent contributed ZERO stories with no alarm anywhere
+    # (2026-07-29 and 2026-08-02 both shipped that way, and the merger padded the
+    # gap with recycled older stories).
+    if not _has_sources(vendor_news):
+        print("  ⚠️  VendorResearcher returned no sourced content — retrying once…")
+        vendor_news = _step1_vendor_research()
+
     community     = _step2_community_research(vendor_news)
     briefing_json = _step3_write_briefing(vendor_news, community)
     hebrew_json   = _step4_translate(briefing_json)

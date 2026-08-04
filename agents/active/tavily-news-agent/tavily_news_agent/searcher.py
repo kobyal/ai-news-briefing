@@ -16,9 +16,17 @@ class Article:
     headline: str
     url: str
     snippet: str
-    published_date: str
+    published_date: str            # display form ("July 31, 2026") for the writer prompt
     score: float = 0.0
     source: str = ""   # "tavily" | "ddg"
+    #: The provider's ORIGINAL date string, kept so freshness filtering works on
+    #: the real value rather than the reformatted display string.
+    published_date_raw: str = ""
+
+
+#: Below this many in-window articles, admit undated ones rather than starve the
+#: writer (the DuckDuckGo fallback supplies no dates whatsoever).
+_MIN_FRESH_ARTICLES = 12
 
 
 import sys; sys.path.insert(0, str(next((_p for _p in __import__("pathlib").Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), __import__("pathlib").Path(__file__).resolve().parents[2])))
@@ -143,6 +151,7 @@ def fetch_all_vendor_news(lookback_days: int = 3) -> List[Article]:
                     published_date=_format_date(r.get("published_date") or r.get("date") or ""),
                     score=float(r.get("score", 0.5)),
                     source=provider,
+                    published_date_raw=(r.get("published_date") or r.get("date") or ""),
                 ))
         return results
 
@@ -164,15 +173,69 @@ def fetch_all_vendor_news(lookback_days: int = 3) -> List[Article]:
             unique.append(a)
 
     print(f"  → {len(unique)} unique articles across {len(VENDOR_QUERIES)} vendors")
-    return unique
+
+    # ── Enforce the lookback window ourselves ────────────────────────────────
+    # Tavily's `days=` parameter does NOT constrain results to that window:
+    # measured 2026-08-04, days=3 returned articles from Jul 28 – Aug 02 (2-7
+    # days old), and the agent shipped a briefing whose newest item was 4 days
+    # old while ADK/perplexity had same-day news. We already receive a real
+    # published_date per article — it just was never used for anything. Filter
+    # on it, and be loud about what that costs so the daily freshness panel
+    # reflects reality instead of a silently stale briefing.
+    cutoff = (datetime.now() - timedelta(days=lookback_days)).date()
+    fresh, stale, undated = [], [], []
+    for a in unique:
+        d = _parse_date(a.published_date_raw)
+        if d is None:
+            undated.append(a)
+        elif d >= cutoff:
+            fresh.append(a)
+        else:
+            stale.append(a)
+
+    if stale or undated:
+        print(f"  Freshness: {len(fresh)} within {lookback_days}d · "
+              f"{len(stale)} older (dropped) · {len(undated)} undated")
+    # Undated articles are mostly the DuckDuckGo fallback path, which returns no
+    # dates at all. Keep them only when we'd otherwise be starved, so a
+    # DDG-only run still produces something rather than nothing.
+    kept = fresh if len(fresh) >= _MIN_FRESH_ARTICLES else fresh + undated
+    if len(fresh) < _MIN_FRESH_ARTICLES:
+        print(f"  ⚠ Only {len(fresh)} article(s) inside the {lookback_days}d window — "
+              f"admitting {len(undated)} undated to reach {len(kept)}")
+    if not kept:
+        print("  ⚠ No fresh articles at all — returning the newest stale ones so the "
+              "run produces output; the freshness panel will flag this")
+        kept = sorted(stale, key=lambda a: _parse_date(a.published_date_raw) or cutoff,
+                      reverse=True)[:10]
+    return kept
+
+
+def _parse_date(raw: str):
+    """Parse a Tavily/DDG published_date into a `date`, or None.
+
+    Tavily's news topic returns RFC-2822 ("Fri, 31 Jul 2026 09:41:35 GMT"), which
+    the old ISO-only _format_date could not read — it silently fell through to
+    `raw[:20]`, so the writer LLM received the truncated garbage string
+    "Fri, 31 Jul 2026 09:" instead of a date. That is a large part of why this
+    agent's published_date values were invented rather than observed (audited
+    2026-08-04). Handle both formats.
+    """
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+    except Exception:
+        pass
+    try:
+        from email.utils import parsedate_to_datetime
+        return parsedate_to_datetime(raw).date()
+    except Exception:
+        return None
 
 
 def _format_date(raw: str) -> str:
-    if not raw:
-        return "Date unknown"
-    try:
-        # Try ISO format
-        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        return dt.strftime("%B %d, %Y")
-    except Exception:
-        return raw[:20] if raw else "Date unknown"
+    d = _parse_date(raw)
+    if d:
+        return d.strftime("%B %d, %Y")
+    return "Date unknown"

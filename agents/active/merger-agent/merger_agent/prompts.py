@@ -93,6 +93,20 @@ Produce ONE merged briefing as a JSON object. Rules:
    - published_date: use the LATEST date among the merged sources (not the earliest)
    - ONLY merge when stories describe the SAME specific announcement (e.g. two articles about "Bedrock Agent Registry launch").
      Do NOT merge different announcements from the same vendor (e.g. "Agent Registry" and "Project Houdini" are separate stories even though both are AWS).
+   - NEVER ANNEX A CONCURRENT-BUT-SEPARATE EVENT. Two things happening at the same vendor in the
+     same week are still two stories. If you catch yourself writing "separately,", "meanwhile,",
+     "in a related development", or "this lands alongside" to introduce a DIFFERENT event inside a
+     story's summary/detail — stop: that second event is its own news_item (or, if it isn't
+     significant enough to stand alone, it should be dropped, not smuggled in).
+     A source URL may ONLY appear under a story if it reports THAT story's event.
+     ❌ 2026-07-31: "Anthropic confirms Claude models infiltrated three organizations during cyber
+        evals" carried a bleepingcomputer.com link about a worldwide Claude OUTAGE, and its summary
+        narrated that outage as "a separate worldwide Claude '529 Overloaded' outage on July 29".
+        Two events, two sources, one story → the outage source read as a mis-linked citation.
+     ✓  "Anthropic confirms Claude models infiltrated three organizations during cyber evals"
+     ✓  "Claude hit by worldwide '529 Overloaded' outage" (separate news_item, its own URL)
+     Cross-event CONTEXT is still fine — but only as analysis in `detail` with no source URL
+     attached to it, and never in `summary`, and never as a second subject in the headline.
 
 1b. ONE ANNOUNCEMENT PER STORY — each news_item must cover exactly ONE specific event or announcement.
    - If a source article bundles 2+ distinct events (e.g. "OpenAI files IPO + ships ChatGPT in PowerPoint + claims math breakthrough"),

@@ -37,6 +37,7 @@ from shared.pricing import estimate_cost  # noqa: E402
 from shared import anthropic_cc  # noqa: E402
 from shared.he_glossary import HE_TERM_GLOSSARY  # noqa: E402
 from shared import article_date  # noqa: E402
+from shared import story_similarity as _story_similarity  # noqa: E402
 
 # Freshness/repetition policy (tightened 2026-08-02 after an audit showed 47% of a
 # day's briefing had already run in the prior 3 days and 15% of checkable stories
@@ -946,6 +947,7 @@ def run_pipeline() -> dict:
     # so a repeat primary means "same story", not "a development".
     prior_urls: set[str] = set()
     prior_primaries: set[str] = set()
+    prior_headlines: list = []          # (headline, date) for subject-level dedup
     for delta in range(1, _DEDUP_LOOKBACK_DAYS + 1):
         day = (datetime.now() - timedelta(days=delta)).strftime("%Y-%m-%d")
         try:
@@ -959,6 +961,8 @@ def run_pipeline() -> dict:
                 prior_urls.add(_norm_url(u))
             if urls:
                 prior_primaries.add(_norm_url(urls[0]))
+            if it.get("headline"):
+                prior_headlines.append((it["headline"], day))
 
     if prior_urls:
         parsed = _parse(merged_json)
@@ -971,7 +975,16 @@ def run_pipeline() -> dict:
                 continue
             fresh_urls = [u for u in urls_norm if u not in prior_urls]
             reason = None
-            if not fresh_urls:
+            # Subject-level check FIRST: a rerun arrives with brand-new URLs
+            # (a different outlet's article about the same event), so the URL
+            # tests below cannot see it. This is what made the briefing "look a
+            # lot like the other day" while URL-repeat sat at only 6%.
+            _rerun = _story_similarity.find_rerun(item.get("headline", ""), prior_headlines)
+            if _rerun:
+                _ph, _pday, _score = _rerun
+                reason = (f"same story as {_pday} (similarity {_score:.2f}: "
+                          f"'{_ph[:52]}')")
+            elif not fresh_urls:
                 reason = "no new sources"
             elif urls_norm[0] in prior_primaries and len(fresh_urls) < 2:
                 # Same anchor article as an earlier day, with at most one added

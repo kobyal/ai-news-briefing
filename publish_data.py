@@ -2212,6 +2212,56 @@ _realign_youtube_he()
 # NOTE: when remediation reorders urls[0], the story_id (sha256(urls[0])) changes.
 # That only matters for a same-day re-run of an already-published mis-sourced
 # story (rare); we log it so it's visible.
+#: briefing_he arrays that are parallel to news_items BY POSITION.
+_HE_PARALLEL_KEYS = ("headlines_he", "summaries_he", "details_he")
+
+
+def _drop_stories_by_index(drop_idx) -> int:
+    """Drop stories from _news_items AND every positionally-parallel structure.
+
+    THE INVARIANT: briefing_he.{headlines,summaries,details}_he are parallel to
+    news_items by POSITION, not by story_id. Dropping a story without dropping
+    its HE entries shifts the Hebrew text of every story after it.
+
+    This exists because _reverify_primary_freshness() (added 2026-08-04) removed
+    2 stale stories and did NOT do that. news_items went to 16 while the HE
+    arrays stayed at 18, so from index 7 on, every story rendered the WRONG
+    Hebrew: the Meta-earnings card showed Gemini Robotics 2's Hebrew headline and
+    summary. Any future code path that removes a story must call THIS, not
+    reimplement the kept-index dance.
+
+    Also remaps tldr_story_indices so it can't point at post-shift positions
+    (bullet_story_ids is re-resolved from scratch later, so it self-heals).
+
+    Returns the number of stories dropped.
+    """
+    drop = {i for i in drop_idx}
+    if not drop:
+        return 0
+    orig_len = len(_news_items)
+    keep = [i for i in range(orig_len) if i not in drop]
+    _news_items[:] = [_news_items[i] for i in keep]   # in place → _briefing stays in sync
+
+    bh = merger.get("briefing_he", {}) or {}
+    for k in _HE_PARALLEL_KEYS:
+        arr = bh.get(k)
+        if isinstance(arr, list) and len(arr) == orig_len:
+            bh[k] = [arr[i] for i in keep]
+        elif isinstance(arr, list) and arr:
+            # Already out of step with news_items — say so rather than shift it
+            # further and silently mis-pair Hebrew text.
+            print(f"  ⚠ briefing_he.{k} has {len(arr)} entries for {orig_len} stories "
+                  f"— NOT realigned (pre-existing misalignment)")
+
+    old_to_new = {old: new for new, old in enumerate(keep)}
+    idxs = _briefing.get("tldr_story_indices")
+    if isinstance(idxs, list):
+        _briefing["tldr_story_indices"] = [
+            old_to_new.get(i) if isinstance(i, int) else None for i in idxs
+        ]
+    return len(drop)
+
+
 def _remediate_source_mismatch():
     bh = merger.get("briefing_he", {}) or {}
     he_keys = ("headlines_he", "summaries_he", "details_he")
@@ -2241,12 +2291,7 @@ def _remediate_source_mismatch():
             q_idx.append(idx)
             actions.append(f"  ⊘ QUARANTINED (sourceless after drop): '{head}' | bad={bad[:55]}")
     if q_idx:
-        keep = [i for i in range(orig_len) if i not in set(q_idx)]
-        _news_items[:] = [_news_items[i] for i in keep]   # mutate in place → _briefing stays in sync
-        for k in he_keys:
-            arr = bh.get(k)
-            if isinstance(arr, list) and len(arr) == orig_len:
-                bh[k] = [arr[i] for i in keep]
+        _drop_stories_by_index(q_idx)   # keeps briefing_he + tldr indices in step
     if actions:
         print(f"\n  🛠 SOURCE-RELEVANCE REMEDIATION — {len(actions)} action(s):")
         for a in actions:
@@ -2283,21 +2328,19 @@ def _reverify_primary_freshness():
         print(f"  ⚠ freshness re-verify skipped ({e})")
         return []
 
-    kept, dropped, corrected = [], [], 0
-    for item, primary in zip(_news_items, primaries):
+    drop_idx, dropped, corrected = [], [], 0
+    for idx, (item, primary) in enumerate(zip(_news_items, primaries)):
         d = real.get(primary)
         if d is None:
-            kept.append(item)
             continue
         claimed = article_date.parse_us(item.get("published_date", ""))
         if claimed != d:
             item["published_date"] = article_date.format_us(d)
             corrected += 1
         item["date_verified"] = True
-        if d >= cutoff:
-            kept.append(item)
-        else:
+        if d < cutoff:
             age = (datetime.now().date() - d).days
+            drop_idx.append(idx)
             dropped.append(f"    ✂ {item.get('headline','?')[:62]} "
                            f"({age}d old after URL filtering — primary is now {primary[:70]})")
     if corrected:
@@ -2306,7 +2349,10 @@ def _reverify_primary_freshness():
         print(f"\n  🕒 FRESHNESS RE-VERIFY — dropped {len(dropped)} story/ies stale on their FINAL primary:")
         for line in dropped:
             print(line)
-        _news_items[:] = kept
+        # MUST go through the shared dropper: it also trims the parallel Hebrew
+        # arrays. Assigning _news_items[:] directly (the original 2026-08-04 bug)
+        # desynced briefing_he and mis-paired every later story's Hebrew text.
+        _drop_stories_by_index(drop_idx)
     return dropped
 
 

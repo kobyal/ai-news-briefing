@@ -11,6 +11,8 @@ import { LoadingSpinner, DaySeparator, INFINITE_SCROLL_ROOT_MARGIN, withMinDelay
 import { BackToTopButton } from "@/components/ui/BackToTopButton";
 import { FilterCarousel } from "@/components/ui/FilterCarousel";
 import { readDateParam, scrollToHash } from "@/lib/anchors";
+import { isAiRelevantVideo } from "@/lib/video-relevance";
+import CHANNELS_JSON from "@/data/channels.json";
 
 // Mirrors BriefingPage / community page relative-date label helper.
 function formatOlderDayLabel(dateStr: string, todayStr: string, isHe: boolean): string {
@@ -74,6 +76,54 @@ function videoDuration(v: YouTubeVideo): string {
   return "";
 }
 
+// Drop off-topic uploads that broad-interest channels (Lex Fridman, 3Blue1Brown,
+// Computerphile, NetworkChuck) mix in. Applies at render time so archive days
+// get cleaned too, not just days collected after the pipeline fix.
+function videoIsRelevant(v: YouTubeVideo): boolean {
+  return isAiRelevantVideo(videoTitle(v), String(v.summary || v.description || ""), videoChannel(v));
+}
+
+// ── Language / content-kind classification ─────────────────────────────────
+// The pipeline stamps `lang` and `kind` on every video it selects. Older day
+// JSONs (and videos injected by publish_data's per-story explainer search)
+// lack them, so fall back to the channel name.
+function videoLang(v: YouTubeVideo): string {
+  if (v.lang === "he" || v.lang === "en") return v.lang;
+  return HEBREW_CHANNEL_NAMES.has(videoChannel(v)) ? "he" : "en";
+}
+function videoKind(v: YouTubeVideo): string {
+  if (v.kind === "tutorial" || v.kind === "commentary") return v.kind;
+  return TUTORIAL_CHANNEL_NAMES.has(videoChannel(v)) ? "tutorial" : "commentary";
+}
+
+// Age in days from whichever timestamp the item carries.
+function videoAgeDays(v: YouTubeVideo): number {
+  const raw = v.published_at || videoDate(v);
+  if (!raw) return 999;
+  const t = new Date(raw).getTime();
+  if (!Number.isFinite(t)) return 999;
+  return Math.max((Date.now() - t) / 86_400_000, 0);
+}
+
+// Reach discounted by age — mirrors _rank_score in the youtube agent.
+// Replaces the old raw-views sort, which merged every loaded day into one pool
+// and let a week-old 348K-view video outrank today's releases.
+function videoScore(v: YouTubeVideo): number {
+  const views = Math.max(typeof v.views === "number" ? v.views : 0, 1);
+  return Math.log10(views) / (1 + 0.35 * videoAgeDays(v));
+}
+
+// A channel's "latest" upload stops being news after a couple of months.
+// Karpathy last posted in January, Yannic in March — showing those as "latest"
+// made the whole page look stale.
+const STALE_LATEST_DAYS = 60;
+function isStaleLatest(latest?: ChannelLatestVideo): boolean {
+  if (!latest?.published_at) return false;
+  const t = new Date(latest.published_at).getTime();
+  if (!Number.isFinite(t)) return false;
+  return (Date.now() - t) / 86_400_000 > STALE_LATEST_DAYS;
+}
+
 // ── Pair stories with LLM-judged videos only (drop keyword-fallback noise) ──
 function pairedExplainers(stories: NewsItem[], videos: YouTubeVideo[]): { story: NewsItem; video: YouTubeVideo }[] {
   if (!stories?.length || !videos?.length) return [];
@@ -103,138 +153,88 @@ interface Channel {
   pipelineNames?: string[];
 }
 
-const CHANNELS: Channel[] = [
-  // ── YouTube — Hebrew ───────────────────────────
-  { name: "CloudAI Hebrew", name_he: "CloudAI עברית", desc: "AI tutorials & news in Hebrew", desc_he: "הדרכות וחדשות AI בעברית",
-    url: "https://www.youtube.com/@CloudAI_Hebrew", platform: "youtube", lang: "he",
-    pipelineNames: ["cloudai", "cloud ai", "cloudai hebrew"] },
-  { name: "TrashTech News", name_he: "טראשטק", desc: "Tech industry gossip, AI & startup news", desc_he: "גוסיפ טק, חדשות AI וסטארטאפים",
-    url: "https://www.youtube.com/@TrashTechNews", platform: "youtube", lang: "he",
-    pipelineNames: ["trashtech"] },
-  { name: "yuv-ai", name_he: "yuv-ai", desc: "AI skills, Claude Code, and dev tools", desc_he: "כישורי AI, Claude Code וכלי פיתוח",
-    url: "https://www.youtube.com/@yuv-ai", platform: "youtube", lang: "he",
-    pipelineNames: ["yuv-ai", "yuval avidani", "yuv ai"] },
-  // ── YouTube — English: Official ─────────────────
-  { name: "Claude", name_he: "Claude", desc: "Official Anthropic channel — Claude demos & updates", desc_he: "הערוץ הרשמי של Anthropic — הדגמות ועדכוני Claude",
-    url: "https://www.youtube.com/@claude", platform: "youtube", lang: "en",
-    pipelineNames: ["anthropic", "claude"] },
-  { name: "Google Cloud Tech", name_he: "Google Cloud Tech", desc: "Gemini, Vertex AI, ADK & cloud AI demos", desc_he: "Gemini, Vertex AI, ADK והדגמות AI בענן",
-    url: "https://www.youtube.com/@GoogleCloudTech", platform: "youtube", lang: "en",
-    pipelineNames: ["google cloud tech"] },
-  { name: "Google for Developers", name_he: "Google for Developers", desc: "Google AI APIs, ADK, and developer tools", desc_he: "ממשקי AI של גוגל, ADK וכלי פיתוח",
-    url: "https://www.youtube.com/@GoogleDevelopers", platform: "youtube", lang: "en",
-    pipelineNames: ["google for developers"] },
-  { name: "OpenAI", name_he: "OpenAI", desc: "GPT, Codex, Sora demos & research talks", desc_he: "הדגמות GPT, Codex, Sora ושיחות מחקר",
-    url: "https://www.youtube.com/@OpenAI", platform: "youtube", lang: "en",
-    pipelineNames: ["openai"] },
-  { name: "Amazon Web Services", name_he: "Amazon Web Services", desc: "Bedrock, AI agents, serverless & cloud tutorials", desc_he: "Bedrock, סוכני AI, serverless והדרכות ענן",
-    url: "https://www.youtube.com/@amazonwebservices", platform: "youtube", lang: "en",
-    pipelineNames: ["amazon web services", "aws"] },
-  // ── YouTube — English: Creators ────────────────
-  { name: "Fireship", name_he: "Fireship", desc: "Fast-paced AI & dev news in 100 seconds", desc_he: "חדשות AI ופיתוח בקצב מהיר",
-    url: "https://www.youtube.com/@Fireship", platform: "youtube", lang: "en",
-    pipelineNames: ["fireship"] },
-  { name: "Matt Wolfe", name_he: "Matt Wolfe", desc: "Weekly AI tool roundups & news", desc_he: "סקירת כלי AI שבועית וחדשות",
-    url: "https://www.youtube.com/@mreflow", platform: "youtube", lang: "en",
-    pipelineNames: ["matt wolfe"] },
-  { name: "Two Minute Papers", name_he: "Two Minute Papers", desc: "AI research explained — what a time to be alive!", desc_he: "מחקרי AI מוסברים בקצרה",
-    url: "https://www.youtube.com/@TwoMinutePapers", platform: "youtube", lang: "en",
-    pipelineNames: ["two minute papers"] },
-  { name: "Theo - t3.gg", name_he: "Theo - t3.gg", desc: "Dev tools, AI coding, and web dev takes", desc_he: "כלי פיתוח, AI קוד ועולם הווב",
-    url: "https://www.youtube.com/@t3dotgg", platform: "youtube", lang: "en",
-    pipelineNames: ["theo", "t3.gg"] },
-  { name: "AI Explained", name_he: "AI Explained", desc: "Deep-dive analysis of AI breakthroughs", desc_he: "ניתוחים מעמיקים של פריצות דרך ב-AI",
-    url: "https://www.youtube.com/@aiexplained-official", platform: "youtube", lang: "en",
-    pipelineNames: ["ai explained"] },
-  { name: "Greg Isenberg", name_he: "Greg Isenberg", desc: "AI startups, products & business ideas", desc_he: "סטארטאפים, מוצרים ורעיונות עסקיים עם AI",
-    url: "https://www.youtube.com/@GregIsenberg", platform: "youtube", lang: "en",
-    pipelineNames: ["greg isenberg"] },
-  { name: "Andrej Karpathy", name_he: "Andrej Karpathy", desc: "From-scratch neural network deep dives — by ex-Tesla AI / OpenAI", desc_he: "צלילות עומק לרשתות נוירונים — לשעבר Tesla AI / OpenAI",
-    url: "https://www.youtube.com/@AndrejKarpathy", platform: "youtube", lang: "en",
-    pipelineNames: ["andrej karpathy", "karpathy"] },
-  { name: "Wes Roth", name_he: "Wes Roth", desc: "AGI commentary + AI safety news", desc_he: "פרשנות AGI וחדשות בטיחות AI",
-    url: "https://www.youtube.com/@WesRoth", platform: "youtube", lang: "en",
-    pipelineNames: ["wes roth"] },
-  { name: "Matthew Berman", name_he: "Matthew Berman", desc: "Hands-on LLM reviews + local model setups", desc_he: "סקירות LLM מעשיות + הקמת מודלים מקומיים",
-    url: "https://www.youtube.com/@matthew_berman", platform: "youtube", lang: "en",
-    pipelineNames: ["matthew berman"] },
-  { name: "Yannic Kilcher", name_he: "Yannic Kilcher", desc: "ML paper reviews + research commentary", desc_he: "סקירת מאמרי ML ופרשנות מחקרית",
-    url: "https://www.youtube.com/@YannicKilcher", platform: "youtube", lang: "en",
-    pipelineNames: ["yannic kilcher"] },
-  { name: "David Shapiro", name_he: "David Shapiro", desc: "Autonomous agents + AGI cognitive architectures", desc_he: "סוכנים אוטונומיים וארכיטקטורות AGI",
-    url: "https://www.youtube.com/@DaveShap", platform: "youtube", lang: "en",
-    pipelineNames: ["david shapiro"] },
-  { name: "Cole Medin", name_he: "Cole Medin", desc: "AI agents, n8n automations, local AI tools", desc_he: "סוכני AI, אוטומציות n8n וכלי AI מקומיים",
-    url: "https://www.youtube.com/@ColeMedin", platform: "youtube", lang: "en",
-    pipelineNames: ["cole medin"] },
-  { name: "Sam Witteveen", name_he: "Sam Witteveen", desc: "Google AI tutorials + LangChain & LLM apps", desc_he: "מדריכי Google AI, LangChain ואפליקציות LLM",
-    url: "https://www.youtube.com/@samwitteveenai", platform: "youtube", lang: "en",
-    pipelineNames: ["sam witteveen"] },
-  { name: "AI Jason", name_he: "AI Jason", desc: "AI agents, RAG pipelines, LLM application tutorials", desc_he: "מדריכי סוכני AI, RAG ויישומי LLM",
-    url: "https://www.youtube.com/@AIJasonZ", platform: "youtube", lang: "en",
-    pipelineNames: ["ai jason"] },
-  { name: "All About AI", name_he: "All About AI", desc: "Practical AI tools + local LLM setup walkthroughs", desc_he: "כלי AI מעשיים והקמת LLMs מקומיים",
-    url: "https://www.youtube.com/@AllAboutAI", platform: "youtube", lang: "en",
-    pipelineNames: ["all about ai"] },
-  // ── Podcasts — Hebrew ──────────────────────────
-  { name: "בזמן שעבדתם", name_he: "בזמן שעבדתם", desc: "News you missed while working — AI, tech & culture", desc_he: "חדשות שפספסתם — AI, טק ותרבות",
-    url: "https://open.spotify.com/show/0R8OGY0eb6BJSepIApWB0z", platform: "spotify", lang: "he" },
-  { name: "פשוט AI", name_he: "פשוט AI", desc: "AI explained in simple Hebrew — by Benny Farber", desc_he: "בינה מלאכותית בשפה פשוטה — בני פרבר",
-    url: "https://open.spotify.com/show/3nmpfA2evHKSVvzOnbmb0w", platform: "spotify", lang: "he" },
-  { name: "בינה בקטנה", name_he: "בינה בקטנה", desc: "5-min weekly AI news recap — Shira Weinberg Harel", desc_he: "סיכום שבועי של 5 דקות — שירה וינברג הראל",
-    url: "https://open.spotify.com/show/0NnB7UQUMBjx5n24FDE4Iz", platform: "spotify", lang: "he" },
-  { name: "בינה מלאכותית בגובה העיניים", name_he: "בינה מלאכותית בגובה העיניים", desc: "AI for everyone — Bar Shaltiel & Yuval Bialik", desc_he: "AI לכולם — בר שאלתיאל ויובל ביאליק",
-    url: "https://open.spotify.com/show/5bt0qGN6KIFkrH3kg5hw5J", platform: "spotify", lang: "he" },
-  { name: "Hands-On AI", name_he: "Hands-On AI", desc: "AI in Israeli organizations — by Eyal Marcus", desc_he: "AI בארגונים ישראליים — אייל מרקוס",
-    url: "https://open.spotify.com/show/5ShlAGb2ExK4UwWcN1fkNO", platform: "spotify", lang: "he" },
-  // ── Podcasts — English ─────────────────────────
-  { name: "The AWS Developers Podcast", name_he: "The AWS Developers Podcast", desc: "AWS services, AI agents, serverless & cloud dev", desc_he: "שירותי AWS, סוכני AI, serverless ופיתוח ענן",
-    url: "https://open.spotify.com/show/7rQjgnBvuyr18K03tnEHBI", platform: "spotify", lang: "en" },
-  { name: "Lex Fridman Podcast", name_he: "Lex Fridman Podcast", desc: "Deep conversations with AI leaders & researchers", desc_he: "שיחות מעמיקות עם מובילי AI וחוקרים",
-    url: "https://open.spotify.com/show/2MAi0BvDc6GTFvKFPXnkCL", platform: "spotify", lang: "en" },
-  { name: "Hard Fork", name_he: "Hard Fork", desc: "NYT podcast on AI, tech & the internet — fun & sharp", desc_he: "פודקאסט ניו יורק טיימס על AI, טק והאינטרנט",
-    url: "https://open.spotify.com/show/44fllCS2FTFr2x2kjP9xeT", platform: "spotify", lang: "en" },
-  { name: "Latent Space", name_he: "Latent Space", desc: "The AI Engineer Podcast — by swyx & Alessio (Decibel/Smol AI)", desc_he: "פודקאסט מהנדסי AI — swyx ו-Alessio",
-    url: "https://open.spotify.com/show/2p7zZVwVF6Yk0Zsb4QmT7t", platform: "spotify", lang: "en" },
-  { name: "Dwarkesh Podcast", name_he: "Dwarkesh Podcast", desc: "Long-form AI leader interviews — Dwarkesh Patel", desc_he: "ראיונות מעמיקים עם מובילי AI — דוורקש פטל",
-    url: "https://open.spotify.com/show/4JH4tybY1zX6e5hjCwU6gF", platform: "spotify", lang: "en" },
-  { name: "The AI Daily Brief", name_he: "The AI Daily Brief", desc: "Daily AI news analysis — Nathaniel Whittemore (NLW)", desc_he: "ניתוח חדשות AI יומי — נתנאל ויטמור",
-    url: "https://open.spotify.com/show/7gKwwMLFLc6RmjmRpbMtEO", platform: "spotify", lang: "en" },
-  { name: "TWIML AI Podcast", name_he: "TWIML AI Podcast", desc: "ML/AI practitioner interviews — Sam Charrington", desc_he: "ראיונות עם אנשי מקצוע בלמידת מכונה — סם צ'רינגטון",
-    url: "https://open.spotify.com/show/2sp5EL7s7EqxttxwwoJ3i7", platform: "spotify", lang: "en" },
-  { name: "No Priors", name_he: "No Priors", desc: "AI startups & founders — Sarah Guo (Conviction) & Elad Gil", desc_he: "סטארטאפים ומייסדים ב-AI — שרה גואו ואלאד גיל",
-    url: "https://open.spotify.com/show/0O65xhqvGVhpgdIrrdlEYk", platform: "spotify", lang: "en" },
-];
+// Content kind, mirroring _TUTORIAL_CHANNELS in the youtube agent's pipeline.
+// "tutorial" = instructional / deep-dive / official vendor walkthrough;
+// everything else is "commentary" (reaction + news-of-the-week). The pipeline
+// stamps `kind` onto each video, but day JSONs published before that change
+// don't have it — this set is the fallback so the split works on old data too.
+const TUTORIAL_CHANNEL_NAMES = new Set([
+  "Andrej Karpathy", "3Blue1Brown", "Computerphile", "Yannic Kilcher",
+  "Two Minute Papers", "Machine Learning Street Talk",
+  "Cole Medin", "Sam Witteveen", "AI Jason", "All About AI", "IndyDevDan",
+  "NetworkChuck",
+  "Claude", "OpenAI", "Google DeepMind", "Google Cloud Tech",
+  "Google for Developers", "NVIDIA", "Amazon Web Services", "AWS Events",
+  "CloudAI Hebrew", "YUV AI",
+]);
+
+const HEBREW_CHANNEL_NAMES = new Set(["CloudAI Hebrew", "TrashTech", "YUV AI"]);
+
+// Single source of truth: web/src/data/channels.json — the SAME file
+// shared/channels.py loads for the daily email report. It used to be a TS array
+// here and a hand-copied Python list there; the Python copy was written once on
+// 2026-04-25 and never updated, so by 2026-08 the site had 33 YouTube channels
+// and the email had 14. One file, two readers, cannot drift again.
+// Add channels to the JSON, not here.
+const CHANNELS: Channel[] = CHANNELS_JSON as Channel[];
 
 // ── Video topic taxonomy ───────────────────────────────────────────────────
+// Rebuilt 2026-08-05 from the actual pool. The previous eight topics left 65%
+// of videos matching nothing at all (reachable only via "All"), while Azure AI
+// scored 0 every day and AWS Bedrock / RAG & LLM Ops / Vibe Coding sat at 1-2.
+// These are the clusters the pool is genuinely full of. Near-dead topics were
+// dropped rather than shown greyed-out; re-add when the volume justifies it.
 const VIDEO_TOPICS = [
-  { id: "claude",   icon: "🔮", label: "Claude Code",   label_he: "Claude Code",   color: "#8b5cf6" },
-  { id: "agents",   icon: "🤖", label: "AI Agents",     label_he: "סוכני AI",       color: "#7c3aed" },
-  { id: "aws",      icon: "☁️", label: "AWS Bedrock",   label_he: "AWS Bedrock",   color: "#f97316" },
-  { id: "google",   icon: "🔷", label: "Google ADK",    label_he: "Google ADK",    color: "#2563eb" },
-  { id: "azure",    icon: "🔵", label: "Azure AI",      label_he: "Azure AI",      color: "#0284c7" },
-  { id: "lectures", icon: "🧠", label: "Lectures",      label_he: "הרצאות",         color: "#059669" },
-  { id: "vibe",     icon: "⚡", label: "Vibe Coding",   label_he: "Vibe Coding",   color: "#dc2626" },
-  { id: "rag",      icon: "🛠️", label: "RAG & LLM Ops", label_he: "RAG ו-LLM",     color: "#b45309" },
+  { id: "models",     icon: "🚀", label: "Model Releases", label_he: "מודלים חדשים",  color: "#8b5cf6" },
+  { id: "claude",     icon: "🔮", label: "Claude Code",    label_he: "Claude Code",   color: "#7c3aed" },
+  { id: "agents",     icon: "🤖", label: "AI Agents",      label_he: "סוכני AI",       color: "#6d28d9" },
+  { id: "opensource", icon: "🔓", label: "Open Source",    label_he: "קוד פתוח",       color: "#0e7a3a" },
+  { id: "safety",     icon: "🛡️", label: "Safety",         label_he: "בטיחות",         color: "#dc2626" },
+  { id: "business",   icon: "💰", label: "Business & Chips", label_he: "עסקים ושבבים", color: "#b45309" },
+  { id: "multimodal", icon: "🎙️", label: "Voice & Vision", label_he: "קול ותמונה",     color: "#db2777" },
+  { id: "google",     icon: "🔷", label: "Google AI",      label_he: "Google AI",     color: "#2563eb" },
+  { id: "lectures",   icon: "🧠", label: "Deep Learning",  label_he: "למידה עמוקה",    color: "#059669" },
 ];
 
 function classifyVideo(v: YouTubeVideo): Set<string> {
   const t = (videoTitle(v)).toLowerCase();
   const ch = (v.channel || "").toLowerCase();
   const tags = new Set<string>();
-  if (/claude\s*code|claude\s*4|claude\s*3|anthropic|claude\s*agent/.test(t) ||
-      /claude|anthropic|yuv.ai|yuv ai/.test(ch)) tags.add("claude");
-  if (/\bagent\b|\bagentic|langgraph|crewai|autogen|multi.agent|autonomous\s*ai/.test(t) ||
-      /cole medin|ai jason|sam witteveen|david shapiro/.test(ch)) tags.add("agents");
-  if (/\baws\b|bedrock|sagemaker|\bamazon\s*ai/.test(t) ||
-      /amazon web services/.test(ch)) tags.add("aws");
-  if (/\badk\b|vertex\s*ai|gemini|google\s*ai|google\s*cloud|google\s*i\/o|google\s*io/.test(t) ||
-      /google cloud|google for dev|google develop/.test(ch)) tags.add("google");
-  if (/\bazure\b|azure\s*openai|microsoft\s*ai|ai\s*foundry|copilot\s*stack/.test(t)) tags.add("azure");
-  if (/lecture|tutorial|course|\bexplained\b|neural\s*network|transformer|paper\b|research\b/.test(t) ||
-      /karpathy|yannic|two minute papers|andrej/.test(ch)) tags.add("lectures");
-  if (/vibe\s*cod|\bcursor\b|\bwindsurf\b|ai.cod|agentic\s*programm|bolt\.new|lovable/.test(t)) tags.add("vibe");
-  if (/\brag\b|retrieval|embedding|vector\s*db|llm\s*op|production\s*llm|fine.tun/.test(t)) tags.add("rag");
+
+  // Model launches, version bumps and head-to-head benchmarks — the single
+  // biggest cluster in the pool and previously untagged entirely.
+  if (/\b(opus|sonnet|haiku|fable|gpt|claude|gemini|grok|qwen|deepseek|kimi|llama|mistral|glm|laguna|astra)[\s-]?\d/.test(t) ||
+      /\bgpt-?\d|\bo\d\s*(mini|pro)?\b|benchmark|\bsota\b|state of the art|\bbeats\b|outperform|\bvs\.?\s|head.to.head|new model|model release|just (launched|dropped|released|went live)/.test(t))
+    tags.add("models");
+
+  if (/claude\s*code|claude\s*agent|anthropic|\bopus\b|\bsonnet\b/.test(t) ||
+      /claude|anthropic/.test(ch)) tags.add("claude");
+
+  if (/\bagent\b|\bagentic|\bagents\b|langgraph|crewai|autogen|multi.agent|autonomous\s*ai|\bmcp\b|tool.use|\bharness\b|\bloop\b/.test(t) ||
+      /cole medin|ai jason|sam witteveen|david shapiro|indydevdan/.test(ch)) tags.add("agents");
+
+  // Open-weight / self-hosted / run-it-yourself.
+  if (/open.?(source|weight)|\blocal\b|self.host|\bollama\b|llama\.cpp|\bgguf\b|quantiz|on.device|\bhugging\s*face\b|\bopen\s*model/.test(t))
+    tags.add("opensource");
+
+  // Safety, alignment, misuse and the incident coverage that follows.
+  if (/\brogue\b|jailbreak|alignment|\bsafety\b|misalign|deceptio|scheming|sandbox|breach|hacked|exfiltrat|\brisk\b|\bagi\b|superintelligen|existential|red.?team|\bevals?\b|guardrail/.test(t))
+    tags.add("safety");
+
+  // Money, silicon and geopolitics.
+  if (/\bfunding\b|\bipo\b|valuation|\braise[ds]?\b|\bbillion\b|\bmillion\b|earnings|revenue|\bmarket\b|acquisition|acquire|lawsuit|\bsues?\b|antitrust|\bchips?\b|\bgpu\b|\btpu\b|nvidia|\btsmc\b|export|geopolit|\bprice|\bcost\b|cheaper|\bjobs?\b|layoff|\bstartup/.test(t))
+    tags.add("business");
+
+  // Voice, image, video, music, 3D — anything not text-in-text-out.
+  if (/\bvoice\b|\bspeech\b|transcri|\btts\b|\bstt\b|\baudio\b|\bmusic\b|\bimage\b|\bvideo\b|\bvision\b|multimodal|text.to.(image|video|speech)|\b3d\b|render|diffusion|\bsora\b|\bveo\b|\bmidjourney\b|world model|robot/.test(t))
+    tags.add("multimodal");
+
+  if (/\badk\b|vertex\s*ai|gemini|google\s*ai|google\s*cloud|google\s*i\/o|google\s*io|deepmind|\bveo\b|\blyria\b/.test(t) ||
+      /google cloud|google for dev|google develop|google deepmind/.test(ch)) tags.add("google");
+
+  if (/lecture|tutorial|course|\bexplained\b|neural\s*network|transformer|\bpaper\b|research|from scratch|\bmath\b|\bhow .* works?\b|deep dive|fine.?tun|\brag\b|retrieval|embedding|vector\s*db|quantum/.test(t) ||
+      /karpathy|yannic|two minute papers|3blue1brown|computerphile|machine learning street/.test(ch)) tags.add("lectures");
+
   return tags;
 }
 
@@ -462,7 +462,10 @@ function VideoCard({ video }: { video: YouTubeVideo }) {
 }
 
 // ── Channel card (avatar + latest video thumb) ──────────────────────────────
-function ChannelCard({ channel, latest, isHe }: { channel: Channel; latest?: ChannelLatestVideo; isHe: boolean }) {
+function ChannelCard({ channel, latest: rawLatest, isHe }: { channel: Channel; latest?: ChannelLatestVideo; isHe: boolean }) {
+  // A months-old upload isn't a "latest video" — suppress the thumbnail rather
+  // than making the whole page look abandoned (Karpathy, Yannic Kilcher).
+  const latest = isStaleLatest(rawLatest) ? undefined : rawLatest;
   const name = isHe ? channel.name_he : channel.name;
   const desc = isHe ? channel.desc_he : channel.desc;
   const isYT = channel.platform === "youtube";
@@ -779,7 +782,10 @@ function TopicFilterBar({ topics, counts, selected, onSelect, isHe }: {
         <span style={{ fontSize: "10px", fontWeight: 800, lineHeight: 1.2 }}>{isHe ? "הכל" : "All"}</span>
         {(counts["__all__"] || 0) > 0 && <span style={{ fontSize: "9px", opacity: 0.6 }}>{counts["__all__"]}</span>}
       </button>
-      {topics.map((topic) => {
+      {/* Zero-count topics were rendered greyed-out but still clickable, and
+          clicking one just produced an empty section. "Azure AI" had a count of
+          0 every single day. Drop them instead of offering a dead filter. */}
+      {topics.filter((t) => (counts[t.id] || 0) > 0).map((topic) => {
         const count = counts[topic.id] || 0;
         const isActive = selected === topic.id;
         return (
@@ -889,9 +895,13 @@ function DayMediaBlock({ data, isHe, includeTopVideos = false }: { data: DayData
   const pairedUrls = new Set(pairs.map(({ video }) => videoUrl(video)));
   const unpairedVideos = allVideos.filter((v) => !pairedUrls.has(videoUrl(v)));
 
-  const numericViews = (v: YouTubeVideo) => (typeof v.views === "number" ? v.views : 0);
   const pairsBelow = pairs;
-  const restVideosBelow = [...unpairedVideos].sort((a, b) => numericViews(b) - numericViews(a));
+  // Same EN/HE hard split and kind split as the top-of-page sections.
+  const ranked = unpairedVideos.filter(videoIsRelevant).sort((a, b) => videoScore(b) - videoScore(a));
+  const dayHebrew = ranked.filter((v) => videoLang(v) === "he");
+  const dayForeign = ranked.filter((v) => videoLang(v) === "en");
+  const dayTutorials = dayForeign.filter((v) => videoKind(v) === "tutorial");
+  const dayCommentary = dayForeign.filter((v) => videoKind(v) === "commentary");
 
   return (
     <>
@@ -916,15 +926,49 @@ function DayMediaBlock({ data, isHe, includeTopVideos = false }: { data: DayData
         </>
       )}
 
-      {includeTopVideos && restVideosBelow.length > 0 && (
+      {includeTopVideos && isHe && dayHebrew.length > 0 && (
         <>
           <SectionHead
-            title={isHe ? "הדרכות ופיתוח AI" : "AI Engineering Tutorials"}
-            sub={isHe ? "טוטוריאלים ופיצ׳רים מ-AWS, Google, Claude Code ועוד" : "Tutorials & features from AWS, Google, Claude Code and more"}
-            count={isHe ? `${restVideosBelow.length} סרטונים` : `${restVideosBelow.length} videos`}
+            title="מה חדש בעברית"
+            sub="סרטוני AI מהערוצים הישראליים"
+            count={`${dayHebrew.length} סרטונים`}
+            iconChar="🇮🇱"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {restVideosBelow.map((v) => (
+            {dayHebrew.map((v) => (
+              <VideoCard key={videoUrl(v)} video={v} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {includeTopVideos && dayTutorials.length > 0 && (
+        <>
+          <SectionHead
+            title={isHe ? "צלילות עומק והדרכות" : "Deep Dives & Tutorials"}
+            sub={isHe
+              ? "תוכן מלמד — ערוצים רשמיים, מחקר ובנייה מעשית (באנגלית)"
+              : "Instructional content — official channels, research & hands-on building"}
+            count={isHe ? `${dayTutorials.length} סרטונים` : `${dayTutorials.length} videos`}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {dayTutorials.map((v) => (
+              <VideoCard key={videoUrl(v)} video={v} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {includeTopVideos && dayCommentary.length > 0 && (
+        <>
+          <SectionHead
+            title={isHe ? "מהעולם — חדשות ופרשנות" : "This Week in AI"}
+            sub={isHe ? "סקירות ופרשנות מיוצרי תוכן (באנגלית)" : "Roundups & commentary from AI creators"}
+            count={isHe ? `${dayCommentary.length} סרטונים` : `${dayCommentary.length} videos`}
+            iconChar="📰"
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {dayCommentary.map((v) => (
               <VideoCard key={videoUrl(v)} video={v} />
             ))}
           </div>
@@ -949,7 +993,9 @@ function MediaPageInner() {
   const [loading, setLoading] = useState(true);
   const [explainersOpen, setExplainersOpen] = useState(false);
   const [showAllChannels, setShowAllChannels] = useState(false);
-  const [showAllVideos, setShowAllVideos] = useState(false);
+  const [showAllHebrew, setShowAllHebrew] = useState(false);
+  const [showAllTutorials, setShowAllTutorials] = useState(false);
+  const [showAllCommentary, setShowAllCommentary] = useState(false);
   const [showAllPodcasts, setShowAllPodcasts] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [olderDays, setOlderDays] = useState<OlderMediaDay[]>([]);
@@ -1067,9 +1113,10 @@ function MediaPageInner() {
   }, [hasMoreOlderDays, loadingOlder, loadNextOlderDay]);
 
   // Reset pagination when topic filter changes.
-  useEffect(() => { setShowAllVideos(false); }, [selectedTopic]);
+  useEffect(() => { setShowAllTutorials(false); setShowAllCommentary(false); }, [selectedTopic]);
 
-  // Aggregate video pool: today's unpaired + all preloaded older days, deduped, sorted by views.
+  // Aggregate video pool: today's unpaired + all preloaded older days, deduped,
+  // ranked by reach-discounted-by-age (see videoScore).
   // Must be before the early return — hooks can't be called conditionally.
   const allPoolVideos = useMemo(() => {
     if (!data) return [];
@@ -1089,24 +1136,43 @@ function MediaPageInner() {
       const u = videoUrl(v);
       if (!seen.has(u)) { seen.add(u); out.push(v); }
     }
-    return out.sort((a, b) => {
-      const av = typeof a.views === "number" ? a.views : 0;
-      const bv = typeof b.views === "number" ? b.views : 0;
-      return bv - av;
-    });
+    return out.filter(videoIsRelevant).sort((a, b) => videoScore(b) - videoScore(a));
   }, [data, olderDays]);
 
+  // Hard EN/HE split. On the Hebrew page the Hebrew channels get their own
+  // top section and the two English sections below are English-only; on the
+  // English page Hebrew videos don't appear at all.
+  const hebrewPoolVideos = useMemo(
+    () => allPoolVideos.filter((v) => videoLang(v) === "he"),
+    [allPoolVideos]
+  );
+  const foreignPoolVideos = useMemo(
+    () => allPoolVideos.filter((v) => videoLang(v) === "en"),
+    [allPoolVideos]
+  );
+
+  // The topic filter drives the two English sections; the Hebrew section is
+  // small enough that filtering it would usually empty it.
   const topicCounts = useMemo(() => {
-    const c: Record<string, number> = { "__all__": allPoolVideos.length };
-    for (const v of allPoolVideos) {
+    const c: Record<string, number> = { "__all__": foreignPoolVideos.length };
+    for (const v of foreignPoolVideos) {
       for (const id of classifyVideo(v)) { c[id] = (c[id] || 0) + 1; }
     }
     return c;
-  }, [allPoolVideos]);
+  }, [foreignPoolVideos]);
 
   const filteredPoolVideos = useMemo(
-    () => selectedTopic ? allPoolVideos.filter((v) => classifyVideo(v).has(selectedTopic)) : allPoolVideos,
-    [allPoolVideos, selectedTopic]
+    () => selectedTopic ? foreignPoolVideos.filter((v) => classifyVideo(v).has(selectedTopic)) : foreignPoolVideos,
+    [foreignPoolVideos, selectedTopic]
+  );
+
+  const tutorialVideos = useMemo(
+    () => filteredPoolVideos.filter((v) => videoKind(v) === "tutorial"),
+    [filteredPoolVideos]
+  );
+  const commentaryVideos = useMemo(
+    () => filteredPoolVideos.filter((v) => videoKind(v) === "commentary"),
+    [filteredPoolVideos]
   );
 
   if (loading || !data) {
@@ -1125,7 +1191,9 @@ function MediaPageInner() {
   const numericViews = (v: YouTubeVideo): number =>
     typeof v.views === "number" ? v.views : 0;
   const pairsBelow = pairs;
-  const visiblePoolVideos = showAllVideos ? filteredPoolVideos : filteredPoolVideos.slice(0, 6);
+  const visibleHebrew = showAllHebrew ? hebrewPoolVideos : hebrewPoolVideos.slice(0, 3);
+  const visibleTutorials = showAllTutorials ? tutorialVideos : tutorialVideos.slice(0, 6);
+  const visibleCommentary = showAllCommentary ? commentaryVideos : commentaryVideos.slice(0, 6);
 
   // Per-channel latest map (keyed by channel URL from CHANNELS table)
   const channelLatest: Record<string, ChannelLatestVideo> = {};
@@ -1141,8 +1209,16 @@ function MediaPageInner() {
     }
   }
 
-  const ytChannels = CHANNELS.filter((c) => c.platform === "youtube");
-  const podChannels = CHANNELS.filter((c) => c.platform === "spotify");
+  // Hard EN/HE split on the channel grid too: Hebrew page leads with the
+  // Israeli channels, English page shows English channels only.
+  const allYtChannels = CHANNELS.filter((c) => c.platform === "youtube");
+  const ytChannels = isHe
+    ? [...allYtChannels.filter((c) => c.lang === "he"), ...allYtChannels.filter((c) => c.lang !== "he")]
+    : allYtChannels.filter((c) => c.lang !== "he");
+  const allPodChannels = CHANNELS.filter((c) => c.platform === "spotify");
+  const podChannels = isHe
+    ? [...allPodChannels.filter((c) => c.lang === "he"), ...allPodChannels.filter((c) => c.lang !== "he")]
+    : allPodChannels.filter((c) => c.lang !== "he");
   const visibleChannels = showAllChannels ? ytChannels : ytChannels.slice(0, 4);
   const visiblePodcasts = showAllPodcasts ? podChannels : podChannels.slice(0, 4);
 
@@ -1161,6 +1237,33 @@ function MediaPageInner() {
         <p className="mb-6 text-[13px]" style={{ color: "#9a9ab8" }}>
           {isHe ? "הסברים לכתבות, ערוצי AI ופודקאסטים" : "Story explainers, AI channels & podcasts worth following"}
         </p>
+        {/* ── HEBREW FIRST (Hebrew page only) ─────────────────────────
+            The Israeli channels can never win a views-based ranking against
+            900K-view US channels, so on the Hebrew page they get their own
+            section at the top instead of competing for slots below. */}
+        {isHe && hebrewPoolVideos.length > 0 && (
+          <>
+            <SectionHead
+              title="מה חדש בעברית"
+              sub="סרטוני AI חדשים מהערוצים הישראליים"
+              count={`${hebrewPoolVideos.length} סרטונים`}
+              iconChar="🇮🇱"
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {visibleHebrew.map((v) => (
+                <VideoCard key={videoUrl(v)} video={v} />
+              ))}
+              {hebrewPoolVideos.length > 3 && (
+                <ShowMoreButton
+                  open={showAllHebrew}
+                  onClick={() => setShowAllHebrew(!showAllHebrew)}
+                  label={showAllHebrew ? "הצג פחות" : `הצג את כל ${hebrewPoolVideos.length} הסרטונים`}
+                />
+              )}
+            </div>
+          </>
+        )}
+
         {pairsBelow.length > 0 && (
           <>
             <SectionHead
@@ -1182,12 +1285,16 @@ function MediaPageInner() {
           </>
         )}
 
-        {/* ── AI ENGINEERING TUTORIALS (multi-day pool + topic filter) ── */}
-        <SectionHead
-          title={isHe ? "הדרכות ופיתוח AI" : "AI Engineering Tutorials"}
-          sub={isHe ? "טוטוריאלים ופיצ׳רים מ-AWS, Google, Claude Code ועוד — מימים אחרונים" : "Tutorials & features from AWS, Google, Claude Code and more — recent days"}
-          count={allPoolVideos.length > 0 ? (isHe ? `${allPoolVideos.length} סרטונים` : `${allPoolVideos.length} videos`) : undefined}
-        />
+        {/* ── ENGLISH POOL, split into two honest sections ──────────────
+            Was one section titled "AI Engineering Tutorials" holding mostly
+            reaction videos ("X just CRASHED the industry"). Instructional
+            content and news commentary are now labelled for what they are. */}
+        <p
+          className="mt-9 mb-2"
+          style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#9a9ab8" }}
+        >
+          {isHe ? "סינון לפי נושא" : "Filter by topic"}
+        </p>
         <TopicFilterBar
           topics={VIDEO_TOPICS}
           counts={topicCounts}
@@ -1195,25 +1302,71 @@ function MediaPageInner() {
           onSelect={setSelectedTopic}
           isHe={isHe}
         />
-        {filteredPoolVideos.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {visiblePoolVideos.map((v) => (
-              <VideoCard key={videoUrl(v)} video={v} />
-            ))}
-            {filteredPoolVideos.length > 6 && (
-              <ShowMoreButton
-                open={showAllVideos}
-                onClick={() => setShowAllVideos(!showAllVideos)}
-                label={
-                  showAllVideos
-                    ? (isHe ? "הצג פחות" : "Show less")
-                    : (isHe ? `הצג את כל ${filteredPoolVideos.length} הסרטונים` : `Show all ${filteredPoolVideos.length} videos`)
-                }
-              />
-            )}
-          </div>
-        ) : (
-          <p style={{ fontSize: "13px", color: "#9a9ab8", fontStyle: "italic" }}>
+
+        {/* With a topic selected, one of these two sections is very often
+            empty — "Claude Code" is ~all commentary, "Lectures" ~all tutorial.
+            Rendering a header plus "no videos found" made the page look broken,
+            so an empty section is hidden entirely and the "nothing matched"
+            message only appears when BOTH are empty. */}
+        {tutorialVideos.length > 0 && (
+          <>
+            <SectionHead
+              title={isHe ? "צלילות עומק והדרכות" : "Deep Dives & Tutorials"}
+              sub={isHe
+                ? "תוכן מלמד — ערוצים רשמיים, מחקר ובנייה מעשית (באנגלית)"
+                : "Instructional content — official channels, research & hands-on building"}
+              count={isHe ? `${tutorialVideos.length} סרטונים` : `${tutorialVideos.length} videos`}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {visibleTutorials.map((v) => (
+                <VideoCard key={videoUrl(v)} video={v} />
+              ))}
+              {tutorialVideos.length > 6 && (
+                <ShowMoreButton
+                  open={showAllTutorials}
+                  onClick={() => setShowAllTutorials(!showAllTutorials)}
+                  label={
+                    showAllTutorials
+                      ? (isHe ? "הצג פחות" : "Show less")
+                      : (isHe ? `הצג את כל ${tutorialVideos.length} הסרטונים` : `Show all ${tutorialVideos.length} videos`)
+                  }
+                />
+              )}
+            </div>
+          </>
+        )}
+
+        {commentaryVideos.length > 0 && (
+          <>
+            <SectionHead
+              title={isHe ? "מהעולם — חדשות ופרשנות" : "This Week in AI"}
+              sub={isHe
+                ? "סקירות ופרשנות מיוצרי תוכן (באנגלית)"
+                : "Roundups & commentary from AI creators"}
+              count={isHe ? `${commentaryVideos.length} סרטונים` : `${commentaryVideos.length} videos`}
+              iconChar="📰"
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {visibleCommentary.map((v) => (
+                <VideoCard key={videoUrl(v)} video={v} />
+              ))}
+              {commentaryVideos.length > 6 && (
+                <ShowMoreButton
+                  open={showAllCommentary}
+                  onClick={() => setShowAllCommentary(!showAllCommentary)}
+                  label={
+                    showAllCommentary
+                      ? (isHe ? "הצג פחות" : "Show less")
+                      : (isHe ? `הצג את כל ${commentaryVideos.length} הסרטונים` : `Show all ${commentaryVideos.length} videos`)
+                  }
+                />
+              )}
+            </div>
+          </>
+        )}
+
+        {tutorialVideos.length === 0 && commentaryVideos.length === 0 && (
+          <p className="mt-4" style={{ fontSize: "13px", color: "#9a9ab8", fontStyle: "italic" }}>
             {isHe ? "לא נמצאו סרטונים בקטגוריה זו" : "No videos found for this topic"}
           </p>
         )}

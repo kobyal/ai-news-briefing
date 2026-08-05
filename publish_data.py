@@ -1837,6 +1837,106 @@ def _yt_keys() -> list[str]:
     return out
 
 
+# ── Explainer candidate quality gate (2026-08-05) ────────────────────────────
+# search.list surfaces faceless AI-digest channels that re-narrate the day's
+# news over stock footage — ToolScout, nova sudoHer, Why Bureau, AI archwizard,
+# The Study Corner, World News English, Next Level AI, AI Tech Scope. They out-
+# rank real coverage on `order=relevance` because their titles restate the
+# headline verbatim. View count is the cheapest honest signal: a genuine
+# explainer of a major AI story gets traction, slop does not. Costs 1 quota
+# unit per 50 videos vs the 100 units the search itself already spent.
+_YT_MIN_EXPLAINER_VIEWS = 1500
+
+# Channels exempt from the view floor: the curated list we already vouch for
+# (shared/channels.py — same source the static report uses), plus official
+# vendor feeds and major outlets. A low-traffic upload from an official AWS
+# feed is still authoritative; a low-traffic upload from "ToolScout" is not.
+def _yt_trusted_channels() -> set:
+    trusted = {
+        "what's new at aws", "aws developers", "microsoft developer",
+        "microsoft azure", "meta ai", "hugging face", "cnbc television",
+        "bloomberg technology", "reuters", "the financial express",
+        "wall street journal", "the verge", "techcrunch",
+    }
+    try:
+        from shared.channels import CHANNELS as _curated
+        trusted |= {(c.get("name") or "").lower() for c in _curated if c.get("name")}
+    except Exception:
+        pass
+    return {t for t in trusted if t}
+
+# Channel-name shapes that are almost always auto-generated digest channels.
+# Deliberately narrow — real outlets (CNBC Television, The Financial Express)
+# and official feeds ("What's new at AWS") must still pass.
+_YT_SLOP_CHANNEL_PATTERNS = re.compile(
+    r'\bai\s+(archwizard|tech\s+scope|daily\s+digest|news\s+hub)\b|'
+    r'\b(toolscout|nova\s+sudo|why\s+bureau|next\s+level\s+ai)\b|'
+    r'\bthe\s+study\s+corner\b|'
+    r'\bworld\s+news\s+english\b',
+    re.IGNORECASE,
+)
+
+
+def _yt_video_views(vid_ids: list[str]) -> dict:
+    """Batch videos.list for viewCount. Returns {video_id: views}."""
+    keys = _yt_keys()
+    if not keys or not vid_ids:
+        return {}
+    views = {}
+    for i in range(0, len(vid_ids), 50):
+        batch = vid_ids[i:i + 50]
+        for key in keys:
+            params = {"part": "statistics", "id": ",".join(batch), "key": key}
+            url = "https://www.googleapis.com/youtube/v3/videos?" + urllib.parse.urlencode(params)
+            try:
+                with urllib.request.urlopen(url, timeout=20) as r:
+                    data = json.loads(r.read())
+            except urllib.error.HTTPError as e:
+                if e.code in (403, 429):
+                    continue  # try next key
+                break
+            except Exception:
+                break
+            for item in data.get("items", []):
+                try:
+                    views[item["id"]] = int((item.get("statistics") or {}).get("viewCount", "0"))
+                except Exception:
+                    pass
+            break
+    return views
+
+
+def _yt_reject_slop(candidates: list[dict]) -> list[dict]:
+    """Drop faceless-digest channels and low-traction videos from explainer
+    candidates. Fails OPEN: if the stats call gives us nothing (quota, network)
+    we keep the candidates rather than silently emptying the explainer pool."""
+    if not candidates:
+        return []
+    kept = [c for c in candidates
+            if not _YT_SLOP_CHANNEL_PATTERNS.search(c.get("channel") or "")]
+    dropped_name = len(candidates) - len(kept)
+
+    trusted = _yt_trusted_channels()
+    ids = [u.rsplit("v=", 1)[-1] for c in kept for u in c.get("urls", [])[:1]]
+    views = _yt_video_views(ids)
+    if views:
+        def _passes(c: dict) -> bool:
+            if (c.get("channel") or "").lower().strip() in trusted:
+                return True
+            vid = (c.get("urls") or [""])[0].rsplit("v=", 1)[-1]
+            # Unknown view count → keep (fail open, don't punish an API miss).
+            return views.get(vid, _YT_MIN_EXPLAINER_VIEWS) >= _YT_MIN_EXPLAINER_VIEWS
+        before = len(kept)
+        kept = [c for c in kept if _passes(c)]
+        dropped_views = before - len(kept)
+    else:
+        dropped_views = 0
+    if dropped_name or dropped_views:
+        print(f"    Explainer gate: dropped {dropped_name} slop-channel + "
+              f"{dropped_views} low-view candidates ({len(kept)} kept)")
+    return kept
+
+
 def _yt_search(api_key: str, query: str, max_results: int = 3, lookback_days: int = 14) -> list[dict]:
     """One YouTube Data API v3 search.list call. Returns news_item-shaped videos.
 
@@ -1913,7 +2013,7 @@ def _yt_search(api_key: str, query: str, max_results: int = 3, lookback_days: in
             "channel":   snippet.get("channelTitle", ""),
             "thumbnail": thumb or f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
         })
-    return out
+    return _yt_reject_slop(out)
 
 
 def _enrich_youtube_per_story(news_items: list, videos: list, api_key: str) -> int:
@@ -1926,7 +2026,9 @@ def _enrich_youtube_per_story(news_items: list, videos: list, api_key: str) -> i
     seen = {_video_url(v) for v in videos if _video_url(v)}
     added = 0
     for story in news_items:
-        candidates = _yt_search(api_key, story.get("headline") or "", max_results=2, lookback_days=14)
+        # 7 days, matching the gap-fill window — an explainer older than the
+        # news week isn't explaining today's story.
+        candidates = _yt_search(api_key, story.get("headline") or "", max_results=2, lookback_days=7)
         for c in candidates:
             u = _video_url(c)
             if not u or u in seen:
@@ -2026,7 +2128,9 @@ def _gap_fill_unpaired(news_items: list, videos: list, api_key: str) -> int:
         q = _alt_query(story)
         if not q:
             continue
-        candidates = _yt_search(api_key, q, max_results=3, lookback_days=30)
+        # 7 days, not 30 — a 30-day window paired a July 14 video to an
+        # August 5 story. An explainer older than the news week isn't one.
+        candidates = _yt_search(api_key, q, max_results=3, lookback_days=7)
         candidates = [c for c in candidates if _video_url(c) not in seen]
         if not candidates:
             continue

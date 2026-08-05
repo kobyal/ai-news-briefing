@@ -97,6 +97,11 @@ export interface YouTubeVideo {
   summary?: string;
   vendor?: string;
   paired_with_story_id?: string;
+  // Stamped by the youtube agent so /media can split EN/HE and separate
+  // instructional content from news commentary. Absent on archive days.
+  lang?: string;
+  kind?: string;
+  published_at?: string;
 }
 
 export interface ChannelLatestVideo {
@@ -106,6 +111,8 @@ export interface ChannelLatestVideo {
   url: string;
   published_at: string;
   thumbnail?: string;
+  lang?: string;
+  kind?: string;
 }
 
 export interface GitHubRepo {

@@ -11,6 +11,7 @@ Uses YouTube Data API v3 (free quota: 10K units/day).
 - Video stats: 1 unit per 50 videos (cheap)
 """
 import json
+import math
 import os
 import re
 import time
@@ -80,6 +81,27 @@ AI_CHANNELS = {
     "Lex Fridman": "UUSHZKyawb77ixDdsGog4iWA",
 }
 
+# ---------------------------------------------------------------------------
+# Per-channel content kind. "tutorial" = instructional / deep-dive / official
+# vendor walkthrough (the practitioner tier). Everything else defaults to
+# "commentary" = reaction + news-of-the-week coverage. The frontend renders
+# these as two separate sections so a section titled "tutorials" can't fill up
+# with "X just CRASHED the industry" videos.
+# ---------------------------------------------------------------------------
+_TUTORIAL_CHANNELS = {
+    # Research / from-scratch teaching
+    "Andrej Karpathy", "3Blue1Brown", "Computerphile", "Yannic Kilcher",
+    "Two Minute Papers", "Machine Learning Street Talk",
+    # Hands-on building
+    "Cole Medin", "Sam Witteveen", "AI Jason", "All About AI", "IndyDevDan",
+    "NetworkChuck",
+    # Official vendor channels — demos, feature walkthroughs, docs
+    "Claude", "OpenAI", "Google DeepMind", "Google Cloud Tech",
+    "Google for Developers", "NVIDIA", "Amazon Web Services", "AWS Events",
+    # Hebrew builders
+    "CloudAI Hebrew", "YUV AI",
+}
+
 # Targeted searches (only as supplement — max 4 to save quota)
 SEARCH_QUERIES = [
     "Claude GPT Gemini AI news analysis this week",
@@ -97,8 +119,16 @@ _SPAM_PATTERNS = re.compile(
 )
 
 _MIN_VIEWS_CHANNEL = 500      # Minimum views for channel videos
+_MIN_VIEWS_HEBREW = 60        # Israeli channels are 100x smaller — same 500 floor
+                              # silently dropped every Hebrew video from the page
 _MIN_VIEWS_SEARCH = 5000      # Higher threshold for search results (more spam)
 _MIN_DURATION_SECONDS = 120   # Skip Shorts (< 2 min)
+
+# Output shape. Hebrew gets guaranteed slots: ranking by views (even
+# log-scaled) always loses to English mega-channels, so a quota is the only
+# thing that keeps Hebrew on the Hebrew page.
+_MAX_ITEMS = 30
+_HEBREW_SLOTS = 6
 
 
 def _get_api_key() -> str:
@@ -224,7 +254,10 @@ _ALWAYS_AI_CHANNELS = {
     "Cole Medin", "Sam Witteveen", "Cognitive Revolution Podcast",
     "OpenAI", "Google DeepMind", "Google Cloud Tech", "Google for Developers",
     "Claude", "Amazon Web Services", "AWS Events",
-    "CloudAI Hebrew", "TrashTech", "YUV AI", "Lex Fridman",
+    "CloudAI Hebrew", "TrashTech", "YUV AI",
+    # Deliberately NOT Lex Fridman — he covers far more than AI, and the
+    # blanket pass shipped a 3h46m American Civil War episode into the video
+    # pool. His titles must match _AI_KEYWORDS like any other channel.
 }
 
 # Hebrew channels — skip English filter for these
@@ -256,6 +289,35 @@ def _is_english(text: str) -> bool:
         return False
     ascii_chars = sum(1 for c in text if c.isascii() and c.isalpha())
     return ascii_chars / max(len(text), 1) > 0.4
+
+
+def _channel_lang(channel: str) -> str:
+    return "he" if channel in _HEBREW_CHANNELS else "en"
+
+
+def _channel_kind(channel: str) -> str:
+    return "tutorial" if channel in _TUTORIAL_CHANNELS else "commentary"
+
+
+def _age_days(published_at: str) -> float:
+    """Age in days, or a large number if the timestamp is unparseable."""
+    try:
+        pub = datetime.fromisoformat(published_at.replace("Z", "+00:00")).replace(tzinfo=None)
+    except Exception:
+        return 999.0
+    return max((datetime.now() - pub).total_seconds() / 86400.0, 0.0)
+
+
+def _rank_score(v: dict) -> float:
+    """Rank by reach, discounted by age.
+
+    Pure view-count sorting was the core bug: it merged every loaded day into
+    one pool and let a week-old 348K-view video outrank today's releases. Views
+    are log-scaled so a 900K channel doesn't automatically bury a 50K one, then
+    divided by age so fresh wins.
+    """
+    views = max(int(v.get("views") or 0), 1)
+    return math.log10(views) / (1.0 + 0.35 * _age_days(v.get("published_at", "")))
 
 
 def _parse_duration(duration: str) -> int:
@@ -326,6 +388,8 @@ def _fetch_channel_latest_uploads(api_key: str) -> list[dict]:
                 "url": f"https://www.youtube.com/watch?v={vid_id}",
                 "published_at": sn.get("publishedAt", ""),
                 "thumbnail": _best_thumbnail(sn.get("thumbnails")) or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
+                "lang": _channel_lang(channel_name),
+                "kind": _channel_kind(channel_name),
             })
         except Exception:
             continue
@@ -387,6 +451,8 @@ def _fetch_channel_videos(api_key: str) -> list[dict]:
                     "url": f"https://www.youtube.com/watch?v={vid_id}",
                     "thumbnail": _best_thumbnail(snippet.get("thumbnails")) or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
                     "source": "channel",
+                    "lang": _channel_lang(channel_name),
+                    "kind": _channel_kind(channel_name),
                 }
         except Exception:
             continue
@@ -452,6 +518,9 @@ def _search_videos(api_key: str) -> dict:
                     "url": f"https://www.youtube.com/watch?v={vid_id}",
                     "thumbnail": _best_thumbnail(snippet.get("thumbnails")) or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
                     "source": "search",
+                    # Untracked channels are never the practitioner tier.
+                    "lang": "en",
+                    "kind": "commentary",
                 }
         except Exception as e:
             print(f"  Search error: {e}")
@@ -507,15 +576,21 @@ def _enrich_and_filter(api_key: str, videos: dict) -> list[dict]:
         if duration > 0 and duration < _MIN_DURATION_SECONDS:
             continue
 
-        # View threshold depends on source
-        min_views = _MIN_VIEWS_CHANNEL if source == "channel" else _MIN_VIEWS_SEARCH
+        # View threshold depends on source — and on language, since Israeli
+        # channels run two orders of magnitude smaller than US ones.
+        if source != "channel":
+            min_views = _MIN_VIEWS_SEARCH
+        elif v.get("lang") == "he":
+            min_views = _MIN_VIEWS_HEBREW
+        else:
+            min_views = _MIN_VIEWS_CHANNEL
         if views < min_views:
             continue
 
         filtered.append(v)
 
-    # Sort by views
-    filtered.sort(key=lambda v: v.get("views", 0), reverse=True)
+    # Rank by reach discounted by age, not raw views.
+    filtered.sort(key=_rank_score, reverse=True)
     return filtered
 
 
@@ -534,6 +609,25 @@ def _classify_vendor(title: str, desc: str) -> str:
 # ---------------------------------------------------------------------------
 # Pipeline entry point
 # ---------------------------------------------------------------------------
+
+def _select_with_hebrew_quota(ranked: list[dict]) -> list[dict]:
+    """Take the top _MAX_ITEMS, reserving up to _HEBREW_SLOTS for Hebrew.
+
+    `ranked` must already be sorted best-first. Hebrew videos are pulled out
+    first up to the quota, then English fills the rest; unused Hebrew slots go
+    back to English so the list is never short on a quiet Israeli news day.
+    """
+    hebrew = [v for v in ranked if v.get("lang") == "he"][:_HEBREW_SLOTS]
+    taken = {id(v) for v in hebrew}
+    english = [v for v in ranked if id(v) not in taken][:_MAX_ITEMS - len(hebrew)]
+    out = hebrew + english
+    out.sort(key=_rank_score, reverse=True)
+    print(f"  Selected {len(out)}: {len(hebrew)} Hebrew (quota {_HEBREW_SLOTS}), "
+          f"{len(english)} English  |  "
+          f"{sum(1 for v in out if v.get('kind') == 'tutorial')} tutorial / "
+          f"{sum(1 for v in out if v.get('kind') == 'commentary')} commentary")
+    return out
+
 
 def run_pipeline() -> dict:
     print("=" * 60)
@@ -575,7 +669,7 @@ def run_pipeline() -> dict:
     # frontend's redesigned cards can render thumbnails + view counts directly
     # without reparsing summary text.
     news_items = []
-    for v in filtered[:20]:
+    for v in _select_with_hebrew_quota(filtered):
         views_str = _format_views(v.get("views", 0))
         channel = v.get("channel", "")
         summary = v.get("description", "")
@@ -596,6 +690,10 @@ def run_pipeline() -> dict:
             "duration_seconds": v.get("duration", 0),
             "duration_text": _format_duration(v.get("duration", 0)),
             "thumbnail": v.get("thumbnail", ""),
+            # Drive the frontend's EN/HE split and its two video sections.
+            "lang": v.get("lang", "en"),
+            "kind": v.get("kind", "commentary"),
+            "published_at": v.get("published_at", ""),
         })
 
     briefing = {

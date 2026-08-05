@@ -519,6 +519,50 @@ else
 fi
 
 echo
+echo "[4b/6] Running QA evaluator on ${DATE} (BEFORE the email)..."
+# Ordering changed 2026-08-05 (Koby's call). QA used to run AFTER the email, so the
+# email could only ever report the PREVIOUS day's findings — the accepted "day-delay"
+# from 2026-06-14. That delay hid real damage: on 2026-08-05 QA raised 8 P0s including
+# `data_integrity.en_he_length_mismatch` ("readers will see wrong Hebrew text per
+# card"), which had correctly caught live Hebrew corruption — and wrote them to disk
+# 3.5 minutes AFTER the only notification of the day. Koby was finding these by eye.
+# send_email.py's _qa_row() already picks the most recent report.md, so running here
+# needs no change there — today's findings now land in today's email.
+#
+# WATCHDOG: this now sits in front of the email, so a hung QA would delay the one
+# thing that must always ship (see the send_email note below — a 2026-05-23 hang
+# blocked the next day's cycle entirely). macOS has no GNU `timeout` and wrapping
+# scripts in it is banned here, so poll-and-kill instead. QA takes ~4.5 min; 10 min
+# is generous headroom.
+QA_TIMEOUT_SECS="${QA_TIMEOUT_SECS:-600}"
+"$PYTHON_BIN" private/qa-evaluator-agent/run.py --date "$DATE" &
+_qa_pid=$!
+_qa_waited=0
+# Defensive: a bare `wait ""` waits on EVERY child, which would hang the cycle in
+# front of the email — the exact failure this watchdog exists to prevent.
+case "$_qa_pid" in
+  ''|*[!0-9]*) echo "  ⚠ could not capture QA pid — skipping QA so the email still ships"
+               _qa_pid="" ;;
+esac
+while [ -n "$_qa_pid" ] && kill -0 "$_qa_pid" 2>/dev/null && [ "$_qa_waited" -lt "$QA_TIMEOUT_SECS" ]; do
+  sleep 5
+  _qa_waited=$((_qa_waited + 5))
+done
+if [ -z "$_qa_pid" ]; then
+  :   # already reported above
+elif kill -0 "$_qa_pid" 2>/dev/null; then
+  kill -9 "$_qa_pid" 2>/dev/null || true
+  wait "$_qa_pid" 2>/dev/null || true
+  echo "  ⚠ QA evaluator exceeded ${QA_TIMEOUT_SECS}s — killed so the email still ships"
+else
+  if wait "$_qa_pid"; then
+    echo "  ✓ QA evaluator finished (${_qa_waited}s) — report at private/qa-evaluator-agent/output/${DATE}/report.md"
+  else
+    echo "  ⚠ QA evaluator returned non-zero — inspect private/qa-evaluator-agent/output/${DATE}/report.md"
+  fi
+fi
+
+echo
 echo "[5/6] Sending email (subject will be tagged [LOCAL])..."
 # Email runs before the GH Pages wait so the Mac sleeping during the 3-min poll
 # doesn't silently kill it. The "site=" delivery snapshot may show ⚠0 for some
@@ -620,15 +664,8 @@ else
   echo "[5/6] ingest SKIPPED ($([ "$DO_INGEST" -eq 0 ] && echo "--no-ingest" || echo "no push"))"
 fi
 
-echo
-echo "[QA] Running QA evaluator on ${DATE}..."
-# Don't fail the cycle if QA flags issues — the briefing has already shipped.
-# QA findings are for next-run visibility (P0/P1 surface in the report).
-if "$PYTHON_BIN" private/qa-evaluator-agent/run.py --date "$DATE"; then
-  echo "  ✓ QA evaluator finished — report at private/qa-evaluator-agent/output/${DATE}/report.md"
-else
-  echo "  ⚠ QA evaluator returned non-zero — inspect private/qa-evaluator-agent/output/${DATE}/report.md"
-fi
+# NOTE: the QA evaluator moved UP to [4b/6], before the email — see the rationale
+# there. Don't move it back after the email without also giving it its own alert.
 
 echo
 echo "================================================================"

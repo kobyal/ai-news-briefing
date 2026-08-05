@@ -927,10 +927,12 @@ def _add_sidedata_rows(rows: list) -> None:
     _pipeline_start = len(rows)   # rows from here on are build/publish steps, not content agents
     rows.append(_editorial_row())
 
-    # QA evaluator — runs LAST (after this email) and sends no notification of its
-    # own, so its findings were entirely silent. Surface the most recent report.md
-    # available at email time (today's email shows the prior run's QA — accepted
-    # day-delay, user decision 2026-06-14).
+    # QA evaluator — as of 2026-08-05 it runs BEFORE this email (local-cycle [4b/6]),
+    # so the most-recent report.md is normally TODAY's and its P0s reach today's email.
+    # That reverses the accepted day-delay of 2026-06-14, which had hidden a live
+    # Hebrew-corruption P0 for a full day. Still picks the newest report rather than
+    # requiring today's, so a killed/skipped QA degrades to the prior run instead of
+    # blanking the row — check the `json=` date to see which run you're reading.
     def _qa_row() -> dict:
         reports = sorted(glob.glob(str(repo / "private/qa-evaluator-agent/output/*/report.md")))
         if not reports:

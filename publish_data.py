@@ -2324,6 +2324,66 @@ def _realign_youtube_he():
 _realign_youtube_he()
 
 
+def _youtube_plain_desc(v: dict) -> str:
+    """Strip the '[Channel · 845K views]' prefix, URLs and sponsor boilerplate —
+    same shape the merger feeds its translator, so the two batches match."""
+    s = v.get("summary", "") or ""
+    m = re.match(r'\[([^\]]+)\]\s*(.*)', s, re.DOTALL)
+    s = m.group(2).strip() if m else s.strip()
+    s = re.sub(r'https?://\S+', '', s).strip()
+    s = re.sub(r'(?i)(try|get|check out|sign up|use code|sponsored by).*$', '', s, flags=re.MULTILINE).strip()
+    lines = [ln.strip() for ln in s.split('\n') if ln.strip()]
+    return (lines[0] if lines else "")[:300]
+
+
+def _backfill_youtube_he():
+    """Translate videos the merger never saw.
+
+    The merger translates only what the youtube agent handed it. Videos added
+    later by publish_data — per-story explainer search (phase 1) and gap-fill
+    (phase 2) — arrive after that, so _realign_youtube_he pads their HE slots
+    with "" and the Hebrew page renders those cards with English titles. That
+    was ~45% of all video cards (17 of 35 non-empty on 2026-08-05) and the QA
+    check never noticed because it compared array lengths, not content.
+    """
+    if not youtube_items:
+        return
+    bh = merger.get("briefing_he")
+    if not isinstance(bh, dict) or not bh:
+        return  # Hebrew pipeline didn't run — don't invent HE content here.
+
+    heads = list(bh.get("youtube_headlines_he") or [])
+    descs = list(bh.get("youtube_descs_he") or [])
+    heads += [""] * max(0, len(youtube_items) - len(heads))
+    descs += [""] * max(0, len(youtube_items) - len(descs))
+
+    head_gaps = [i for i in range(len(youtube_items))
+                 if not (heads[i] or "").strip() and (youtube_items[i].get("headline") or "").strip()]
+    desc_gaps = [i for i in range(len(youtube_items))
+                 if not (descs[i] or "").strip() and _youtube_plain_desc(youtube_items[i])]
+    if not head_gaps and not desc_gaps:
+        return
+
+    print(f"Backfilling Hebrew for videos the merger never saw "
+          f"({len(head_gaps)} titles, {len(desc_gaps)} descriptions)...")
+    if head_gaps:
+        for i, t in zip(head_gaps, _translate_he([youtube_items[i].get("headline", "") for i in head_gaps])):
+            if (t or "").strip():
+                heads[i] = t.strip()
+    if desc_gaps:
+        for i, t in zip(desc_gaps, _translate_he([_youtube_plain_desc(youtube_items[i]) for i in desc_gaps])):
+            if (t or "").strip():
+                descs[i] = t.strip()
+
+    merger["briefing_he"]["youtube_headlines_he"] = heads
+    merger["briefing_he"]["youtube_descs_he"] = descs
+    print(f"  Hebrew video coverage: titles {sum(1 for x in heads if (x or '').strip())}/{len(youtube_items)}, "
+          f"descriptions {sum(1 for x in descs if (x or '').strip())}/{len(youtube_items)}")
+
+
+_backfill_youtube_he()
+
+
 # ── Source-relevance auto-remediation ─────────────────────────────────────────
 # Detection alone still ships the bad story (the audit only REPORTS, and the QA
 # evaluator runs as a separate post-publish process). This pass PREVENTS a
@@ -2535,11 +2595,22 @@ def _audit_data_quality():
     _people_he = (_briefing_he.get("people_he") or [])
     if len(_people) != len(_people_he) and _people:
         issues.append(f"length mismatch: twitter.people={len(_people)} vs briefing_he.people_he={len(_people_he)}")
-    # youtube descs (cap at display ceiling 12)
+    # Hebrew video coverage. This used to compare LENGTHS against a ceiling of
+    # 12 — useless, because _realign_youtube_he pads the array to exactly
+    # len(youtube_items) with empty strings, so the length always passed while
+    # ~45% of the slots were blank (17/35 non-empty on 2026-08-05). Count real
+    # translations instead, and expect most of them.
     _yt_descs_he = (_briefing_he.get("youtube_descs_he") or [])
-    _yt_expected = min(len(youtube_items), 12)
-    if _yt_expected and len(_yt_descs_he) < _yt_expected:
-        issues.append(f"youtube_descs_he={len(_yt_descs_he)} but {_yt_expected} videos visible on /media/")
+    _yt_heads_he = (_briefing_he.get("youtube_headlines_he") or [])
+    _yt_he_filled = sum(1 for x in _yt_heads_he if (x or "").strip())
+    _yt_expected = int(len(youtube_items) * 0.8)
+    if _yt_expected and _yt_he_filled < _yt_expected:
+        issues.append(f"youtube_headlines_he: only {_yt_he_filled} of {len(youtube_items)} "
+                      f"videos have Hebrew (expected >={_yt_expected}) — HE video cards fall back to English")
+    _yt_desc_filled = sum(1 for x in _yt_descs_he if (x or "").strip())
+    if _yt_expected and _yt_desc_filled < _yt_expected:
+        issues.append(f"youtube_descs_he: only {_yt_desc_filled} of {len(youtube_items)} "
+                      f"videos have a Hebrew description (expected >={_yt_expected})")
 
     # 2. Source diversity — story ending up with all-non-English URLs is a
     # red flag for an over-aggressive vendor/URL filter (the 2026-04-27 verifier

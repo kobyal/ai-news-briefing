@@ -1031,6 +1031,28 @@ _AGGREGATOR_RE = re.compile("|".join(_AGGREGATOR_PATTERNS), re.I)
 # rejected as sources; a story left sourceless is then quarantined downstream.
 _AGGREGATOR_DOMAINS = (
     "my2cents.ai",
+    # 2026-08-05 QA flagged all three as P0 semantic_url_mismatch, each the SOLE
+    # source for a real story:
+    #   llm-stats.com/llm-updates          — a running "LLM updates" category feed,
+    #                                        not an article (sourced the GPT-5.6
+    #                                        1M-context story)
+    #   ad-hoc-news.de                     — German financial-newswire redistributor
+    #                                        (sourced the NVIDIA $250B story); also
+    #                                        a non-English edition
+    #   finance.yahoo.com/.../market-chatter- — Yahoo's "Market Chatter" rumour
+    #                                        column, second-hand by construction
+    "llm-stats.com",
+    "ad-hoc-news.de",
+)
+
+#: Path fragments that mark a running feed / category index rather than an article.
+#: A dated article slug is fine; "/llm-updates" or "/market-chatter-" is not.
+_AGGREGATOR_PATH_FRAGMENTS = (
+    "/llm-updates",
+    "/market-chatter-",
+    "/news/latest",
+    "/category/",
+    "/tag/",
 )
 
 
@@ -1038,6 +1060,8 @@ def _is_aggregator_page(url: str, title: str) -> bool:
     """True if the page is a multi-topic roundup, not a story-specific article."""
     u = (url or "").lower()
     if any(d in u for d in _AGGREGATOR_DOMAINS):
+        return True
+    if any(frag in u for frag in _AGGREGATOR_PATH_FRAGMENTS):
         return True
     return bool(_AGGREGATOR_RE.search((url or "") + " " + (title or "")))
 

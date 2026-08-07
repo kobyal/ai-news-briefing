@@ -424,6 +424,33 @@ _ARCTIC_SEARCH_URL = "https://arctic-shift.photon-reddit.com/api/posts/search"
 _REDDIT_LAG_DAYS = 1     # skip posts younger than this (scores not yet matured)
 _REDDIT_WINDOW_DAYS = 9  # oldest post age to consider (volume for the floor)
 
+#: Half-life for the community-post recency decay, in hours. 24h, so a post
+#: loses half its weight per day: at 48h it's tuned strongly enough that the
+#: >72h threshold QA enforces is only cleared by genuinely outsized threads.
+#: (A 48h half-life was too weak — a 75h/250-comment post still outranked a
+#: 26h/120-comment one, which is exactly the ordering QA flagged.)
+_REDDIT_DECAY_HALFLIFE_H = 24.0
+
+
+def _reddit_rank(article: dict) -> float:
+    """Engagement score decayed by age — the sort key for community posts.
+
+    Ranking on raw comment count alone let the 9-day fetch window dominate the
+    published top-20 with old threads: the 2026-08-07 QA report raised eight
+    `sections.reddit_stale` P1s, with posts 75h, 99h and 123h old sitting at
+    positions #0-#2. The window itself is deliberate (volume, so the
+    per-subreddit upvote floors have something to filter), so the fix belongs in
+    the ranking, not the fetch: a 48h half-life means a day-old thread beats a
+    three-day-old one carrying ~3x the comments, while a genuinely huge old
+    thread can still earn its slot.
+    """
+    score = article.get("_score", 0) or 0
+    pub = article.get("_pub_dt")
+    if not pub:
+        return 0.0          # unknown date — sort to the bottom, don't guess
+    age_h = max(0.0, (datetime.now(tz=timezone.utc) - pub).total_seconds() / 3600.0)
+    return score / (2 ** (age_h / _REDDIT_DECAY_HALFLIFE_H))
+
 
 def _fetch_reddit_hot(url: str, since: datetime, max_items: int = 15) -> List[dict]:
     """Fetch hot Reddit posts via the Arctic Shift archive (no auth required).
@@ -504,7 +531,7 @@ def _fetch_reddit_hot(url: str, since: datetime, max_items: int = 15) -> List[di
     if dropped_below_floor > 0:
         print(f"  [Reddit] r/{sub_name} dropped {dropped_below_floor} posts below {floor}-upvote floor (kept {len(articles)})")
 
-    articles.sort(key=lambda a: a.get("_score", 0), reverse=True)
+    articles.sort(key=_reddit_rank, reverse=True)
     return articles[:max_items]
 
 
@@ -568,7 +595,9 @@ def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
         key=lambda a: (a.get("_pub_dt") or datetime.min.replace(tzinfo=timezone.utc), a.get("_score", 0)),
         reverse=True,
     )
-    community_articles.sort(key=lambda a: a.get("_score", 0), reverse=True)
+    # Recency-decayed, not raw engagement — this sort picks the published top-20
+    # (pipeline._step4_publish walks it in order). See _reddit_rank.
+    community_articles.sort(key=_reddit_rank, reverse=True)
 
     print(f"  → {len(vendor_articles)} vendor articles, {len(community_articles)} community posts")
     # Loud sanity check: 70+ vendor RSS feeds running over a 7-day window

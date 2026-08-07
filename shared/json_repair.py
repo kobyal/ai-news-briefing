@@ -73,6 +73,75 @@ def _close_truncated(value):
     return out if isinstance(out, dict) and out else None
 
 
+def _strip_prose(value):
+    """Return the first balanced top-level {…} / […] in a string that's wrapped
+    in prose, or None if there isn't one.
+
+    2026-08-07: the rss agent shipped 0 English items two days running because
+    `claude -p` prefaced its JSON with an audit-policy sentence ("Output only the
+    JSON briefing. None of the audit rules apply—this is a text-generation task
+    with no file transfers, deployments, or resource operations."). The org's
+    SessionStart context makes the model narrate a compliance check before
+    answering; nothing here could see past it, so a complete, valid briefing
+    parsed to {}. Same class took out the editorial agent on 2026-08-05.
+
+    Scans for the opening brace and walks it to its match with string/escape
+    awareness, so braces inside string values don't end the scan early.
+    """
+    for i, ch in enumerate(value):
+        if ch not in "{[":
+            continue
+        closer = "}" if ch == "{" else "]"
+        depth = 0
+        in_str = False
+        esc = False
+        for j in range(i, len(value)):
+            c = value[j]
+            if in_str:
+                if esc:
+                    esc = False
+                elif c == "\\":
+                    esc = True
+                elif c == '"':
+                    in_str = False
+                continue
+            if c == '"':
+                in_str = True
+            elif c in "{[":
+                depth += 1
+            elif c in "}]":
+                depth -= 1
+                if depth == 0:
+                    return value[i:j + 1] if c == closer else None
+        # Opened but never closed — leave it to the truncation repair, which
+        # also needs the prose gone to find its own starting brace.
+        return value[i:]
+    return None
+
+
+def _dump_failure(value):
+    """Persist an unparseable LLM output so the next failure is diagnosable.
+
+    Until now a parse failure printed 200 chars and threw the rest away, which
+    is why the 2026-08-06 rss failure (output began with `{`, so not the prose
+    bug) can't be root-caused after the fact. Best-effort — never raises.
+    """
+    try:
+        import os
+        import tempfile
+        from datetime import datetime
+        out_dir = os.environ.get("JSON_REPAIR_DUMP_DIR") or os.path.join(
+            tempfile.gettempdir(), "ai-news-json-repair")
+        os.makedirs(out_dir, exist_ok=True)
+        path = os.path.join(
+            out_dir, f"parse_failure_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.txt")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(value)
+        print(f"  [_parse] raw output dumped → {path}")
+    except Exception:
+        pass
+
+
 def parse_json(value):
     """Parse an LLM output that may be a dict, JSON string, ```-fenced JSON, or
     Python-repr string, repairing common Hebrew-quote / unescaped-quote damage.
@@ -85,6 +154,17 @@ def parse_json(value):
     # Strip markdown fences (```json … ```).
     value = re.sub(r"^```(?:json)?\s*", "", value.strip())
     value = re.sub(r"\s*```$", "", value.strip())
+
+    # Strip surrounding prose BEFORE anything else. Runs first because it's
+    # lossless for well-formed JSON (a string that already starts with { is
+    # returned unchanged) and because every strategy below — including the
+    # truncation repair, which requires a leading brace — is blind without it.
+    if not value.startswith(("{", "[")):
+        _inner = _strip_prose(value)
+        if _inner:
+            print(f"  [_parse] stripped {len(value) - len(_inner)} chars of prose "
+                  "before the JSON")
+            value = _inner
 
     try:
         return json.loads(value)
@@ -160,4 +240,5 @@ def parse_json(value):
         print(f"  [_parse] partial recovery: {list(result.keys())}")
         return result
     print(f"  [_parse] FAILED on: {value[:200]!r}")
+    _dump_failure(value)
     return {}

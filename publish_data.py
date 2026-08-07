@@ -1043,6 +1043,12 @@ _AGGREGATOR_DOMAINS = (
     #                                        column, second-hand by construction
     "llm-stats.com",
     "ad-hoc-news.de",
+    # 2026-08-07 QA P0 semantic_url_mismatch: kogelog.com/20260805-03/ ("Azure
+    # Technology Pickup (2026/08/05)") sourced the GitHub Copilot Agent / Azure
+    # VNet story at 0.0% title overlap. A Japanese per-day Azure link-roundup —
+    # the date-slug URL carries no roundup phrase and the page is non-English,
+    # so both the pattern check and the subject-word gate waved it through.
+    "kogelog.com",
 )
 
 #: Path fragments that mark a running feed / category index rather than an article.
@@ -2144,6 +2150,54 @@ def _gap_fill_unpaired(news_items: list, videos: list, api_key: str) -> int:
     return added
 
 
+#: Words that carry no pairing signal — stopwords plus AI/news vocabulary
+#: generic enough to appear in any story and any video title.
+_PAIR_NOISE = frozenset("""
+the a an and or but for to of in on at by with from as is are was were be been
+its it this that these those new now just how why what when who will has have
+had can could would should more most best biggest first last next big huge
+ai model models llm llms release releases released launch launches launched
+update updates announces announced announcement adds add ships ship shipped
+makes make made unveils unveil reveals reveal news today week day open source
+weights free everyone again yet arrived moment changed everything trouble lost
+""".split())
+
+
+def _pair_specific_overlap(story: dict, video: dict) -> set:
+    """Tokens a story headline and a video title share BEYOND the vendor name.
+
+    An empty set means the only thing linking them is the vendor — precisely the
+    "vendor-only match" the pairer prompt forbids but kept producing. On
+    2026-08-07 all three `content_quality.video_mismatch` P1s were this shape:
+    "Google lost a GOAT" ↔ a Hassabis leadership story, "Another DeepSeek Moment
+    Has Arrived" ↔ a DeepSeek pricing story, "Qwen Just Did it Again!" ↔ the
+    Qwen3.8-Max launch. Each names the vendor and no specific fact. The prompt
+    has carried an anti-clickbait rule since 2026-07-31 and still let these
+    through, so the check is enforced deterministically here rather than asked
+    for again.
+    """
+    def toks(s: str) -> set:
+        return {t for t in re.findall(r"[a-z0-9.\-]{3,}", (s or "").lower())
+                if t not in _PAIR_NOISE}
+
+    s_toks = toks(story.get("headline") or "")
+    v_toks = toks(video.get("headline") or video.get("title") or "")
+    # Drop the vendor name (and its individual words) from both sides.
+    vendor = ((story.get("vendor") or "") + " " + (video.get("vendor") or "")).lower()
+    vendor_toks = set(re.findall(r"[a-z0-9]{2,}", vendor))
+    return (s_toks & v_toks) - vendor_toks
+
+
+def _is_latin(s: str) -> bool:
+    """True if the text is predominantly Latin script. The overlap gate compares
+    words literally, so it cannot judge a Hebrew video title against an English
+    headline — those stay the LLM's call rather than being auto-rejected."""
+    letters = [c for c in (s or "") if c.isalpha()]
+    if not letters:
+        return False
+    return sum(c.isascii() for c in letters) / len(letters) > 0.5
+
+
 def _pair_explainer_videos(news_items: list, videos: list) -> int:
     if not news_items or not videos:
         return 0
@@ -2222,6 +2276,7 @@ def _pair_explainer_videos(news_items: list, videos: list) -> int:
         return 0
 
     paired = 0
+    rejected = 0
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -2229,9 +2284,37 @@ def _pair_explainer_videos(news_items: list, videos: list) -> int:
         if v_idx is None or not isinstance(s_idx, int) or not isinstance(v_idx, int):
             continue
         if 0 <= s_idx < len(news_items) and 0 <= v_idx < len(videos):
-            videos[v_idx]["paired_with_story_id"] = _story_id_hash(news_items[s_idx])
+            story, video = news_items[s_idx], videos[v_idx]
+            v_title = video.get("headline") or video.get("title") or ""
+            # Vendor-only matches are rejected outright — see _pair_specific_overlap.
+            if _is_latin(story.get("headline") or "") and _is_latin(v_title):
+                if not _pair_specific_overlap(story, video):
+                    print(f"    ✂ vendor-only pair rejected: {v_title[:60]!r} "
+                          f"↮ {(story.get('headline') or '')[:60]!r}")
+                    rejected += 1
+                    continue
+            video["paired_with_story_id"] = _story_id_hash(story)
             paired += 1
-    print(f"  Explainer pairing: {paired}/{len(news_items)} stories matched with a video (LLM-judged)")
+    print(f"  Explainer pairing: {paired}/{len(news_items)} stories matched with a video "
+          f"(LLM-judged, {rejected} vendor-only pair(s) rejected)")
+
+    # Purge pairings that point at a story_id no longer in today's briefing.
+    # On a same-day re-run the videos list is UNIONed with the earlier run's, so
+    # a `paired_with_story_id` written hours ago survives — but a story's id is
+    # derived from urls[0], and the source-relevance/freshness passes rewrite or
+    # drop primaries. 2026-08-07: source-relevance moved the GPT-5.6 story off
+    # openai.com onto axios.com, re-deriving its id, and the video paired to the
+    # old id rendered on /media pointing at a story that no longer existed.
+    live_ids = {_story_id_hash(s) for s in news_items}
+    stale = 0
+    for v in videos:
+        pid = v.get("paired_with_story_id")
+        if pid and pid not in live_ids:
+            v.pop("paired_with_story_id", None)
+            stale += 1
+    if stale:
+        print(f"  ✂ Dropped {stale} video pairing(s) pointing at a story_id "
+              f"no longer in the briefing (re-derived or dropped)")
     return paired
 
 

@@ -10,12 +10,16 @@ Env vars:
 import json
 import os
 import re
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
+
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
+from shared.ai_relevance import is_ai_relevant  # noqa: E402
 
 _TODAY     = lambda: datetime.now().strftime("%B %d, %Y")
 _TODAY_ISO = lambda: datetime.now().strftime("%Y-%m-%d")
@@ -362,7 +366,7 @@ def _fetch_person(person: dict, auth_token: str, ct0: str, cutoff_ts: float) -> 
         # accounts (@xai, @awscloud, …) are on-topic by definition — keep their
         # best, preferring a relevant one when present.
         is_official = person.get("role") == "Official"
-        relevant = [t for t in tweets if _AI_RELEVANCE_RE.search(t["text"])]
+        relevant = [t for t in tweets if is_ai_relevant(t["text"])]
         if relevant:
             pool = relevant
         elif is_official:
@@ -399,19 +403,12 @@ def _fetch_person(person: dict, auth_token: str, ct0: str, cutoff_ts: float) -> 
 # like posts despite min_faves:500 in the query), so engagement is enforced
 # post-fetch. AI-relevance filter weeds out false-positive matches like
 # 3D-modeling posts that say "MODEL RELEASE".
+# AI-relevance gating moved to shared/ai_relevance.py (2026-08-07) — the flat
+# keyword OR that lived here shipped a crypto market snapshot and an AMD
+# earnings table to /community on a bare `\bai\b` match, and waved through a
+# K-pop post and a VTuber account on the strength of the names "Gemini" and
+# "Claude". See that module.
 _TRENDING_MIN_LIKES = 50
-_AI_RELEVANCE_RE = re.compile(
-    r"\b("
-    r"openai|anthropic|claude|chatgpt|gpt-?\d|sora|codex|"
-    r"gemini|deepmind|llama|bedrock|copilot|"
-    r"nvidia|grok|xai|mistral|cohere|deepseek|qwen|huggingface|perplexity|"
-    r"llm|llms|agi|ai|artificial intelligence|machine learning|"
-    r"transformer|multimodal|fine[- ]?tun|embedding|inference|"
-    r"agent|agentic|reasoning model|model release|open[- ]?(?:source|weight)s?|"
-    r"ml model|neural net|frontier model|foundation model"
-    r")\b",
-    re.IGNORECASE,
-)
 
 # Map post text → most-relevant vendor for the topic badge. First match wins.
 # Order matters: more specific vendor names before generic ones (e.g.
@@ -479,7 +476,7 @@ def _parse_search_tweets(data: dict, cutoff_ts: float) -> list[dict]:
             # AI relevance: post must mention at least one vendor/AI term.
             # The search query alone matches "MODEL RELEASE" too liberally
             # (Blender 3D models, model trains, etc).
-            if not _AI_RELEVANCE_RE.search(text):
+            if not is_ai_relevant(text):
                 continue
             created = legacy.get("created_at", "")
             tid = legacy.get("id_str", "")

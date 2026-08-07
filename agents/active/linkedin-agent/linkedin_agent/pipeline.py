@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
+from shared.ai_relevance import is_ai_relevant  # noqa: E402
 
 _TODAY     = lambda: datetime.now().strftime("%B %d, %Y")
 _TODAY_ISO = lambda: datetime.now().strftime("%Y-%m-%d")
@@ -75,18 +76,10 @@ TRACKED_PEOPLE = [
 
 _SLUG_TO_PERSON = {p["slug"]: p for p in TRACKED_PEOPLE}
 
-_AI_RELEVANCE_RE = re.compile(
-    r"\b(openai|anthropic|claude|claude code|chatgpt|gpt|gemini|llm|llms|agi|"
-    r"artificial intelligence|machine learning|deep learning|"
-    r"ai agent|ai agents|agentic ai|foundation model|frontier model|large language|"
-    r"nvidia|grok|mistral|cohere|deepseek|hugging.?face|llamaindex|langchain|"
-    r"transformer|neural network|fine.?tun|embedding|rag|retrieval.augmented|"
-    r"generative ai|gen ai|agentic|cursor|copilot|vibe.?cod|"
-    r"bedrock|sagemaker|amazon q|aws ai|re.?invent|"
-    r"benchmark|evals|reasoning model|multimodal|inference|mcp|"
-    r"open.?source.*model|model.*release|context.?window|prompt.?engin)\b",
-    re.IGNORECASE,
-)
+# AI-relevance gating moved to shared/ai_relevance.py (2026-08-07). The flat
+# keyword OR that used to live here had drifted from the twitter-agent's copy
+# and treated any single weak term as proof — see that module for the failure
+# modes and the two-tier rule that replaced it.
 
 _VENDOR_PATTERNS = [
     ("Anthropic",    re.compile(r"\b(anthropic|claude(?!\s+von))\b", re.IGNORECASE)),
@@ -187,7 +180,7 @@ def _process_item(item: dict) -> dict | None:
     content = item.get("content", "") or ""
     if not content or len(content) < 30:
         return None
-    if not _AI_RELEVANCE_RE.search(content):
+    if not is_ai_relevant(content):
         return None
 
     author = item.get("author") or {}

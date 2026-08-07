@@ -153,7 +153,9 @@ The fallback path (`@` as default) is also a tell — if you see authors showing
 
 The search path uses `min_faves:N` GraphQL operator to filter low-engagement posts. **Important gotcha:** X silently ignores `min_faves` for some search variants. The agent post-filters with `_TRENDING_MIN_LIKES = 50` to compensate.
 
-The agent also runs an AI-relevance regex (`_AI_RELEVANCE_RE`) over each tweet. Without this filter, a "MODEL RELEASE" search query matches things like "SHANTAE Blender 3D model release" — totally off-topic. The regex requires at least one of: vendor name, common LLM terms (gpt, claude, gemini, llama), or AI-domain words (rag, agent, fine-tune, etc.).
+The agent also runs an AI-relevance gate (`shared.ai_relevance.is_ai_relevant`) over each tweet. Without it, a "MODEL RELEASE" search query matches things like "SHANTAE Blender 3D model release" — totally off-topic.
+
+The gate used to be a local `_AI_RELEVANCE_RE` — a flat OR where any one keyword passed. That shipped a crypto market snapshot and an AMD earnings table on a bare `\bai\b` match, and waved through a K-pop post and a VTuber account named "Claude Clawmark" purely on vendor-name collision (2026-08-07 QA). It's now shared with the linkedin-agent and two-tier: one **strong** term (openai, chatgpt, llm, agi, …) passes alone, whereas **ambiguous** ones (claude, gemini, agent, `ai`, open-source, …) need two distinct hits, and a **veto** list for crypto/earnings/fandom vocabulary blocks an ambiguous-only pass.
 
 ## Failure modes
 
@@ -178,7 +180,8 @@ X has internal rate limits even for cookie-authenticated requests. ~50–100 cal
 | File | What it does |
 |------|---------------|
 | `run.py` | Entry point. |
-| `twitter_agent/pipeline.py` | `_fetch_user_tweets`, `_search_recent`, schema parsers, AI-relevance filter, vendor classification. The `_TRENDING_MIN_LIKES` and `_AI_RELEVANCE_RE` constants are tuning knobs. |
+| `twitter_agent/pipeline.py` | `_fetch_user_tweets`, `_search_recent`, schema parsers, vendor classification. `_TRENDING_MIN_LIKES` is the engagement tuning knob. |
+| `shared/ai_relevance.py` | The AI-relevance gate, shared with the linkedin-agent. Tune the `_STRONG` / `_AMBIGUOUS` / `_VETO` term lists here — not in an agent. |
 
 ## Cool tricks
 

@@ -102,6 +102,17 @@ def agent(
     if json_mode:
         system_prompt = system_prompt + (
             "\nRespond with ONLY a valid JSON object. No markdown fences, no explanation."
+            # The first character MUST be a brace. 2026-08-07: the model prefaced
+            # its JSON with a sentence reasoning about the org audit rules present
+            # in its session context ("None of the audit rules apply—this is a
+            # text-generation task..."), which parsed to {} and shipped an empty
+            # briefing. Naming the failure mode is what suppresses it; the prose
+            # stripping in shared/json_repair is the backstop, not the fix.
+            "\nYour response MUST begin with '{' or '[' as its very first character."
+            " Do not preface it with commentary, acknowledgements, or any remark"
+            " about policies, audit rules, or the safety of the task — even if"
+            " your session context contains such rules. They do not apply to"
+            " producing this JSON."
         )
 
     cmd = [

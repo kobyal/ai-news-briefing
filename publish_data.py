@@ -982,22 +982,50 @@ def _url_misses_subject(url: str, item: dict) -> bool:
         return False
     return not any(k in url.lower() for k in subj)
 
+#: A slug token is matched against the story body by prefix, so a headline's
+#: "capability" corroborates a slug's "capabilities" (and "pricing"/"priced").
+#: Short enough to absorb inflection, long enough that unrelated words don't
+#: collide at ≥5-char tokens.
+_SLUG_STEM_CHARS = 6
+
+
+def _story_body_text(item: dict) -> str:
+    """Everything the story itself asserts — what a source URL must corroborate."""
+    return " ".join(str(item.get(k) or "") for k in ("headline", "summary", "detail")).lower()
+
+
 def _url_names_foreign_subject(url: str, item: dict) -> bool:
     """Precision guard for AUTO-REMEDIATION (stricter than the audit's report):
     True only if the URL slug contains a distinctive product/topic token (≥5 chars,
-    not boilerplate) that appears NOWHERE in the headline — i.e. the page is
+    not boilerplate) that appears NOWHERE IN THE STORY — i.e. the page is
     demonstrably about something else (e.g. '/bedrock-agentcore-available/' on a
     Grok story → 'agentcore' is foreign). This is what separates a genuinely wrong
     source from a legit story whose subject just isn't slugified — so we never
-    drop/quarantine a story merely because its slug omits the headline subject."""
-    head = (item.get("headline") or "").lower()
+    drop/quarantine a story merely because its slug omits the headline subject.
+
+    Matched against headline + summary + detail rather than the headline alone
+    (2026-08-24): a vendor routinely slugs its own announcement in different
+    words than our headline picks. OpenAI's own post on pausing RL training was
+    at `/index/pacing-model-development-cyber-capabilities/`, and against the
+    headline "OpenAI pauses RL training after internal model autonomously
+    breaches Hugging Face" every one of 'pacing'/'development'/'cyber'/
+    'capabilities' read as foreign — so remediation dropped the story's canonical
+    first-party source, the Euronews fallback became primary, and the freshness
+    re-verify then killed the whole story as 5d old. The body corroborates all
+    four words. The AgentCore-on-a-Grok-story case still trips the gate, because
+    there the foreign tokens appear nowhere in the story either.
+
+    Deliberately NOT "does the token identify another story in today's set" —
+    tested and rejected: at ≥5-char substring matching 'cyber' hits an unrelated
+    'cybersecurity' headline, so real mis-sources and paraphrases score alike."""
+    body = _story_body_text(item)
     try:
         slug = urllib.parse.urlsplit(url).path.lower()
     except Exception:
         return False
     slug_toks = [t for t in re.findall(r"[a-z][a-z0-9]+", slug)
                  if len(t) >= 5 and t not in _SUBJECT_GENERIC_WORDS and t not in _URL_PATH_NOISE]
-    return any(t not in head for t in slug_toks)
+    return any(t not in body and t[:_SLUG_STEM_CHARS] not in body for t in slug_toks)
 
 def _url_is_wrong_source(url: str, item: dict) -> bool:
     """Auto-remediation drop condition: the URL both lacks any headline subject
@@ -2805,26 +2833,78 @@ if _tldr_bullets_final:
         _midx = _it.get("_merger_idx")
         if isinstance(_midx, int):
             _idx_to_pos[_midx] = _pos
-    _llm_pos = [
-        _idx_to_pos.get(_pending_tldr_indices[_bi]) if _bi < len(_pending_tldr_indices) else None
-        for _bi in range(len(_tldr_bullets_final))
-    ]
-    if any(_p is None for _p in _llm_pos):
-        _llm_pos = None  # partial mapping — let the binder re-match every bullet
-    _bound = _bind_bullets(_tldr_bullets_final, [_bsi_text(_it) for _it in _news_items], _llm_pos)
+    # A bullet whose merger story was DROPPED here (stale / quarantined) is a
+    # DEFINITE orphan: we know exactly which story the writer meant, and it is
+    # not in the set. Re-matching it against what survives is precisely how a
+    # bullet ends up linking to the WRONG story — 2026-08-24: the Anthropic
+    # "$65B run rate" bullet lost its story to the freshness re-verify and was
+    # re-bound to "Microsoft Foundry adds five Claude capabilities" on the
+    # shared Anthropic/Claude/revenue vocabulary. That link resolved, dangled
+    # nothing, and every guard stayed green — it was just a different story.
+    # Also note the old all-or-nothing bailout: ONE unmappable bullet set
+    # _llm_pos = None and discarded the writer's intent for ALL nine, which is
+    # why the other eight show up as "re-matched" in that day's log.
+    _have_idx = (isinstance(_pending_tldr_indices, (list, tuple))
+                 and len(_pending_tldr_indices) >= len(_tldr_bullets_final))
+    _orphaned_by_drop = set()
+    _llm_pos = None
+    if _have_idx:
+        _llm_pos = []
+        for _bi in range(len(_tldr_bullets_final)):
+            _mi = _pending_tldr_indices[_bi]
+            _p = _idx_to_pos.get(_mi) if isinstance(_mi, int) else None
+            if _p is None:
+                _orphaned_by_drop.add(_bi)
+            _llm_pos.append(_p)
+    # Bind only the bullets whose story is still here; splice the known orphans
+    # back in afterwards so `_bound` stays one entry per bullet.
+    _bind_order = [_bi for _bi in range(len(_tldr_bullets_final)) if _bi not in _orphaned_by_drop]
+    _sub_bound = _bind_bullets(
+        [_tldr_bullets_final[_bi] for _bi in _bind_order],
+        [_bsi_text(_it) for _it in _news_items],
+        [_llm_pos[_bi] for _bi in _bind_order] if _llm_pos else None,
+    )
+    _bound = [(None, "orphan", 0.0)] * len(_tldr_bullets_final)
+    for _bi, _res in zip(_bind_order, _sub_bound):
+        _bound[_bi] = _res
+    for _bullet, (_pos, _why, _sc) in zip(_tldr_bullets_final, _bound):
+        if _pos is None:
+            print(f"  ⚠️  TL;DR bullet orphaned (no matching story, best {_sc:.1f}): {_bullet[:70]}")
+        elif _why == "overlap":
+            print(f"  ↻ TL;DR bullet re-bound to '{_news_items[_pos].get('headline','')[:45]}': {_bullet[:55]}")
+    print(f"  TL;DR binding: {len(_tldr_bullets_final)} bullets ({_describe_binding(_bound)})")
+
+    # DROP the orphans rather than shipping them unlinked. The merger runs this
+    # same guard before translation; publish needs its own pass because the
+    # drops that orphan a bullet (source remediation, freshness re-verify,
+    # dedup, quarantine) all happen down here, after tldr_he already exists.
+    # An unlinked bullet is a dead card — it describes a story that is not on
+    # the page and does nothing when clicked, which is what a reader reported
+    # on 2026-08-24. tldr and tldr_he are positionally parallel (see
+    # _realign_tldr_he above, which ran already), so they must be cut together;
+    # the TL;DR MP3s are generated further down, from the trimmed arrays, so
+    # audio↔card alignment is preserved by construction.
+    _keep_bi = [_bi for _bi, (_pos, _, _) in enumerate(_bound) if _pos is not None]
+    _n_orphans = len(_tldr_bullets_final) - len(_keep_bi)
+    if _n_orphans:
+        _he = merger.setdefault("briefing_he", {})
+        _he_bullets = _he.get("tldr_he")
+        _briefing["tldr"] = [_tldr_bullets_final[_bi] for _bi in _keep_bi]
+        if isinstance(_he_bullets, list) and len(_he_bullets) == len(_tldr_bullets_final):
+            _he["tldr_he"] = [_he_bullets[_bi] for _bi in _keep_bi]
+        elif isinstance(_he_bullets, list) and _he_bullets:
+            print(f"  ⚠ briefing_he.tldr_he has {len(_he_bullets)} entries for "
+                  f"{len(_tldr_bullets_final)} bullets — NOT trimmed (pre-existing misalignment)")
+        _bound = [_bound[_bi] for _bi in _keep_bi]
+        _tldr_bullets_final = _briefing["tldr"]
+        print(f"  ✂ Dropped {_n_orphans} orphan TL;DR bullet(s) — "
+              f"kept {len(_keep_bi)} with a live story")
+
     _bullet_sids = [
         _final_sid_for_bullet(_news_items[_pos]) if _pos is not None else ""
         for _pos, _why, _sc in _bound
     ]
     _briefing["bullet_story_ids"] = _bullet_sids
-    for _bullet, (_pos, _why, _sc) in zip(_tldr_bullets_final, _bound):
-        if _pos is None:
-            print(f"  ⚠️  TL;DR bullet left unlinked (no matching story, best {_sc:.1f}): {_bullet[:70]}")
-        elif _why == "overlap":
-            print(f"  ↻ TL;DR bullet re-bound to '{_news_items[_pos].get('headline','')[:45]}': {_bullet[:55]}")
-    _n_bad = sum(1 for _s in _bullet_sids if not _s)
-    print(f"  bullet_story_ids: {len(_bullet_sids)} resolved for {len(_tldr_bullets_final)} bullets "
-          f"({_describe_binding(_bound)})")
     for _it in _news_items:
         _it.pop("_merger_idx", None)
 

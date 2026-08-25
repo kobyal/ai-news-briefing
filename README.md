@@ -766,6 +766,7 @@ It routes every Anthropic call through the `claude -p` CLI (Claude Max subscript
 - **[docs/learn/](./docs/learn/)** — 23 chapters, one per agent + system layers + code tour. Each chapter has a 7-min NotebookLM video overview. Best place to dig deep.
 - **[docs/COSTS.md](./docs/COSTS.md)** — measured costs and the levers to cut them.
 - **[docs/FALLBACKS.md](./docs/FALLBACKS.md)** — every rotation path per service.
+- **[docs/CODE_JANITOR.md](./docs/CODE_JANITOR.md)** — the daily dead-code sweep: what it deletes, the verification gate, how to undo a sweep.
 
 ---
 

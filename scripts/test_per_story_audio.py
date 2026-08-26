@@ -19,7 +19,6 @@ sys.path.insert(0, str(REPO))
 # so we vendor just the function under test by exec-ing it from source. This
 # avoids triggering the file-glob / DeepL / OG-image work that runs at import.
 import ast
-import textwrap
 
 src = (REPO / "publish_data.py").read_text(encoding="utf-8")
 tree = ast.parse(src)

@@ -218,6 +218,11 @@ for f in sorted(DATA_DIR.glob("2026-*.json"), reverse=True):
             "detail":       s.get("detail") or "",
             "detail_he":    detail_he,
             "og_image":     og_image,
+            # Carried through so /story/<id>/ can emit og:image:width/height —
+            # WhatsApp drops the picture from a preview when it can't learn the
+            # size without fetching the file. Recorded by mirror_og_images.py.
+            "og_image_w":   s.get("og_image_w") or 0,
+            "og_image_h":   s.get("og_image_h") or 0,
         })
     # IMPORTANT: `date` MUST be the date of the JSON file the item is
     # surfaced in (the "archive date"), NOT the original post/published

@@ -13,6 +13,8 @@ type IndexEntry = {
   summary?: string;
   summary_he?: string;
   og_image?: string;
+  og_image_w?: number;
+  og_image_h?: number;
 };
 
 type SearchIndex = { stories?: IndexEntry[]; extras?: IndexEntry[] };
@@ -103,6 +105,17 @@ export async function generateMetadata(
     // host — cross-domain CloudFront URLs render as the site logo instead.
     const img = (story.og_image || "/og.png")
       .replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/");
+    // WhatsApp's unfurler will not download the image to measure it, and drops
+    // the picture entirely when og:image:width/height are absent — which is why
+    // the homepage (layout.tsx hardcodes 1200x630) previewed with a photo while
+    // story pages did not. Real per-image dimensions come from the search index
+    // (recorded during mirroring); the /og.png fallback is a known 1200x630.
+    const usingFallback = !story.og_image;
+    const imgW = usingFallback ? 1200 : story.og_image_w || 0;
+    const imgH = usingFallback ? 630 : story.og_image_h || 0;
+    const ogImage = imgW && imgH
+      ? { url: img, width: imgW, height: imgH, alt: headline }
+      : { url: img, alt: headline };
     // SERP <title>: lead with the entity-first headline (Google truncates ~60
     // chars / 600px). Only append " — AI Briefing" when it fits inside ~60 chars
     // — otherwise the suffix truncates away anyway and risks cutting the headline.
@@ -125,7 +138,7 @@ export async function generateMetadata(
         url,
         siteName: "AI Briefing",
         type: "article",
-        images: [{ url: img, alt: headline }],
+        images: [ogImage],
       },
       twitter: {
         card: "summary_large_image",

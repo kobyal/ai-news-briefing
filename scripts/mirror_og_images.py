@@ -91,6 +91,44 @@ def _to_jpeg(raw: bytes) -> bytes | None:
         return None
 
 
+def _ensure_og_dims(items: list) -> int:
+    """Record each mirrored image's pixel dimensions on the story as
+    og_image_w / og_image_h.
+
+    WhatsApp's link unfurler is stricter than Facebook's: without og:image:width
+    and og:image:height it will not download the image to measure it, and drops
+    the picture from the preview entirely — which is why the homepage (whose
+    layout.tsx hardcodes 1200x630) unfurled while every /story/<id>/ page came up
+    pictureless. The dimensions can't be hardcoded here because mirrors keep the
+    source's aspect ratio (only the longest side is capped at _MAX_DIM).
+
+    Idempotent and self-healing: skips stories that already have dimensions, and
+    reads them off the live mirror for images mirrored on an earlier run, so a
+    backfill is just a re-run. A failure leaves the story without dimensions —
+    the previous behaviour — rather than writing a wrong guess.
+    """
+    fixed = 0
+    for it in items:
+        og = it.get("og_image") or ""
+        if not any(fp in og for fp in _FIRST_PARTY):
+            continue
+        if it.get("og_image_w") and it.get("og_image_h"):
+            continue
+        try:
+            resp = requests.get(og, headers=_UA, timeout=20)
+            if resp.status_code != 200 or not resp.content:
+                print(f"    ✗ dims: HTTP {resp.status_code} for {og}")
+                continue
+            with Image.open(io.BytesIO(resp.content)) as im:
+                it["og_image_w"], it["og_image_h"] = im.size
+            fixed += 1
+        except Exception as e:           # noqa: BLE001
+            print(f"    ✗ dims: {e} for {og}")
+    if fixed:
+        print(f"[og-mirror] recorded dimensions for {fixed} image(s)")
+    return fixed
+
+
 def _upload(date: str, story_id: str, data: bytes) -> bool:
     key = f"data/img/{date}/{story_id}.jpg"
     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tf:
@@ -187,7 +225,9 @@ def main() -> int:
             continue                     # already points at a mirror
         it["og_image"] = f"{CF}/data/img/{args.date}/{sid}.jpg"
         repointed += 1
-    if repointed:
+    dimmed = _ensure_og_dims(items)
+
+    if repointed or dimmed:
         data_path.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
         # In the pipeline the day-JSON upload is deferred to the single atomic
         # publish after the frontend build (SKIP_S3_UPLOAD=1) — we've already

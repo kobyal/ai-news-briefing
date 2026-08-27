@@ -13,6 +13,8 @@ type IndexEntry = {
   summary?: string;
   summary_he?: string;
   og_image?: string;
+  og_image_w?: number;
+  og_image_h?: number;
 };
 
 type SearchIndex = { stories?: IndexEntry[]; extras?: IndexEntry[] };
@@ -94,6 +96,16 @@ export async function generateMetadata(
     const enUrl = `https://aibriefing.dev/story/${id}/`;
     const img = (story.og_image || "/og.png")
       .replace(/^https?:\/\/d2p40aowelo4td\.cloudfront\.net\//, "https://aibriefing.dev/");
+    // WhatsApp's unfurler will not download the image to measure it, and drops
+    // the picture entirely when og:image:width/height are absent. Real per-image
+    // dimensions come from the search index (recorded during mirroring); the
+    // /og.png fallback is a known 1200x630.
+    const usingFallback = !story.og_image;
+    const imgW = usingFallback ? 1200 : story.og_image_w || 0;
+    const imgH = usingFallback ? 630 : story.og_image_h || 0;
+    const ogImage = imgW && imgH
+      ? { url: img, width: imgW, height: imgH, alt: headline }
+      : { url: img, alt: headline };
     return {
       // Branded <title> for SERP CTR; OG/Twitter keep the bare headline.
       title: `${headline} — AI Briefing`,
@@ -109,7 +121,7 @@ export async function generateMetadata(
         siteName: "AI Briefing",
         locale: "he_IL",
         type: "article",
-        images: [{ url: img, alt: headline }],
+        images: [ogImage],
       },
       twitter: {
         card: "summary_large_image",

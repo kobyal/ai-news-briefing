@@ -77,9 +77,16 @@ VENDOR_STOCK_POOL: dict[str, list[str]] = {
 # Be conservative: only true AI-vendor names; do NOT include generic terms
 # like "AI" or single common words ("Apple"-the-fruit risk is mitigated by
 # matching vendor exactly, but still — keep this list curated).
+# NOTE: "anthropic"/"claude" are deliberately NOT here. Wikipedia's `Anthropic`
+# article uses a photo of the SLACK offices on Howard Street as its lead image
+# (Anthropic's HQ is that building), so the bypass shipped a Slack office photo
+# on every Anthropic story — including the WhatsApp preview Koby caught on
+# 2026-08-31. `Claude (language model)` has no lead image at all. Leaving both
+# out of the allowlist keeps them vision-judged, which correctly rejects the
+# building shot and falls through to the gradient + vendor icon.
 _WIKI_VENDOR_ALLOWLIST: set[str] = {
-    "alibaba", "anthropic", "apple", "amazon", "aws", "azure", "bedrock",
-    "claude", "cohere", "deepmind", "deepseek", "gemini", "google",
+    "alibaba", "apple", "amazon", "aws", "azure", "bedrock",
+    "cohere", "deepmind", "deepseek", "gemini", "google",
     "hugging face", "meta", "microsoft", "mistral", "nvidia", "openai",
     "perplexity", "samsung", "stability ai", "xai",
 }

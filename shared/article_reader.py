@@ -141,8 +141,11 @@ def _fetch_jina(url: str) -> Optional[ArticleContent]:
     with _JINA_SEM:
         keys = [(name, os.environ.get(name, "")) for name in ("JINA_API_KEY", "JINA_API_KEY2")]
         keys = [(n, k) for n, k in keys if k]
-        if not keys:
-            keys = [("(none)", "")]  # no-auth path still works against r.jina.ai
+        # no-auth path still works against r.jina.ai — keep it as the LAST rung of
+        # the rotation, not just the no-keys case. Both paid keys 402'ing left the
+        # final 402 un-rotated → firecrawl (also dead) → jina=0, 0/44 articles
+        # (2026-09-08). Same shape as the 2026-06-05 402 bug one level up.
+        keys.append(("(none)", ""))
         last_status = None
         for idx, (key_name, key) in enumerate(keys):
             try:

@@ -759,6 +759,27 @@ def _step3_translate(merged_json: str, social_data: dict = None, youtube_data: l
     if details_he:
         he["details_he"] = details_he
     people_parsed = _parse(result_people)
+    # A translator that returns real text but parses to {} silently drops every
+    # key it owns — on 2026-09-08 Translator-C finished end_turn with 7.7K output
+    # tokens and pulse_items_he/people_he/twitter_descs_he/youtube_*_he all
+    # vanished with no log line at all. Save the raw text so the next occurrence
+    # is diagnosable instead of invisible.
+    for _label, _raw, _parsed in (
+        ("Translator-A", result_short, he),
+        ("Translator-B", result_summaries, _parse(result_summaries)),
+        ("Translator-D", result_details, _parse(result_details)),
+        ("Translator-C", result_people, people_parsed),
+    ):
+        if not _parsed and len((_raw or "").strip()) > 40:
+            try:
+                _dbg = _agent_dir("merger-agent") / "output" / datetime.now().strftime("%Y-%m-%d")
+                _dbg.mkdir(parents=True, exist_ok=True)
+                _p = _dbg / f"translator_unparsed_{_label}_{datetime.now().strftime('%H%M%S')}.txt"
+                _p.write_text(_raw, encoding="utf-8")
+                print(f"  ⚠ {_label}: returned {len(_raw)} chars but parsed to empty — raw saved to {_p}")
+            except Exception as _e:
+                print(f"  ⚠ {_label}: returned {len(_raw)} chars but parsed to empty (raw save failed: {_e})")
+
     if people_parsed.get("people_he"):
         he["people_he"] = people_parsed["people_he"]
     if people_parsed.get("pulse_items_he"):

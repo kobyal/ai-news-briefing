@@ -838,7 +838,18 @@ def run_pipeline() -> dict:
     merged_json = _step2_merge(adk_briefing, px_briefing, rss_briefing, tavily_briefing, social_briefing, enriched_articles, extra_sources)
     parsed = _parse(merged_json)
     if not parsed or not parsed.get("news_items"):
-        _fail_path = f"merger-agent/output/{datetime.now().strftime('%Y-%m-%d')}/merger_failed_{datetime.now().strftime('%H%M%S')}.txt"
+        # MUST be resolved via agent_dir, not a bare relative path. The old
+        # literal "merger-agent/output/..." predates the 2026-07-14 move to
+        # agents/active/ and, being relative to CWD, CREATED a stray
+        # <repo-root>/merger-agent/ directory whenever a merge failed. Because
+        # shared.repo_root._SEARCH_BASES probes the repo root FIRST, that empty
+        # shadow dir then won find_dir("merger-agent") and every later
+        # run_all.py invoked "<root>/merger-agent/run.py" — which does not
+        # exist. One failed merge silently disabled the merger for all
+        # subsequent runs, and 2026-09-09 shipped an empty briefing that way.
+        _fail_path = str(_agent_dir("merger-agent") / "output"
+                         / datetime.now().strftime('%Y-%m-%d')
+                         / f"merger_failed_{datetime.now().strftime('%H%M%S')}.txt")
         try:
             os.makedirs(os.path.dirname(_fail_path), exist_ok=True)
             with open(_fail_path, "w", encoding="utf-8") as _fh:

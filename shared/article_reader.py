@@ -104,6 +104,36 @@ def _truncate(text: str, max_chars: int) -> str:
     return cut.rstrip()
 
 
+_IMG_INLINE = re.compile(r'!\[[^\]]*\]\([^)]*\)')   # ![alt](url)
+_IMG_REF    = re.compile(r'!\[[^\]]*\]\[[^\]]*\]')  # ![alt][ref]
+
+
+def strip_image_embeds(text: str) -> str:
+    """Drop markdown image embeds from scraped article text.
+
+    Jina emits `![Image 1: caption](https://…)` for every figure. An image
+    pointing at a remote URL inside untrusted scraped text is a recognised
+    prompt-injection / exfil pattern, and the managed UserPromptSubmit policy
+    hook on this machine blocks any prompt containing one (rule
+    "injection_exfil_channel #1").
+
+    That killed the 2026-09-09 merger: `claude -p` returned num_turns=0 with
+    the block notice as its result, the wrapper saw rc=0 with no assistant
+    events, and the merge came back as '' — see
+    shared.anthropic_cc.PromptBlocked.
+
+    Applied on BOTH the fetch path and the cache read path: entries cached
+    before this existed still hold the raw embeds, and sanitising only on
+    fetch let them flow straight back out of the cache.
+
+    Article bodies are narrative context only — the merger takes its URLs from
+    the source briefings — so dropping the embeds loses nothing.
+    """
+    if not text:
+        return text
+    return _IMG_REF.sub('', _IMG_INLINE.sub('', text))
+
+
 def _clean_jina_response(text: str) -> tuple[str, str]:
     """Parse Jina Reader response. Returns (title, body)."""
     lines = text.split("\n")
@@ -127,6 +157,7 @@ def _clean_jina_response(text: str) -> tuple[str, str]:
 
     # Remove common Jina artifacts
     body = re.sub(r'\[!\[.*?\]\(.*?\)\]\(.*?\)', '', body)  # nested image links
+    body = strip_image_embeds(body)
     body = re.sub(r'\n{3,}', '\n\n', body)  # excessive newlines
 
     return title, body
@@ -247,7 +278,10 @@ def read_article(url: str) -> ArticleContent:
     if cached:
         return ArticleContent(
             url=url, title=cached.get("title", ""),
-            text=cached.get("text", ""), source=cached.get("source", "cached"),
+            # Sanitise on the way out too — entries cached before
+            # strip_image_embeds existed still hold raw `![alt](url)` embeds.
+            text=strip_image_embeds(cached.get("text", "")),
+            source=cached.get("source", "cached"),
             char_count=cached.get("char_count", 0), cached=True,
         )
 

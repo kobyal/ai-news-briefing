@@ -27,6 +27,24 @@ class UsagePolicyRefusal(RuntimeError):
     """
 
 
+class PromptBlocked(RuntimeError):
+    """A local/managed `UserPromptSubmit` policy hook refused the prompt.
+
+    Distinct from UsagePolicyRefusal: this is a hook on THIS machine (e.g. an
+    org-managed security agent under
+    /Library/Application Support/ClaudeCode/managed-settings.d/), not an
+    Anthropic-side AUP decision, and `claude -p` reports it as rc=0 /
+    num_turns=0 / no assistant events — indistinguishable from success unless
+    the result event is inspected.
+
+    Do NOT respond by disabling or bypassing the hook — it is a security
+    control and may not be ours to change. Fix the INPUT instead: the
+    2026-09-09 case was markdown image embeds (`![alt](remote-url)`) in
+    Jina-scraped article text tripping rule "injection_exfil_channel #1";
+    the fix was stripping them in shared/article_reader._clean_jina_response.
+    """
+
+
 # Headline/summary terms that commonly trip Anthropic's AUP classifier when fed
 # into the briefing writer. The AUP covers more than "cyber": security-exploit
 # content AND biological / chemical / weapons content (observed 2026-06-07: a
@@ -122,6 +140,13 @@ def agent(
         "--verbose",
         "--system-prompt", system_prompt,
         "--tools", "",
+        # No tools are enabled, so the user-level MCP servers (figma, context7,
+        # playwright) this child would otherwise boot from ~/.claude.json are
+        # pure overhead. With no --mcp-config given, --strict-mcp-config skips
+        # them: measured 988MB -> 286MB peak RSS per call (8 -> 5 processes),
+        # and run_all.py runs 5+ of these in parallel.
+        # (2026-09-07: that pressure was a factor in an ANE sleep-timeout panic.)
+        "--strict-mcp-config",
         "--no-session-persistence",
         "--disable-slash-commands",
         "--effort", _cc_effort(),
@@ -228,6 +253,20 @@ def agent(
 
     text = assistant_texts[0] if assistant_texts else ""
     elapsed = time.time() - t0
+
+    # A prompt refused by a UserPromptSubmit policy hook exits rc=0 with
+    # num_turns=0 and NO assistant events — the block notice arrives as the
+    # result event's `result` field. Without this check the wrapper returns ""
+    # and the caller reports "invalid JSON: ''", which says nothing about the
+    # real cause. Cost 2026-09-09 the whole merger run: a managed security hook
+    # blocked the prompt over markdown image embeds in scraped article text
+    # (rule "injection_exfil_channel #1") and the pipeline died with an empty
+    # parse. Surface it instead of swallowing it.
+    if not assistant_texts and result_event is not None:
+        _res = str(result_event.get("result") or "")
+        if re.search(r"blocked by hook|blocked by policy|operation blocked", _res, re.IGNORECASE):
+            _first = _res.strip().splitlines()[0][:300] if _res.strip() else "(no detail)"
+            raise PromptBlocked(f"[{label}] prompt blocked by a policy hook: {_first}")
     usage = (result_event or {}).get("usage", {}) or {}
     in_tok = usage.get("input_tokens", 0)
     out_tok = usage.get("output_tokens", 0)

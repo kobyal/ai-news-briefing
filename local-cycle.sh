@@ -158,6 +158,32 @@ echo "================================================================"
 echo " Local cycle · $DATE"
 echo " ANTHROPIC_API_KEY: <UNSET>   MERGER_VIA_CLAUDE_CODE: 1"
 echo " push=$DO_PUSH  ingest=$DO_INGEST"
+# ── POWER / WAKE STATE ────────────────────────────────────────────────────────
+# 2026-09-10 took 3h29m instead of ~30min. Root cause was NOT the code: the
+# 05:30 launchd slot fired inside a Power-Nap **DarkWake** (a coincidental
+# com.apple.searchd.heartbeat maintenance wake landed at 05:30:10), and the
+# machine never reached FullWake until a keypress at 07:18. `caffeinate -i`
+# blocks *idle* sleep but CANNOT block the DarkWake→sleep transition, so the
+# system kept napping and every network-bound agent hung on its sockets — one
+# Tavily call spanned 4785s against a ~150s norm.
+#
+# Same mechanism explains the 2026-09-08 MISSED run: no maintenance wake
+# coincided with 05:30 that day, so launchd never fired at all.
+#
+# The real fix lives outside this repo and needs sudo — a scheduled wake is a
+# true FullWake, unlike DarkWake:
+#     sudo pmset repeat wake MTWRFSU 05:25:00     # verify: pmset -g sched
+#
+# These lines exist so the NEXT slow run is diagnosable from the log alone
+# instead of by digging through `pmset -g log`.
+_PWR="$(pmset -g ps 2>/dev/null | head -1 | sed 's/^Now drawing from //; s/['\''"]//g')"
+_SCHED_WAKE="$(pmset -g sched 2>/dev/null | grep -ci 'repeat' || true)"
+_LAST_WAKE="$(pmset -g log 2>/dev/null | grep -E '\sWake\s+(DarkWake to FullWake|from)' | tail -1 | cut -c1-19)"
+echo " power=${_PWR:-unknown}  repeat-wake-configured=${_SCHED_WAKE:-0}  last-full-wake=${_LAST_WAKE:-unknown}"
+if [ "${_PWR}" != "AC Power" ]; then
+  echo " ⚠ ON BATTERY — caffeinate -s is AC-only and cannot hold a DarkWake awake."
+  echo " ⚠ Expect stalls. Plug in, or run: sudo pmset repeat wake MTWRFSU 05:25:00"
+fi
 echo "================================================================"
 
 echo

@@ -134,3 +134,26 @@ article, youtube, github, xai (disabled), twitter, linkedin, merger.
 - **Skip MCP startup** for these one-shot calls (no tools are used: `--tools ""`).
 - Consider the **direct API** for one-shot extraction calls instead of the full
   `claude -p` CLI harness.
+
+## Healthy-run timing baseline (2026-09-11 → 09-14, launchd 05:30 start)
+
+Use this to answer "is it stuck or just slow?" — compare the log's `HH:MM:SS` step
+markers against these. Log: `logs/local-cycle-<DATE>.log`.
+
+| Step | Typical start | Duration |
+|---|---|---|
+| Source agents (parallel) | 05:30 | 3–5 min (Perplexity is the long pole, ~4.5 min) |
+| Merger (`claude -p`) | ~05:40 | ~5 min model + ~4 min HTML/HEAD-checks (`Done in ~580s`) |
+| `[3/6]` publish_data.py | ~05:49 | ~14 min (URL/OG validation, video pairing, HE backfill) |
+| `[3b/6]` side-data (podcasts, hot_tools, search-index) | ~06:03 | ~6 min (hot_tools is ~5 min) |
+| `[3d/6]` editorial synth + HE | ~06:09 | ~6 min |
+| `[3c/6]` Next.js build + `aws s3 sync web/out` | ~06:15–06:29 | **18–20 min** — the sync alone runs ~15 min; not a hang |
+| `[4/6]` git commit + push | ~06:33–06:49 | ~3 min |
+| `[5/6]` email | +3 min | ~15 s |
+| `[6/6]` wrap-up → `====` line | | ~3 min |
+
+End-to-end: **~70–85 min**, finishing 06:40–06:55. Quick status check:
+`ps -o pid,etime,command -g $(pgrep -f local-cycle.sh | head -1)` shows the current
+child (e.g. `aws s3 sync …` during 3c). Live site serves the *previous* day until the
+atomic publish at the end of 3c — `curl -sI https://aibriefing.dev/data/latest.json`
+`Last-Modified` flipping is the "published" signal.

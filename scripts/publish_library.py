@@ -92,12 +92,20 @@ def _remote_sizes(prefix: str) -> dict[str, int]:
             return sizes
 
 
+# The title block of a rendered title page: everything below it is blank, and
+# an uncropped page scaled into a card makes the title unreadably small. These
+# bounds (in the 900px-wide render) hold for one- and two-line titles and keep
+# the speakers/track/duration lines in frame. ~1.91:1 — also the OG card ratio.
+COVER_CROP = ("-x", "0", "-y", "120", "-W", "900", "-H", "470")
+COVER_W, COVER_H = 900, 470
+
+
 def _render_cover(pdf: Path, dest: Path) -> bool:
-    """Page 1 of the PDF → a ~900px-wide PNG cover."""
+    """Page 1's title block → a 900x470 PNG cover."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     res = subprocess.run(
         ["pdftoppm", "-png", "-f", "1", "-l", "1", "-scale-to-x", "900", "-scale-to-y", "-1",
-         "-singlefile", str(pdf), str(dest.with_suffix(""))],
+         *COVER_CROP, "-singlefile", str(pdf), str(dest.with_suffix(""))],
         capture_output=True, text=True,
     )
     if res.returncode != 0 or not dest.exists():

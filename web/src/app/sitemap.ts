@@ -13,6 +13,20 @@ function loadIndex(): SearchIndex {
   return JSON.parse(readFileSync(path, "utf8")) as SearchIndex;
 }
 
+// Library documents are evergreen — unlike the daily stories they stay worth
+// indexing indefinitely, which is the whole reason /library exists.
+function loadLibrarySlugs(): string[] {
+  try {
+    const path = join(process.cwd(), "..", "docs", "data", "library.json");
+    const manifest = JSON.parse(readFileSync(path, "utf8")) as {
+      collections?: { items?: { slug: string }[] }[];
+    };
+    return (manifest.collections ?? []).flatMap((c) => (c.items ?? []).map((i) => i.slug));
+  } catch {
+    return [];
+  }
+}
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = "https://aibriefing.dev";
   const index = loadIndex();
@@ -27,6 +41,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/community`,           changeFrequency: "daily",   priority: 0.8 },
     { url: `${base}/tools`,               changeFrequency: "daily",   priority: 0.7 },
     { url: `${base}/media`,               changeFrequency: "weekly",  priority: 0.7 },
+    { url: `${base}/library`,             changeFrequency: "weekly",  priority: 0.8 },
     { url: `${base}/archive`,             changeFrequency: "weekly",  priority: 0.6 },
     { url: `${base}/search`,              changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/about`,               changeFrequency: "monthly", priority: 0.4 },
@@ -54,6 +69,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
   });
 
   const storyPages: MetadataRoute.Sitemap = allStories.flatMap((s) => {
+    // Library docs ride in the search index as extras but live at
+    // /library/<slug>/ — emitting /story/<slug>/ for them would put dead URLs
+    // in the sitemap (the soft-404 failure mode). They're added below instead.
+    if (s.type === "library") return [];
     const enUrl = `${base}/story/${s.story_id}/`;
     const heUrl = `${base}/he/story/${s.story_id}/`;
     const lastModified = s.date ? new Date(s.date) : undefined;
@@ -71,5 +90,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     return [{ url: enUrl, lastModified, changeFrequency: "never" as const, priority: 0.8 }];
   });
 
-  return [...staticPages, ...vendorPages, ...storyPages];
+  const libraryPages: MetadataRoute.Sitemap = loadLibrarySlugs().map((slug) => ({
+    url: `${base}/library/${slug}/`,
+    changeFrequency: "yearly" as const,
+    priority: 0.7,
+  }));
+
+  return [...staticPages, ...vendorPages, ...storyPages, ...libraryPages];
 }

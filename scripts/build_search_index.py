@@ -435,6 +435,30 @@ if HOT_TOOLS_PATH.exists():
             "url":          url,
         })
 
+# ── Library documents ─────────────────────────────────────────────────────────
+# Evergreen long-form write-ups (/library). They belong in search — that's how
+# anyone finds a session six months after the event — but they are NOT stories:
+# they link to /library/<slug>/, never to /story/<id>/. The frontend branches on
+# type == "library" (search page href, sitemap exclusion).
+lib_path = REPO / "docs/data/library.json"
+if lib_path.exists():
+    lib = json.loads(lib_path.read_text(encoding="utf-8"))
+    for coll in lib.get("collections", []):
+        for doc in coll.get("items", []):
+            extras.append({
+                "type":         "library",
+                "date":         coll.get("date") or "",
+                "posted_date":  coll.get("date") or "",
+                "story_id":     doc.get("slug") or "",
+                "headline":     f"{doc.get('code', '')} {doc.get('title', '')}".strip(),
+                "headline_he":  doc.get("title_he") or "",
+                "summary":      doc.get("description") or "",
+                "summary_he":   doc.get("blurb_he") or "",
+                "vendor":       coll.get("title") or "",
+                "thumbnail":    doc.get("cover") or "",
+                "url":          f"/library/{doc.get('slug')}/",
+            })
+
 payload = {"stories": stories, "extras": extras}
 
 out_path = REPO / "docs/data/search-index.json"

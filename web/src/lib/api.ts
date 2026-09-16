@@ -134,7 +134,7 @@ export async function fetchArchive(): Promise<string[]> {
 // Single discriminated-union result type. `type` decides rendering on the
 // /search page. The old article-only shape (no type) is still accepted —
 // missing/legacy entries default to article.
-export type SearchResultType = "article" | "video" | "repo" | "community" | "reddit" | "twitter" | "tool";
+export type SearchResultType = "article" | "video" | "repo" | "community" | "reddit" | "twitter" | "tool" | "library";
 
 export interface SearchResult {
   type?: SearchResultType;

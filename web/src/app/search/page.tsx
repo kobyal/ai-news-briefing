@@ -30,6 +30,7 @@ const TYPE_META: Record<NonNullable<SearchResult["type"]>, TypeMeta> = {
   reddit:    { label: "REDDIT",    label_he: "רדיט",   color: "#ff4500", bg: "rgba(255,69,0,0.08)" },
   twitter:   { label: "X",         label_he: "X",       color: "#0f172a", bg: "rgba(15,23,42,0.08)" },
   tool:      { label: "TOOL",      label_he: "כלי",     color: "#b45309", bg: "rgba(180,83,9,0.08)" },
+  library:   { label: "DOCUMENT",  label_he: "מסמך",    color: "#4a4a6a", bg: "rgba(74,74,106,0.08)" },
 };
 
 function videoIdFromUrl(url: string): string {
@@ -54,6 +55,10 @@ function SearchResultCard({ result: r, isHe }: { result: SearchResult; isHe: boo
   let external = true;
   if (type === "article" && r.story_id) {
     href = `/${r.date}/#story-${r.story_id}`;
+    external = false;
+  } else if (type === "library" && r.story_id) {
+    // Library documents have their own page; story_id carries the slug.
+    href = `/library/${r.story_id}/`;
     external = false;
   } else if (sourceUrl) {
     const anchorTypeMap: Record<string, AnchorType> = {
@@ -196,6 +201,7 @@ const TYPE_FILTERS: { value: TypeFilter; label: string; label_he: string }[] = [
   { value: "twitter",   label: "X",         label_he: "X" },
   { value: "repo",      label: "GitHub",    label_he: "GitHub" },
   { value: "tool",      label: "Tools",     label_he: "כלים" },
+  { value: "library",   label: "Library",   label_he: "ספרייה" },
 ];
 
 function SearchContent() {

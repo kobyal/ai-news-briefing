@@ -889,9 +889,11 @@ export default function MainPage() {
 
       </div>
       {/* Primary newsletter CTA — reader just finished the weekly editorial = peak intent */}
-      <div className="max-w-3xl mx-auto px-4 mb-10 mt-4">
-        <NewsletterSignup variant="feature" />
-      </div>
+      {false && (
+        <div className="max-w-3xl mx-auto px-4 mb-10 mt-4">
+          <NewsletterSignup variant="feature" />
+        </div>
+      )}
       <Footer />
       <BackToTopButton isHe={isHe} labelHe="חזרה לתקציר" label="Back to top" />
     </>

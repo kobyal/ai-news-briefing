@@ -479,7 +479,7 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
 
         {/* Newsletter CTA — after today's stories, before the endless older feed
             (reader has engaged; not buried in infinite scroll). */}
-        {!activeVendor && (
+        {false && !activeVendor && (
           <div className="max-w-3xl mx-auto mb-14 px-1">
             <NewsletterSignup variant="feature" />
           </div>

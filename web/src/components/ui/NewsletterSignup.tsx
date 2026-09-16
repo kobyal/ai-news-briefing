@@ -26,6 +26,10 @@ const ENDPOINT =
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SUBSCRIBED_KEY = "aibriefing_subscribed";
 
+// Kill switch — the signup flow is incomplete (no weekly send wired up yet), so
+// it's hidden site-wide. Flip to true to bring it back; nothing else to change.
+const NEWSLETTER_ENABLED = false;
+
 type Status = "idle" | "submitting" | "ok" | "error";
 
 export function NewsletterSignup({ variant = "feature" }: { variant?: "feature" | "footer" }) {
@@ -110,6 +114,9 @@ export function NewsletterSignup({ variant = "feature" }: { variant?: "feature" 
       setStatus("error");
     }
   }
+
+  // Hidden while disabled (after the hooks, so hook order stays stable).
+  if (!NEWSLETTER_ENABLED) return null;
 
   const dir = isHe ? "rtl" : "ltr";
   const feature = variant === "feature";

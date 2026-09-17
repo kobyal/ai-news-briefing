@@ -448,7 +448,7 @@ if [ "$DO_PUSH" -eq 1 ]; then
     aws s3 sync web/out/_next "s3://${S3_BUCKET}/_next" \
       --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 || true
     if aws s3 sync web/out "s3://${S3_BUCKET}" --delete \
-         --exclude "data/*" --exclude "audio/*" --exclude "img/*" --exclude "library/*" \
+         --exclude "data/*" --exclude "audio/*" --exclude "img/*" --exclude "library-assets/*" \
          --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1; then
       # ── ATOMIC DATA PUBLISH ────────────────────────────────────────────────
       # The static story pages are now on S3. Push the data files they reference

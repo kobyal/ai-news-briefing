@@ -8,8 +8,11 @@ a build failure there silently starves the ingest lambda. So these files are
 uploaded straight to the CloudFront-fronted bucket and referenced by absolute
 path from the site — the Next build never sees them.
 
-⚠ `local-cycle.sh`'s `aws s3 sync web/out … --delete` would wipe `library/`
-(it isn't in web/out), so that sync excludes it. Don't remove that exclude.
+⚠ Assets live under `library-assets/`, NOT under `/library/` (the Next route).
+`local-cycle.sh`'s `aws s3 sync web/out … --delete` must exclude them (they
+aren't in web/out, so --delete would wipe them) — and if they shared the
+`library/` prefix, that same exclude would skip uploading the library PAGES,
+leaving /library/ to fall back to the homepage. Keep the prefixes separate.
 
 Covers are rendered from page 1 of each PDF with `pdftoppm` (poppler, already
 installed) — no new Python dependency, and consistent with the aws-CLI-based
@@ -149,7 +152,7 @@ def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="library-covers-"))
 
     for coll in collections:
-        prefix = f"library/{coll['id']}/"
+        prefix = f"library-assets/{coll['id']}/"
         print(f"\n{coll['id']} — {len(coll['items'])} documents")
         remote = {} if args.force else _remote_sizes(prefix)
 
@@ -187,7 +190,7 @@ def main() -> int:
 
     if not args.dry_run and uploaded:
         res = _aws("cloudfront", "create-invalidation", "--distribution-id", CLOUDFRONT_DIST_ID,
-                   "--paths", "/data/library.json", "/library/*")
+                   "--paths", "/data/library.json", "/library-assets/*")
         print("  ✓ CloudFront invalidated" if res.returncode == 0
               else f"  ⚠ invalidation failed: {res.stderr.strip()[:160]}")
 

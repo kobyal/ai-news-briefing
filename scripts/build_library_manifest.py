@@ -187,11 +187,17 @@ def build_collection(spec: dict) -> dict | None:
             "video_url": meta.get("source") or "",
             # Paths are relative to the site root — publish_library.py puts the
             # files at exactly these keys on S3.
-            "pdf": f"/library/{spec['id']}/{slug}.pdf",
+            #
+            # NOTE the `library-assets/` prefix: it deliberately does NOT sit
+            # under `/library/`, which is the Next route. The deploy sync must
+            # exclude the assets (they aren't in web/out, so `--delete` would
+            # wipe them) — and an exclude on `library/*` would also skip
+            # uploading the library PAGES. Separate prefixes, no collision.
+            "pdf": f"/library-assets/{spec['id']}/{slug}.pdf",
             "pdf_bytes": pdf.stat().st_size,
-            "docx": f"/library/{spec['id']}/{slug}.docx" if docx else "",
+            "docx": f"/library-assets/{spec['id']}/{slug}.docx" if docx else "",
             "docx_bytes": docx.stat().st_size if docx else 0,
-            "cover": f"/library/{spec['id']}/covers/{slug}.png",
+            "cover": f"/library-assets/{spec['id']}/covers/{slug}.png",
         })
 
     items.sort(key=lambda it: it["code"])

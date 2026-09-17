@@ -453,7 +453,19 @@ Three small Python scripts in `scripts/` produce auxiliary JSON files alongside 
   iTunes Search API → cover art + feedUrl + latest releaseDate; then parses the RSS for the latest episode title + duration. Falls back to Spotify oEmbed for cover-only when iTunes doesn't index the show (mostly Hebrew shows). Powers the Podcasts grid on `/media/`.
 
 - **`scripts/build_search_index.py`** → `docs/data/search-index.json` (+ run-log `_search_index_runs.jsonl`).
-  Walks every `docs/data/<date>.json`, extracts ~7 resource types (articles, videos, GitHub, community pulse, reddit, X, tools), normalizes dates to ISO + deduplicates by URL, uploads to S3, invalidates CloudFront. Powers `/search/` (the type-filter chips + in-site deep links). **Must run AFTER ingest** since the ingest Lambda overwrites the index with its own stories-only version on every invoke.
+  Walks every `docs/data/<date>.json`, extracts ~7 resource types (articles, videos, GitHub, community pulse, reddit, X, tools) plus the library documents, normalizes dates to ISO + deduplicates by URL, uploads to S3, invalidates CloudFront. Powers `/search/` (the type-filter chips + in-site deep links). **Must run AFTER ingest** since the ingest Lambda overwrites the index with its own stories-only version on every invoke. ⚠ **It uploads to S3 and invalidates by default** — set `SKIP_S3_UPLOAD=1` to build the index locally without touching the live site.
+
+### Library scripts (added 2026-09-16)
+
+Two scripts in `scripts/` publish the `/library/` document collections. Unlike the side-data scripts these are **on-demand, not part of the daily cycle** — run them when a collection gains documents.
+
+- **`scripts/build_library_manifest.py`** → `docs/data/library.json`.
+  Derives every field from the source `recording-to-pdf` project (its `sessions/index.json` + each document's `content.json`): session code, EN title + abstract, HE title + blurb, speakers, duration, track, level, topics, page count, and the original recording URL. Nothing is hand-written, so re-running picks up newly published sessions. Collections are declared in the `COLLECTIONS` list at the top — a second event is a data change, not a code change. **This file is committed**: the static build reads it for `generateStaticParams`.
+
+- **`scripts/publish_library.py`** → `s3://<bucket>/library-assets/<collection>/`.
+  Uploads PDFs/DOCX, renders covers from page 1 with `pdftoppm` (cropped to the title block so it stays legible in a card), skips unchanged assets by size, invalidates. **The ~150MB of assets deliberately stay out of git** — committing them would push the GH Pages build past its 10-min timeout, which silently starves the ingest lambda.
+
+  ⚠ **Why the `library-assets/` prefix and not `library/`:** the deploy's `aws s3 sync web/out … --delete` must exclude the assets (they aren't in `web/out`, so `--delete` would wipe them) — but an exclude on `library/*` would *also* skip uploading the library **pages**, leaving `/library/` to fall back to the homepage. That shipped once on 2026-09-16. Keep the two prefixes separate.
 
 ### QA evaluator — `private/qa-evaluator-agent/` (local-only)
 
@@ -602,7 +614,8 @@ The maintainer's deployment has two extra components in the public repo's tracke
 - **`/community/`** — three-card layout (Twitter / Reddit / Community Pulse), vendor clustering, infinite scroll, in-site anchor-deep-links from `/search/?q=...` results.
 - **`/media/`** — "Top Picks This Week" 2×3 grid (paired-explainers first, vendor cap=2), Story Explainers, Top Videos shelf, YouTube channels grid with collapsible "Show all 23", Podcasts grid with **real cover art + latest episode + duration** (built by `scripts/fetch_podcasts.py` via iTunes Search + RSS parse).
 - **`/tools/`** — "Hot AI Tools" (renamed from `/github/` 2026-05-11; old path redirects). Five sections: GitHub Trending repos + releases, Hugging Face Trending Models, HF Spaces, **Docker Hub AI/ML images, PyPI Python packages, npm JavaScript packages**. Each card has its own org avatar from `github.com/{org}.png` + DeepL-translated Hebrew description. Built by `scripts/fetch_hot_tools.py`.
-- **`/search/`** — site-wide search across `articles / videos / community / reddit / X / GitHub / tools` with type-filter chips, in-site deep-link routing (clicking a tweet result opens `/community/?date=...#tweet-{id}` with smooth-scroll-to-anchor + soft highlight). Index built by `scripts/build_search_index.py`.
+- **`/library/`** *(added 2026-09-16)* — the **document library**: original long-form write-ups, unlike everything else on the site (which is dated and decays). First collection is **AWS Summit Tel Aviv 2026** — 47 Hebrew session write-ups produced by [recording-to-pdf](https://github.com/kobyal/recording-to-pdf). Cards filter by track; each `/library/<slug>/` page is statically exported (so LinkedIn/WhatsApp unfurl a preview) and offers **Download PDF + Download Word**, a link to the original recording, and the PDF **rendered inline**. Manifest built by `scripts/build_library_manifest.py` → `docs/data/library.json`; assets published by `scripts/publish_library.py`.
+- **`/search/`** — site-wide search across `articles / videos / community / reddit / X / GitHub / tools / library` with type-filter chips, in-site deep-link routing (clicking a tweet result opens `/community/?date=...#tweet-{id}` with smooth-scroll-to-anchor + soft highlight). Index built by `scripts/build_search_index.py`.
 - **`/archive/`** — archive listing.
 - **`/story?id=...`** — story detail page (community discussion + paired videos when present).
 - **Back-to-top floating pill** on `/`, `/community/`, `/media/`, `/tools/` once you scroll past 600px.

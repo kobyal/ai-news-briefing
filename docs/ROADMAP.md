@@ -1,7 +1,28 @@
 AI Briefing — Roadmap & Improvement Ideas
 ==========================================
 Created: 2026-04-09
-Last updated: 2026-06-29
+Last updated: 2026-09-16
+
+SHIPPED 2026-09-16 — /library (document library)
+------------------------------------------------
+47 Hebrew AWS Summit TLV 2026 session write-ups live at aibriefing.dev/library, produced by
+github.com/kobyal/recording-to-pdf. Fits the DISTRIBUTION thesis below: original Hebrew
+long-form nobody else has, evergreen (unlike the daily feed), and a real thing to link from
+LinkedIn. Scripts: build_library_manifest.py + publish_library.py (on-demand, not in the
+daily cycle). See README "Library scripts".
+
+Follow-ups, in rough priority order:
+- [ ] Newsletter signup is HIDDEN (NEWSLETTER_ENABLED=false) — Koby: incomplete + looks
+      bad. Either finish the weekly send (see item 1 below) or leave it off. Re-enabling
+      = flip the constant + drop the `{false &&` guards at the two call sites.
+- [ ] Add the remaining sessions as AWS publishes their recordings (47 of 90+ so far):
+      re-run recording-to-pdf, then build_library_manifest.py + publish_library.py.
+- [ ] Mark GA4 `download` as a Key Event (same pending task as `outbound_click`) —
+      otherwise the library's engagement signal isn't tracked as a conversion.
+- [ ] Consider a HE-language landing/announcement for the library + a LinkedIn post
+      linking it (distribution is the whole point; the corpus is Hebrew).
+- [ ] The collection blurbs in COLLECTIONS are hand-written per collection — fine for
+      one event, revisit if collections multiply.
 
 ACTIVE FOCUS (2026-06-22) — traffic = DISTRIBUTION, not more SEO
 ---------------------------------------------------------------

@@ -235,7 +235,7 @@ else
       | tail -3 || \
       echo "  ⚠ ${req} requirements failed (continuing — package may already be installed)"
   done
-  "$PYTHON_BIN" -m pip install --quiet --disable-pip-version-check firecrawl-py exa-py newsapi-python duckduckgo-search ddgs edge-tts 2>&1 | tail -3 || true
+  "$PYTHON_BIN" -m pip install --quiet --disable-pip-version-check firecrawl-py exa-py newsapi-python duckduckgo-search ddgs edge-tts Pillow 2>&1 | tail -3 || true
   touch "$DEPS_MARKER"
   echo "  ✓ Deps marker written: $DEPS_MARKER"
 fi

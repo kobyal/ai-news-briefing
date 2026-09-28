@@ -55,6 +55,8 @@ def _model_tier(model: str) -> str:
 
 def _friendly_model(model: str) -> str:
     m = (model or "").lower()
+    if "opus-5-5" in m:    return "Opus 5.5"
+    if "sonnet-5" in m:    return "Sonnet 5"
     if "opus-4-8" in m:    return "Opus 4.8"
     if "opus-4-7" in m:    return "Opus 4.7"
     if "opus-4-6" in m:    return "Opus 4.6"

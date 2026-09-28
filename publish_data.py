@@ -317,6 +317,7 @@ def _best_rss(pattern):
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shared.repo_root import agent_dir as _agent_dir  # noqa: E402
 from shared import article_date  # noqa: E402
+from shared.models import OPUS  # noqa: E402
 def _out(_name):  # location-independent glob for an agent's JSON outputs
     return str(_agent_dir(_name) / "output" / "**" / "*.json")
 
@@ -736,7 +737,7 @@ def _regen_tldr_over_union(_merger: dict) -> bool:
     print(f"  Regenerating TLDR over unioned {len(_items)} stories via claude -p...")
     try:
         _res = _subp.run(
-            ["claude", "-p", "--model", os.environ.get("MERGER_CC_MODEL", "claude-opus-4-8"), _prompt],
+            ["claude", "-p", "--model", os.environ.get("MERGER_CC_MODEL", OPUS), _prompt],
             capture_output=True, text=True, check=False, timeout=180,
         )
         if _res.returncode != 0:

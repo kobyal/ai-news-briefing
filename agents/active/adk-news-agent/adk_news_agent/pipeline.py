@@ -167,7 +167,7 @@ async def _run_async():
             if usage:
                 in_tok = getattr(usage, "prompt_token_count", 0) or 0
                 out_tok = getattr(usage, "candidates_token_count", 0) or 0
-                model = getattr(event, "model", None) or os.environ.get("GOOGLE_GENAI_MODEL", "gemini-2.5-flash")
+                model = getattr(event, "model", None) or os.environ.get("GOOGLE_GENAI_MODEL", "gemini-3.8-flash")
                 pin, pout = _price_for(model)
                 cost = (in_tok * pin + out_tok * pout) / 1_000_000
                 calls.append({

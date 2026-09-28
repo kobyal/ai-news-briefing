@@ -21,12 +21,13 @@ from .tools import _parse
 # Shared subscription path — shells to `claude -p` when MERGER_VIA_CLAUDE_CODE=1
 sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
 from shared import anthropic_cc  # noqa: E402
+from shared.models import SONNET  # noqa: E402
 from shared.pricing import estimate_cost  # noqa: E402
 
 _LOOKBACK_DAYS    = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 _TODAY            = lambda: datetime.now().strftime("%B %d, %Y")
 _API_KEY          = lambda: os.environ.get("ANTHROPIC_API_KEY", "")
-_WRITER_MODEL     = lambda: os.environ.get("TAVILY_WRITER_MODEL",     "claude-sonnet-4-20250514")
+_WRITER_MODEL     = lambda: os.environ.get("TAVILY_WRITER_MODEL",     SONNET)
 _TRANSLATOR_MODEL = lambda: os.environ.get("TAVILY_TRANSLATOR_MODEL", "claude-haiku-4-5-20251001")
 
 

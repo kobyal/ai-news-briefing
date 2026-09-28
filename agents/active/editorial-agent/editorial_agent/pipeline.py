@@ -22,6 +22,9 @@ _ROOT = next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / 
 _DOCS_DATA = _ROOT / "docs" / "data"
 _OUTPUT_DIR = Path(__file__).parent.parent / "output"
 
+sys.path.insert(0, str(_ROOT / "shared"))
+import models as _models  # noqa: E402
+
 # ── Env / API ─────────────────────────────────────────────────────────────────
 
 def _load_env():
@@ -773,7 +776,7 @@ def _synthesize(context: dict) -> dict:
     for i, (label, system, text) in enumerate(attempts, 1):
         print(f"  → Opus: editorial synthesis (attempt {i}/{len(attempts)})...")
         try:
-            raw = _call_llm(text, system, label=label, model="claude-opus-4-8")
+            raw = _call_llm(text, system, label=label, model=_models.OPUS)
         except Exception as e:                       # transport/AUP/timeout
             print(f"  ⚠ synthesis call failed ({type(e).__name__}: {e})")
             continue
@@ -816,7 +819,7 @@ def _translate(synthesis: dict, community: Optional[list] = None) -> dict:
     prompt = TRANSLATE_USER.format(content=json.dumps(to_translate, ensure_ascii=False, indent=2))
     print("  → Sonnet: Hebrew translation (upgraded from Haiku)...")
     try:
-        raw = _call_llm(prompt, TRANSLATE_SYSTEM, label="editorial-translate", model="claude-sonnet-4-6")
+        raw = _call_llm(prompt, TRANSLATE_SYSTEM, label="editorial-translate", model=_models.SONNET)
     except RuntimeError as e:
         print(f"  ⚠ Translation failed ({e}) — using empty Hebrew fields")
         return {}
@@ -832,7 +835,7 @@ def _translate(synthesis: dict, community: Optional[list] = None) -> dict:
             f"(escape any unescaped quotes inside string values) and return valid JSON only:\n\n{raw}"
         )
         try:
-            raw2 = _call_llm(repair_prompt, "Return only valid JSON. No explanation.", label="editorial-translate-repair", model="claude-sonnet-4-6")
+            raw2 = _call_llm(repair_prompt, "Return only valid JSON. No explanation.", label="editorial-translate-repair", model=_models.SONNET)
             return _parse_json(raw2)
         except (ValueError, RuntimeError):   # ValueError covers JSONDecodeError
             print("  ⚠ Translation repair also failed — using empty Hebrew fields")

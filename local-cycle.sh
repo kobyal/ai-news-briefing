@@ -36,8 +36,12 @@ fi
 # google.adk every day (ADK silent failure 2026-05-04 → 05-06). Pinning every
 # step to the same interpreter — and using `$PYTHON_BIN -m pip` instead of bare
 # `pip` — keeps install + run on the same Python.
-# Prefer 3.11 (currently has all per-agent deps); fall back to whatever python3 is.
-if command -v python3.11 >/dev/null 2>&1; then
+# Prefer the repo's Python 3.14 venv (.venv — all per-agent deps, 2026-09-28;
+# a venv also sidesteps Homebrew's PEP 668 block on system pip installs).
+# Rebuild: python3.14 -m venv .venv && rm "$DEPS_MARKER" (step [0/6] reinstalls).
+if [ -x "$ROOT/.venv/bin/python" ]; then
+  PYTHON_BIN="$ROOT/.venv/bin/python"
+elif command -v python3.11 >/dev/null 2>&1; then
   PYTHON_BIN="$(command -v python3.11)"
 elif command -v python3 >/dev/null 2>&1; then
   PYTHON_BIN="$(command -v python3)"
@@ -146,7 +150,7 @@ export MERGER_VIA_CLAUDE_CODE=1
 # Without this, merger fails (rc=1, empty stderr) and QA's 20+ LLM judges all
 # fall back to API — see 2026-05-14 17:00 re-run incident.
 if [ "${CLAUDE_CODE_USE_BEDROCK:-0}" = "1" ]; then
-  export MERGER_CC_MODEL="${ANTHROPIC_DEFAULT_OPUS_MODEL:-eu.anthropic.claude-opus-4-8}"
+  export MERGER_CC_MODEL="${ANTHROPIC_DEFAULT_OPUS_MODEL:-eu.anthropic.claude-opus-5-5}"
 fi
 
 # Suppress per-agent `open <output_json>` popups in pipeline runs (each
@@ -231,7 +235,7 @@ else
       | tail -3 || \
       echo "  ⚠ ${req} requirements failed (continuing — package may already be installed)"
   done
-  "$PYTHON_BIN" -m pip install --quiet --disable-pip-version-check firecrawl-py exa-py newsapi-python duckduckgo-search edge-tts 2>&1 | tail -3 || true
+  "$PYTHON_BIN" -m pip install --quiet --disable-pip-version-check firecrawl-py exa-py newsapi-python duckduckgo-search ddgs edge-tts 2>&1 | tail -3 || true
   touch "$DEPS_MARKER"
   echo "  ✓ Deps marker written: $DEPS_MARKER"
 fi
@@ -274,7 +278,7 @@ then
 fi
 
 echo
-echo "[1/6] Running pipeline via subscription (claude -p / Opus 4.7)..."
+echo "[1/6] Running pipeline via subscription (claude -p / Opus 5.5)..."
 "$PYTHON_BIN" run_all.py --skip xai
 
 # Check if YouTube agent hit quota exhaustion (quota resets midnight PT = ~10:00 AM Israel)

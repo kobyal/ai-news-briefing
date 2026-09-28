@@ -12,7 +12,7 @@ Step 5  Publisher           — local Python function, saves HTML
 
 Models are configurable via .env:
   PERPLEXITY_SEARCH_MODEL    (default: perplexity/sonar-pro)
-  PERPLEXITY_WRITER_MODEL    (default: anthropic/claude-sonnet-4-6)
+  PERPLEXITY_WRITER_MODEL    (default: anthropic/claude-sonnet-5)
   PERPLEXITY_TRANSLATOR_MODEL (default: anthropic/claude-haiku-4-5)
 """
 import json
@@ -30,6 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
 from shared.pricing import estimate_cost  # noqa: E402
 from shared import anthropic_cc  # noqa: E402
+from shared.models import SONNET  # noqa: E402
 
 from .prompts import (
     VENDOR_RESEARCHER_PROMPT,
@@ -52,7 +53,7 @@ _SEARCH_MODEL     = lambda: os.environ.get("PERPLEXITY_SEARCH_MODEL",     "anthr
 # (e.g. PERPLEXITY_WRITER_MODEL=anthropic/claude-sonnet-4-6), which charges a
 # markup over direct Anthropic. We now call Anthropic directly — stripping the
 # "anthropic/" prefix when present, so existing env values keep working.
-_WRITER_MODEL     = lambda: os.environ.get("PERPLEXITY_WRITER_MODEL",     "anthropic/claude-sonnet-4-6")
+_WRITER_MODEL     = lambda: os.environ.get("PERPLEXITY_WRITER_MODEL",     f"anthropic/{SONNET}")
 _TRANSLATOR_MODEL = lambda: os.environ.get("PERPLEXITY_TRANSLATOR_MODEL", "anthropic/claude-haiku-4-5")
 
 _LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))

@@ -35,6 +35,7 @@ sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_
 from shared.repo_root import agent_dir as _agent_dir  # noqa: E402
 from shared.pricing import estimate_cost  # noqa: E402
 from shared import anthropic_cc  # noqa: E402
+from shared.models import OPUS, SONNET  # noqa: E402
 from shared.he_glossary import HE_TERM_GLOSSARY  # noqa: E402
 from shared import article_date  # noqa: E402
 from shared import story_similarity as _story_similarity  # noqa: E402
@@ -54,11 +55,11 @@ _DEDUP_LOOKBACK_DAYS = 7  # was 2 — day-3+ recurrence used to sail through
 # ---------------------------------------------------------------------------
 
 _API_KEY   = lambda: os.environ.get("ANTHROPIC_API_KEY", "")
-_WRITER_MODEL     = lambda: os.environ.get("MERGER_WRITER_MODEL",     "claude-sonnet-4-20250514")
-_TRANSLATOR_MODEL = lambda: os.environ.get("MERGER_TRANSLATOR_MODEL", "claude-sonnet-4-20250514")
+_WRITER_MODEL     = lambda: os.environ.get("MERGER_WRITER_MODEL",     SONNET)
+_TRANSLATOR_MODEL = lambda: os.environ.get("MERGER_TRANSLATOR_MODEL", SONNET)
 
 _VIA_CC     = lambda: os.environ.get("MERGER_VIA_CLAUDE_CODE") == "1"
-_CC_MODEL   = lambda: os.environ.get("MERGER_CC_MODEL",  "claude-opus-4-8")
+_CC_MODEL   = lambda: os.environ.get("MERGER_CC_MODEL",  OPUS)
 _CC_EFFORT  = lambda: os.environ.get("MERGER_CC_EFFORT", "low")
 
 _ROOT = next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])  # repo root

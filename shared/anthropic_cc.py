@@ -87,10 +87,11 @@ def _cc_model() -> str:
     # "eu.anthropic.claude-opus-4-8" under CLAUDE_CODE_USE_BEDROCK=1, and to a
     # plain id like "claude-opus-4-8" under Claude Max subscription). Fall back
     # to the subscription-style id.
+    from shared.models import OPUS
     return (
         os.environ.get("MERGER_CC_MODEL")
         or os.environ.get("ANTHROPIC_MODEL")
-        or "claude-opus-4-8"
+        or OPUS
     )
 
 

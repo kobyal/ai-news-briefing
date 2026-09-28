@@ -30,7 +30,7 @@ from .prompts import (
     PUBLISHER_PROMPT,
 )
 
-MODEL = os.environ.get("GOOGLE_GENAI_MODEL", "gemini-2.5-flash")
+MODEL = os.environ.get("GOOGLE_GENAI_MODEL", "gemini-3.8-flash")
 
 # ---------------------------------------------------------------------------
 # Pydantic output schemas

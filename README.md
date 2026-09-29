@@ -233,7 +233,7 @@ The merger can talk to Claude in two ways. Pick whichever matches your account.
 
 ### A. Anthropic API (default)
 
-Set `ANTHROPIC_API_KEY` in your environment and run normally. Cost ≈ **$0.76/run** for the merger (Sonnet 4.6 input + 3 parallel translations) plus collector LLMs ≈ $0.25 → **~$1.01/run total**. See [docs/COSTS.md](./docs/COSTS.md) for the measured breakdown.
+Set `ANTHROPIC_API_KEY` in your environment and run normally. Cost ≈ **$0.76/run** for the merger (Sonnet 5 input + 3 parallel translations) plus collector LLMs ≈ $0.25 → **~$1.01/run total**. See [docs/COSTS.md](./docs/COSTS.md) for the measured breakdown.
 
 ### B. Claude Max subscription (zero per-call cost)
 
@@ -423,7 +423,7 @@ Final synthesis. Loads the latest of every per-agent JSON output, runs them thro
 
 ```mermaid
 flowchart LR
-    A[Load core 4 briefings] --> M[Merge call<br/>(Claude Sonnet 4.6<br/>or Opus 4.7 sub)]
+    A[Load core 4 briefings] --> M[Merge call<br/>(Claude Sonnet 5<br/>or Opus 5.5 sub)]
     B[Load Article Reader<br/>full text] --> M
     C[Load Exa + NewsAPI] --> M
     M --> T[3× parallel<br/>Hebrew translation]
@@ -438,9 +438,9 @@ flowchart LR
 **Run:** `cd merger-agent && python3 run.py`
 **Env:**
 - `ANTHROPIC_API_KEY` *or* `MERGER_VIA_CLAUDE_CODE=1` (subscription path — see above)
-- `MERGER_WRITER_MODEL` (default `claude-sonnet-4-6` on API path)
-- `MERGER_TRANSLATOR_MODEL` (default `claude-sonnet-4-6`)
-- `MERGER_CC_MODEL` (default `claude-opus-4-7`, subscription only)
+- `MERGER_WRITER_MODEL` (default `claude-sonnet-5` on API path)
+- `MERGER_TRANSLATOR_MODEL` (default `claude-sonnet-5`)
+- `MERGER_CC_MODEL` (default `claude-opus-5-5` from `shared/models.py`, subscription only)
 - `MERGER_CC_EFFORT` (default `low`, subscription only — keeps output under the 32K single-turn ceiling so Claude Code doesn't auto-continue and break JSON parsing)
 
 ---
@@ -546,9 +546,9 @@ Output: `private/qa-evaluator-agent/output/<DATE>/report.md` + `report.json`. Se
 | Agent | API path default | Subscription path | Provider |
 |-------|------------------|-------------------|----------|
 | ADK | `gemini-2.5-flash` + `google_search` | (n/a — not Anthropic) | Google AI |
-| Perplexity | search: Sonar; writer + translator: `claude-haiku-4-5` (direct) | writer + translator → Opus 4.7 via `claude -p` | Perplexity + Anthropic |
-| RSS | writer + translator: `claude-haiku-4-5` | → Opus 4.7 via `claude -p` | Anthropic |
-| Tavily | writer + translator: `claude-haiku-4-5` | → Opus 4.7 via `claude -p` | Tavily + Anthropic |
+| Perplexity | search: `anthropic/claude-haiku-4-5` via Perplexity; writer + translator: `claude-haiku-4-5` (direct) | writer + translator → Opus 5.5 via `claude -p` | Perplexity + Anthropic |
+| RSS | writer + translator: `claude-haiku-4-5` | → Opus 5.5 via `claude -p` | Anthropic |
+| Tavily | writer + translator: `claude-haiku-4-5` | → Opus 5.5 via `claude -p` | Tavily + Anthropic |
 | Article Reader | (no LLM) | (n/a) | Jina + Firecrawl |
 | Exa | (no LLM) | (n/a) | Exa |
 | NewsAPI | (no LLM) | (n/a) | NewsAPI |
@@ -556,7 +556,7 @@ Output: `private/qa-evaluator-agent/output/<DATE>/report.md` + `report.json`. Se
 | GitHub Trending | (no LLM) | (n/a) | GitHub REST |
 | Twitter | (no LLM) | (n/a) | X GraphQL (scrape) |
 | xAI | `grok-4` + `x_search` | (not routed) | xAI |
-| **Merger** | writer + translator: `claude-sonnet-4-6` | `claude-opus-4-7` via `claude -p` | Anthropic |
+| **Merger** | writer + translator: `claude-sonnet-5` | `claude-opus-5-5` via `claude -p` | Anthropic |
 
 ---
 

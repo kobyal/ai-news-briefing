@@ -1,6 +1,6 @@
 """Prompt strings for the Merger pipeline."""
 import sys; sys.path.insert(0, str(next((_p for _p in __import__("pathlib").Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), __import__("pathlib").Path(__file__).resolve().parents[2])))
-from shared.vendors import VENDOR_ENUM
+from shared.vendors import VENDOR_ENUM, VENDOR_NAMES  # VENDOR_ENUM is re-exported to pipeline.py
 from shared.he_glossary import HE_TERM_GLOSSARY
 
 MERGER_PROMPT = """\
@@ -224,8 +224,7 @@ Produce ONE merged briefing as a JSON object. Rules:
      "related_person": "person name if referencing someone from people_highlights, or empty string"
    }
 
-   AIM FOR VENDOR COVERAGE: try to include at least one item per major active vendor (Anthropic,
-   OpenAI, Google, AWS, Meta, xAI, NVIDIA, Mistral, HuggingFace, DeepSeek). Source items from
+   AIM FOR VENDOR COVERAGE: try to include at least one item per major active vendor (""" + ", ".join(VENDOR_NAMES) + """). Source items from
    X posts, Reddit threads, HN comments, Lobsters, Dev.to — whichever platform had the hottest
    reaction. Lobsters and Dev.to signal developer-practitioner sentiment; HN captures researcher
    + startup community; Reddit captures end-user + power-user perspective.

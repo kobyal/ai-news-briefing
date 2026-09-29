@@ -23,10 +23,10 @@ from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
 from pathlib import Path
 
-BASE = "https://aibriefing.dev"
 RECIPIENT = SENDER = "kobyal@gmail.com"
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))  # for shared/
+from shared.aws_config import PUBLIC_BASE as BASE  # noqa: E402
 LOG = _ROOT / "logs" / "health-check.log"
 
 

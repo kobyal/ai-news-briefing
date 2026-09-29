@@ -52,11 +52,17 @@ export function FilterCarousel({
   };
 
   // Keep the active card in view when the selection changes (deep links, etc.).
+  // On mount use "nearest": centering the default (first) card scrolls the row
+  // by its own padding, which parked the "All" chip under the ‹ arrow on phones
+  // (seen on /library, iPhone + Android, 2026-09-28). "center" only afterwards.
+  const mounted = useRef(false);
   useEffect(() => {
     const el = scrollRef.current?.querySelector(
       '[data-carousel-active="true"]'
     ) as HTMLElement | null;
-    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    const inline = mounted.current ? "center" : "nearest";
+    mounted.current = true;
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline });
   }, [activeKey]);
 
   return (

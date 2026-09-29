@@ -14,11 +14,16 @@ import json
 import math
 import os
 import re
+import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
+
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
+from shared.article_date import from_iso as _format_date  # noqa: E402
+from shared.vendors import classify_vendor as _classify_vendor_shared  # noqa: E402
 
 _TODAY = lambda: datetime.now().strftime("%B %d, %Y")
 _LOOKBACK_DAYS = lambda: int(os.environ.get("YOUTUBE_LOOKBACK_DAYS", os.environ.get("LOOKBACK_DAYS", "7")))
@@ -213,16 +218,6 @@ def _yt_get(url: str, params: dict, timeout: int = 15):
         import builtins
         builtins._yt_quota_exhausted = True
     return last
-
-
-def _format_date(raw: str) -> str:
-    if not raw:
-        return "Date unknown"
-    try:
-        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        return dt.strftime("%B %d, %Y")
-    except Exception:
-        return raw[:20]
 
 
 def _format_views(count) -> str:
@@ -562,8 +557,8 @@ def _enrich_and_filter(api_key: str, videos: dict) -> list[dict]:
                         videos[vid_id]["duration"] = _parse_duration(
                             details.get("duration", "")
                         )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  ⚠ YouTube stats/duration fetch failed (batch dropped): {e}")
 
     # Filter
     filtered = []
@@ -598,8 +593,6 @@ def _enrich_and_filter(api_key: str, videos: dict) -> list[dict]:
 # Vendor classification
 # ---------------------------------------------------------------------------
 
-import sys, pathlib as _pl; sys.path.insert(0, str(next((_p for _p in _pl.Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), _pl.Path(__file__).resolve().parents[2])))
-from shared.vendors import classify_vendor as _classify_vendor_shared
 
 
 def _classify_vendor(title: str, desc: str) -> str:

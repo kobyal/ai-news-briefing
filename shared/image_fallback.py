@@ -33,6 +33,9 @@ import os
 import urllib.parse
 import urllib.request
 
+from shared.aws_config import PUBLIC_BASE
+from shared.models import HAIKU
+
 
 # Vendor → canonical homepage (used for favicon fallback).
 # Google's /s2/favicons?sz=256 service is rock-solid and returns the site's
@@ -128,7 +131,7 @@ _WIKI_VENDOR_QUERY: dict[str, str] = {
 }
 
 
-_PREWARMED_MANIFEST_URL = "https://aibriefing.dev/data/img/fallback/prewarmed/index.json"
+_PREWARMED_MANIFEST_URL = f"{PUBLIC_BASE}/data/img/fallback/prewarmed/index.json"
 _prewarmed_cache: dict[str, str] | None = None
 
 
@@ -341,54 +344,6 @@ def wikipedia_vendor_image(story: dict) -> str | None:
     return img
 
 
-# Universities, research labs, and major tech firms whose GitHub org pages exist
-# but produce a generic GitHub-branded image instead of a story-relevant one.
-# E.g. "Stanford/Berkeley/NVIDIA's LLM-as-a-Verifier" picked up Stanford's GitHub
-# org page (just a GitHub logo + "stanford" name) for a research-collab story.
-_GITHUB_ORG_DENYLIST = {
-    "stanford", "berkeley", "harvard", "mit", "oxford", "cambridge", "cmu",
-    "princeton", "yale", "cornell", "columbia", "caltech",
-    "google", "microsoft", "apple", "amazon", "meta", "facebook", "nvidia",
-    "openai", "anthropic", "deepmind",
-}
-
-
-def github_org_image(story: dict) -> str | None:
-    """If headline's first proper-noun matches an existing GitHub org, use GitHub's
-    auto-generated opengraph image (real branded landscape PNG). Good for open-source
-    story subjects that aren't on Wikipedia (Fathym, Cohere, small AI labs, etc.).
-
-    Skip if:
-      - the candidate is a slash-separated research collaboration
-        (e.g. "Stanford/Berkeley/NVIDIA's …") — there's no single org image;
-      - the candidate is a denylisted university or major tech firm — their
-        GitHub org image is just generic GitHub branding, not story-related.
-    """
-    import re as _re, urllib.request as _ur
-    headline = story.get("headline", "") or ""
-    # Skip slash-separated research collab headlines (e.g. "Stanford/Berkeley/NVIDIA's …")
-    if _re.match(r"^[A-Z][A-Za-z]+/[A-Z]", headline):
-        return None
-    # Grab the leading proper noun (single capitalized word, 4+ chars)
-    m = _re.match(r"^([A-Z][A-Za-z0-9-]{3,})", headline)
-    if not m:
-        return None
-    candidate = m.group(1).lower()
-    if candidate in _GITHUB_ORG_DENYLIST:
-        return None
-    # Try a few common org-name variants
-    for org in [candidate, f"{candidate}-dev", f"{candidate}-deno", f"{candidate}-ai", f"{candidate}-io"]:
-        try:
-            req = _ur.Request(f"https://api.github.com/orgs/{org}",
-                              headers={"User-Agent": "ai-briefing/1.0", "Accept": "application/vnd.github+json"})
-            with _ur.urlopen(req, timeout=4) as r:
-                if r.status == 200:
-                    return f"https://opengraph.githubassets.com/1/{org}"
-        except Exception:
-            continue
-    return None
-
-
 def is_logo_or_generic(image_url: str, headline: str = "", vendor: str = "") -> bool | None:
     """Vision-judge: is this image just a logo / generic / wrong-subject?
     Returns True (logo, skip), False (real photo, keep), or None (uncertain
@@ -436,7 +391,7 @@ def is_logo_or_generic(image_url: str, headline: str = "", vendor: str = "") -> 
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model=os.environ.get("MERGER_TRANSLATOR_MODEL", "claude-haiku-4-5"),
+            model=os.environ.get("MERGER_TRANSLATOR_MODEL", HAIKU),
             max_tokens=200,
             system=("You judge whether a news article's hero image is a real photo "
                     "ABOUT the story, or just a logo/wordmark/generic-stock filler. "

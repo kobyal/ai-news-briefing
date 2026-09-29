@@ -359,39 +359,3 @@ def read_articles(
           f"({cached} cached) in {elapsed:.1f}s")
     return results
 
-
-def prepare_writer_context(
-    articles: list[dict],
-    enriched: dict[str, str],
-    url_key: str = "url",
-    snippet_key: str = "snippet",
-    top_n_full: int = 10,
-    mid_n_excerpt: int = 20,
-    full_chars: int = 2500,
-    mid_chars: int = 800,
-) -> list[dict]:
-    """Enrich articles with tiered content depth.
-
-    Top articles get full text, middle tier gets excerpts,
-    rest keep original snippets. Returns the same list with
-    an added 'enriched_text' key.
-    """
-    for i, article in enumerate(articles):
-        url = article.get(url_key, "")
-        if not url and article.get("urls"):
-            url = article["urls"][0] if article["urls"] else ""
-
-        full_text = enriched.get(url, "")
-        original = article.get(snippet_key, "")
-
-        if full_text:
-            if i < top_n_full:
-                article["enriched_text"] = _truncate(full_text, full_chars)
-            elif i < top_n_full + mid_n_excerpt:
-                article["enriched_text"] = _truncate(full_text, mid_chars)
-            else:
-                article["enriched_text"] = original[:400] if original else ""
-        else:
-            article["enriched_text"] = original[:400] if original else ""
-
-    return articles

@@ -26,7 +26,8 @@ from email.mime.text import MIMEText
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SITE = "https://aibriefing.dev"
+sys.path.insert(0, str(ROOT))
+from shared.aws_config import PUBLIC_BASE as SITE  # noqa: E402
 ACCENT_BAR = "linear-gradient(90deg,#b45309,#d97706,#4f46e5,#7c3aed)"
 
 def esc(s): return html.escape(str(s or ""))

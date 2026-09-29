@@ -7,7 +7,6 @@ names or URLs from scratch. Invalid IDs are silently dropped.
 
 import datetime
 import glob
-import hashlib
 import json
 import os
 import re
@@ -24,6 +23,7 @@ _OUTPUT_DIR = Path(__file__).parent.parent / "output"
 
 sys.path.insert(0, str(_ROOT / "shared"))
 import models as _models  # noqa: E402
+from story_id import derive_story_id  # noqa: E402
 
 # ── Env / API ─────────────────────────────────────────────────────────────────
 
@@ -146,9 +146,7 @@ def _story_id(item: dict) -> str:
     urls = item.get("urls") or []
     if isinstance(urls, str):
         urls = [urls]
-    if urls:
-        return hashlib.sha256(urls[0].encode()).hexdigest()[:12]
-    return hashlib.sha256((item.get("headline") or "").encode()).hexdigest()[:12]
+    return derive_story_id({**item, "urls": urls})
 
 
 def _build_story_catalog(days: list, search_index: dict) -> dict:

@@ -32,10 +32,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from shared.aws_config import (  # noqa: E402
-    S3_BUCKET as BUCKET, AWS_PROFILE, CLOUDFRONT_DIST_ID,
+    S3_BUCKET as BUCKET, AWS_PROFILE, CLOUDFRONT_DIST_ID, PUBLIC_BASE as CF,
 )
 PREFIX = "data/img/fallback/prewarmed"
-CF = "https://aibriefing.dev"
 
 # Subjects to pre-warm. key = slug (used as lookup key + filename), value = Wikipedia title.
 # Keep slugs lowercase, space-separated so matching against headlines is easy.

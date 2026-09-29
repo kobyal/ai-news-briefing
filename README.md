@@ -467,6 +467,56 @@ Two scripts in `scripts/` publish the `/library/` document collections. Unlike t
 
   ⚠ **Why the `library-assets/` prefix and not `library/`:** the deploy's `aws s3 sync web/out … --delete` must exclude the assets (they aren't in `web/out`, so `--delete` would wipe them) — but an exclude on `library/*` would *also* skip uploading the library **pages**, leaving `/library/` to fall back to the homepage. That shipped once on 2026-09-16. Keep the two prefixes separate.
 
+### Library Agent — `agents/active/library-agent/` (added 2026-09-29, daily)
+
+Keeps `/library/` alive: every cycle adds **one** reviewed long-form talk (YouTube) to the
+`talks` collection, in the same format as the AWS Summit write-ups (Hebrew review with the
+speaker's slides, timestamped quotes, glossary). Runs in `local-cycle.sh` [3b] before the
+web build so the new `/library/<slug>/` page is statically generated.
+
+- **Discover + rank:** `yt-dlp` lists 11 curated channels (Anthropic, AI Engineer, YC, AWS
+  Events, DeepMind, OpenAI, Latent Space, Sequoia, a16z, Microsoft Developer, Stanford) plus
+  a few searches; 15–100 min, ≤120 days old, not yet done. One `claude -p` call scores
+  relevance (Claude Code / agents / AI engineering) and quality (talk vs. tutorial).
+  Scores <5 are remembered in `state/state.json` so they're not re-fetched daily.
+- **Produce:** `prep.py` (under the `recording-to-review` skill venv, `R2R_HOME`) does
+  fetch → whisper (local, free) → slide frames; `writer.py` calls `claude -p` with the
+  `Read` tool so the model *looks at* the contact sheets before writing `content.json`;
+  `render.py` makes DOCX+PDF; video/raw frames are deleted after render.
+- **Publish:** `build_library_manifest.py` + `publish_library.py --collection talks`
+  (assets to S3, manifest + invalidation). ~5 min per talk end to end.
+- **Resumable:** `LIBRARY_TIME_BUDGET_S` (default 1500) stops between stages; an unfinished
+  talk resumes next run, and is parked after 3 failed runs.
+- Flags: `--dry-run` (ranking only), `--url <youtube>` (force), `--lang he|en`,
+  `--no-publish`, `--max N`. If `yt-dlp` returns 403, `brew upgrade yt-dlp`
+  (`YT_CLIENT=web_embedded` is the pinned workaround).
+
+### Events Agent — `agents/active/events-agent/` (added 2026-09-29, daily)
+
+Builds `docs/data/events.json` — upcoming AI / cloud / developer events in central Israel
+for the next ~60 days — rendered as "Upcoming events" at the top of `/community/`
+(`web/src/components/EventsSection.tsx`, `web/src/lib/events.ts`).
+
+- **Sources (no JS, plain `requests`):** Meetup (`__NEXT_DATA__` Apollo `Event:` objects),
+  Eventbrite (JSON-LD `ItemList`), Luma (`/tel-aviv` page data), the AWS events directory
+  API, and one Perplexity search for vendor/conference events; each source is retry-wrapped
+  and fail-soft.
+- **Gates:** in-person events must be in a central-Israel city allowlist; online events only
+  when clearly aimed at Israelis (Hebrew, or an Israeli community — global feeds branded
+  "Tel Aviv" are dropped). One batched `claude -p` call classifies AI relevance, tags,
+  price/format and writes the Hebrew title + blurb; verdicts are cached by event id in
+  `cache/classified.json`. Perplexity-sourced dates are checked against the event page and
+  flagged `date_unverified` otherwise.
+- **Merge:** previous still-future events are kept (dropped after 7 days unseen), past events
+  dropped, deduped by URL and (title, date). `--publish` uploads to `s3://<bucket>/data/events.json`
+  and invalidates; `--dry-run` scrapes only. Run log: `docs/data/_events_runs.jsonl`.
+
+### Mobile verification — `scripts/mobile_shots.sh`
+
+Screenshots pages on a real iPhone Simulator (Mobile Safari) and the Android emulator
+(Chrome): `scripts/mobile_shots.sh https://aibriefing.dev /tmp/shots / /library/ /community/`.
+Needs Xcode and the Android SDK with the `aih-pixel` AVD; `MOBILE_ONLY=ios|android` limits it.
+
 ### QA evaluator — `private/qa-evaluator-agent/` (local-only)
 
 LangGraph-orchestrated nightly quality check. Runs after `[6/6]` email-send in `local-cycle.sh`. Six parallel nodes:

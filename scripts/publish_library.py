@@ -39,7 +39,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from build_library_manifest import COLLECTIONS  # noqa: E402
+from build_library_manifest import COLLECTIONS, newest  # noqa: E402
 from shared.aws_config import AWS_PROFILE, AWS_REGION, CLOUDFRONT_DIST_ID, S3_BUCKET  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
@@ -62,9 +62,7 @@ def _source_files(collection_id: str, slug: str) -> tuple[Path | None, Path | No
     if not spec:
         return None, None
     out_dir = spec["root"] / "sessions" / slug / "out"
-    pdf = next(iter(sorted(out_dir.glob("*.pdf"))), None)
-    docx = next(iter(sorted(out_dir.glob("*.docx"))), None)
-    return pdf, docx
+    return newest(out_dir, "*.pdf"), newest(out_dir, "*.docx")
 
 
 def _aws(*args: str) -> subprocess.CompletedProcess:

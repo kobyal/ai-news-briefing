@@ -50,9 +50,8 @@ from PIL import Image
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 from shared.aws_config import (  # noqa: E402
-    S3_BUCKET as BUCKET, AWS_PROFILE, CLOUDFRONT_DIST_ID,
+    AWS_PROFILE, CLOUDFRONT_DIST_ID, PUBLIC_BASE as CF, s3_uri,
 )
-CF = "https://aibriefing.dev"
 
 _MAX_DIM = 1200          # longest side; OG sweet spot is 1200x630, this caps it
 _JPEG_QUALITY = 82       # ~200-400 KB for a 1200px photo — safely under 600 KB
@@ -65,7 +64,7 @@ _FIRST_PARTY = ("aibriefing.dev/data/img", "d2p40aowelo4td.cloudfront.net")
 def _existing_mirrors(date: str) -> set[str]:
     """story_ids that already have a mirror under data/img/<date>/."""
     r = subprocess.run(
-        ["aws", "s3", "ls", f"s3://{BUCKET}/data/img/{date}/",
+        ["aws", "s3", "ls", s3_uri("data/img", date) + "/",
          "--profile", AWS_PROFILE],
         capture_output=True, text=True,
     )
@@ -136,7 +135,7 @@ def _upload(date: str, story_id: str, data: bytes) -> bool:
         tmp = tf.name
     try:
         r = subprocess.run(
-            ["aws", "s3", "cp", tmp, f"s3://{BUCKET}/{key}",
+            ["aws", "s3", "cp", tmp, s3_uri(key),
              "--content-type", "image/jpeg",
              "--cache-control", "public, max-age=604800",
              "--profile", AWS_PROFILE, "--quiet"],
@@ -240,7 +239,7 @@ def main() -> int:
             return 0
         key = f"data/{args.date}.json"
         up = subprocess.run(
-            ["aws", "s3", "cp", str(data_path), f"s3://{BUCKET}/{key}",
+            ["aws", "s3", "cp", str(data_path), s3_uri(key),
              "--content-type", "application/json",
              "--cache-control", "public, max-age=300, s-maxage=300",
              "--profile", AWS_PROFILE, "--quiet"],

@@ -10,12 +10,13 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from pydantic import ValidationError as _PydValidationError
 
-from .agent import root_agent
+from .agent import root_agent, MODEL
 
 _TIMEOUT = int(os.environ.get("ADK_TIMEOUT", "900"))  # 15 min default — VendorResearcher alone can take 4-5 min on slow Gemini days
 
 # Gemini pricing per 1M tokens (current as of 2026; update if tier changes)
 _GEMINI_PRICES = {
+    "gemini-3.8-flash":      (0.15, 0.60),   # verify — copied from 2.5-flash; no published 3.8 rate in docs/COSTS.md yet
     "gemini-2.5-flash":      (0.15, 0.60),
     "gemini-2.5-flash-lite": (0.075, 0.30),
     "gemini-2.5-pro":        (1.25, 10.0),
@@ -167,7 +168,7 @@ async def _run_async():
             if usage:
                 in_tok = getattr(usage, "prompt_token_count", 0) or 0
                 out_tok = getattr(usage, "candidates_token_count", 0) or 0
-                model = getattr(event, "model", None) or os.environ.get("GOOGLE_GENAI_MODEL", "gemini-3.8-flash")
+                model = getattr(event, "model", None) or MODEL
                 pin, pout = _price_for(model)
                 cost = (in_tok * pin + out_tok * pout) / 1_000_000
                 calls.append({

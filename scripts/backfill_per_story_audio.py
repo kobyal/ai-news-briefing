@@ -20,7 +20,6 @@ Flags:
 """
 import argparse
 import asyncio
-import hashlib
 import json
 import os
 import subprocess
@@ -32,9 +31,8 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
 from shared.aws_config import (  # noqa: E402
-    S3_BUCKET, CLOUDFRONT_DIST_ID as CF_DIST, AWS_PROFILE,
+    CLOUDFRONT_DIST_ID as CF_DIST, AWS_PROFILE, PUBLIC_BASE, s3_uri,
 )
-PUBLIC_BASE = "https://aibriefing.dev"  # CloudFront alias — used for audio URLs in JSON
 VOICE_EN = os.environ.get("TLDR_TTS_VOICE_EN", "en-US-GuyNeural")
 VOICE_HE = os.environ.get("TLDR_TTS_VOICE_HE", "he-IL-AvriNeural")
 
@@ -55,7 +53,7 @@ def aws(*args, capture=True):
 
 def list_s3_dates() -> list[str]:
     """Return sorted YYYY-MM-DD dates with a published JSON in S3."""
-    res = aws("s3", "ls", f"s3://{S3_BUCKET}/data/")
+    res = aws("s3", "ls", s3_uri("data") + "/")
     dates = []
     for line in res.stdout.splitlines():
         parts = line.split()
@@ -67,17 +65,17 @@ def list_s3_dates() -> list[str]:
 
 
 def fetch_s3_json(date: str, dest: Path) -> dict:
-    aws("s3", "cp", f"s3://{S3_BUCKET}/data/{date}.json", str(dest), capture=False)
+    aws("s3", "cp", s3_uri("data", f"{date}.json"), str(dest), capture=False)
     return json.loads(dest.read_text(encoding="utf-8"))
 
 
 def upload_s3_json(date: str, src: Path) -> None:
-    aws("s3", "cp", str(src), f"s3://{S3_BUCKET}/data/{date}.json",
+    aws("s3", "cp", str(src), s3_uri("data", f"{date}.json"),
         "--content-type", "application/json", capture=False)
 
 
 def upload_s3_mp3(date: str, mp3: Path) -> None:
-    aws("s3", "cp", str(mp3), f"s3://{S3_BUCKET}/audio/{date}/{mp3.name}",
+    aws("s3", "cp", str(mp3), s3_uri("audio", date, mp3.name),
         "--content-type", "audio/mpeg", capture=False)
 
 

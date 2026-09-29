@@ -38,7 +38,6 @@ why code_janitor.py records every merge so the next day can revert it.
 from __future__ import annotations
 
 import argparse
-import ast
 import json
 import os
 import py_compile

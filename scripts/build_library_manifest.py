@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -62,9 +63,44 @@ COLLECTIONS = [
         "lang": "he",
         "source_label": "AWS Summit Tel Aviv livestream",
     },
+    {
+        # Rolling collection: agents/active/library-agent adds one talk per run.
+        "id": "talks",
+        "root": Path(__file__).resolve().parents[1] / "agents/active/library-agent/collections/talks",
+        "title": "Talks worth your time",
+        "title_he": "הרצאות ששוות את הזמן",
+        "blurb": (
+            "Curated long-form talks on Claude Code, agentic coding and AI engineering — "
+            "from conference and official channels — reviewed in Hebrew with the speaker's "
+            "slides and timestamped quotes. One new talk is added automatically every day."
+        ),
+        "blurb_he": (
+            "הרצאות ארוכות ונבחרות על Claude Code, agentic coding והנדסת AI — מכנסים "
+            "ומערוצים רשמיים — מסוכמות בעברית עם הסליידים של המרצה וציטוטים עם חותמות זמן. "
+            "הרצאה חדשה נוספת אוטומטית מדי יום."
+        ),
+        "date": None,
+        "lang": "he",
+        "source_label": "YouTube",
+        "sort": "newest",
+    },
 ]
 
 TOOL_URL = "https://github.com/kobyal/recording-to-pdf"
+
+
+def newest(out_dir: Path, pattern: str) -> Path | None:
+    """The most recently rendered file, not the alphabetically first one — a
+    re-render under a new name used to leave `sorted()[0]` pointing at the stale
+    PDF. Shared with publish_library so both resolve the same file."""
+    return max(out_dir.glob(pattern), key=lambda p: p.stat().st_mtime, default=None)
+
+
+def _pdf_pages(pdf: Path) -> int:
+    """Page count via pdfinfo (poppler) — for collections without an index document."""
+    res = subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True)
+    m = re.search(r"^Pages:\s+(\d+)", res.stdout, re.M)
+    return int(m.group(1)) if m else 0
 
 
 def _parse_tags(raw: str) -> tuple[str, list[str]]:
@@ -159,15 +195,18 @@ def build_collection(spec: dict) -> dict | None:
             continue
 
         out_dir = root / "sessions" / slug / "out"
-        pdf = next(iter(sorted(out_dir.glob("*.pdf"))), None)
-        docx = next(iter(sorted(out_dir.glob("*.docx"))), None)
+        pdf = newest(out_dir, "*.pdf")
+        docx = newest(out_dir, "*.docx")
         if not pdf:
             skipped += 1
             continue
 
         meta = entry.get("meta", {})
         level, topics = _parse_tags(meta.get("tags", ""))
-        code = _session_code(slug)
+        # The talks agent writes code/speakers/minutes into its index entries
+        # (there is no event catalogue to derive them from); the summit entries
+        # don't have them, so those keep coming from the slug and the document.
+        code = entry.get("code") or _session_code(slug)
         details = _doc_details(root / "sessions" / slug)
 
         items.append({
@@ -177,14 +216,16 @@ def build_collection(spec: dict) -> dict | None:
             "title_he": details.get("title_he", ""),
             "description": (meta.get("description") or "").strip(),
             "blurb_he": details.get("blurb_he", ""),
-            "speakers": details.get("speakers", ""),
-            "minutes": details.get("minutes", 0),
+            "speakers": entry.get("speakers") or details.get("speakers", ""),
+            "minutes": entry.get("minutes") or details.get("minutes", 0),
             "track": meta.get("track") or "",
             "level": level,
             "topics": topics,
             "lang": entry.get("asr", {}).get("language") or spec.get("lang", ""),
-            "pages": pages.get(code, 0),
+            "pages": pages.get(code) or (_pdf_pages(pdf) if not pages else 0),
             "video_url": meta.get("source") or "",
+            # Talk-only fields, present only when the index entry carries them.
+            **{k: entry[k] for k in ("channel", "added", "video_id") if entry.get(k)},
             # Paths are relative to the site root — publish_library.py puts the
             # files at exactly these keys on S3.
             #
@@ -200,7 +241,10 @@ def build_collection(spec: dict) -> dict | None:
             "cover": f"/library-assets/{spec['id']}/covers/{slug}.png",
         })
 
-    items.sort(key=lambda it: it["code"])
+    if spec.get("sort") == "newest":
+        items.sort(key=lambda it: (it.get("added", ""), it["code"]), reverse=True)
+    else:
+        items.sort(key=lambda it: it["code"])
     print(f"  ✓ {spec['id']}: {len(items)} documents ({skipped} skipped)")
 
     return {

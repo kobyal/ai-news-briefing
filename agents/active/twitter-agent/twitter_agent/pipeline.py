@@ -424,7 +424,7 @@ _VENDOR_PATTERNS = [
     ("Cohere",    re.compile(r"\bcohere\b", re.IGNORECASE)),
     ("Alibaba",   re.compile(r"\b(qwen|alibaba)\b", re.IGNORECASE)),
     ("NVIDIA",    re.compile(r"\bnvidia\b", re.IGNORECASE)),
-    ("HuggingFace", re.compile(r"\bhugging.?face\b", re.IGNORECASE)),
+    ("Hugging Face", re.compile(r"\bhugging.?face\b", re.IGNORECASE)),
 ]
 
 

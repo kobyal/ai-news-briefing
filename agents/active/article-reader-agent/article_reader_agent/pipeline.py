@@ -22,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
 from shared.repo_root import agent_dir  # noqa: E402
 
-from shared.article_reader import read_article, ArticleContent, _should_skip_url, _SKIP
+from shared.article_reader import read_article, _should_skip_url, _SKIP
 
 _ROOT = next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])
 _TODAY = lambda: datetime.now().strftime("%B %d, %Y")
@@ -189,8 +189,8 @@ def run_pipeline() -> dict:
                         "source": result.source,
                         "char_count": result.char_count,
                     }
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"  ⚠ article read failed, dropped {futures[future]}: {e}")
 
     read_elapsed = time.time() - t_read
     jina_count = sum(1 for a in articles.values() if a["source"] == "jina")

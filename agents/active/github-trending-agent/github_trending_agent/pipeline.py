@@ -7,11 +7,16 @@ import hashlib
 import json
 import os
 import re
+import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
+
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
+from shared.article_date import from_iso as _format_date  # noqa: E402
+from shared.models import HAIKU  # noqa: E402
 
 # Drop CJK / Cyrillic / Thai / Arabic / Devanagari runs from descriptions —
 # repos like xming521/WeClone tail their English description with a Chinese
@@ -93,9 +98,7 @@ def _generate_explainer(repo_name: str, description: str, topics: list, cache: d
     he = ""
     try:
         if os.environ.get("MERGER_VIA_CLAUDE_CODE") == "1":
-            import sys as _sys
-            _sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
-            from shared.anthropic_cc import agent as _cc_agent  # noqa: E402
+            from shared.anthropic_cc import agent as _cc_agent
             raw = _cc_agent(
                 input_text=user,
                 instructions=_EXPLAINER_PROMPT,
@@ -109,7 +112,7 @@ def _generate_explainer(repo_name: str, description: str, topics: list, cache: d
             import anthropic
             client = anthropic.Anthropic(api_key=api_key)
             resp = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model=HAIKU,
                 max_tokens=600,
                 system=_EXPLAINER_PROMPT,
                 messages=[{"role": "user", "content": user}],
@@ -346,16 +349,6 @@ def _parse_repo(repo: dict) -> dict:
         "updated_at": repo.get("pushed_at", ""),
         "topics": repo.get("topics", [])[:5],
     }
-
-
-def _format_date(raw: str) -> str:
-    if not raw:
-        return "Date unknown"
-    try:
-        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        return dt.strftime("%B %d, %Y")
-    except Exception:
-        return raw[:20]
 
 
 def _deduplicate(repos: list[dict]) -> list[dict]:

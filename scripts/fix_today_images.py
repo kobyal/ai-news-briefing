@@ -17,11 +17,10 @@ Run:
 from __future__ import annotations
 import json
 import os
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup

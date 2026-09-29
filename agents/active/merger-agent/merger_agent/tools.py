@@ -1,7 +1,5 @@
 """HTML builder for the Merger Agent — gold/amber "combined" theme."""
-import ast
 import html as _html
-import json
 import os
 import re
 from datetime import datetime
@@ -370,9 +368,6 @@ def _build_html(tldr, news_items, community_pulse, topic,
 
     # ── Recommended YouTube Channels + Podcasts (curated, mirrors web/media) ────
     try:
-        import sys as _sys
-        from pathlib import Path as _Path
-        _sys.path.insert(0, str(next((_p for _p in __import__("pathlib").Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), __import__("pathlib").Path(__file__).resolve().parents[2])))
         from shared.channels import youtube_channels as _yt_channels, podcasts as _podcasts
     except Exception:
         _yt_channels = lambda: []

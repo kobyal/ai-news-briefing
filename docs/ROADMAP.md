@@ -326,6 +326,58 @@ wrap shared/vendors needlessly).
   locked term map instead of forking it. Each agent still keeps its own persona/
   headline rules; only the contested house-style terms are shared.
 
+Code health 2026-09-28 (post model-upgrade audit)
+- ✅ Dead code removed: `shared/image_fallback.github_org_image` + its denylist
+  (caller gone since ea0cc0fb), `shared/article_reader.prepare_writer_context`
+  (never called), `send_email._anthropic_mtd_cost_usd` (caller gone since
+  509f6766), adk `URL_FINDER_PROMPT` (superseded by URL_RESOLVER_PROMPT), 27
+  unused imports across 16 files (each verified sole-occurrence by grep).
+- ✅ Model ids centralized: `shared/models.HAIKU` / `GEMINI_FLASH` now consumed by
+  image_fallback, github, tavily, rss, perplexity (translator), adk agent+pipeline
+  — no `claude-haiku-*` / `gemini-*` literal left outside `shared/models.py`
+  except perplexity's SEARCH model (`anthropic/claude-haiku-4-5` is a
+  Perplexity-hosted id, not an Anthropic one) and the adk price table keys.
+  adk `_GEMINI_PRICES` gained a `gemini-3.8-flash` row (copied from 2.5-flash,
+  marked "verify") so `_price_for` no longer silently falls through.
+- ✅ Vendor-name drift: twitter-agent + merger prompt emitted "HuggingFace" vs
+  `shared/vendors` "Hugging Face"; the merger's coverage list is now built from
+  `VENDOR_NAMES`. (`web/src/app/community/page.tsx:507` keeps a now-redundant
+  `HuggingFace → "Hugging Face"` alias — harmless, drop when next in web/.)
+- ✅ editorial-agent `_story_id` delegates to `shared.story_id.derive_story_id`
+  (asserted byte-identical on url / headline / empty inputs).
+- ✅ `shared/article_date.from_iso` replaces the byte-identical `_format_date`
+  in github + youtube pipelines.
+- ✅ `shared/aws_config.PUBLIC_BASE` (`https://aibriefing.dev`) replaces 8
+  literals (image_fallback, backfill_per_story_audio, prewarm_fallback_images,
+  mirror_og_images, monitor_health, build_search_index, build_weekly_email);
+  hand-built `s3://{BUCKET}/…` strings in 3 scripts now use `aws_config.s3_uri`.
+- ✅ Redundant in-function `sys.path.insert` copies removed (tavily searcher ×2,
+  merger tools); github + youtube pipelines now wire `shared/` once at the top.
+- ✅ `run_all.py` skips any agent whose dir resolves under `agents/inactive/`
+  (xai) with a one-line notice — a bare `python run_all.py` no longer launches
+  the parked paid agent; `--only xai` still forces it; `--list` marks it.
+- ✅ Silent `except: pass` on youtube stats/duration fetch and article-reader
+  per-article read now print a one-line ⚠ with the exception.
+- ✅ The 2026-06-25 FOLLOW-UP above (`build_search_index.py` `__main__` guard) is
+  DONE — inverted guard at the top of the module body raises on import.
+
+Deferred (with reasons):
+- ⏳ `publish_data.py` (~:740) raw `claude -p` TL;DR regen lacks the env-strip /
+  PromptBlocked / transient-retry handling → route via `anthropic_cc.agent`.
+  Deferred: file under active edit by another session.
+- ⏳ `scripts/fetch_hot_tools.py` `_translate_via_cli` — same gap, same reason.
+- ⏳ 4 copies of the Anthropic API-key call+retry loop (tavily / rss / merger /
+  perplexity) → one shared API-path helper next to `anthropic_cc`. Medium risk:
+  needs a keyed CI run to verify (the subscription path never exercises it).
+- ⏳ 3 copies of short-string HE translation (publish_data / linkedin /
+  fetch_hot_tools) → a shared batch translator (blocked on the two excluded
+  files above).
+- ⏳ `run.py` env-loading boilerplate → `shared.repo_root.agent_env` (exists,
+  zero callers today).
+- Pre-existing pyflakes noise left untouched (not made unused by this pass):
+  adk `prompts.py` VENDOR_ENUM, merger `pipeline.py` subprocess, merger
+  `tools.py` module-level `_Path`, prewarm `re`, a few assigned-never-read locals.
+
 Known limitations (worth documenting, not necessarily fixing)
 -------------------------------------------------------------
 

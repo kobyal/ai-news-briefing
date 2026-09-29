@@ -107,6 +107,9 @@ def agent(
     label: str = "",
     usage_log: list | None = None,
     soft_timeout: int | None = None,
+    tools: list[str] | None = None,
+    add_dirs: list[str] | None = None,
+    effort: str | None = None,
 ) -> str:
     """One-shot Claude call via `claude -p` (subscription).
 
@@ -116,6 +119,14 @@ def agent(
     `soft_timeout` (seconds): try this shorter window first and, if it times
     out, retry once on the full 1800s window — a fast-fail for cold-start /
     transient throttle (merger 2026-05-09). None = single 1800s window.
+
+    `tools`: built-in tools to enable (e.g. ["Read"]) — default none. With
+    tools on, the call is multi-turn and the LAST assistant text is returned
+    (the library agent lets the model look at slide contact sheets before
+    writing). `add_dirs`: extra directories those tools may access.
+
+    `effort`: per-call override of MERGER_CC_EFFORT (the library writer needs
+    "high" for a 30-page document while its ranking call is fine on "low").
     """
     system_prompt = instructions or "You are a helpful assistant. Return only the requested output."
     if json_mode:
@@ -140,7 +151,7 @@ def agent(
         "--output-format", "stream-json",
         "--verbose",
         "--system-prompt", system_prompt,
-        "--tools", "",
+        "--tools", ",".join(tools or []),
         # No tools are enabled, so the user-level MCP servers (figma, context7,
         # playwright) this child would otherwise boot from ~/.claude.json are
         # pure overhead. With no --mcp-config given, --strict-mcp-config skips
@@ -150,8 +161,13 @@ def agent(
         "--strict-mcp-config",
         "--no-session-persistence",
         "--disable-slash-commands",
-        "--effort", _cc_effort(),
+        "--effort", effort or _cc_effort(),
     ]
+    if tools:
+        # Auto-approve the enabled tools — `-p` has no one to answer a prompt.
+        cmd += ["--allowedTools", ",".join(tools)]
+        for d in add_dirs or []:
+            cmd += ["--add-dir", d]
 
     # Strip session-specific Claude Code env vars before spawning so the child
     # `claude -p` uses OAuth/subscription auth instead of being confused by
@@ -174,7 +190,7 @@ def agent(
     # stalled/throttled call visible in the timestamped run log (2026-06-25: a
     # single call could silently burn up to ~2h via the 1800s timeout × retries
     # with no trace of when it began). flush so it lands in real time.
-    print(f"    ▶  {label:<22} start   model={_cc_model()} effort={_cc_effort()}", flush=True)
+    print(f"    ▶  {label:<22} start   model={_cc_model()} effort={effort or _cc_effort()}", flush=True)
     last_err: Exception | None = None
     _HARD_TIMEOUT = 1800
     _timeout = soft_timeout or _HARD_TIMEOUT
@@ -252,7 +268,13 @@ def agent(
         elif obj.get("type") == "result":
             result_event = obj
 
-    text = assistant_texts[0] if assistant_texts else ""
+    # Tool-enabled calls are legitimately multi-turn (tool use, then the
+    # answer): the deliverable is the last text. Tool-less calls keep the
+    # first turn — a second one there is an auto-continue artifact.
+    if tools:
+        text = next((t for t in reversed(assistant_texts) if t.strip()), "")
+    else:
+        text = assistant_texts[0] if assistant_texts else ""
     elapsed = time.time() - t0
 
     # A prompt refused by a UserPromptSubmit policy hook exits rc=0 with
@@ -274,7 +296,7 @@ def agent(
     stop = (result_event or {}).get("stop_reason", "unknown")
     n_msgs = len(assistant_texts)
     print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={_cc_model()} (sub)  in={in_tok} out={out_tok}  stop={stop}  msgs={n_msgs}", flush=True)
-    if n_msgs > 1:
+    if n_msgs > 1 and not tools:
         print(f"    ⚠  [{label}] Claude Code auto-continued — using first turn only")
 
     if usage_log is not None:

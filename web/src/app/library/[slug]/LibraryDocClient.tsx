@@ -117,7 +117,8 @@ export default function LibraryDocClient({
 
         <p style={{ fontSize: "13px", color: "#6b6b8a", lineHeight: 1.6, marginBottom: "4px" }}>{item.speakers}</p>
         <p style={{ fontSize: "12.5px", color: "#9a9ab8", marginBottom: "18px" }}>
-          {coll.title} · {item.track}
+          {coll.title} · {item.channel || item.track}
+          {item.added && ` · ${item.added}`}
           {item.minutes > 0 && ` · ${isHe ? `${item.minutes} דק׳` : `${item.minutes} min`}`}
           {item.pages > 0 && ` · ${isHe ? `${item.pages} עמודים` : `${item.pages} pages`}`}
         </p>

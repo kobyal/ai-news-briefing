@@ -15,6 +15,8 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "ai-news-briefing-web2")
 CLOUDFRONT_DIST_ID = os.environ.get("CF_DIST", "E1TSW76SSEILK4")
 AWS_PROFILE = os.environ.get("S3_PROFILE", "koby-personal")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+# Public site origin (CloudFront alias) — audio/og/search-index URLs baked into JSON.
+PUBLIC_BASE = os.environ.get("PUBLIC_BASE", "https://aibriefing.dev")
 
 
 def s3_uri(*parts: str) -> str:

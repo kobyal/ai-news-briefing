@@ -21,6 +21,10 @@ export interface LibraryItem {
   lang: string;
   pages: number;
   video_url: string;       // the original recording
+  // Talks collection only (agents/active/library-agent) — absent on summit items.
+  channel?: string;
+  added?: string;          // YYYY-MM-DD the talk was added
+  video_id?: string;
   pdf: string;
   pdf_bytes: number;
   docx: string;
@@ -34,7 +38,7 @@ export interface LibraryCollection {
   title_he: string;
   blurb: string;
   blurb_he: string;
-  date: string;
+  date: string | null;     // null for a rolling collection
   lang: string;
   source_label: string;
   items: LibraryItem[];

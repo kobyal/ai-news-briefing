@@ -63,12 +63,20 @@ function DocCard({ item, isHe }: { item: LibraryItem; isHe: boolean }) {
               {isHe ? `רמה ${item.level}` : `Level ${item.level}`}
             </span>
           )}
+          {/* Talks have no level; the document language is the useful badge there. */}
+          {item.added && item.lang && (
+            <span style={{ fontSize: "10.5px", fontWeight: 600, color: "#6b6b8a", border: "1px solid #e0e0ec", padding: "2px 7px", borderRadius: "5px" }}>
+              {item.lang.toUpperCase()}
+            </span>
+          )}
         </div>
         <h3 style={{
           fontFamily: "var(--font-display)", fontSize: "15px", fontWeight: 700,
           color: "var(--text-primary)", lineHeight: 1.35, marginBottom: "6px",
         }}>{title}</h3>
-        <p style={{ fontSize: "12px", color: "#8585a3", lineHeight: 1.5 }}>{item.track}</p>
+        <p style={{ fontSize: "12px", color: "#8585a3", lineHeight: 1.5 }}>
+          {item.added ? `${item.channel || item.track} · ${item.added}` : item.track}
+        </p>
         <div className="flex items-center gap-2 mt-3" style={{ fontSize: "11.5px", color: "#9a9ab8", flexWrap: "wrap" }}>
           <span>{isHe ? `${item.pages} עמודים` : `${item.pages} pages`}</span>
           {item.minutes > 0 && <><span>·</span><span>{isHe ? `${item.minutes} דק׳ הקלטה` : `${item.minutes} min talk`}</span></>}

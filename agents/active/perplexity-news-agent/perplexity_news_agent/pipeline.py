@@ -18,19 +18,17 @@ Models are configurable via .env:
 import json
 import os
 import re
-import subprocess
 import time
 from datetime import datetime, timedelta
 
-import requests
 
 # Bootstrap repo root so shared/ is importable.
 import sys
 from pathlib import Path
 sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
 from shared.pricing import estimate_cost  # noqa: E402
-from shared import anthropic_cc  # noqa: E402
-from shared.models import SONNET  # noqa: E402
+from shared import anthropic_cc, perplexity  # noqa: E402
+from shared.models import HAIKU, SONNET  # noqa: E402
 
 from .prompts import (
     VENDOR_RESEARCHER_PROMPT,
@@ -45,8 +43,6 @@ from .tools import _parse
 # Config
 # ---------------------------------------------------------------------------
 
-_API_KEY   = lambda: os.environ.get("PERPLEXITY_API_KEY", "")
-_BASE_URL  = "https://api.perplexity.ai"
 
 _SEARCH_MODEL     = lambda: os.environ.get("PERPLEXITY_SEARCH_MODEL",     "anthropic/claude-haiku-4-5")
 # Writer + translator used to proxy through Perplexity's Response API
@@ -54,7 +50,7 @@ _SEARCH_MODEL     = lambda: os.environ.get("PERPLEXITY_SEARCH_MODEL",     "anthr
 # markup over direct Anthropic. We now call Anthropic directly — stripping the
 # "anthropic/" prefix when present, so existing env values keep working.
 _WRITER_MODEL     = lambda: os.environ.get("PERPLEXITY_WRITER_MODEL",     f"anthropic/{SONNET}")
-_TRANSLATOR_MODEL = lambda: os.environ.get("PERPLEXITY_TRANSLATOR_MODEL", "anthropic/claude-haiku-4-5")
+_TRANSLATOR_MODEL = lambda: os.environ.get("PERPLEXITY_TRANSLATOR_MODEL", f"anthropic/{HAIKU}")
 
 _LOOKBACK_DAYS = lambda: int(os.environ.get("LOOKBACK_DAYS", "3"))
 _TODAY         = lambda: datetime.now().strftime("%B %d, %Y")
@@ -186,94 +182,15 @@ def _agent(
     """POST /v1/responses — returns the output text.
 
     This is the primitive that replaces an ADK LlmAgent.
-    Each call is one "agent step" in the pipeline.
+    Each call is one "agent step" in the pipeline. The HTTP call itself lives
+    in shared/perplexity.py (also used by the events agent); this wrapper only
+    binds the module-level usage log.
     """
-    if not _API_KEY():
-        raise RuntimeError("PERPLEXITY_API_KEY not set — add it to .env")
-
-    payload: dict = {
-        "model":             model,
-        "input":             input_text,
-        "max_steps":         max_steps,
-        # Required by the Perplexity /responses API when proxying Anthropic
-        # models ("max_output_tokens is required when using Anthropic models",
-        # 400 otherwise) — this silently killed the agent on step 1 every day
-        # (2026-06-25). Valid for Sonar models too, so set it unconditionally.
-        "max_output_tokens": max_output_tokens,
-    }
-    if tools:
-        payload["tools"] = tools
-    if instructions:
-        payload["instructions"] = instructions
-    if json_mode:
-        payload["text"] = {"format": {"type": "json_object"}}
-
-    t0 = time.time()
-    _RETRYABLE = {429, 500, 502, 503}
-    _RETRY_DELAYS = [5, 15, 30]
-    resp = None
-    for _attempt in range(len(_RETRY_DELAYS) + 1):
-        try:
-            resp = requests.post(
-                f"{_BASE_URL}/v1/responses",
-                headers={
-                    "Authorization": f"Bearer {_API_KEY()}",
-                    "Content-Type":  "application/json",
-                },
-                json=payload,
-                timeout=120,
-            )
-        except (requests.Timeout, requests.ConnectionError) as e:
-            # The Sonar API sometimes stalls past the 120s read timeout. A raised
-            # ReadTimeout/ConnectionError must be retried like a 5xx — otherwise it
-            # propagates and kills the whole agent (2026-06-11: uncaught ReadTimeout
-            # → perplexity wrote no output → "agent didn't run today").
-            if _attempt < len(_RETRY_DELAYS):
-                delay = _RETRY_DELAYS[_attempt]
-                print(f"    ⟳  [{label}] Perplexity API network timeout ({type(e).__name__}) — retrying in {delay}s (attempt {_attempt + 1}/{len(_RETRY_DELAYS)})...")
-                time.sleep(delay)
-                continue
-            raise RuntimeError(f"[{label}] Perplexity API network timeout after {len(_RETRY_DELAYS)} retries: {e}")
-        if resp.ok:
-            break
-        if resp.status_code in _RETRYABLE and _attempt < len(_RETRY_DELAYS):
-            delay = _RETRY_DELAYS[_attempt]
-            print(f"    ⟳  [{label}] Perplexity API {resp.status_code} — retrying in {delay}s (attempt {_attempt + 1}/{len(_RETRY_DELAYS)})...")
-            time.sleep(delay)
-            continue
-        # Non-retryable error or exhausted retries
-        raise RuntimeError(
-            f"[{label}] Perplexity API {resp.status_code}: {resp.text[:400]}"
-        )
-
-    data    = resp.json()
-    elapsed = time.time() - t0
-
-    # Extract text: output[*].content[*].text  (Agent API envelope)
-    text = ""
-    for item in data.get("output", []):
-        if item.get("type") == "message":
-            for part in item.get("content", []):
-                if part.get("type") == "output_text":
-                    text += part.get("text", "")
-
-    # Cost reporting — Perplexity's response includes authoritative usage.cost.total_cost
-    usage_obj  = data.get("usage", {}) or {}
-    cost_info  = usage_obj.get("cost", {}) or {}
-    cost_usd   = float(cost_info.get("total_cost", 0) or 0)
-    cost_str   = f"  ${cost_usd:.4f}" if cost_usd else ""
-    model_used = data.get("model", model)
-    print(f"    ✓  {label:<22} {elapsed:5.1f}s   model={model_used}{cost_str}")
-    _usage_log.append({
-        "step": label,
-        "model": model_used,
-        "api": "Perplexity",
-        "input_tokens": usage_obj.get("prompt_tokens", 0) or 0,
-        "output_tokens": usage_obj.get("completion_tokens", 0) or 0,
-        "cost_usd": round(cost_usd, 4),
-    })
-
-    return text
+    return perplexity.responses(
+        input_text, model=model, tools=tools, max_steps=max_steps,
+        instructions=instructions, json_mode=json_mode, label=label,
+        max_output_tokens=max_output_tokens, usage_log=_usage_log,
+    )
 
 
 # ---------------------------------------------------------------------------

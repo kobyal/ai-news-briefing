@@ -95,24 +95,6 @@ HUGGING FACE:
 - URLs: [article URLs]
 """
 
-URL_FINDER_PROMPT = """\
-Today is {today}. Find article URLs for each news story below.
-
-{{state.raw_vendor_news}}
-
-For each vendor with news, run 2 searches:
-1. [vendor name] [headline keyword] {today}
-2. [vendor name] [headline keyword] {today} site:techcrunch.com OR site:venturebeat.com OR site:theverge.com
-
-Run up to 10 searches total.
-
-IMPORTANT: Output ONLY a plain list of URLs — one URL per line. \
-No headings, no bullets, no descriptions. Just the raw URLs starting with https://
-Example output:
-https://techcrunch.com/2026/03/22/some-article
-https://venturebeat.com/2026/03/22/another-article
-"""
-
 URL_RESOLVER_PROMPT = """\
 Your ONLY job is to call the resolve_source_urls tool.
 

@@ -22,7 +22,7 @@ sys.path.insert(0, str(REPO))
 from _run_log import append_run_log  # noqa: E402
 from shared.story_id import hash_primary  # noqa: E402
 from shared.aws_config import (  # noqa: E402
-    S3_BUCKET as BUCKET, AWS_PROFILE as PROFILE, CLOUDFRONT_DIST_ID,
+    S3_BUCKET as BUCKET, AWS_PROFILE as PROFILE, CLOUDFRONT_DIST_ID, PUBLIC_BASE, s3_uri,
 )
 
 # Map (date, story_id) -> first-party og_image URL by listing the lambda's
@@ -52,9 +52,9 @@ def _first_party_image_map() -> dict[tuple[str, str], str]:
             date, _fb, sid, _ext = m.groups()
             # Prefer plain <id> over fb_<id> when both exist for the same story
             # (article-extracted og:image is more relevant than vendor fallback).
-            url = f"https://aibriefing.dev/{key}"
+            url = f"{PUBLIC_BASE}/{key}"
             cur = out.get((date, sid))
-            if cur is None or (cur.startswith("https://aibriefing.dev/data/img/") and "/fb_" in cur and "/fb_" not in url):
+            if cur is None or (cur.startswith(f"{PUBLIC_BASE}/data/img/") and "/fb_" in cur and "/fb_" not in url):
                 out[(date, sid)] = url
     except Exception as e:
         print(f"First-party image map build failed: {e}")
@@ -100,7 +100,7 @@ def _s3_story_id_maps() -> tuple[dict[tuple[str, str], str], dict[tuple[str, str
         try:
             result = subprocess.run(
                 ["aws", "s3", "cp",
-                 f"s3://{BUCKET}/data/{date}.json", "-",
+                 s3_uri("data", f"{date}.json"), "-",
                  "--profile", PROFILE, "--region", "us-east-1"],
                 capture_output=True, text=True, timeout=20,
             )
@@ -480,7 +480,7 @@ if _os.environ.get("SKIP_S3_UPLOAD") == "1":
     print("SKIP_S3_UPLOAD=1 → built locally, upload deferred to caller")
 else:
     result = subprocess.run([
-        "aws", "s3", "cp", str(out_path), f"s3://{BUCKET}/{KEY}",
+        "aws", "s3", "cp", str(out_path), s3_uri(KEY),
         "--content-type", "application/json",
         "--cache-control", "no-cache, public, max-age=300",
         "--profile", PROFILE, "--region", "us-east-1",

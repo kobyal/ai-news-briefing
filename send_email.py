@@ -167,38 +167,6 @@ def _pct(used: float, limit: float) -> str:
     return f" ({p:.0f}%)" if p >= 1 else f" (<1%)"
 
 
-def _anthropic_mtd_cost_usd() -> tuple[float, float] | None:
-    """Returns (mtd_total_usd, yesterday_usd) via the Admin API.
-    Requires ANTHROPIC_ADMIN_API_KEY. 'Yesterday' = previous UTC day's bucket,
-    which approximates the cost of the most recent pipeline run."""
-    admin_key = os.environ.get("ANTHROPIC_ADMIN_API_KEY", "")
-    if not admin_key:
-        return None
-    try:
-        from datetime import timezone, timedelta
-        now = datetime.now(timezone.utc)
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        starting_at = start.strftime("%Y-%m-%dT%H:%M:%SZ")
-        url = f"https://api.anthropic.com/v1/organizations/cost_report?starting_at={starting_at}&bucket_width=1d&limit=31"
-        req = urllib.request.Request(url)
-        req.add_header("x-api-key", admin_key)
-        req.add_header("anthropic-version", "2023-06-01")
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            d = json.loads(resp.read())
-        total_cents = 0.0
-        yesterday_cents = 0.0
-        yesterday_iso_prefix = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-        for bucket in d.get("data", []):
-            bucket_total = sum(float(it.get("amount", "0") or 0) for it in bucket.get("results", []))
-            total_cents += bucket_total
-            if bucket.get("starting_at", "").startswith(yesterday_iso_prefix):
-                yesterday_cents = bucket_total
-        return (total_cents / 100, yesterday_cents / 100)
-    except Exception as e:
-        print(f"  Admin cost_report failed: {e}")
-        return None
-
-
 # Mark status "warn" (yellow) when usage hits this percent of the limit
 _WARN_THRESHOLD_PCT = 80
 

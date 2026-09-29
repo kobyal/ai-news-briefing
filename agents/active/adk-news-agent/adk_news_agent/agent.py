@@ -1,5 +1,6 @@
 """AI Latest Briefing — parallel research pipeline with timing callbacks."""
 import os
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -30,7 +31,10 @@ from .prompts import (
     PUBLISHER_PROMPT,
 )
 
-MODEL = os.environ.get("GOOGLE_GENAI_MODEL", "gemini-3.8-flash")
+sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[2])))
+from shared.models import GEMINI_FLASH  # noqa: E402
+
+MODEL = os.environ.get("GOOGLE_GENAI_MODEL", GEMINI_FLASH)
 
 # ---------------------------------------------------------------------------
 # Pydantic output schemas

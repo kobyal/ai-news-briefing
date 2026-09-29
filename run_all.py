@@ -39,6 +39,11 @@ AGENTS = {
     "merger":     ("merger-agent",            "paid",  "Anthropic Claude"),
 }
 
+def _is_inactive(name: str) -> bool:
+    """True when the agent's dir resolves under agents/inactive/ (parked)."""
+    return "inactive" in agent_dir(AGENTS[name][0]).parts
+
+
 AGENT_DISPLAY = {
     "adk": "ADK News Agent", "perplexity": "Perplexity News Agent",
     "rss": "RSS News Agent", "tavily": "Tavily News Agent",
@@ -142,7 +147,8 @@ def main():
         print("-" * 50)
         for name, (_, tier, api) in AGENTS.items():
             icon = {"free": "🟢", "cheap": "🟡", "paid": "🔴"}[tier]
-            print(f"  {icon} {name:<12} {tier:<6} {api}")
+            note = "  [inactive — skipped unless --only]" if _is_inactive(name) else ""
+            print(f"  {icon} {name:<12} {tier:<6} {api}{note}")
         return
 
     if args.merge_only:
@@ -163,6 +169,13 @@ def main():
 
     enabled -= skip
     enabled.discard("merger")  # merger runs after all others
+
+    # Agents parked under agents/inactive/ never run by default (their dir still
+    # resolves, so the registry alone would launch them); --only forces one.
+    for name in sorted(enabled):
+        if _is_inactive(name) and name not in args.only:
+            print(f"  Skipping {name}: parked in agents/inactive/ (use --only {name} to force)")
+            enabled.discard(name)
 
     # Build parallel list (everything except merger)
     agents = []

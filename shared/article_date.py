@@ -44,6 +44,18 @@ MAX_STORY_AGE_DAYS = 3
 
 _cache: dict[str, date | None] = {}
 
+
+def from_iso(raw: str) -> str:
+    """ISO-8601 timestamp (API-observed, e.g. GitHub pushed_at / YouTube publishedAt)
+    → "%B %d, %Y" display string. Empty → "Date unknown"; unparseable → raw[:20]."""
+    if not raw:
+        return "Date unknown"
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        return dt.strftime("%B %d, %Y")
+    except Exception:
+        return raw[:20]
+
 # Durable on-disk cache. Deliberately NOT shared/article_cache.py: that one is
 # day-scoped and self-cleans after 3 days because article CONTENT goes stale. A
 # publication date is an immutable fact, so caching it forever is both correct

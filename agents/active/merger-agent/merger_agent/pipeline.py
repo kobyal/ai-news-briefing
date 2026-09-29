@@ -18,7 +18,7 @@ import re
 import subprocess
 import time
 import urllib.parse
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -367,7 +367,6 @@ def _recent_headlines(n_days: int = 3) -> str:
     """Last N days of published headlines so the merger can avoid deja-vu and use
     'UPDATE:' / continuation framing when a story is still trending. Reads from
     docs/data/{date}.json (the live published JSON), not merger raw output."""
-    import glob as _g
     out_lines = []
     today = datetime.now().date()
     for delta in range(1, n_days + 1):

@@ -14,6 +14,7 @@ import { getVendorLogo, getVendor, VENDOR_LIST } from "@/lib/vendors";
 import { VendorFilterBar } from "@/components/briefing/VendorFilterBar";
 import { LoadingSpinner, DaySeparator, INFINITE_SCROLL_ROOT_MARGIN, withMinDelay } from "@/components/ui/InfiniteScroll";
 import { BackToTopButton } from "@/components/ui/BackToTopButton";
+import { EventsSection } from "@/components/EventsSection";
 import { readDateParam, scrollToHash } from "@/lib/anchors";
 
 // Mirror BriefingPage's relative-date label helper so historical day dividers
@@ -777,8 +778,8 @@ function CommunityPageInner() {
         </h1>
         <p className="mb-4 text-[13px]" style={{ color: "#9a9ab8" }}>
           {isHe
-            ? "פוסטים מ-X · LinkedIn · דיונים ב-Reddit · דופק הקהילה (HN, arXiv, Lobsters, Dev.to)"
-            : "Posts from X · LinkedIn · Reddit threads · Community pulse (HN, arXiv, Lobsters, Dev.to)"}
+            ? "אירועים קרובים · פוסטים מ-X · LinkedIn · דיונים ב-Reddit · דופק הקהילה (HN, arXiv, Lobsters, Dev.to)"
+            : "Upcoming events · Posts from X · LinkedIn · Reddit threads · Community pulse (HN, arXiv, Lobsters, Dev.to)"}
         </p>
 
         {/* Vendor filter ribbon */}
@@ -788,6 +789,9 @@ function CommunityPageInner() {
           vendors={vendors}
           todayVendors={todayVendors}
         />
+
+        {/* Upcoming events — one section, above the day blocks */}
+        <EventsSection />
 
         {/* Today's block */}
         <CommunityDayBlock data={data} vendorFilter={activeVendor} />

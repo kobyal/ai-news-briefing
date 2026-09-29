@@ -75,7 +75,7 @@ HEBREW_RE = re.compile(r"[֐-׿]")
 # Organizers whose "Tel Aviv"/"Israel" name is a franchise label on a global
 # syndicated feed (APAC/US sessions, Spanish-language streams); their ONLINE
 # sessions count as local only when the title itself says so.
-GLOBAL_FEEDS_RE = re.compile(r"microsoft reactor|computer vision israel", re.I)
+GLOBAL_FEEDS_RE = re.compile(r"microsoft reactor|computer vision israel|odsc", re.I)
 ISRAELI_ORG_RE = re.compile(r"israel|ישראל|\btlv\b|tel[ -]aviv|\bil\b", re.I)
 LOCAL_TITLE_RE = re.compile(r"israel|ישראל|\btlv\b|tel[ -]aviv", re.I)
 
@@ -86,7 +86,7 @@ def _locality(rec: dict) -> str | None:
     livestream that happens to be syndicated through a Tel Aviv meetup group."""
     if rec["format"] != "online":
         return f"in_person:{rec['city']}" if rec["city"] not in ("", "Online") else None
-    text = f"{rec['title']} {rec['_desc']}"
+    text = f"{rec['title']} {rec.get('_desc') or rec.get('blurb', '')}"  # carried-over records have no _desc
     if HEBREW_RE.search(text):
         return "online:hebrew"
     if re.search(r"\((español|français|deutsch|português)\)", rec["title"], re.I):
@@ -458,6 +458,11 @@ def merge(fresh: list[dict], previous: list[dict], today: date, until: date, cac
         if not (today.isoformat() <= rec["date"] <= until.isoformat()):
             continue
         if rec["id"] in cache and not cache[rec["id"]].get("relevant"):
+            continue
+        # Same for the locality gate: a carried-over event must still pass
+        # today's rules (2026-09-29: ODSC's global webinar lingered as "stale"
+        # for a week after ODSC was added to the global-feed list).
+        if _locality(rec) is None:
             continue
         u, t = _canon_url(rec["url"]), _title_key(rec)
         if u in seen_urls or t in seen_titles:

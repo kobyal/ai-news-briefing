@@ -40,29 +40,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 OUT_PATH = Path(__file__).resolve().parents[1] / "docs" / "data" / "library.json"
 
 # ── Collections ────────────────────────────────────────────────────────────────
+# Order = page order: the rolling talks collection first so the newest document
+# is above the fold, the one-off event archives after it.
 # `root` is the recording-to-pdf project dir. Everything else is presentation:
 # the title/blurb the /library index shows for the collection as a whole.
 COLLECTIONS = [
-    {
-        "id": "aws-summit-tlv-2026",
-        "root": Path.home() / "vscode/projects/aws-summit-2026/04-reviews",
-        "title": "AWS Summit Tel Aviv 2026",
-        "title_he": "AWS Summit תל אביב 2026",
-        "blurb": (
-            "Session write-ups from AWS Summit Tel Aviv 2026 (Expo Tel Aviv, "
-            "September 10, 2026). Each document is generated from the session's own "
-            "recording: transcript, slides extracted from the video, and quotes with "
-            "timestamps. Hebrew."
-        ),
-        "blurb_he": (
-            "סיכומי סשנים מ-AWS Summit תל אביב 2026 (אקספו תל אביב, 10 בספטמבר 2026). "
-            "כל מסמך הופק מההקלטה עצמה: תמלול, סליידים שחולצו מהווידאו, וציטוטים עם "
-            "חותמות זמן."
-        ),
-        "date": "2026-09-10",
-        "lang": "he",
-        "source_label": "AWS Summit Tel Aviv livestream",
-    },
     {
         # Rolling collection: agents/active/library-agent adds one talk per run.
         "id": "talks",
@@ -84,6 +66,27 @@ COLLECTIONS = [
         "source_label": "YouTube",
         "sort": "newest",
     },
+    {
+        "id": "aws-summit-tlv-2026",
+        "root": Path.home() / "vscode/projects/aws-summit-2026/04-reviews",
+        "title": "AWS Summit Tel Aviv 2026",
+        "title_he": "AWS Summit תל אביב 2026",
+        "blurb": (
+            "Session write-ups from AWS Summit Tel Aviv 2026 (Expo Tel Aviv, "
+            "September 10, 2026). Each document is generated from the session's own "
+            "recording: transcript, slides extracted from the video, and quotes with "
+            "timestamps. Hebrew."
+        ),
+        "blurb_he": (
+            "סיכומי סשנים מ-AWS Summit תל אביב 2026 (אקספו תל אביב, 10 בספטמבר 2026). "
+            "כל מסמך הופק מההקלטה עצמה: תמלול, סליידים שחולצו מהווידאו, וציטוטים עם "
+            "חותמות זמן."
+        ),
+        "date": "2026-09-10",
+        "lang": "he",
+        "source_label": "AWS Summit Tel Aviv livestream",
+    },
+
 ]
 
 TOOL_URL = "https://github.com/kobyal/recording-to-pdf"

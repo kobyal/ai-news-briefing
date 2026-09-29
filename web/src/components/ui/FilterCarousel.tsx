@@ -52,17 +52,17 @@ export function FilterCarousel({
   };
 
   // Keep the active card in view when the selection changes (deep links, etc.).
-  // On mount use "nearest": centering the default (first) card scrolls the row
-  // by its own padding, which parked the "All" chip under the ‹ arrow on phones
-  // (seen on /library, iPhone + Android, 2026-09-28). "center" only afterwards.
+  // Not on mount: any scrollIntoView triggers scroll-snap, which used to park
+  // the first chip under the ‹ arrow (seen on /library, phones + desktop,
+  // 2026-09-28). The scrollPadding below keeps snap positions clear of the
+  // arrows for user scrolls too.
   const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return; }
     const el = scrollRef.current?.querySelector(
       '[data-carousel-active="true"]'
     ) as HTMLElement | null;
-    const inline = mounted.current ? "center" : "nearest";
-    mounted.current = true;
-    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline });
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   }, [activeKey]);
 
   return (
@@ -78,6 +78,7 @@ export function FilterCarousel({
           overflowX: "auto",
           scrollbarWidth: "none",
           padding: "4px 36px",
+          scrollPadding: "0 36px",
           scrollSnapType: "x proximity",
           userSelect: "none",
         }}

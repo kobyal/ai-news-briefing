@@ -74,7 +74,9 @@ Reliability + newsletter + photos (2026-06-25 → 27):
   10-12 min vs a 3-min wait) with no visible effect: the site is static-first. Removed
   local-cycle [5a]-[5c], the email's ingest row, and the frontend `/api/stories` + `/api/archive`
   fallbacks. ⏳ Later: `cdk destroy` the ingest/API Lambdas + `ai-news-stories` DynamoDB table,
-  and consider disabling GitHub Pages (it only fed the ingest).
+  ✅ GitHub Pages disabled 2026-09-29: audio URLs now point at the site, historical MP3s synced
+  to `s3://…/audio/`, `docs/audio` gitignored + untracked (4.5GB out of the tree), the cycle syncs
+  the day's MP3s to S3 in [3/6].
 
 Source-relevance defense-in-depth (2026-06-23) — credibility guard:
 - Trigger: `/story/2127eaa27275` showed a Grok-4.3 headline sourced from an AWS

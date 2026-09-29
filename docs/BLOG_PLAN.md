@@ -72,8 +72,9 @@ timelines make natural opinionated posts — launch as a linked series.
   framework choice. Hugo has no MDX. Eleventy is fine but Astro's schema layer wins.
 
 **Hosting:** new bucket `ai-news-briefing-blog` + new CloudFront distribution, alias
-`blog.aibriefing.dev`, existing ACM cert extended with a SAN (or wildcard), Route53
-alias. Separate distribution = separate cache/invalidations, no Lambda@Edge
+`blog.aibriefing.dev`, new ACM cert for the subdomain (current cert covers apex + www only), CNAME at
+**Cloudflare** — aibriefing.dev DNS is Cloudflare, not Route53; a DNS:Edit token is in
+`private/.env` (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`), keep the record DNS-only. Separate distribution = separate cache/invalidations, no Lambda@Edge
 index-rewrite tricks. ⚑ Subdomain vs `/blog` path: subdomain recommended; path only
 matters for consolidating SEO authority, which isn't the growth lever here. Add the
 new IDs to `shared/aws_config.py` — never as literals in a new script.

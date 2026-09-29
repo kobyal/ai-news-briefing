@@ -1,0 +1,71 @@
+---
+title: "Harness engineering: המודל הוא רק חצי מה-agent"
+description: "מה זה harness engineering, מי טבע את המונח, ולמה אותו מודל קופץ מ-68% ל-88% הצלחה רק בגלל מה שעוטף אותו."
+lang: he
+key: harness-engineering
+term: "harness engineering"
+pubDate: 2026-09-29
+tags: ["harness-engineering", "agents", "coding-agents", "evals", "context-engineering"]
+hero: /posts/harness-engineering/hero.jpg
+diagram: /posts/harness-engineering/diagram.svg
+video: /posts/harness-engineering/video.mp4
+videoPoster: /posts/harness-engineering/video-poster.jpg
+sources:
+  - { title: "Harness design for long-running application development", url: "https://www.anthropic.com/engineering/harness-design-long-running-apps", date: "" }
+  - { title: "The State Of AI Harness Engineering 2026", url: "https://marmelab.com/blog/2026/09/24/the-state-of-ai-harness-engineering-2026.html", date: "" }
+  - { title: "Effective harnesses for long-running agents", url: "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents", date: "" }
+  - { title: "Harness engineering: Leveraging Codex in an agent-first world", url: "https://openai.com/index/harness-engineering", date: "2026-06-05" }
+  - { title: "Harness engineering for self-improvement", url: "https://lilianweng.github.io/posts/2026-07-04-harness", date: "2026-08-04" }
+  - { title: "Learn Harness Engineering", url: "https://walkinglabs.github.io/learn-harness-engineering/en", date: "2026-05-18" }
+  - { title: "Harness Engineering", url: "https://Habitat-Thinking.github.io/ai-literacy-superpowers/plugins/ai-literacy-superpowers/explanation/harness-engineering", date: "2026-08-27" }
+  - { title: "Building agents without harness engineering", url: "https://rajitkhanna.com/agents", date: "2026-06-11" }
+  - { title: "Agent Harness Engineering", url: "https://addyosmani.com/blog/agent-harness-engineering", date: "2026-07-12" }
+opinion: "harness engineering עובר את מבחן יום שני, וזה לא מובן מאליו למונח שנגמר ב-engineering. רוב מה שמתואר פה הוא הנדסה ישנה: test harness, CI, הפרדה בין מי שכותב למי שבודק, רק עם מודל באמצע. זה בסדר גמור, כי השם נותן לצוות שפה משותפת ומזיז את הדיון מה-prompt למערכת: מה המודל רואה, במה הוא נוגע, איך בודקים אותו ומתי מאפסים אותו. זה שאנשים עדיין מתווכחים מי טבע את המונח ומה נכנס בו הוא סימן שמדובר במשהו אמיתי ולא בתואר משרה. אצלנו, בכל מקום שהחלפנו בו קריאה למודל בכלל פשוט, הפייפליין נהיה זול ואמין יותר. בתוך ה-harness, לולאת הבדיקה שווה יותר מה-generator."
+madeWith: { model: "claude-opus-5-5", sourceCount: 9, reviewedBy: "Koby Almog" }
+---
+
+## מאיפה זה הגיע
+
+המילה harness לא חדשה. test harness קיים בהנדסת תוכנה עשרות שנים: הקוד שמריץ את הקוד שלך, בודק אותו ומדווח. החדש הוא השימוש בה בהקשר של agents.
+
+על מי שטבע את המונח יש ויכוח. Addy Osmani כותב שזה Viv Trivedy, בפוסט "Anatomy of an Agent Harness" ב-X. משם הגיעה השורה שכולם מצטטים: "Agent = Model + Harness. If you're not the model, you're the harness." התיעוד של ai-literacy-superpowers מייחס את המונח ל-Birgitta Böckeler, שכתבה עליו ב-martinfowler.com. היא כתבה מתוך העבודה של ThoughtWorks עם צוותים שמשחררים קוד אמיתי עם עוזרי AI. שני הצדדים מתארים את אותה בעיה. agents כותבים קוד שנראה סביר, ולאט לאט מושכים את ה-codebase הצידה. הם שוכחים קונבנציות וחוזרים על אותן טעויות. הקוד עדיין מתקמפל והטסטים עוברים, כך שאף אחד לא שם לב שמשהו נשחק.
+
+במקביל חברות ה-AI עצמן פרסמו איך הן עושות את זה. Anthropic פרסמו בנובמבר 2025 את "Effective harnesses for long-running agents". יש שם initializer agent שמפרק spec לרשימת משימות, ו-coding agent שמתקדם פיצ'ר אחד בכל session ומשאיר artifacts לסשן הבא. במרץ 2026 הגיע ההמשך: planner, generator ו-evaluator, בהשראת GANs. OpenAI תיארו צוות שבנה מוצר פנימי של כמיליון שורות קוד בלי שורה אחת שנכתבה ביד. זה יצא בערך 1,500 PRs בחמישה חודשים, עם שלושה מהנדסים שגדלו לשבעה. ביולי Lilian Weng כתבה על harness engineering בהקשר של self-improvement. בספטמבר Marmelab פרסמו סקירה של 246 repositories ו-57 פרסומים.
+
+
+<figure><img src="/posts/harness-engineering/diagram.svg" alt="איך זה עובד" /><figcaption>איך זה עובד</figcaption></figure>
+
+## מה זה באמת
+
+harness הוא כל מה שעוטף את המודל ואינו המודל עצמו. זה כולל את ה-prompts, הכלים, מדיניות ה-context, ה-hooks, ה-sandbox, ה-subagents, לולאות ה-feedback ומסלולי ההתאוששות. Lilian Weng מגדירה אותו כמערכת שמחליטה איך המודל מתכנן, קורא לכלים, מנהל context, שומר artifacts ובודק תוצאות. harness engineering אומר להתייחס לכל זה כקוד רציני, שמתהדק בכל פעם שה-agent נופל. בניסוח של Osmani: כל פעם שה-agent טועה, בונים משהו שימנע ממנו לחזור על אותה טעות.
+
+מה זה לא. זה לא prompt engineering, כי ה-prompt הוא רכיב אחד בתוך ה-harness. זה גם לא context engineering בדיוק. context engineering עוסק במה שהמודל רואה. harness engineering עוסק גם במה שהוא יכול לגעת בו, איך בודקים אותו ומתי מאפסים אותו. Böckeler מציגה את context engineering כאחד משלושה רכיבים בתוך ה-harness. וזה גם לא agent framework. framework נותן לך אבני בניין. ה-harness הוא ההחלטות שלך לגבי איך לחבר אותן לבעיה שלך.
+
+## איך עושים את זה
+
+1. **מפרקים לפני שבונים.** agent שמנסה לבנות הכל בבת אחת נשאר בלי context באמצע, ומשאיר פיצ'ר חצי כתוב ולא מתועד. זה בדיוק ה-failure mode ש-Anthropic תיעדו עם Opus 4.5. הפתרון: רשימת משימות מפורשת, ופיצ'ר אחד בכל session.
+2. **מעבירים context דרך קבצים, לא דרך זיכרון.** compaction לא מספיק. כל session מתחיל נקי, ולכן ה-agent צריך לקרוא מה קרה קודם מתוך קובץ מסודר.
+3. **מפרידים בין מי שכותב למי שבודק.** evaluator נפרד עם קריטריונים מוגדרים תופס את מה שה-generator בטוח שכבר סיים. זה גם מונע מה-agent להכריז על הצלחה לפני הזמן.
+4. **כללים דטרמיניסטיים לכל מה שאפשר.** linters, בדיקות ארכיטקטורה, schema validation. מה שכלל יכול לבדוק לא צריך מודל שיבדוק.
+5. **גבולות מפורשים.** sandbox, הרשאות, מה מותר לגעת בו ומה אסור. וקובץ AGENTS.md שמסביר ל-agent איך עובדים ב-repo.
+6. **observability.** אם אי אפשר לראות מה ה-agent עשה בכל שלב, אי אפשר לתקן את ה-harness.
+
+הקורס Learn Harness Engineering מחלק "minimal harness pack" של שלושה קבצים, שממחיש את כל זה:
+
+```
+AGENTS.md            # rules, boundaries, how to run tests
+feature_list.json    # the task list, each item with pass/fail status
+claude-progress.md   # what the last session did, what comes next
+```
+
+## מה זה נותן, ומה זה לא
+
+לפי Marmelab, יש מספר אחד שמישהו באמת מדד. אותו מודל, אותו ספק, אותם כלים, 25 משימות, ו-8 harnesses שונים. שיעור ההצלחה נע בין 68% ל-88%. עשרים נקודות אחוז רק מהמעטפת. פער כזה מייחסים בדרך כלל למעבר לדור הבא של מודלים.
+
+מה זה לא נותן. Marmelab עצמם כותבים שזה בערך הדבר היחיד שנמדד כמו שצריך, ורוב השאר אנקדוטות. OpenAI מדברים על עבודה מהירה פי 10, אבל זו הערכה של הצוות על המוצר של עצמו. והקורס של walkinglabs כותב במפורש ש-harness לא הופך את המודל לחכם יותר. הוא סוגר סביבו לולאה.
+
+ויש מחיר. harness הוא קוד, וקוד צריך לתחזק. Rajit Khanna מ-prismvideos סיפר שהם מחקו agent שבנו בעצמם ועברו ל-Hermes. מתחרה הוציא זיכרון בין sessions, skills ו-filesystem, דברים שהיו לוקחים להם שבועות. לא כל צוות צריך לבנות harness מאפס. לפעמים ה-harness הנכון הוא של מישהו אחר, ואתה בונה רק את השכבה שייחודית לך.
+
+## דוגמה מהשטח
+
+ב-aibriefing.dev רץ כל בוקר, מאז מאי 2026, גרף של כעשרה agents עם שלב merger. אחרי ה-publish רץ QA evaluator שמסמן P0. הבאגים הכי גרועים שלנו לא היו תשובות שגויות. הם היו כשלים שקטים: JSON שבור, ריצה שנתקעת, פלט ריק שנראה כמו הצלחה. מה שתיקן שלוש תקלות production לא היה מודל טוב יותר ולא prompt חכם יותר. זה היה wrapper קטן סביב `claude -p`, שעושה retry לכשלים חולפים ומתקן JSON פגום. ה-wrapper יושב ב-`shared/`. כשהלוגיקה הזאת הועתקה בין agents, תיקון באג באחד העותקים השאיר את האחרים שבורים. זה harness engineering בגרסה הכי משעממת שלו, וזה החלק שעבד.

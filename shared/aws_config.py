@@ -18,6 +18,11 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 # Public site origin (CloudFront alias) — audio/og/search-index URLs baked into JSON.
 PUBLIC_BASE = os.environ.get("PUBLIC_BASE", "https://aibriefing.dev")
 
+# ── blog.aibriefing.dev (Astro, separate bucket + distribution, 2026-09-29) ──
+BLOG_S3_BUCKET = os.environ.get("BLOG_S3_BUCKET", "ai-news-briefing-blog")
+BLOG_CLOUDFRONT_DIST_ID = os.environ.get("BLOG_CF_DIST", "E30X41I4MDIA4Z")
+BLOG_PUBLIC_BASE = os.environ.get("BLOG_PUBLIC_BASE", "https://blog.aibriefing.dev")
+
 
 def s3_uri(*parts: str) -> str:
     """Build an ``s3://bucket/key`` URI from path parts (slashes normalized)."""

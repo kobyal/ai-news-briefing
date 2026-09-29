@@ -16,8 +16,11 @@ It's intentionally fork-friendly:
 - **Fork it as-is** and it'll run end-to-end on GitHub Actions + GitHub Pages — no AWS, no other infrastructure required.
 
 **Live site:** [aibriefing.dev](https://aibriefing.dev/) (Next.js app on CloudFront — maintainer's deployment)
-**Raw merged briefing:** `kobyal.github.io/ai-news-briefing/report/latest.html` (GitHub Pages — what this repo publishes directly)
-**Structured data:** `kobyal.github.io/ai-news-briefing/data/<YYYY-MM-DD>.json` (machine-readable daily snapshot)
+**Raw merged briefing:** `aibriefing.dev/report/latest.html`
+**Structured data:** `aibriefing.dev/data/<YYYY-MM-DD>.json` (machine-readable daily snapshot)
+(GitHub Pages for this repo was retired 2026-09-29 — the maintainer's deployment is S3/CloudFront
+only, and `docs/audio` is no longer committed; a fork can still enable Pages on `docs/` and get the
+same contract.)
 
 **Operational docs:**
 - [docs/COSTS.md](./docs/COSTS.md) — per-run + month-to-date cost breakdown, dashboard refresh recipe
@@ -598,7 +601,7 @@ Output: `private/qa-evaluator-agent/output/<DATE>/report.md` + `report.json`. Se
 }
 ```
 
-The site at `kobyal.github.io/ai-news-briefing/data/<date>.json` is the maintainer's deployment of this contract — fork-friendly because the same file is what your fork would publish.
+The site at `aibriefing.dev/data/<date>.json` is the maintainer's deployment of this contract — fork-friendly because the same file is what your fork would publish.
 
 ---
 
@@ -682,6 +685,30 @@ The maintainer's deployment has two extra components in the public repo's tracke
 2. **Build your own consumer** — your own Next.js/Astro/static frontend that reads the JSON. The schema above is the contract; you don't need DynamoDB or any AWS.
 
 ---
+
+## Blog (blog.aibriefing.dev)
+
+A companion blog — one AI-engineering term a week, explained in Hebrew (English mirror
+under `/en/`) with a diagram, a hero card and a narrated Remotion explainer video.
+Plan + rationale: `docs/BLOG_PLAN.md`.
+
+- **Site:** `blog/` (Astro 7, MDX content collection `src/content/posts/<key>/{he,en}.mdx`,
+  schema in `src/content.config.ts`). Assets per post in `blog/public/posts/<key>/`.
+- **Video:** `blog/video/` (Remotion; scene contract in `src/props.ts`).
+- **Agent:** `agents/active/blog-agent/` — `discover.py` (term velocity over HN / Arctic
+  Shift / arXiv / feeds, seeded by `BACKLOG`), `research.py` (sources via
+  `shared.article_reader`), `writer.py` (two `claude -p` calls: HE canonical, EN edition;
+  voice from `house_positions.md` + `shared/he_glossary`), `media.py` (D2 diagram, hero
+  via Chrome screenshot, edge-tts narration, Remotion render), `publish.py` (MDX → astro
+  build → S3 `ai-news-briefing-blog` → CloudFront `E30X41I4MDIA4Z`, constants in
+  `shared/aws_config.py`).
+- **Run:** `python agents/active/blog-agent/run.py [--term "…"] [--seed URL] [--publish] [--no-video] [--draft]`.
+  Default is build-only; `--publish` syncs + invalidates and marks the term covered
+  (`state/covered.json`). Weekly launchd job `com.kobyalmog.ai-briefing-blog`
+  (Sunday 07:00) runs `--publish` and commits the new post.
+- **Editorial rules:** 1 post/week, named author, "how this was made" badge, ≥3 sources,
+  opinion written from `house_positions.md` (edit that file to change the voice).
+- **DNS** for the subdomain is at Cloudflare (token in `private/.env`, `CLOUDFLARE_*`).
 
 ## Forking & customizing
 

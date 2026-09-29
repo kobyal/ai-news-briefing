@@ -25,7 +25,6 @@ except KeyError:
 # your laptop doesn't get mistaken for the morning CI email.
 RUNNER = "CI" if os.environ.get("GITHUB_ACTIONS") == "true" else "local"
 WEBSITE_URL  = "https://aibriefing.dev"
-PAGES_BASE   = "https://kobyal.github.io/ai-news-briefing"
 
 # Find latest merged HTML
 files = sorted(glob.glob("agents/active/merger-agent/output/**/*.html", recursive=True))
@@ -35,7 +34,7 @@ if not files:
 
 latest   = files[-1]
 # docs/index.html is now a redirect to CloudFront; raw merged HTML lives at docs/report/
-report_url = f"{PAGES_BASE}/report/latest.html"
+report_url = PUBLIC_BASE  # the site is the report (GitHub Pages retired 2026-09-29)
 date     = datetime.now().strftime("%B %d, %Y")
 
 # ── Collect per-agent usage from usage*.json files ──────────────────────

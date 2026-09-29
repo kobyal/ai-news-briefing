@@ -1,0 +1,23 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import PostList from './PostList.astro';
+import { t, type Lang } from '../lib/i18n';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const s = t(lang);
+const posts = (await getCollection('posts', (p) => p.data.lang === lang && !p.data.draft))
+  .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
+---
+<Base lang={lang} title={`AI Briefing Blog — ${s.heroTitle}`} description={s.heroLede}>
+  <main class="wrap-wide">
+    <section class="hero">
+      <span class="term-pill">{s.blog}</span>
+      <h1>{s.heroTitle}</h1>
+      <p>{s.heroLede}</p>
+    </section>
+    <h2 class="meta" style="margin:8px 0 14px;font-size:12px;text-transform:uppercase;">{s.latest}</h2>
+    <PostList lang={lang} posts={posts} />
+  </main>
+</Base>

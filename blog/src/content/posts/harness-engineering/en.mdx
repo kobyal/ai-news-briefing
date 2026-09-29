@@ -1,0 +1,71 @@
+---
+title: "Harness engineering: the model is only half the agent"
+description: "What harness engineering is, who coined the term, and why the same model jumps from 68% to 88% success just from what wraps it."
+lang: en
+key: harness-engineering
+term: "harness engineering"
+pubDate: 2026-09-29
+tags: ["harness-engineering", "agents", "coding-agents", "evals", "context-engineering"]
+hero: /posts/harness-engineering/hero-en.jpg
+diagram: /posts/harness-engineering/diagram.svg
+video: /posts/harness-engineering/video-en.mp4
+videoPoster: /posts/harness-engineering/video-en-poster.jpg
+sources:
+  - { title: "Harness design for long-running application development", url: "https://www.anthropic.com/engineering/harness-design-long-running-apps", date: "" }
+  - { title: "The State Of AI Harness Engineering 2026", url: "https://marmelab.com/blog/2026/09/24/the-state-of-ai-harness-engineering-2026.html", date: "" }
+  - { title: "Effective harnesses for long-running agents", url: "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents", date: "" }
+  - { title: "Harness engineering: Leveraging Codex in an agent-first world", url: "https://openai.com/index/harness-engineering", date: "2026-06-05" }
+  - { title: "Harness engineering for self-improvement", url: "https://lilianweng.github.io/posts/2026-07-04-harness", date: "2026-08-04" }
+  - { title: "Learn Harness Engineering", url: "https://walkinglabs.github.io/learn-harness-engineering/en", date: "2026-05-18" }
+  - { title: "Harness Engineering", url: "https://Habitat-Thinking.github.io/ai-literacy-superpowers/plugins/ai-literacy-superpowers/explanation/harness-engineering", date: "2026-08-27" }
+  - { title: "Building agents without harness engineering", url: "https://rajitkhanna.com/agents", date: "2026-06-11" }
+  - { title: "Agent Harness Engineering", url: "https://addyosmani.com/blog/agent-harness-engineering", date: "2026-07-12" }
+opinion: "Harness engineering passes the Monday test, which isn't a given for a term ending in \"engineering\". Most of what's described here is old engineering: test harnesses, CI, separating the writer from the checker, just with a model in the middle. That's fine, because the name gives a team a shared vocabulary and moves the conversation from the prompt to the system: what the model sees, what it touches, how it gets checked, and when it gets reset. The fact that people still argue about who coined it and what belongs in it is a sign it's something real and not a job title. For us, everywhere we replaced a model call with a simple rule, the pipeline got cheaper and more reliable. Inside the harness, the checking loop is worth more than the generator."
+madeWith: { model: "claude-opus-5-5", sourceCount: 9, reviewedBy: "Koby Almog" }
+---
+
+## Where it came from
+
+The word harness isn't new. Software engineering has had test harnesses for decades: the code that runs your code, checks it, and reports back. What's new is using the word for agents.
+
+Who coined the term is disputed. Addy Osmani credits Viv Trivedy, from his X post "Anatomy of an Agent Harness". That's the source of the line everyone quotes: "Agent = Model + Harness. If you're not the model, you're the harness." The ai-literacy-superpowers docs credit Birgitta Böckeler, who wrote about it on martinfowler.com, drawing on ThoughtWorks' work with teams shipping real code with AI assistants. Both describe the same problem. Agents write code that looks reasonable and slowly pull the codebase off course. They forget conventions and repeat the same mistakes. The code still compiles and the tests still pass, so nobody notices anything is wearing down.
+
+Meanwhile, the AI labs published how they do it. In November 2025 Anthropic released "Effective harnesses for long-running agents". It uses an initializer agent that breaks a spec into a task list, and a coding agent that advances one feature per session and leaves artifacts for the next one. The follow-up came in March 2026: a planner, a generator and an evaluator, inspired by GANs. OpenAI described a team that built an internal product of roughly a million lines of code with not a single line written by hand. That came to about 1,500 PRs over five months, with three engineers growing to seven. In July, Lilian Weng wrote about harness engineering in the context of self-improvement. In September, Marmelab published a survey of 246 repositories and 57 publications.
+
+
+<figure><img src="/posts/harness-engineering/diagram.svg" alt="How it fits together" /><figcaption>How it fits together</figcaption></figure>
+
+## What it actually is
+
+A harness is everything around the model that isn't the model. That includes prompts, tools, context policy, hooks, the sandbox, subagents, feedback loops and recovery paths. Lilian Weng defines it as the system that decides how the model plans, calls tools, manages context, saves artifacts and checks results. Harness engineering means treating all of that as serious code that gets tighter every time the agent fails. As Osmani puts it: every time the agent makes a mistake, you build something that stops it from making the same one again.
+
+What it isn't. It isn't prompt engineering, because the prompt is one component inside the harness. It isn't exactly context engineering either. Context engineering is about what the model sees. Harness engineering is also about what it can touch, how it gets checked, and when it gets reset. Böckeler presents context engineering as one of three components inside the harness. And it isn't an agent framework. A framework gives you building blocks. The harness is your decisions about how to wire them to your problem.
+
+## How to do it
+
+1. **Break it down before you build.** An agent that tries to build everything at once runs out of context halfway through and leaves a half-written, undocumented feature. That's exactly the failure mode Anthropic documented with Opus 4.5. The fix: an explicit task list, and one feature per session.
+2. **Pass context through files, not memory.** Compaction isn't enough. Every session starts clean, so the agent needs to read what happened before from a structured file.
+3. **Separate the writer from the checker.** A separate evaluator with defined criteria catches what the generator is sure it already finished. It also stops the agent from declaring success too early.
+4. **Deterministic rules for everything you can.** Linters, architecture checks, schema validation. If a rule can check it, you don't need a model to check it.
+5. **Explicit boundaries.** A sandbox, permissions, what it may touch and what it may not. Plus an AGENTS.md file that tells the agent how work gets done in the repo.
+6. **Observability.** If you can't see what the agent did at each step, you can't fix the harness.
+
+The Learn Harness Engineering course hands out a three-file "minimal harness pack" that shows all of this:
+
+```
+AGENTS.md            # rules, boundaries, how to run tests
+feature_list.json    # the task list, each item with pass/fail status
+claude-progress.md   # what the last session did, what comes next
+```
+
+## What it buys you, and what it doesn't
+
+According to Marmelab, there's one number someone actually measured. Same model, same provider, same tools, 25 tasks, and 8 different harnesses. Success rates ranged from 68% to 88%. Twenty percentage points from the wrapper alone. A gap that size is usually credited to moving up a model generation.
+
+What it doesn't buy you. Marmelab themselves say this is about the only thing that's been measured properly, and most of the rest is anecdote. OpenAI talks about working 10x faster, but that's the team's own estimate of its own product. And the walkinglabs course says outright that a harness doesn't make the model smarter. It closes a loop around it.
+
+And there's a cost. A harness is code, and code needs maintenance. Rajit Khanna of prismvideos described deleting an agent they had built themselves and moving to Hermes. A competitor had shipped cross-session memory, skills and a filesystem, things that would have taken them weeks. Not every team needs to build a harness from scratch. Sometimes the right harness is someone else's, and you build only the layer that's unique to you.
+
+## From our own pipeline
+
+At aibriefing.dev, a graph of about ten agents with a merger step has run every morning since May 2026. After publish, a QA evaluator runs and flags P0s. Our worst bugs weren't wrong answers. They were silent failures: broken JSON, a run that hangs, empty output that looks like success. What fixed three production incidents wasn't a better model or a smarter prompt. It was a small wrapper around `claude -p` that retries transient failures and repairs malformed JSON. The wrapper lives in `shared/`. When that logic was copied between agents, fixing a bug in one copy left the others broken. That's harness engineering at its most boring, and it's the part that worked.

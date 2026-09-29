@@ -57,6 +57,7 @@ export function Header({ date }: HeaderProps) {
     { href: "/tools/", label: isHe ? "כלים" : "Tools" },
     { href: "/library/", label: isHe ? "ספרייה" : "Library" },
     { href: "/search/", label: isHe ? "חיפוש" : "Search" },
+    { href: "https://blog.aibriefing.dev/", label: isHe ? "בלוג" : "Blog" },
     { href: "/about/", label: isHe ? "אודות" : "About" },
   ];
 

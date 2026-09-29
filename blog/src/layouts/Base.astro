@@ -1,0 +1,71 @@
+---
+import '../styles/global.css';
+import { t, altLangHref } from '../lib/i18n';
+
+interface Props {
+  lang: 'he' | 'en';
+  title: string;
+  description: string;
+  image?: string;
+  canonical?: string;
+  altHref?: string;       // same page in the other language
+  type?: 'website' | 'article';
+  jsonLd?: Record<string, unknown>;
+}
+const { lang, title, description, image = '/og-default.jpg', canonical, altHref, type = 'website', jsonLd } = Astro.props;
+const dir = lang === 'he' ? 'rtl' : 'ltr';
+const site = Astro.site?.toString().replace(/\/$/, '') ?? 'https://blog.aibriefing.dev';
+const url = canonical ?? new URL(Astro.url.pathname, site).toString();
+const other = altHref ?? altLangHref(Astro.url.pathname, lang);
+const s = t(lang);
+---
+<!doctype html>
+<html lang={lang === 'he' ? 'he-IL' : 'en-US'} dir={dir}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={url} />
+    <link rel="alternate" hreflang={lang === 'he' ? 'en' : 'he'} href={new URL(other, site).toString()} />
+    <link rel="alternate" hreflang={lang} href={url} />
+    <link rel="alternate" type="application/rss+xml" title="AI Briefing Blog" href={lang === 'he' ? '/rss.xml' : '/en/rss.xml'} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content="AI Briefing Blog" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={url} />
+    <meta property="og:image" content={new URL(image, site).toString()} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content={lang === 'he' ? 'he_IL' : 'en_US'} />
+    <meta name="twitter:card" content="summary_large_image" />
+    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap-wide bar">
+        <a class="brand" href={lang === 'he' ? '/' : '/en/'}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="6" fill="#4f46e5"/><path d="M7 16l3-8 3 8M8.5 13h3M16 8v8" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          AI Briefing <span class="tag">{s.blog}</span>
+        </a>
+        <nav class="nav">
+          <a class="hide-sm" href="https://aibriefing.dev/">{s.dailyBriefing}</a>
+          <a class="hide-sm" href="https://aibriefing.dev/about/">{s.about}</a>
+          <span class="lang-toggle" dir="ltr">
+            <a href={lang === 'en' ? other : Astro.url.pathname} class={lang === 'en' ? 'on' : ''}>EN</a>
+            <a href={lang === 'he' ? Astro.url.pathname : other} class={lang === 'he' ? 'on' : ''}>עב</a>
+          </span>
+        </nav>
+      </div>
+    </header>
+    <slot />
+    <footer class="site-footer">
+      <div class="wrap-wide" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <span><a href="https://aibriefing.dev/">aibriefing.dev</a> · {s.footerLine}</span>
+        <span><a href={lang === 'he' ? '/rss.xml' : '/en/rss.xml'}>RSS</a> · <a href="https://aibriefing.dev/about/">Koby Almog</a></span>
+      </div>
+    </footer>
+  </body>
+</html>

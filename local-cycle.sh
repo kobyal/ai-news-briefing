@@ -232,7 +232,7 @@ else
     # locally; the per-requirement loop ensures one failed dep doesn't take
     # down the others. See commit decb2ff.
     "$PYTHON_BIN" -m pip install --quiet --disable-pip-version-check -r "${req}/requirements.txt" 2>&1 \
-      | grep -v 'x-client-transaction' \
+      | { grep -v 'x-client-transaction' || true; } \
       | tail -3 || \
       echo "  ⚠ ${req} requirements failed (continuing — package may already be installed)"
   done
@@ -312,6 +312,18 @@ echo "  $(basename "$LATEST") → docs/{index, report/${DATE}, report/latest}.ht
 echo
 echo "[3/6] Building docs/data/${DATE}.json (publish_data.py)..."
 "$PYTHON_BIN" publish_data.py
+
+# Audio → S3. GitHub Pages used to serve docs/audio (URLs in the day JSON
+# pointed at kobyal.github.io); retired 2026-09-29, so the MP3s must reach the
+# bucket here. No --delete: the historical days live only on S3 now.
+if aws s3 sync "docs/audio/${DATE}/" "s3://${S3_BUCKET:-ai-news-briefing-web2}/audio/${DATE}/" \
+    --exclude "*" --include "*.mp3" --content-type "audio/mpeg" \
+    --cache-control "public, max-age=31536000, immutable" \
+    --profile "${S3_PROFILE:-koby-personal}" --region us-east-1 >/dev/null 2>&1; then
+  echo "  ✓ audio/${DATE} synced to S3"
+else
+  echo "  ⚠ audio S3 sync failed (players will 404 for today until re-run)"
+fi
 
 # Mirror story-card og:images to first-party S3 + repoint the day JSON at them.
 # 2026-06-27 root cause: this step (scripts/mirror_og_images.py — the replacement
@@ -545,7 +557,10 @@ if [ "$DO_PUSH" -eq 1 ]; then
   # 14 agents — pruned 2026-06-25. Only the published site content (docs/) is
   # committed below. If you ever need a day's raw agent output in git, add it
   # manually for that one day.
-  git add -f docs/ 2>/dev/null || true
+  # docs/audio is gitignored since 2026-09-29 (S3 is the only copy; 4.5GB of
+  # MP3s were what made every push and GH Pages build slow) — keep it out even
+  # with -f.
+  git add -f -- docs/ ':(exclude)docs/audio' 2>/dev/null || true
   # library/events agents persist small state (done-list, per-talk content, event
   # verdicts); their .gitignore keeps media out.
   git add agents/active/library-agent/state agents/active/library-agent/collections agents/active/events-agent/cache 2>/dev/null || true

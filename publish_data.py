@@ -33,7 +33,6 @@ _TLDR_VOICE_EN = os.environ.get("TLDR_TTS_VOICE_EN", "en-US-GuyNeural")
 #   long  (story details)          → edge-tts AvriNeural (free, quality matters less for long-form)
 _GOOGLE_TTS_VOICE_HE = os.environ.get("GOOGLE_TTS_VOICE_HE", "he-IL-Chirp3-HD-Orus")
 _EDGE_TTS_VOICE_HE   = os.environ.get("TLDR_TTS_VOICE_HE",   "he-IL-AvriNeural")
-_GH_PAGES_BASE = "https://kobyal.github.io/ai-news-briefing"
 
 
 def _normalize_he_for_tts(text: str) -> str:
@@ -318,6 +317,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shared.repo_root import agent_dir as _agent_dir  # noqa: E402
 from shared import article_date  # noqa: E402
 from shared.models import OPUS  # noqa: E402
+# Audio URLs point at the site (S3/CloudFront). GitHub Pages retired 2026-09-29;
+# the name is kept because per-story audio helpers take it as a parameter.
+from shared.aws_config import PUBLIC_BASE as _GH_PAGES_BASE  # noqa: E402
 def _out(_name):  # location-independent glob for an agent's JSON outputs
     return str(_agent_dir(_name) / "output" / "**" / "*.json")
 

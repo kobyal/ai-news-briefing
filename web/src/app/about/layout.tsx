@@ -23,6 +23,8 @@ const jsonLd = {
   "author": {
     "@type": "Person",
     "name": "Koby Almog",
+    "image": "https://aibriefing.dev/koby-almog.jpg",
+    "sameAs": ["https://www.linkedin.com/in/koby-almog-56b50714/"],
   },
   "publisher": {
     "@type": "Organization",

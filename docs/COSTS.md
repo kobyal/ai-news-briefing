@@ -34,32 +34,41 @@ Same agents, but `MERGER_VIA_CLAUDE_CODE=1` routes the four Anthropic calls thro
 
 | Agent | What's still paid | Cost/run |
 |-------|-------------------|---------:|
-| merger-agent | — (Opus 4.7 via subscription) | **$0.0000** |
-| rss-news-agent | — (Haiku-tier model via subscription) | $0.0000 |
-| tavily-news-agent | — (Haiku-tier model via subscription) | $0.0000 |
-| perplexity-news-agent | Sonar search only (writer/translator on subscription) | ~$0.12 |
-| adk-news-agent | Google Gemini 2.5 Flash | $0.04 |
-| **TOTAL** | | **~$0.16** |
+| merger-agent | — (Opus 5.5 via subscription) | **$0.0000** |
+| rss-news-agent | — (Opus 5.5 via subscription) | $0.0000 |
+| tavily-news-agent | — (Opus 5.5 via subscription; Tavily search on free keys) | $0.0000 |
+| perplexity-news-agent | research step: Claude Haiku 4.5 via Perplexity web search (writer/translator on subscription) | ~$0.25–0.33 |
+| adk-news-agent | Google Gemini 3.8 Flash + Search grounding | ~$0.03 |
+| linkedin-agent | Apify actor (free plan, $5/month cap) | ~$0.02 |
+| **TOTAL** | | **~$0.30–0.40** |
 
 The `usage_*.json` log records `via=subscription` and `cost_usd=0.0` for these calls — that's how the email's `TOKEN USAGE` panel shows agents as `via=sub` (green) with a `~$X saved` column.
 
-## Month-to-date provider spend
+## Provider balances
 
-Source: `private/dashboard_mtd.json` (gitignored; mirrored to GH secret `DASHBOARD_MTD_JSON` for the daily email).
+The daily email checks every provider **live** via `shared/sources.py` (the source
+registry): usage/limits endpoints where they exist (Tavily per key, Apify, Firecrawl,
+Jina), a tiny real call where there's no balance API (Anthropic API key, Gemini), and
+"balance: console only" where nothing is exposed (Perplexity, Gemini). Spend columns
+(`today $X · 7d $Y`) come from our own `usage_*.json` files. The old hand-edited
+`private/dashboard_mtd.json` is no longer read (it showed an April snapshot as current).
 
-Snapshot taken **2026-04-23** — refresh weekly:
+Snapshot **2026-09-29** (dashboards + live checks):
 
-| Provider | MTD | Notes |
-|----------|----:|-------|
-| Anthropic | $22.77 | AI-Briefing key $15.62 + Claude Code $7.15. $0.54 credits left. Auto-reload OFF. |
-| Google Gemini | $14.50 | ₪51.36 / ₪100 monthly cap. Tier 1 PRO. |
-| Perplexity | $46.55 → projected ~$39 next cycle | After Apr 23 routing fix (writer + translator now hit Anthropic direct, not via Perplexity proxy). $18.56 balance. |
-| xAI | $12.05 (on credits) | Not active in pipeline (Twitter scrape replaces it). $2.95 left. |
-| Exa | $3.02 | 432 searches. Second key (kobytest account) is fresh backup. |
-| **Total MTD** | **~$99** | |
+| Provider | Balance / usage | Notes |
+|----------|-----------------|-------|
+| Anthropic API | $0.00 | Unused in practice — all calls go through the Claude Max subscription |
+| Google Gemini | ₪20.67 / ₪100 monthly cap | Tier 1 |
+| Perplexity | $9.77 left, ~$5.20 / 30 days | |
+| Apify | $0.49 / $5 this month | LinkedIn |
+| Tavily | key #1 1,000/1,000 · #2 8/1,000 · #3 353/1,000 | free Researcher plan per key, monthly |
+| Jina | both keys out of balance (402) | articles still read via no-key mode |
+| Firecrawl | token invalid | backup article reader is down |
+| xAI | $2.22 | parked (X backup) |
 
 ## What changed recently
 
+- **2026-09-29** Provider balances checked live by `shared/sources.py` (email no longer reads `dashboard_mtd.json`). Ingest Lambda retired. Models: Opus 5.5 (subscription), Gemini 3.8 Flash.
 - **2026-04-27** Per-requirement pip install (CI + `local-cycle.sh`). The old single batched `pip install -r a -r b -r c` was atomic — if one git+https URL transiently 404'd, the whole batch rolled back, silently skipping `google-adk` / `firecrawl-py` / etc. ADK silently produced 0 items for ≥1 day before the cause was found. Splitting per-file fixes the root cause; per-cost impact zero, but per-run cost reliability went up.
 - **2026-04-26** Lambda CDK redeploy passes `secondary_vendor` through; the old `local-cycle.sh` step that re-uploaded `docs/data/<date>.json` to S3 (and broke the website's `{date, stories}` shape) is now removed.
 - **2026-04-24** Subscription path live: `MERGER_VIA_CLAUDE_CODE=1` routes Anthropic calls through `claude -p`. The maintainer's daily run is now zero-Anthropic-spend; CI sees a marker file and skips the redundant cron run within a 5-hour window.
@@ -86,20 +95,7 @@ Snapshot taken **2026-04-23** — refresh weekly:
 
 3. **Daily / 7-day aggregation** — `send_email.py::_cost_by_provider_since()` sums across every `usage_*.json` whose directory is ≥ the requested start date. Powers the `today $X · 7d $Y` columns in the paid-API email section.
 
-4. **Monthly dashboard** — `private/dashboard_mtd.json` (local) and GH secret `DASHBOARD_MTD_JSON` (CI) carry user-refreshed numbers from each provider's dashboard. Only Anthropic has a programmatic admin API (requires `sk-ant-admin-...` key); the others are copy-pasted manually weekly.
-
-## How to update MTD numbers
-
-```bash
-# Edit private/dashboard_mtd.json with fresh values from each provider dashboard
-vim private/dashboard_mtd.json
-
-# Sync to CI so the next daily email uses them
-gh secret set DASHBOARD_MTD_JSON --repo kobyal/ai-news-briefing < private/dashboard_mtd.json
-
-# Re-trigger the email (otherwise waits for tomorrow's run)
-gh workflow run email_only.yml
-```
+4. **Live balances** — `shared/sources.py::check_all()` probes each provider during the email step (see "Provider balances" above).
 
 ## Levers if you need cheaper
 

@@ -1,0 +1,1092 @@
+[0:00] Daisy Ruhl- Hey, how's everyone doing today?
+[0:11] Having a good conference so far?
+[0:12] Yeah.
+[0:13] I'm the last talk of the day, so I really
+[0:16] have to bring the energy if everyone wants to stay awake.
+[0:19] Thanks for sticking around to come to my talk.
+[0:22] I really appreciate it.
+[0:25] My name's Daisy.
+[0:26] I work at Anthropic.
+[0:29] I work on this side project that turned into something big
+[0:35] called Cloud Code.
+[0:37] I don't know how it, who in here has used Cloud Code before?
+[0:42] Holy crap, that's a lot of people.
+[0:44] OK.
+[0:46] That's really exciting.
+[0:48] But I will get to go through some of the early slides
+[0:51] first a little fast.
+[0:54] And we'll get to some of the bigger later slides.
+[0:57] That's really cool.
+[0:59] Yeah, I got the amazing privilege of joining Anthropic
+[1:05] right before Cloud Code went out.
+[1:08] It was actually an internal product called Claude CLI
+[1:13] that I first contributed to.
+[1:14] And literally the day after I contributed my first PR,
+[1:18] the name was changed to Claude Code, which I think
+[1:23] was a much better name for marketing than Claude CLI,
+[1:25] even though us silly engineers thought CLI
+[1:28] was going to be a much better name.
+[1:32] In that time, I got to lead the design and implementation
+[1:34] of plugins and agent teams.
+[1:38] A few other small features here and there,
+[1:39] but plugins especially have been my passion,
+[1:43] both in terms of building community
+[1:44] and building customizability.
+[1:46] I'm really interested in full-scale software
+[1:49] engineering, not just agentic programming.
+[1:52] And I hope you'll understand the difference between those two
+[1:54] at the end, but I really want people
+[1:56] to be able to do their jobs with this and not just
+[1:59] build cute prototypes.
+[2:03] My background is in programming languages.
+[2:05] I was involved in the C++ Standards Committee
+[2:08] for almost a decade.
+[2:10] I was a chair for a couple of years.
+[2:13] I've been very deep in the trenches
+[2:16] of difficult programming.
+[2:18] I used to work on parallel and distributed programming
+[2:22] models for supercomputers, so trying to figure out ways
+[2:25] to make it easier for people to write code that needed
+[2:28] to scale up to an entire data center.
+[2:32] And now I'm working on Cloud Code for kind of the same reasons.
+[2:36] I think it's I want non-technical people
+[2:40] and semi-technical people to be able to build real production
+[2:44] software.
+[2:44] And I think that this talk is more
+[2:48] about figuring out ways to enable that for people around you.
+[2:52] Software engineers, more and more,
+[2:54] are going to be about software engineering more and more
+[2:57] is going to be about enabling that.
+[3:00] So yeah, where we're headed here.
+[3:04] Well, I have a section that is about getting
+[3:06] on the same page about what agentic programming even is.
+[3:09] But I guess everyone in here has used Cloud Code.
+[3:12] So that is, we'll see how that section goes.
+[3:17] If I get a lot of nods, I'll go really fast
+[3:19] and I'll spend more time on the later stuff.
+[3:23] We're going to talk about customization of Cloud Code,
+[3:25] why do you need to do it, how the context window
+[3:29] is the basic primitive that you are working with when
+[3:33] you do this customization.
+[3:35] Then we're going to dig into how plugins are created
+[3:39] in Cloud Code, what they're composed of,
+[3:42] how do you build out this knowledge base in your monorepo
+[3:47] or in your real large-scale software engineering
+[3:49] environment that enables Claude to act as a software engineer.
+[3:55] And I'll talk through a few of the ways that we actually
+[3:58] run Claude code within Anthropic and even just on the Claude code
+[4:03] team and kind of what's coming next.
+[4:07] So yeah, let's start a little bit basic.
+[4:11] Some of you may understand this.
+[4:12] I promise you it's going to get more technical.
+[4:15] But what is the difference between a chatbot and an agent?
+[4:20] So when we first started to get LLMs working,
+[4:25] we were building chatbots with them.
+[4:26] And the interaction looked something like this.
+[4:30] It was the human turn, and then the model says something,
+[4:34] and then you go back to the human turn.
+[4:36] And then the model says something,
+[4:38] and you go back to the human turn.
+[4:39] In 2024, we came up with this thing called tool calling,
+[4:45] which allows the model to basically just ask the computer
+[4:49] to do something.
+[4:50] I'll go through the specifics of what that looks like,
+[4:52] but probably most of you have seen this happen.
+[4:55] And at first, it was just kind of like the model
+[4:57] could go do something, could go get the output,
+[5:00] and then could make a decision based on that,
+[5:01] and then go back to the human.
+[5:03] And kind of we slowly started adding more and more tools,
+[5:07] Like, it could do a second tool call based
+[5:10] on the first tool call results.
+[5:11] And then it could do a third one.
+[5:13] And at some point, we crossed over a boundary
+[5:15] where we decided we needed a new name for the thing
+[5:18] and started calling them agents.
+[5:20] I think this is the easiest way.
+[5:22] Like, I don't like the debate of what's
+[5:25] an agent or the discussion.
+[5:27] It's a very buzzwordy thing.
+[5:29] But this is basically what led to the term agent,
+[5:32] is that you went from no tool calls to one tool call
+[5:36] to a few tool calls to at some point it's got enough autonomy
+[5:39] that we're going to call it an agent.
+[5:43] And coding agents or agentic programming harnesses
+[5:48] or whatever term you want to use for them,
+[5:51] like Cloud Code, like Codex, like Cursor,
+[5:56] are basically agents where the tools we gave them
+[5:58] are like normal programming tools, shell commands, file
+[6:03] edits, CI-related tools, the ability to run code,
+[6:08] the ability to compile code.
+[6:11] I mean, all of those kind of fell into shell commands.
+[6:13] But it's like we're basically giving the agent the ability
+[6:15] to do things that a programmer can do.
+[6:17] And I'm saying programmer, not software engineer.
+[6:20] Because we're going to talk about what the difference is there
+[6:22] or the gap is there.
+[6:23] But tool calls are shockingly simple.
+[6:28] When I first started getting onboarded into this whole AI
+[6:31] world from C++ world, I was kind of shocked
+[6:37] at how primitive it all is.
+[6:39] It's like, literally, you tell the model
+[6:42] that it can write JSON.
+[6:44] And something will happen when it writes a certain JSON.
+[6:48] And then you give back the results
+[6:51] of doing the something to the model
+[6:54] and stick it in the context window right after that.
+[6:57] And that's the entire thing.
+[6:59] This is how the model runs something in Bash,
+[7:02] is it says that the tool it wants to use is Bash.
+[7:05] Here's the command.
+[7:07] Then the harness goes and runs the command,
+[7:11] and then puts the output in a tool result block.
+[7:14] Right?
+[7:16] It's super easy to get your mind around,
+[7:19] and everything in agentic harnesses
+[7:23] is built around this idea.
+[7:24] And the ability to act on this output
+[7:31] and then create another tool use that is based on it
+[7:35] and then continue that loop is what an agent is.
+[7:39] And everything is built around that.
+[7:42] The big workhorse that really makes coding agents work
+[7:46] is the edit tool.
+[7:48] And the edit tool, this is literally
+[7:52] The schema for the edit tool that is in Cloud Code is,
+[7:58] so by the way, Cloud Code made all of my slides.
+[8:01] So when I wanted this, I said, hey,
+[8:03] can you put a tool call from your system prompt into here?
+[8:09] Yeah, so it has to give the old string,
+[8:13] gives the file name, the old string, and the new string.
+[8:17] And it's like, yeah, it's a find and replace.
+[8:21] There's no cursor, no selection, no quoting.
+[8:24] Old string has to match byte for byte.
+[8:26] If there's multiples of old string,
+[8:28] it either has to say up front that I expect there
+[8:30] to be multiples, or it just fails.
+[8:33] These are really, really primitive tools.
+[8:35] And I think there's a lot of iterating
+[8:37] to be done in that space that I'll talk about later.
+[8:40] But I think, yeah, just to give you
+[8:42] some idea of where we're coming from,
+[8:45] one of my favorite things to do with this
+[8:47] is since Claude made these slides, the tool call
+[8:50] to make the previous slide look like this,
+[8:53] where it is writing JSON that contains some JSON
+[8:57] that references an old slide.
+[9:00] The models are shockingly good at this.
+[9:03] Like, not making a single token mistake in this entire thing
+[9:09] is pretty shocking to me, at least.
+[9:11] The mental model that I have about how agents work
+[9:15] and what they're good at and what they're bad at
+[9:17] really still doesn't even jibe with this.
+[9:19] I'm like, that is not something a human could do character
+[9:23] for character if they had to.
+[9:25] So this gives you some nuance into what the agent is doing,
+[9:31] what the agent might be good at, what it might not be good at.
+[9:33] It had no trouble producing this.
+[9:35] No errors, no multiple attempts.
+[9:38] Probably the last time I saw a string replace error
+[9:42] or an edit tool error was something like, I don't know,
+[9:46] last February of 2025, or maybe April of 2025.
+[9:53] The models have progressed a lot past that,
+[9:56] because this is an easy thing to train.
+[9:59] Yeah.
+[10:02] And then you have these increasingly,
+[10:04] because it can handle this complexity,
+[10:07] you can make the tool calls increasingly complex.
+[10:10] You can make it be able to do more and more complex things.
+[10:13] And that leads to these longer time horizon tasks being possible.
+[10:19] And there's this chart from an AI research organization called
+[10:25] Meter that some of you have seen this before.
+[10:28] Give me some idea.
+[10:29] OK, a few people.
+[10:32] As to how it's been called the Moore's Law of agentic,
+[10:39] I don't know, the Moore's Law of agents or something,
+[10:41] is that roughly speaking, the time horizon for the task
+[10:46] that models can do with a 50% success rate
+[10:50] is doubling about every four months.
+[10:54] You'll see that this kind of stops
+[10:56] at the beginning of this year.
+[10:58] Now two model versions later, Opus 4.7 and 4.8.
+[11:02] And it's because the Institute actually
+[11:04] decided that the error bars are too big as to what counts
+[11:08] as a 16-hour task at this point.
+[11:10] And so this chart is almost no longer useful.
+[11:14] But it's been a pretty steady trend
+[11:17] over the past three years.
+[11:19] I don't know about putting a 2019 dot here,
+[11:23] but 2022 through 2026.
+[11:25] This gives you an idea of where we're headed
+[11:28] and what the trend looks like.
+[11:31] And so you can start by assuming
+[11:36] that this is gonna plateau at some point.
+[11:37] It will.
+[11:38] But I think that if you had, back in the 80s or 70s,
+[11:43] bet on Moore's Law plateauing, you'd
+[11:47] be in a very different spot than if you hadn't.
+[11:50] So I think it is worth considering the possibility,
+[11:53] at least, that this trend continues at least
+[11:54] for another year or two.
+[11:57] And exponential trends are pretty crazy
+[12:01] in terms of the way that they change how we work.
+[12:06] And this is starting to show up in hockey stick-like charts.
+[12:10] This is from April.
+[12:13] Mozilla Foundation put out a chart
+[12:17] of the security vulnerabilities, security bug fixes
+[12:22] that they'd shipped in the month of April with access
+[12:26] to our latest model.
+[12:28] And it was literally more than they'd
+[12:31] had fixed in the past 15 months combined.
+[12:36] And that's, keep in mind, it's not
+[12:38] like they didn't have AI tools in the past 15 months.
+[12:41] This is the difference between the most recent AI tools
+[12:46] and the ones that they had in the past 15 months.
+[12:50] And yeah.
+[12:53] This gives you some idea of the practical uses here.
+[12:57] This is fixing real bugs in software.
+[12:59] and I don't know about you, fixing bugs in software
+[13:03] is useful work, I would say.
+[13:05] So when somebody tells me, oh, I don't
+[13:08] know that agents can do useful work,
+[13:10] I like to point them to something like this.
+[13:12] What if you never had to fix a bug in your software ever again?
+[13:16] I don't know anyone who likes recreational debugging.
+[13:22] I like making things.
+[13:24] And debugging is a thing that I ended up
+[13:26] having to do because I like making things.
+[13:29] So for the rest of this talk, I'd like to consider
+[13:31] the hypothetical of what does engineering look like
+[13:36] if and when agents can write better code than you?
+[13:42] Keep in mind, I am a person who used to give talks
+[13:45] on C++ metaprogramming minutiae.
+[13:49] I was so proud of how good of a coder I was.
+[13:54] And the past year and a half at Anthropic
+[13:57] has really convinced me that it doesn't matter.
+[14:03] And I'm not going to necessarily sit here
+[14:06] and try and convince you that this hypothetical will become
+[14:09] a reality.
+[14:10] Totally valid opinion if you don't think
+[14:12] that it's worth contemplating.
+[14:16] But if you do, I'd like to build on that hypothesis.
+[14:19] What does agentic programming look like?
+[14:21] What does harness design look like?
+[14:22] What does context engineering look like in a way
+[14:25] we can build this into something that can really manage monorepo-sized software projects.
+[14:33] Cloud Code just happens to be the one I build in my day job. Copilot, Cursor, Codex, all of this
+[14:40] information should transfer. I'm an engineer. I'm not here to give an advertisement. I'm here to
+[14:48] to give an academic talk about the discipline
+[14:50] of agentic software engineering.
+[14:54] So if you hear me say Claude a bunch of times,
+[14:57] meaning like an LLM, I'm sorry,
+[15:00] that's just because I'm used to saying that in my day job,
+[15:02] but I don't actually mean that, right?
+[15:04] I really am interested in the direction
+[15:06] that software engineering is headed.
+[15:09] Okay, so let's talk about why do you even need
+[15:15] to customize the model in the first place, right?
+[15:17] If we are headed towards AGI, quote unquote,
+[15:19] it's generally intelligent.
+[15:21] Why do I need to tell it anything at all?
+[15:24] And there's three sub points here.
+[15:26] It needs to have access to the things
+[15:28] it needs to access to do its job.
+[15:30] It needs to know about all of the institutional knowledge
+[15:35] that's available to you or to any other employee
+[15:38] of your company.
+[15:39] And it has to have the tooling to get all of that information
+[15:43] into the context window correctly.
+[15:46] So we're going to talk through what that looks like.
+[15:48] But the fundamental thesis that I'd
+[15:50] love for you to walk away with from here
+[15:53] is that if Claude can't do everything you can do,
+[15:56] it can't do your job with you.
+[16:01] Out of the box, it really only sees a repo and a shell.
+[16:05] We don't even let it go out of the folder
+[16:07] that you started in by default.
+[16:09] And there are good security reasons for that.
+[16:12] But I don't know anyone who's a professional software
+[16:15] engineer who's like, I am going to spend my entire day
+[16:18] without looking at any information anywhere
+[16:21] that's not in this folder.
+[16:25] It is kind of fine for 0 to 1 projects.
+[16:28] I think this is part of the reason
+[16:29] why people see so much more success with rapid prototypes
+[16:34] and 0 to 1 projects.
+[16:35] Part of it is that that is really easier.
+[16:38] Even if you're a regular software engineer,
+[16:40] that's a human software engineer,
+[16:42] that is an easier thing to do.
+[16:44] But part of it is that the constrained context,
+[16:47] the boundaries we put it in,
+[16:50] negatively impact the agent even more.
+[16:53] It's rarely enough to do high quality software engineering
+[16:57] at really large scales.
+[16:59] And I mean, another thing about this
+[17:02] that I don't think people think about enough
+[17:04] is the fact that most professional software engineering
+[17:07] doesn't live in the source code, right?
+[17:09] Source code is about programming.
+[17:10] Software engineering is about much, much more
+[17:13] than just programming, right?
+[17:16] So, like giving Claude or giving your model access
+[17:20] to the things you have access to in order to do your job
+[17:24] will help it do your job or do your job with you better.
+[17:30] Like, we are really not about trying
+[17:33] to replace ourselves necessarily.
+[17:36] We are about trying to multiply ourselves, right?
+[17:38] And there's some subtlety there that in terms of like,
+[17:43] how scary the impact is on society that I won't go into, but for the sake of an academic
+[17:48] talk, let's talk about, I think every one of us would like to have five of us at our
+[17:54] company and would feel very good about the productivity that you get out of that.
+[18:01] Where does your work actually live?
+[18:05] Where are most of the decisions made?
+[18:07] The decisions aren't actually made in the source code unless you have a very different
+[18:11] software engineering environment than the one I'm used to, at least. You have a team chat,
+[18:16] you have CI where you find out whether or not things work, you have dashboards that show you
+[18:23] what's going on in production, you have internal docs, design docs, things like that. The tip that
+[18:30] I give people, and it's actually an experiment worth trying, although depending on how much
+[18:36] time you have for this kind of thing, try doing a full day of work without leaving the terminal.
+[18:45] And if you can't do your full job, then Claude can't do your job with you. If you get a Slack
+[18:53] message and you can't respond to that Slack message by telling Claude what to say for you,
+[18:59] then Claude can't answer that Slack message for you or Claude can't act on the information in
+[19:05] that thread, right? If you have a CI failure and you're like copy-pasting the CI failure
+[19:12] into the prompt, that's something you're doing for it and it can't do for you anymore.
+[19:20] Yeah. So the second aspect of this is knowledge in general. And when I say knowledge, there
+[19:28] is some aspects of this that are like, oh, this just wasn't in the training data. But
+[19:34] But I think people tend to over-access, oops, people tend to over-index on wasn't in the
+[19:41] training data.
+[19:43] And the reality is that there are things that are just like can't be trained into the model
+[19:48] because different companies do them differently, right?
+[19:51] Like your code base's conventions are something that the model needs to know about but can't
+[19:58] be trained into the model because different companies do different things different ways.
+[20:02] Your institutional memory, things that your team tried two quarters ago and never saw
+[20:08] the light of day.
+[20:09] Even if we had a perfectly trained model, we would need a way for the model to access
+[20:12] this information.
+[20:13] It's not even public.
+[20:17] Things that changed last week, right?
+[20:19] Models have a training cutoff.
+[20:23] Things that are just yours, internal APIs, internal vocabulary, definitions for terms
+[20:28] that your code base uses and that your design docs use
+[20:32] and how to find those definitions.
+[20:36] So customization is...
+[20:38] Knowledge customization is closing this gap
+[20:41] between what the model knows inherently
+[20:43] and what your team knows.
+[20:46] The fancy term for this, if you want to sound fancy,
+[20:49] is called in-context learning,
+[20:51] which is a really fancy term that basically means text files.
+[20:56] So the model weights are frozen at the point at which we release the model, right?
+[21:03] You're not going to be changing those.
+[21:05] And especially recently with the wind down of fine-tuning interfaces
+[21:10] and fine-tuning APIs, there's just less and less fine-tuning out there.
+[21:15] Almost all of the customization that you're going to do happens in text space,
+[21:20] which is actually really cool if you think about it, right?
+[21:22] Because, like, programmers know how to control text, right?
+[21:26] And so this gives you a lot of control over how you can improve the model
+[21:32] without having to know anything about how LLMs work in terms of weights.
+[21:37] You don't need to know any of the math or anything like that.
+[21:39] You know how to control text.
+[21:40] You can put text into the model, and you get different output.
+[21:44] It's not deterministic, but you can improve on the output of the model
+[21:48] based on what you put into it.
+[21:52] Yeah.
+[21:53] Yeah. Tooling. So we already talked about what tool calls look like. But I think many
+[22:01] of you will have noticed that this is, like, incredibly primitive, right? It's, like, literally
+[22:08] Claude is roughly using — who here has used ed, the Unix utility ed, to, like, edit anything
+[22:16] before? Who here knows what it is? Okay. Everyone, I assume, knows VI, right? The bottom line
+[22:29] of VI, if that was the entire editor, that's ED. So if you had to do the entirety of your
+[22:34] editing by like find and replace, that is roughly where agentic code is today.
+[22:48] And no one has really figured out what does an IDE for Cloud look like?
+[22:52] What does real-time feedback for the model look like?
+[22:57] The gap between ED or VI, like raw VI, and VS code
+[23:04] is the opportunity here.
+[23:05] And that's all happening in text space, which
+[23:08] is very exciting.
+[23:11] We're not feeding things back into the weights
+[23:14] in order to get the model to stop making mistakes
+[23:17] while it's programming.
+[23:17] We are actually just feeding text back into the model.
+[23:21] So the example I like to give is what
+[23:24] red squigglies look like for agents?
+[23:27] How does an agent know that it's done something wrong
+[23:29] in a tool call?
+[23:31] Well, how do humans know that they've
+[23:32] edited something wrong?
+[23:34] If this variable doesn't exist or isn't
+[23:37] valid to reference in this context,
+[23:41] you get a red squiggly.
+[23:43] But obviously, models get raw text.
+[23:46] They don't get rich text like this.
+[23:49] And they don't get feedback as they type.
+[23:52] So we have to add that.
+[23:54] The mechanism we have for that in Cloud Code
+[23:57] is called a post-tool-use hook, which
+[24:00] is when Cloud does the tool call that we showed earlier,
+[24:05] as part of the tool response block,
+[24:08] we will tack on some information that you give us.
+[24:13] And that information can look like this.
+[24:16] But this is already something you know how to produce.
+[24:19] Your code base already knows how to produce this
+[24:21] because you used to produce it in order
+[24:25] to mouse over this red squiggly.
+[24:28] That text exists.
+[24:30] It's a nudge right at the moment of the mistake,
+[24:33] not when the model goes back and compiles later
+[24:36] and has to think about, oh, what did I actually mean there?
+[24:39] Using up more tokens.
+[24:43] And there's lots of things you can put here, right?
+[24:45] Type checking, linting.
+[24:48] You can flag things that you were trying to get it to do
+[24:53] in your cloud.md, but it didn't do.
+[24:55] We're going to talk about the mechanisms
+[24:58] that we provide for this later.
+[25:00] But really, the fastest way to make an agent better
+[25:04] at your code base isn't necessarily a smarter model.
+[25:06] It's a tighter feedback loop.
+[25:08] It's telling it that it's made a mistake sooner
+[25:10] rather than later.
+[25:12] Most of these are scripts you already have.
+[25:14] Another perspective on this is that for those of you who've worked in developer tooling before or developer experience before, there really are two kinds of tools.
+[25:27] There's ones that kind of compensate for a lack of intelligence and there's ones that scale up with intelligence.
+[25:34] This is for humans or for models or for whatever, right?
+[25:37] you can give a junior engineer something that stops them from editing certain files
+[25:44] or stops them from changing certain things or running certain things,
+[25:48] and at some point, they will become senior enough that you trust them to do something, right?
+[25:52] And you have to give them a new set of tools for that.
+[25:55] But if you can have a tool that gives a nudge or that gives a reminder,
+[26:01] that scales across because, you know, senior engineers still make these mistakes from time
+[26:07] to time, but they also know when it's not a mistake, right? So these, like, you want
+[26:12] to focus on being, well, being AGI-pilled, sorry, loaded buzzword, but it really is focusing
+[26:21] on building the second kind of tools for your agents, right? Thinking about not just what's
+[26:26] going to help the model now, but also what's going to help the model two generations from
+[26:32] now when it is better or stronger in some way.
+[26:37] Okay.
+[26:41] The context window is a box.
+[26:43] The context window is this space that you have to do this customization, right?
+[26:48] The context window is where you can put your text.
+[26:53] Over the past year, the capabilities of models have kind of exploded.
+[26:58] We went from like, auto-complete, fancy auto-complete, to like, kind of long time horizon autonomous
+[27:05] work.
+[27:06] But like, the context window sizes have not changed.
+[27:11] Who's comfortable with the idea of a context window?
+[27:14] Okay, I think that's most people.
+[27:17] I will go through it in more detail.
+[27:19] but it is just the set of tokens that a model can see
+[27:23] in order to predict the next token.
+[27:26] And that's a limited, fixed-sized thing.
+[27:30] And context windows really haven't changed that much.
+[27:33] The first one million token context windows
+[27:35] were late 2024.
+[27:39] And the state-of-the-art frontier models
+[27:42] were one million token models in February of 2025.
+[27:48] And right now, the state-of-the-art frontier models
+[27:51] are roughly one million token context windows.
+[27:55] That hasn't scaled up nearly as quickly
+[27:57] as the capabilities of the model.
+[28:00] This means that as the tasks grow,
+[28:02] you have to get smarter and smarter and smarter
+[28:04] with what you actually put into this context window.
+[28:08] Your entire, like we figured out very early on
+[28:11] that you can't just throw the entire code base in there.
+[28:14] But like documentation and internal code base
+[28:22] and reminders and all of these other things,
+[28:24] you have to cram this all into the context window.
+[28:28] So it's becoming a full-time engineering discipline.
+[28:33] And I think there is definitely an aversion
+[28:36] to the title context engineer that I see around a lot
+[28:41] from software engineers.
+[28:43] I kind of want to assert that these are the same thing.
+[28:47] As agents get better and better at writing software,
+[28:51] doing real software engineering, teaching them
+[28:55] how to do it is going to become the main discipline
+[28:59] of software engineering.
+[29:01] And figuring out how to get good at that.
+[29:02] Secretly, it's always been the main discipline
+[29:05] of software engineering.
+[29:05] It's just that you had to get to a senior enough level
+[29:08] where your full-time job was making sure
+[29:11] that more junior engineers can do their jobs.
+[29:14] Now it's just that they're all agents.
+[29:17] And you have to be able to do it at every single level.
+[29:22] So yeah, the context window is where
+[29:24] we have to put everything that contributes
+[29:26] to the prediction of the next token.
+[29:28] Everything that Claude can think about in a given token
+[29:34] prediction or when it's creating a tool call,
+[29:36] when it's making an edit, has to fit into this space.
+[29:39] You have your system prompt, your tool definitions,
+[29:43] plotted MD, skills, any files you've read,
+[29:46] any tool results, all of that.
+[29:48] And the more stuff you put up here up front,
+[29:51] the less room you have to do actual tasks for their back.
+[29:55] So every customization competes with the space to do work.
+[30:01] Your whole code base doesn't fit.
+[30:04] And you can't just kind of naively dump everything
+[30:07] into the box.
+[30:08] You can, but that's not going to perform nearly as well as very carefully selecting the relevant context.
+[30:16] The analogy I like to use for this is that it is like running NPM on an Arduino.
+[30:24] When you are running a package manager on your computer, you can do all kinds of things to deal with traditional management problems.
+[30:36] If you have diamond problems, diamond dependency problems in PM, you can literally just import
+[30:45] two different versions of the library to resolve it.
+[30:47] You can't do that when you're customizing a context.
+[30:51] You have to decide what is the more relevant piece of information intelligently and put
+[30:56] that into the context and leave out the things that aren't relevant.
+[31:01] So the customization really does have to be,
+[31:03] don't pay for what you don't use.
+[31:05] Zero overhead principle.
+[31:08] Or you're going to run out of tokens very, very quickly.
+[31:12] There's one more constraint that I actually really
+[31:15] want to go over, because I don't see this in a lot of talks
+[31:19] about this kind of thing.
+[31:20] And that is the KV cache.
+[31:22] The way that next token prediction works in modern LLMs.
+[31:29] This will probably change at some point,
+[31:31] but it's been about to change for a year and a half now
+[31:35] or two years now, and I still haven't
+[31:38] seen a lot of progress on the problem space.
+[31:42] It's a lot, lot cheaper if all of these tokens
+[31:47] are the same as the previous time you
+[31:50] try to predict these tokens.
+[31:53] So in computing in general, when you're
+[31:56] looking at the shape of problem we've
+[31:57] been talking about so far, where you have relevant information
+[32:01] and less relevant information and a really confined space
+[32:04] to put all of that into, you do something that
+[32:07] looks like an LRU cache.
+[32:09] This is how CPU caches work.
+[32:11] This is how web caches work.
+[32:15] This space has been explored.
+[32:17] But the problem is that because of this constraint where, like,
+[32:24] all of the things before your token have to be the same
+[32:30] in order to predict the next token,
+[32:34] like this prediction costs 10 times more than this prediction.
+[32:39] And if you do that every tool call,
+[32:42] you will end up with a massive, massive token spin.
+[32:45] So very early on, if I understand correctly at least,
+[32:50] Cursor used to do this with Cursor rules.
+[32:52] They would kind of swap them in and out
+[32:54] based on what was the most relevant rule
+[32:56] for the particular thing that it was working on,
+[32:58] and then it would evict an old rule that wasn't related.
+[33:02] And very quickly, they found out that that costs a whole lot.
+[33:09] And so this problem is more difficult and more nuanced
+[33:13] than just doing an LRU cache of the relevant information
+[33:17] and calling it a day.
+[33:20] So that's the other constraint here
+[33:23] that's difficult to explain without going deep on that.
+[33:26] But the caching of the prediction mechanism
+[33:31] enables this to be very, very cheap, whereas this whole thing
+[33:35] is very expensive.
+[33:40] All right, so I'm going to dive into the plugins
+[33:42] are the mechanism that we provide for customization,
+[33:44] especially at enterprise scale of Cloud Code.
+[33:49] And I want to talk through each of the plugin abstractions
+[33:54] that you can build plugins out of and talk about what
+[33:57] happens when you throw this into a monorepo
+[34:00] with 100 million lines of code.
+[34:04] Or if you're not a monorepo company,
+[34:06] what happens when you have 5,000 different repos that
+[34:10] all have information that you need
+[34:12] to know in order to do something in one or two of those repos?
+[34:15] And so the question there right is, does it scale?
+[34:20] If you have 5,000 different repos and they all want to provide three or four different skills to explain how to work with their own part of the repo,
+[34:30] what happens? What happens if each one of them provides their own MCP server?
+[34:36] So we're going to walk through that in the context of four specific plugin primitives.
+[34:42] primitives. There are other plugin primitives, but a lot of the logic kind of transfers there.
+[34:47] Anyway, we'll dive in. Who here knows what MCP is? Okay, I think most people have heard of it,
+[34:54] but I don't think most people have thought about it in terms of customizing agentic coding
+[35:00] environments. So if you are going to build some integration with Anthropic in general,
+[35:10] you probably should send out a public MCP server, right?
+[35:16] Or you should put out an MCP server for that integration.
+[35:18] But this is about how do you customize your code base
+[35:22] to interact with other developers at your company?
+[35:25] MCP is this protocol that exposes,
+[35:28] it basically just adds more schemas for tool calls
+[35:32] to your system prompts, right?
+[35:35] It gives a way of doing that.
+[35:38] It's a JSON-based protocol.
+[35:41] It gives a way, like a very lightweight from the client
+[35:45] side way of the client to say, here, I want extra tools
+[35:51] to deal with this thing.
+[35:54] It is transport agnostic.
+[35:56] It has a lot of nice properties for consumers
+[35:59] that are not necessarily great for software engineers.
+[36:01] They can be, but pretty rarely.
+[36:04] So when is it the right tool?
+[36:06] Yeah, if you need to design this for any client,
+[36:07] needs to work with a chat bot.
+[36:11] The server side owns the authentication,
+[36:14] which is a really big portability win.
+[36:16] But then you have to actually set all of this up
+[36:18] to work in any environment.
+[36:20] And the fact is that you're not programming in any environment.
+[36:25] You are programming in the development environment
+[36:27] of your company.
+[36:30] If you already have a command line interface for something,
+[36:32] it's probably a lot better to create
+[36:35] a skill that explains how to use the CLI for your product.
+[36:41] So does it scale?
+[36:41] This is what we're looking at.
+[36:43] What happens if you have 1,000 MCP servers in your monorepo?
+[36:48] And you try and just load them all into context.
+[36:51] Well, every tool has a name, a description,
+[36:54] and a schema that sits in the system prompt
+[36:57] so that the model knows how to use it.
+[36:59] If you have 20 MCP servers and they each have 15 tools,
+[37:02] that ends up with a context window that's mostly full of tool
+[37:08] descriptions.
+[37:08] And you have very little room to work, right?
+[37:12] So no, it doesn't scale without help.
+[37:15] What we have been working on recently
+[37:18] is a thing called Tool Search, which loads the names of all
+[37:22] of the tools up front.
+[37:23] So it doesn't still completely scale,
+[37:26] because if you have, I don't know, literally a million tools,
+[37:30] then you're going to use your entire context.
+[37:32] But it scales a little better than name plus description
+[37:36] plus schema.
+[37:37] So we give the names, and then we give Claude a tool
+[37:41] to search for tools, which, yeah, turtles all the way down.
+[37:47] But the problem is that there's not a lot of free lunch here.
+[37:53] The more descriptive name you give,
+[37:57] or especially if you include some subset of the description,
+[38:02] the more likely Claude is to remember to search for the tool.
+[38:07] And if you don't give much, if you have a random tool
+[38:12] named query, then Claude will very rarely search for it
+[38:17] at the right time.
+[38:19] So you do still have to think about,
+[38:21] how many MCP servers am I going to give?
+[38:23] If you use Claude code, you should
+[38:24] be thinking about, how many MCP servers
+[38:26] am I giving it access to?
+[38:28] Because that is going to dilute its ability
+[38:32] to find the tools it needs to do its job.
+[38:35] So it does scale up a little bit with tool search, but not great.
+[38:42] Who knows what skills are?
+[38:45] OK, cool.
+[38:47] Skills are just folders, folders with a markdown file in them.
+[38:52] The basic idea here is that a skill is a lazy system prompt.
+[38:58] It has a bunch of instructions, and it
+[39:01] has some sort of summary of those instructions
+[39:03] that the model can use to decide when it wants to expand
+[39:06] this part of the system prompt.
+[39:09] This is how a lot of scaling, you have a small thing,
+[39:14] and then you can turn it into a big thing on demand.
+[39:16] This is how a lot of scaling in software engineering
+[39:18] has always worked.
+[39:22] And, yeah, so you can also have other resources in the folder with the skill,
+[39:30] and Claude will know how to get to them.
+[39:34] But I think the thing that has resonated with a lot of people about this
+[39:40] is the fact that it has such a simple form factor.
+[39:43] It's just a folder. There's no special protocol.
+[39:46] There is front matter fields to the skill.md file,
+[39:49] but there are things like description.
+[39:52] And then you put this short description
+[39:53] that tells the model whether or not
+[39:56] it wants to expand the full prompt.
+[40:01] Give me a second.
+[40:01] I'm going to take a drink of water.
+[40:03] It is warm up here.
+[40:07] Are people following, more or less, where I'm going?
+[40:10] OK, I'm seeing a lot of nods.
+[40:11] So I'm taking that as a somewhat good sign.
+[40:13] I guess the people that I have lost are asleep.
+[40:15] So that's OK, too.
+[40:19] It's a lot, right?
+[40:20] Like, this is a...
+[40:22] Software engineering is a field that has been around
+[40:24] for 60, 70 years, and we're having more change
+[40:29] in the past two years than the rest of it, right?
+[40:33] In some ways, at least, or at least arguably.
+[40:37] We can talk about whether or not we have, but...
+[40:41] All right.
+[40:43] So, skills.
+[40:44] So, skills are these lazy system prompts, right?
+[40:47] It has a description of when Claude wants to use the thing.
+[40:50] It expands to a much larger amount of text
+[40:53] when Claude decides that it is relevant.
+[40:57] So does it scale, right?
+[40:58] The whole body is pay-per-use.
+[41:00] So we are getting, like, don't pay for the body
+[41:03] if you don't use it.
+[41:06] And so, like, you know, at a small code base scale,
+[41:11] you know, maybe 500,000 lines.
+[41:13] I would call 500,000 lines of code a small code base.
+[41:16] And I think many of you probably work in enterprises
+[41:18] where you would call that a small enterprise code base.
+[41:24] The body is paved per use.
+[41:27] The description is always loaded.
+[41:29] The description always goes in the system prompt.
+[41:32] So if you have 100,000 skills and you load 100,000 descriptions
+[41:38] into the system prompt, you are going
+[41:39] to use your entire context window.
+[41:41] So it still doesn't completely scale up to a large enterprise
+[41:46] like Google's code base or Facebook's code base.
+[41:52] And I think, for me at least, that's
+[41:54] the interesting question about how do we get these things
+[41:57] to do software engineering.
+[41:58] They need to be able to scale up in that way.
+[42:00] Skills also currently don't have a way to do hierarchy.
+[42:03] We're working on that, hopefully out soon.
+[42:06] So it does scale, kind of.
+[42:08] It's kind of the same problem that we talked about in terms
+[42:10] of tool search, right?
+[42:12] Tool search has this description line
+[42:19] that if you make it longer and longer, it triggers better.
+[42:26] Yeah.
+[42:27] Sub-agents, what's up?
+[42:29] Quick question.
+[42:30] So do you think we need a skill search tool as well?
+[42:34] We were working on that, yes.
+[42:35] So the question was, do we need a skill search tool?
+[42:38] We're working on that.
+[42:39] It's a little harder because it requires the model
+[42:44] to know what it doesn't know versus tool search,
+[42:51] the model is much more likely to know what it can't do.
+[42:55] Does that make sense?
+[42:57] It's a lot easier to tell that you can't do something
+[43:00] than to tell that you don't know something.
+[43:03] But yeah, that is a direction we are going.
+[43:05] Sub-agents are relatively similar to skills.
+[43:07] I'm going to go through this pretty quickly
+[43:09] because I actually want to get to the nice stuff at the end.
+[43:12] Where you basically give it a short description.
+[43:14] That gets put into the system prompt.
+[43:16] But instead of Claude expanding that text
+[43:19] into its own context window, it'll
+[43:20] expand that text into a separate context window
+[43:24] and then get back a summary of what the subagent did.
+[43:27] It'll expand that text along with its own prompt
+[43:31] into a subagent context window, a separate context window,
+[43:35] and then gets back a summary that is compact.
+[43:38] So in this sense, it actually scales better,
+[43:42] but across a monorepo, a large monorepo,
+[43:46] where you have hundreds of these, or thousands of these,
+[43:49] or tens of thousands of these, you're
+[43:51] going to start using up large fractions of your context
+[43:53] window on these description strings.
+[44:00] But the takeaway for understanding the difference
+[44:02] here is that skills are in context,
+[44:04] Subagents are out of context.
+[44:06] I think we think that the difference is fundamental enough
+[44:10] to keep them as separately named things,
+[44:12] but there is a lot of similarity there.
+[44:15] I think we're still figuring out how we
+[44:18] want to name these things, how we want to separate these things,
+[44:21] what the ontology of all of this is.
+[44:25] I don't think anyone really knows
+[44:26] what the long-term state of this is.
+[44:28] But hooks are my favorite abstraction
+[44:31] to talk about in this context because hooks do scale.
+[44:36] Spoiler, right?
+[44:37] So this is like the kinds of abstractions
+[44:39] that I think we generally want to be building
+[44:42] are the abstractions that don't put anything at all
+[44:46] into the context window unless you somehow determine
+[44:50] it is relevant, right?
+[44:52] So hooks are an abstraction that we have in quad code
+[44:55] that will, when a certain event happens,
+[44:58] like a tool use, or a user submits a prompt,
+[45:01] or the model stops working for one reason or another,
+[45:07] or the whole context compacts, you can run a specific script.
+[45:11] And there is a protocol for what the input to that script
+[45:15] looks like and what output you have to deliver.
+[45:17] And based on how you deliver that output,
+[45:20] we will put some context into the context window for you
+[45:25] or not.
+[45:27] But the way to think about how this scales is if you have,
+[45:32] if you are working on a Rust project
+[45:34] and you have 10 JavaScript skills,
+[45:38] you still pay for those 10 short prompts
+[45:41] related to JavaScript,
+[45:43] even though you're not doing anything related at all.
+[45:46] And you have to remember to manually toggle them off
+[45:49] to not use that, right?
+[45:50] If you have 10 skills for linting your JavaScript code
+[45:55] JavaScript code and you are working on a Rust code base, you don't pay it. Well, you pay for like
+[46:02] running the script that immediately sees you're not writing JavaScript and then goes away, right?
+[46:08] You don't pay for anything you don't use except for like CPU resources, which I think we can all
+[46:13] agree are a little bit less limited than context space. Yeah, so it runs outside the context window.
+[46:20] So you can do them as scripts.
+[46:24] You can also actually put an agent in here
+[46:28] if you really want to.
+[46:30] Probably use that sparingly, because you'll
+[46:32] use a whole lot of tokens really quickly.
+[46:36] Does it scale?
+[46:37] Well, we already talked about this.
+[46:38] It only injects something when it fires, when it matches.
+[46:42] The pattern that we have is, like, call the script,
+[46:46] determine if it's relevant immediately, and quick exit
+[46:49] If not, and otherwise do some processing
+[46:50] to figure out if there's anything relevant
+[46:52] that you can tell the model.
+[46:55] This is where the red squigglies live,
+[46:56] as we talked about earlier.
+[47:00] What are some abstractions that I don't consider
+[47:02] to be good parts of plugins?
+[47:04] This is a pretty quick aside, so I'm going to go through it.
+[47:07] But the one that I really like to talk about here
+[47:09] is cloud.md.
+[47:11] I have had so many people ask me, why do plugins not
+[47:16] have a cloud.md abstraction?
+[47:17] And I think hopefully if you follow the talk up to this point,
+[47:22] you should understand this.
+[47:26] It is the worst at don't pay for what you don't use.
+[47:30] Because if we were to provide an abstraction that
+[47:32] allowed plugins to unconditionally inject a large amount
+[47:38] of text at the very beginning of every context,
+[47:40] then we'd be limited to five or 10 plugins being
+[47:45] active at any given time.
+[47:48] And the biggest problem with that
+[47:49] is that it doesn't look like it's that expensive.
+[47:51] If you're writing out your plugin,
+[47:53] probably the first thing you're going to do
+[47:54] is create a cloud.md file that explains what the plugin is.
+[47:58] It's so low cost on the implementation side,
+[48:01] and it's so high cost on the use side.
+[48:10] So you can still do this.
+[48:12] You can still set up a session start
+[48:14] that injects a whole bunch of tokens into your context
+[48:18] right at the beginning of every single session.
+[48:22] But at least that makes it obvious that you're doing something
+[48:25] that costs everyone no matter what.
+[48:32] Memory.
+[48:33] Memory is another one that I like to say
+[48:36] kind of establishes a different boundary
+[48:38] of what I would call a plugin, right?
+[48:40] Memory is like this model curated.
+[48:43] Who here is familiar with model memory or agentic memory?
+[48:49] A few people?
+[48:51] Spoiler alert, it's text files.
+[48:53] All of it's text files.
+[48:55] You just tell the model to write a text file
+[48:57] and then read the text file at a very specific point later.
+[49:01] But because it's model curated, I
+[49:03] don't consider it to be a context engineering primitive.
+[49:07] We really want to focus on what are
+[49:09] the primitives for sustainable, reusable context engineering.
+[49:13] And I think I'd like to keep that separate from what
+[49:16] we call a plug-in.
+[49:16] So even if they are shaped like skills,
+[49:19] even if they are things that are updated
+[49:22] and contain the same kinds of knowledge as skills,
+[49:27] I really think that the future of software engineering
+[49:30] at ultra-large scale is going to have
+[49:32] to be very discriminating about what we call context engineering
+[49:36] and what we call memory.
+[49:38] Those two things are going to need
+[49:40] to function very separately.
+[49:41] So I throw that in because I think I've,
+[49:44] I hope at this point in the talk,
+[49:46] I've given you the tools to understand why I believe that.
+[49:51] All right, the part where we talk about some of the things
+[49:53] that the Cloud Code team uses these days
+[49:56] and where I see this going in 2026,
+[50:01] the only way to scale up from here,
+[50:02] the only way to speed up from here
+[50:04] is to do multiple things at the same time.
+[50:06] How many people would say that your regular workflow
+[50:11] uses more than, well let's say,
+[50:14] how many people would say your regular workflow
+[50:15] uses more than one clod at a time, more than one session?
+[50:19] How about more than five?
+[50:22] More than 20?
+[50:26] Okay, so somewhere around there,
+[50:29] but you can pretty quickly see how,
+[50:31] if you could get to the point where you're comfortable
+[50:35] managing 20 clods at a time, you could get close to four times
+[50:38] as much work done as if you can manage five.
+[50:41] So I think a lot of the work in 2026
+[50:46] is going to be figuring out abstractions that
+[50:48] give developers the cognitive space
+[50:51] they need to context switch between these things quickly.
+[50:55] Get work trees are the simplest way to get started on this.
+[50:58] Put each session on a different work tree so that you're not,
+[51:03] the clods aren't stepping on each other.
+[51:05] I don't know that I need to go too far on that,
+[51:07] but one of the things that really helps with this
+[51:09] when you have multiple sessions,
+[51:11] who has used slash rename or slash color?
+[51:14] It's okay, it's three people.
+[51:17] Should be everyone.
+[51:18] If you've used everyone who raised their hand
+[51:20] about multiple clods, this works wonders.
+[51:25] It's super, super simple, super, super easy.
+[51:27] Just label what it's working on, give it a color.
+[51:31] When you switch to the window that's doing it,
+[51:34] your brain will see the color.
+[51:36] It'll trigger some memory of what's going on there.
+[51:40] There's some research to show that humans recall things
+[51:44] related to color, or non-colorblind humans recall
+[51:48] things related to color faster than they recall things
+[51:51] related to prose.
+[51:55] My actual setup looks like this.
+[51:56] I actually have these long-running agents.
+[51:59] This is a little outdated because I
+[52:02] didn't feel like I could operate efficiently with just 16
+[52:06] permanent work trees.
+[52:07] So now this goes all the way to Z instead of A through F.
+[52:11] But each one of them is separate.
+[52:13] They're kind of long running, and they're set up.
+[52:15] They're parked in one spot.
+[52:17] And there's an agent that knows that its responsibility
+[52:20] is to maintain that work tree long term.
+[52:24] And for me, at least, having an agent with a persistent name
+[52:27] and a persistent memory.
+[52:30] It kind of manages its own scratch files
+[52:32] within its own branch of the work tree.
+[52:37] Allows me, at least as someone who has experience
+[52:41] being a tech lead or of a large organization where
+[52:45] you have a bunch of different people coming to you
+[52:47] over the course of the day telling you what they've done,
+[52:50] having persistent identities really helps me.
+[52:54] I think it's worth trying.
+[52:57] This is like diagrammatically what it looks like.
+[52:59] I have like long-lived work trees
+[53:02] that have names corresponding to the agent name,
+[53:06] and they all track upstream main,
+[53:08] and they know that they're supposed to manage
+[53:10] that tracking of upstream main,
+[53:12] so they don't step on each other even from a...
+[53:16] So it's like, I mean, it's like
+[53:17] they're separate developers, right?
+[53:21] Anyway, yeah, I have a whole talk
+[53:23] that I'd like to develop out about,
+[53:25] how does agent identity work with cognitive load?
+[53:28] So I don't know.
+[53:30] I think that's a very interesting thing
+[53:31] to explore over the course of 2026.
+[53:36] Agent teams.
+[53:38] Has anyone here tried agent teams before?
+[53:41] Oh, that breaks my heart.
+[53:43] We need more.
+[53:45] So agent teams are ways that the basic thing here
+[53:49] is just giving the model ways to talk to other agents.
+[53:51] So if you're running two Claude's at the same time
+[53:53] and you tell one of them one thing,
+[53:55] you can tell it to tell the other one the same thing
+[53:58] if it needs it.
+[54:00] SendMessageTool is the baseline primitive that
+[54:04] gives Claude the ability to send a message from one session
+[54:07] to another.
+[54:10] You can have a team leader that delegates to teammates.
+[54:13] You can also just have a bunch of agents that
+[54:16] are all peers of each other.
+[54:19] And if one of them discovers something,
+[54:20] You can tell it to share it with the others,
+[54:23] or you can tell it not to.
+[54:24] This is all under your control.
+[54:26] We are moving towards, I actually
+[54:28] don't know if it's been launched because I've
+[54:30] been out of office for a couple of weeks,
+[54:31] but it is announced enough that we're
+[54:35] moving towards a direction where if you are signed in a certain
+[54:38] way and you give it permission, then any session on any machine
+[54:41] that you have can talk to any session on any other machine
+[54:44] that you have, hopefully, so that you just
+[54:49] have the ability to tell the model to talk to other instances.
+[54:52] And this is another example of give Claude access
+[54:55] to all of the things that you have access to, right?
+[54:58] Because it needs to be able to see the things you can see.
+[55:01] And if another agent is one of the things you can see,
+[55:04] then you should be giving it access to that, right?
+[55:09] Slash, oh, babysitting.
+[55:12] Slash loop is something we shipped maybe two months ago.
+[55:17] It is literally a cron command or cron tool for the model
+[55:22] that it can schedule a message to just show up every 10 minutes.
+[55:27] It has the ability to turn itself off at some point.
+[55:30] So if it's like, OK, that's enough.
+[55:31] I've seen this every 10 minutes for three days now.
+[55:34] I'm just going to turn it off.
+[55:35] Uses some amount of tokens, obviously,
+[55:38] but it's surprisingly minimal, too,
+[55:43] compared to human having to go and check CI and then copy
+[55:47] pace and get the thing started up again.
+[55:49] I find often that the problem is that the model goes to sleep before it's finished the
+[55:53] job, and this really helps with that.
+[55:57] I think it also gives Claude the tools to make sure it doesn't do that.
+[56:00] We see that increasingly the models are better at understanding the fact that if something
+[56:06] is going to come in as a result in three hours, that it should set something to wake itself
+[56:12] up in three hours.
+[56:16] YOLO mode? Who's using auto mode?
+[56:20] Should be everyone, hopefully.
+[56:23] Yeah, this is really what enables this multi-clotting, right?
+[56:26] This is how you get up to 20 or 30 agents, right?
+[56:28] So you're not just sitting there hitting enter all day.
+[56:31] It is better than YOLO mode.
+[56:33] We have a sophisticated set of safeguards
+[56:39] that go through several screenings of models and classifiers
+[56:43] that check whether something is dangerous
+[56:46] before blocking it or allowing it.
+[56:48] It looks through all of your prompts
+[56:49] and sees if you've actually told it to do something or not.
+[56:53] And if you haven't told it to do something that seems dangerous,
+[56:55] it'll stop it from doing it.
+[56:58] This is what makes slash loop and agent teams and overnight runs
+[57:02] actually work.
+[57:03] It's a little expensive.
+[57:04] It costs anywhere from 10% to 40% more,
+[57:09] depending on the model.
+[57:12] I am running out of time, and I'm sorry.
+[57:14] But this is really what I'm getting at here,
+[57:18] and I think I've said this a few times.
+[57:20] 2025 was about getting information into the model
+[57:25] to get better results, because agentic programming
+[57:28] was in its infancy, and we were constantly compensating
+[57:32] for the model making mistakes.
+[57:34] 2026, I believe, is going to be a lot more
+[57:37] about getting information from the model to the user.
+[57:40] The quality of the information that the user gives the model
+[57:44] is going to matter less and less as the models get stronger,
+[57:47] and it's going to be less and less of a bottleneck.
+[57:50] And this year, it's going to be a lot more about how quickly
+[57:53] can you context switch?
+[57:54] How quickly can you scale up your workflows
+[57:57] to get information about what the model is doing?
+[58:02] Claude put it this way, your attention
+[58:04] is the smallest box in the system, which I think is cute.
+[58:09] So Cloud Agents is actually one of the things
+[58:12] we've launched along those lines, if you haven't tried it.
+[58:15] It's also called Fleet View.
+[58:17] Has anyone tried this yet?
+[58:20] One person.
+[58:21] OK, everyone should try this.
+[58:22] It is amazing.
+[58:25] The team member who put this together
+[58:28] literally hit, I think, 1,000 PRs one week using this.
+[58:34] Or, yeah.
+[58:36] It is a significant way to scale up your attention,
+[58:40] because it is showing everything that's running all in one place.
+[58:43] We have little classifier models that
+[58:45] give a very short description of what the model needs,
+[58:49] what it has just done.
+[58:51] And these are 10 different Cloud Code sessions all in one view.
+[58:57] And yeah, the lightweight classifier.
+[59:01] And you can jump in between sessions from directly in there.
+[59:04] No more like 20 different tabs.
+[59:08] Remote control, another fantastic thing
+[59:11] that I use all the time.
+[59:13] I have these kind of persistent agents running
+[59:15] on a server in the cloud, and I can interact with them
+[59:19] on my phone.
+[59:20] I interact with them on Cloud Code desktop.
+[59:23] I wrote portions of this talk literally
+[59:26] while walking over from my hotel by interacting
+[59:28] with the agent on my phone that was responsible for it.
+[59:31] Sorry, on my dev box that was responsible for this talk.
+[59:34] The three things I do want to reiterate before I run out of time, I have 30 seconds.
+[59:42] Give the model access, think about the box and think about what you're putting into the
+[59:46] box and how that affects what you're getting out, and pick abstractions that scale up to
+[59:53] large-scale real-world software engineering.
+[1:00:00] Thanks for hanging with me.
+[1:00:01] I'm sorry that my stumbling over my words
+[1:00:04] was a little worse than usual.
+[1:00:05] It is also after five for me.
+[1:00:08] But I hope you all enjoyed it.
+[1:00:09] I'll be around.
+[1:00:10] You can always hit me up on Twitter
+[1:00:14] if you have questions about this.
+[1:00:16] I'm happy to answer them.
+[1:00:19] Yeah, thanks for your time, and thanks
+[1:00:21] for hanging out at the end of the day.

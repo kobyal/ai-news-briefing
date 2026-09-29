@@ -1,0 +1,302 @@
+[0:00] At our house, we installed a weather station.
+[0:02] With Cloud, I could design from scratch a multi-modal model,
+[0:07] and it predicts afternoon weather better than the National Weather Service.
+[0:24] I think a lot of people in the industry, they tried to move to Cloud VMs.
+[0:27] They tried to move to these remote environments.
+[0:29] What gave you the conviction to do this?
+[0:31] Well, reliability and security are really important for us.
+[0:35] Stripe operates with five and a half nines of reliability.
+[0:38] So extreme reliability for our core APIs.
+[0:42] But at the same time, we want to be developing and launching new products and adding new features extremely quickly.
+[0:47] We want to have continuous deployment of our API.
+[0:50] And across financial services, the way things typically work is maybe things get deployed once a month, once a quarter,
+[0:57] certain places once a half.
+[1:00] And I mean, that provides a kind of local stability.
+[1:03] But of course, at too enormous cost,
+[1:05] when you don't get sort of quick feedback from customers,
+[1:07] you can ship things on a regular basis.
+[1:09] But then also, it does mean that these moments of migration
+[1:11] are incredibly fraught and scary
+[1:13] because you've this accumulated detritus of months of progress.
+[1:19] And so we thought that was totally untenable.
+[1:21] In fact, when we're developing things,
+[1:23] we want feedback from our customers multiple times a day.
+[1:25] And so we really weren't willing to compromise on this.
+[1:28] And so in order to achieve five and a half nines of reliability,
+[1:31] but with this continuous process of feature evolution development,
+[1:34] we thought we really needed to invest in the end-to-end development
+[1:39] and quality assurance process.
+[1:41] And so the dev boxes are just the first part of that,
+[1:44] and we can have some instrumentation there and observability
+[1:46] and operational characteristics and so forth.
+[1:48] And then a whole process of incremental deployment
+[1:51] deployment where you first roll it out to a handful of machines and then 1% of machines
+[1:57] and some progressive rollout strategy from there. But I guess the general reason for
+[2:02] our conviction, we needed extreme reliability and security, extreme velocity, and I think
+[2:09] it's the only way to achieve both.
+[2:10] It's incredibly impressive, the bar that you've been able to hit. And I feel like everyone
+[2:15] in the industry looks to Stripe as the company that sets the bar for reliability.
+[2:19] That's very nice to hear. We obviously were working extremely hard to sustain that.
+[2:25] It's been interesting for us in the era of agentic development, where obviously there's a question of,
+[2:29] well, will AI be a tailwind or a headwind here?
+[2:33] And there are obviously a lot of concerns of, well, if people are writing code so much faster,
+[2:38] and maybe they're not reviewing each line of the code with quite as much scrutiny,
+[2:43] lots of speculation as to sort of which way this will cut.
+[2:46] I was speaking with one engineer at Stripe this morning, and over the course of H1, he
+[2:51] had more than 600 pull requests merged.
+[2:55] Every single one was written with AI.
+[2:57] And exactly one of those pull requests had to be reverted, which at least suggests that
+[3:02] it is possible to have this enormously accelerated development rate with still empirically quite
+[3:08] high reliability.
+[3:09] Minions are this thing on top of it, which are a way to orchestrate VMs with prompts
+[3:15] from Slack or from a web interface or, I mean, in principle, from any tool,
+[3:19] you can just ask for some feature to be implemented or some task to be completed.
+[3:24] It will create a fully new VM for that and then go and perform all the tasks along the way,
+[3:28] and then it'll package it up and submit it and build it and run it through our test suite
+[3:32] and the whole end-to-end process.
+[3:34] We have seen that quality per pull request over the last 18 months has gone up.
+[3:42] Now, there's still some challenge because the incidence per unit time has gone up slightly.
+[3:50] And so now they're mostly very minor incidents.
+[3:52] And all of our kind of secondary mechanisms for catching things before they become problematic have meant that our total reliability is essentially unchanged, which we take as quite heartening.
+[4:03] And then I think the cool thing is,
+[4:04] obviously with LLMs and AI and everything else,
+[4:07] there's now, of course, the possibility
+[4:08] to build new observability and new instrumentation
+[4:12] and new harnesses and new kinds of automated scrutiny
+[4:14] that we couldn't build before.
+[4:16] And so I feel pretty confident that over the next year or two,
+[4:20] that AI on net will make Stripe quite a bit more reliable.
+[4:23] So tell me a little bit more, like, nuts and bolts.
+[4:25] How do you ship faster using AI
+[4:29] without trading off against reliability and quality?
+[4:31] Like, what are the specific guardrails that you have?
+[4:34] We want to ship a model that's really aligned,
+[4:36] and there's a bunch of protections.
+[4:37] There's, like, prompt injection protection.
+[4:39] And then also, like, as the number of pull requests accumulates,
+[4:42] how do you make sure that everything remains reliable
+[4:45] and that code quality goes up?
+[4:46] It does mostly come back to this idea of relying on invariance
+[4:52] and hard barriers rather than things
+[4:58] that are somewhat more subjective or discretionary
+[5:01] or probabilistic.
+[5:03] And so obviously it's nice
+[5:05] if the model is aligned
+[5:07] and is more likely to write correct code
+[5:09] or secure code or whatever.
+[5:11] I mean, nothing's ever perfect.
+[5:12] You really do want to rely on guarantees.
+[5:15] That's really interesting.
+[5:16] So what I'm hearing is like before AI,
+[5:19] there was a lot of benefits
+[5:19] to kind of encoding guardrails
+[5:21] and constraints as infrastructure.
+[5:22] Yes.
+[5:23] Because then engineers can make less mistakes.
+[5:25] And there's also benefits to data segregation
+[5:28] and making sure that people
+[5:29] just literally can't access data.
+[5:31] they shouldn't access.
+[5:32] And now this is kind of paying dividends.
+[5:34] Yeah, I mean, this is full agreement with all of that.
+[5:36] And actually, we started seriously investing a lot of this,
+[5:40] and the apparatus and the tagging
+[5:45] and the sort of semantically aware guardrails
+[5:48] around our data back in 2017.
+[5:53] And it's been a multi-year journey
+[5:55] because there's a lot of annotating to do
+[5:57] and there's a lot of granular permissioning to do and so forth.
+[6:00] And we did all of this because we thought the security guarantees were so important.
+[6:05] But you're right that it kind of accidentally put us in a better position when a Gentic development came along.
+[6:10] Yeah, and then luckily, Wada is great at writing guardrails, too.
+[6:13] Indeed, indeed, yes.
+[6:14] Well, let's go back to the point where I really, I mean, there's kind of a general question in the world about whether AI and LLMs will be on net a, you know, offense advantaging or defense advantaging.
+[6:26] But my guess is that in equilibrium in a couple of years, this is all going to be substantially defense-advantaging.
+[6:34] I want to come back a bit more to how Stripe uses quad code.
+[6:38] Tell me about how do you use quad?
+[6:40] What are some of the products that you've shipped?
+[6:42] Every dev box has quad code pre-installed.
+[6:44] It's the first place people go when just the median person is going to complete some task.
+[6:49] It really has delivered meaningful acceleration.
+[6:52] One case that I thought was quite informative here was we had the idea at the beginning of the year of building a thing called Stripe Projects.
+[6:58] And this was kind of inspired by Cloud Code, because when you're building some project with Cloud Code,
+[7:05] for anything of any materiality or substance, you invariably need to couple that to some other set of services, right?
+[7:13] I want PostTog for logging, or I want to host it on Vercel, or I want a database, you know, whatever.
+[7:19] Because almost all these companies are Stripe customers already, we thought we could work with them to expose their capabilities in a new way and make it incredibly easy for an agent to instantiate an account with them.
+[7:33] We had this idea at the beginning of the year.
+[7:35] We decided to go and build it.
+[7:36] It was between two and three engineers for about two months.
+[7:43] But from first idea to public launch.
+[7:46] And that's not only building the internal APIs and services and harnesses and all the things,
+[7:53] but also integrating with now about 50 different services.
+[7:58] And those services all have their own idiosyncrasies and occasional bugs.
+[8:03] And I don't think you could have done that with two to three people in eight weeks in the before times.
+[8:09] What would that have taken before?
+[8:10] So I asked one of the engineers involved and his estimate was a bigger team.
+[8:16] He didn't say exactly much bigger, but a bigger team and six months.
+[8:19] Let's just say twice as big a team, I don't know.
+[8:21] And I guess that would have been 3x longer.
+[8:23] So, you know, that's a 6x relative change.
+[8:26] Again, maybe that's an underestimate.
+[8:28] Who knows, in that software engineers are famously optimistic when they estimate software projects.
+[8:35] So maybe we can say at least a 6x speed up.
+[8:38] Stripe has thousands of software engineers,
+[8:40] and who knows if every project is being accelerated
+[8:43] by that magnitude.
+[8:44] I suspect there's a distribution.
+[8:47] Some things are massively faster, some things aren't.
+[8:49] But again, even if we're really pessimistic,
+[8:51] if it's only, let's just say it's only a 2x improvement
+[8:54] across the entirety of what we do,
+[8:56] that's obviously still a preposterously large deal.
+[8:59] Yeah, that's huge.
+[9:00] So it takes less engineers, they do it faster.
+[9:02] What do engineers do?
+[9:04] Again, with higher quality, at least per pull request.
+[9:06] with higher quality, maintain the reliability bar.
+[9:09] So what do engineers do?
+[9:10] You just do more projects, you try more experiments?
+[9:14] I think we definitely create more products
+[9:18] and try more experiments.
+[9:20] And we can see this in the numbers.
+[9:23] Like we just had our annual conference sessions
+[9:26] and the number of new products
+[9:27] and the number of new features.
+[9:29] Yeah, and again, the quantum of the feature
+[9:33] is somewhat subjectively and qualitatively defined,
+[9:35] But we tried to be reasonably consistent year to year.
+[9:38] The number of new products and features at sessions this year
+[9:40] was wildly ahead of any prior year.
+[9:44] The engineering organization was somewhat larger,
+[9:46] but clearly there was some kind of productivity effect
+[9:50] happening there.
+[9:50] So we're certainly building more for customers.
+[9:52] But the other thing that I find kind of interesting,
+[9:53] and that cuts against some of the slop concerns,
+[9:57] is we're undertaking more projects now
+[9:59] to improve our architecture and improve our code base.
+[10:02] And the line from a friend that we often mention at Stripe
+[10:05] is that every code base is now the prompt
+[10:07] for another code base.
+[10:09] And of course, Jared Semner, former Stripe,
+[10:12] has demonstrated this with the BUN rewrite.
+[10:16] My estimate of the, there could be a question of,
+[10:19] with AI and with LLMs, should we expect the quality
+[10:22] of code at Stripe to be higher or lower in three years?
+[10:25] And I think the answer has to be higher.
+[10:26] It's interesting.
+[10:27] There's this sort of like fluidity
+[10:28] between tokens and infrastructure.
+[10:30] You could use the tokens to write product code.
+[10:32] You can use the tokens to write infrastructure.
+[10:34] you can use it to write guardrails.
+[10:37] And I think people kind of over-focus on using it
+[10:39] to directly build product, but it's all these
+[10:41] intermediary use cases that are some of the most powerful.
+[10:44] What were some of the barriers that you hit
+[10:47] getting AI to this kind of scale internally?
+[10:50] In general, it's been adopted very enthusiastically
+[10:55] and very completely and very quickly and so forth.
+[10:59] So in some sense, it feels funny to ask
+[11:01] the barriers given the adoption fervor. The phase changes were definitely
+[11:07] Claude Code itself as a modality, and so thank you for that. And the model improvements of
+[11:15] late last year, another inflection point. I think over the course of this year, I think the main
+[11:22] thing that people had to kind of wrap their minds around is getting a sense for what's possible and
+[11:28] how one can now work.
+[11:31] One person has Stripe, the way he likes to work is he will work with some, you know,
+[11:37] the smartest model available to construct a very complicated, extensive plan, but like
+[11:43] really invest a lot in the planning process.
+[11:46] And then maybe dispatch 10 different dev boxes with different agents executing different
+[11:53] parts of the plan and they might work all day or in the extreme case even for multiple
+[11:59] days on implementing this.
+[12:03] That's a very different way of working, right?
+[12:05] It's only very different to how things worked pre-AI, but it's kind of non-obvious even
+[12:09] given plot code that, oh, I can, like the quantum of labor can actually be so extensive
+[12:16] and again, if properly orchestrated and guided,
+[12:21] that the model is capable of such extensive self-verification.
+[12:25] I think that recently I myself undervalued the plan modality.
+[12:30] And I guess goals have also made a lot of progress
+[12:33] over the course of this year, and I've changed how I use the model.
+[12:36] So anyway, I think there's just kind of getting intuition
+[12:38] for the ever-changing and moving target of the modality.
+[12:41] Yeah, I have this giant graveyard of these projects that I started but never finished.
+[12:45] Right.
+[12:46] And that's just like not really a thing anymore.
+[12:48] You kind of finish every project and then you decide,
+[12:50] do I want this or not?
+[12:51] Yes, exactly.
+[12:52] And it's definitely the case that some shower thoughts
+[12:56] now get translated to actual existence at a far higher rate.
+[13:01] I think the returns to being curious have gotten much higher.
+[13:05] I want to talk a little bit about what you're saying on the Stripe side
+[13:09] about how AI is changing business.
+[13:12] One of the things I've been thinking about is
+[13:14] is with AI, it is much easier for small teams to compete
+[13:19] against much larger teams in a way
+[13:21] that you just couldn't do before.
+[13:23] And I do these talks at Y Combinator
+[13:26] every three months or whatever, and I used to ask,
+[13:29] who uses quad code, raise your hand.
+[13:30] And when we first released quad code,
+[13:32] a few hands went up, then at some point, every hand goes up.
+[13:34] And now I ask a different question,
+[13:35] because that's not a useful question anymore.
+[13:37] I ask, who writes 100% of their code using AI?
+[13:41] And now it's roughly, I think, like 70% of people write 100% at these very small startups.
+[13:48] I think there's more startups than before.
+[13:51] They're moving more quickly than they were before.
+[13:54] They're tackling more ambitious problems.
+[13:55] Yeah.
+[13:56] I'm curious if you're seeing this in the data.
+[13:58] Stripe launched 15 years ago, so we have a decade and a half longitudinal time series of firm creation.
+[14:05] But Stripe has been fairly popular among developers for a reasonable number of years.
+[14:11] And so I think what we see in our time series is some kind of proxy for what's happening in the ecosystem overall.
+[14:16] And, for example, during March of 2020, we saw a significant acceleration in new business creation on Stripe for kind of obvious reasons.
+[14:25] The reason I bring this up is because the acceleration that we've seen over the last year is, on a relative basis, much larger than any prior acceleration that we've ever seen.
+[14:35] The number of new businesses launching on Stripe per unit time is up by roughly a factor of two.
+[14:41] And again, as kind of a one proxy metric for coverage, about a quarter of all Delaware corporations are now incorporated with Stripe.
+[14:50] And of the ones that aren't, lots of them are like random subsidiaries for a multinational or something.
+[14:55] So I think of the true startups, it's an even larger fraction than 25%.
+[15:01] So, I think we're seeing this pretty representative and what we see is this huge acceleration.
+[15:06] And interestingly, the acceleration is quite broad-based in the sense that we see the same thing in most countries.
+[15:13] And in fact, in many cases, government data hasn't even woken up to this yet.
+[15:17] And we recently published a piece in the Stripe Economics sub-stack about how the UK's official company statistics show a year-over-year decline in new company creation.
+[15:27] Whereas in fact, and we kind of walk through the methodology in the post, we think the
+[15:30] UK is seeing a huge surge in new entrepreneurship.
+[15:34] And what we see is that the average revenue per new business is going up, not down.
+[15:39] So it's way more companies and the average outcome is improving.
+[15:43] And if you partition it to look at businesses reaching 100K or a million or, again, any
+[15:51] kind of arbitrary revenue threshold, those are also all up very substantially.
+[15:56] And so I think it's just a straightforwardly better time for entrepreneurship than it was in the relatively recent past.
+[16:07] And that's pretty exciting.
+[16:08] And I think it's also one of the concerns with AI is that it will bring about a more centralized economy.
+[16:17] But in the micro data that we observe, we certainly see evidence for the opposite, where there is more new firm creation happening.
+[16:25] those firms are more likely to succeed
+[16:27] and growth rates overall are improving.
+[16:30] So we're pretty excited.
+[16:32] Has this changed the kinds of products that you're building?
+[16:34] Has it changed how you think about your own product?
+[16:37] We're thinking about how are all the agents
+[16:40] and the cloud code instances,
+[16:43] how are they going to use Stripe directly themselves, right?
+[16:46] And both the Stripe product
+[16:48] and just how will they transact more broadly.
+[16:50] And so we're just thinking a lot about a world
+[16:52] where most transactions,
+[16:53] agents are the counterparties on both sides.
+[16:56] And so how does an agent sign up for Stripe?
+[16:58] How does an agent use Stripe?
+[17:00] Is MCP enough?
+[17:02] What should the Stripe CLI do?
+[17:04] How to make sure that everything in Stripe can be orchestrated and conducted from the CLI
+[17:09] or in some other way that is accessible to agents?
+[17:11] How will agents pay each other? What currency will they use?
+[17:14] It's not just agent economy, but it's like agent to agent economy.
+[17:17] That's right, yes.
+[17:18] The Stripe house view is that most transactions will be between agents within, call it, three years.
+[17:26] It may not be the case that most of the dollar volume is directly between agents,
+[17:32] but I'll be sort of surprised if there isn't just a whirling vortex of reasonably small agent-to-agent payments.
+[17:39] Patrick, thank you so much for coming by.
+[17:41] Thank you for having me. That was super fun.
+[17:43] Yeah, that was great. I think I got to like half the questions.
+[17:48] Thank you.

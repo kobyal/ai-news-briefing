@@ -39,7 +39,8 @@ if need_video and not os.path.exists(rec):
     # YouTube moves again — a yt-dlp upgrade is the real fix.
     client = os.environ.get("YT_CLIENT", "web_embedded")
     subprocess.run(["yt-dlp", "--no-update", "--extractor-args", f"youtube:player_client={client}",
-                    "-f", "bv*[height<=720]+ba/b[height<=720]",
+                    # H.264 first: AV1 decodes fine but is 40% larger for no gain here.
+                    "-f", "bv*[vcodec^=avc1][height<=720]+ba/bv*[height<=720]+ba/b[height<=720]",
                     "--merge-output-format", "mp4", "-o", rec, a.url], check=True)
     st["fetched_s"] = round(time.time() - t0)
 
@@ -49,7 +50,16 @@ if not os.path.exists(blocks):
     st["asr"] = asr.transcribe(wav, work, a.lang)
 
 if not glob.glob(os.path.join(crop, "*.jpg")):
-    raw = slides.detect(rec, os.path.join(work, "frames"))
+    # The skill's 0.12 threshold suits full-screen livestream slides. Conference
+    # recordings with an inset deck score ~0.02 per slide change (NDC, 2026-09-29:
+    # 0 frames at 0.12), so step down until the talk yields a usable set.
+    raw = []
+    for thresh in (0.12, 0.04, 0.015):
+        raw = slides.detect(rec, os.path.join(work, "frames"), thresh=thresh)
+        if len(raw) >= 8:
+            break
+        print(f"  scene threshold {thresh}: {len(raw)} frames — lowering", flush=True)
+    st["scene_thresh"] = thresh
     kept = slides.dedupe(raw, os.path.join(work, "frames"))
     slides.crop_all(kept, crop)
     slides.sheets(kept, os.path.join(work, "frames"), per=30)

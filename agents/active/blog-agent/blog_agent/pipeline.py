@@ -51,7 +51,9 @@ def run_pipeline(args) -> int:
     m["diagram"] = media.diagram(key, post["diagram_d2"])
     m["hero_he"] = media.hero(key, "he", term, post["he"]["title"], "הבלוג של AI Briefing")
     m["hero_en"] = media.hero(key, "en", term, post["en"]["title"], "The AI Briefing blog")
-    if not args.no_video:
+    for lang in ("he", "en"):
+        m[f"visuals_{lang}"] = media.visuals(key, lang, post[lang].get("visuals") or [])
+    if args.video:  # narrated explainer — opt-in (Koby 2026-09-30: not in its current form)
         png = media.out_dir(key) / "diagram.png"
         for lang in ("he", "en"):
             m[f"video_{lang}"] = media.video(key, lang, term, post[lang]["video_scenes"], png)
@@ -77,7 +79,7 @@ def main(argv=None) -> int:
     ap.add_argument("--seed", action="append", help="extra source URL (repeatable)")
     ap.add_argument("--publish", action="store_true", help="sync to S3 + invalidate (default: build only)")
     ap.add_argument("--draft", action="store_true", help="write with draft: true (hidden from lists/RSS)")
-    ap.add_argument("--no-video", action="store_true")
+    ap.add_argument("--video", action="store_true", help="also render the narrated explainer video (off by default)")
     ap.add_argument("--reuse", action="store_true", help="reuse today's post.json if present (skip LLM)")
     args = ap.parse_args(argv)
     try:

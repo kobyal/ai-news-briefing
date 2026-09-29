@@ -1,0 +1,16 @@
+direction: right
+call: claude -p call
+response: Response
+parse: Parse JSON
+repair: Repair JSON
+retry: Retry with backoff
+publish: Publish
+qa: QA evaluator
+call -> response
+response -> retry: transient error
+retry -> call
+response -> parse
+parse -> repair: malformed
+repair -> parse
+parse -> publish: valid
+publish -> qa: flags P0

@@ -67,9 +67,10 @@ h1{{font-weight:800;font-size:{fs}px;line-height:1.12;letter-spacing:-.02em;marg
 .foot{{position:absolute;bottom:56px;inset-inline-start:88px;inset-inline-end:88px;display:flex;justify-content:space-between;align-items:center}}
 .brand{{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:30px;color:#4f46e5;direction:ltr}}
 .sub{{font-size:24px;color:#6b6b8a}}
-</style></head><body><div class="bar"></div><div class="glow"></div><div class="in">
+.card{{position:relative;width:1200px;height:630px;overflow:hidden;contain:paint}}
+</style></head><body><div class="card"><div class="bar"></div><div class="glow"></div><div class="in">
 <span class="term">{term}</span><h1>{title}</h1>
-<div class="foot"><span class="brand">blog.aibriefing.dev</span><span class="sub">{sub}</span></div></div></body></html>"""
+<div class="foot"><span class="brand">blog.aibriefing.dev</span><span class="sub">{sub}</span></div></div></div></body></html>"""
 
 
 def hero(key: str, lang: str, term: str, title: str, sub: str) -> str | None:
@@ -151,3 +152,86 @@ def video(key: str, lang: str, term: str, scenes: list[dict], diagram_png: Path 
     # Poster: frame at 1s
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", "1", "-i", str(out), "-frames:v", "1", "-vf", "scale=1280:-1", str(d / f"{stem}-poster.jpg")])
     return f"/posts/{key}/{stem}.mp4"
+
+
+# ── Inline visuals (GIF / PNG / SVG per section) ───────────────────────────
+_COMPARE_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@500;800&family=Space+Grotesk:wght@700&display=swap');
+html{{overflow:hidden}} body{{margin:0;font-family:Heebo,Inter,system-ui,sans-serif;color:#0f0f1a}}
+.card{{position:relative;width:1200px;height:675px;overflow:hidden;background:linear-gradient(135deg,#ffffff 0%,#f5f4ff 55%,#eeedfb 100%);padding:56px 72px;box-sizing:border-box}}
+.bar{{position:absolute;inset-inline-start:0;top:0;bottom:0;width:12px;background:#4f46e5}}
+h1{{font-size:30px;font-weight:800;margin:0 0 26px;color:#4f46e5}}
+.cols{{display:grid;grid-template-columns:1fr 1fr;gap:26px}}
+.col{{background:#fff;border:1px solid #ededf5;border-radius:18px;padding:24px 26px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04)}}
+.col.r{{border-top:5px solid #4f46e5}} .col.l{{border-top:5px solid #c7c6ff}}
+h2{{font-size:26px;font-weight:800;margin:0 0 14px}}
+li{{font-size:24px;line-height:1.35;margin-bottom:10px}} ul{{padding-inline-start:26px;margin:0}}
+.brand{{position:absolute;bottom:26px;inset-inline-end:72px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;color:#4f46e5;direction:ltr}}
+</style></head><body><div class="card"><div class="bar"></div><h1>{title}</h1><div class="cols">
+<div class="col l"><h2>{lt}</h2><ul>{li}</ul></div><div class="col r"><h2>{rt}</h2><ul>{ri}</ul></div></div>
+<div class="brand">blog.aibriefing.dev</div></div></body></html>"""
+
+
+def _shoot(page_html: str, out: Path, w: int, h: int):
+    from playwright.sync_api import sync_playwright
+    tmp = out.with_suffix(".html"); tmp.write_text(page_html, encoding="utf-8")
+    try:
+        with sync_playwright() as p:
+            b = p.chromium.launch(channel="chrome")
+            pg = b.new_page(viewport={"width": w, "height": h}, device_scale_factor=1)
+            pg.goto(tmp.resolve().as_uri()); pg.wait_for_timeout(900)
+            pg.screenshot(path=str(out), type="jpeg", quality=88) if out.suffix == ".jpg" else pg.screenshot(path=str(out))
+            b.close()
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _gif(comp: str, props: dict, out: Path):
+    props_path = out.with_suffix(".json"); props_path.write_text(json.dumps(props, ensure_ascii=False), encoding="utf-8")
+    try:
+        subprocess.run(["npx", "remotion", "render", "src/index.ts", comp, str(out), f"--props={props_path}", "--codec=gif", "--every-nth-frame=1", "--log=error", "--concurrency=4"],
+                       cwd=VIDEO, check=True, capture_output=True, timeout=600)
+    finally:
+        props_path.unlink(missing_ok=True)
+
+
+def visuals(key: str, lang: str, items: list[dict]) -> list[dict]:
+    """Render the writer's per-section visuals. Returns [{after, src, caption}] for publish._insert_figures."""
+    d = out_dir(key)
+    out = []
+    for i, v in enumerate(items):
+        kind = v.get("kind"); stem = f"v{i + 1}-{kind}-{lang}"
+        try:
+            if kind == "steps":
+                f = d / f"{stem}.gif"
+                _gif("Steps", {"lang": lang, "title": v.get("title", ""), "steps": [str(x) for x in v.get("steps", [])][:5]}, f)
+                cap = v.get("title", "")
+            elif kind == "stat":
+                f = d / f"{stem}.gif"
+                _gif("Stat", {"lang": lang, "value": str(v.get("value", "")), "label": v.get("label", ""), "source": v.get("source", "")}, f)
+                cap = v.get("label", "")
+            elif kind == "compare":
+                f = d / f"{stem}.jpg"
+                L, R = v.get("left", {}), v.get("right", {})
+                li = "".join(f"<li>{html.escape(str(x))}</li>" for x in L.get("items", [])[:4])
+                ri = "".join(f"<li>{html.escape(str(x))}</li>" for x in R.get("items", [])[:4])
+                _shoot(_COMPARE_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", title=html.escape(v.get("title", "")),
+                                            lt=html.escape(L.get("title", "")), rt=html.escape(R.get("title", "")), li=li, ri=ri), f, 1200, 675)
+                cap = v.get("title", "")
+            elif kind == "d2":
+                src = d / f"{stem}.d2"; f = d / f"{stem}.svg"
+                d2 = v.get("d2", "").strip()
+                if "direction:" not in d2:
+                    d2 = "direction: right\n" + d2
+                src.write_text(d2 + "\n", encoding="utf-8")
+                subprocess.run(["d2", "--layout=elk", "--theme=0", "--pad=40", str(src), str(f)], check=True, capture_output=True, timeout=120)
+                cap = v.get("caption", "")
+            else:
+                continue
+            out.append({"after": v.get("after"), "src": f"/posts/{key}/{f.name}", "caption": cap})
+            print(f"  media: visual {stem} ok ({f.stat().st_size // 1024} KB)")
+        except subprocess.CalledProcessError as e:
+            print(f"  media: visual {stem} failed: {(e.stderr or b'')[-300:]!r}")
+        except Exception as e:  # noqa: BLE001
+            print(f"  media: visual {stem} failed ({e})")
+    return out

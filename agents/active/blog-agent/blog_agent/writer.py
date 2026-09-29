@@ -52,8 +52,15 @@ ALSO produce:
   image{heading, caption} (the diagram is inserted automatically); quote{text,who}; opinion{heading,text};
   outro{text, url:"blog.aibriefing.dev"}. On-screen text is SHORT (<=14 words per line); narration carries the detail.
   First scene must be title, one scene must be image, last must be outro.
+- visuals: 3–4 inline visuals, one per section (never two in the same section), each with "after" = the exact
+  ## heading text it belongs to. Kinds (mix them, at least one "steps" and one "stat" or "compare"):
+  {"kind":"steps","after":..,"title":..,"steps":[3-5 items, <=7 words each]}      → animated step-reveal
+  {"kind":"stat","after":..,"value":"88%","label":<=12 words,"source":"Marmelab 2026"} → big animated number (value must START with a number)
+  {"kind":"compare","after":..,"title":..,"left":{"title":..,"items":[3-4]},"right":{"title":..,"items":[3-4]}} → side-by-side card (e.g. term vs neighbour term, before/after)
+  {"kind":"d2","after":..,"caption":..,"d2":"<D2 source, 4-8 nodes, English labels>"}   → a second diagram of a DIFFERENT mechanism than diagram_d2
+  All visible text in the post language. Captions <=12 words.
 Return ONLY JSON with keys: title, description (<=160 chars, no colon at start), tags (3-6 English lowercase),
-body_md, opinion_md, diagram_d2, video_scenes, sources_used (list of the source URLs you actually relied on).
+body_md, opinion_md, diagram_d2, visuals, video_scenes, sources_used (list of the source URLs you actually relied on).
 """
 
 SYSTEM_EN = """You produce the English edition of a Hebrew blog post from blog.aibriefing.dev.
@@ -62,8 +69,10 @@ opinion — written the way a sharp engineer writes English. Plain words, short 
 "in today's fast-paced world", no closing summary. Keep the same ## sections (translate the headings:
 Where it came from / What it actually is / How to do it / What it buys you, and what it doesn't / From our own pipeline).
 Keep code/tables identical. Keep the house opinion in first person plural.
-Also produce video_scenes in English with the same scene types/order as the Hebrew ones, narration 1–2 sentences each.
-Return ONLY JSON with keys: title, description (<=160 chars), body_md, opinion_md, video_scenes.
+Also produce video_scenes in English with the same scene types/order as the Hebrew ones, narration 1–2 sentences each,
+and visuals: the SAME list (same kinds, same order, same d2 sources) with every visible string in English and
+"after" set to the matching English ## heading text.
+Return ONLY JSON with keys: title, description (<=160 chars), body_md, opinion_md, visuals, video_scenes.
 """
 
 
@@ -75,7 +84,7 @@ def _sources_block(sources: list[dict]) -> str:
 
 
 def _check(doc: dict, lang: str) -> str:
-    req = ["title", "description", "body_md", "opinion_md", "video_scenes"] + (["diagram_d2", "tags", "sources_used"] if lang == "he" else [])
+    req = ["title", "description", "body_md", "opinion_md", "video_scenes", "visuals"] + (["diagram_d2", "tags", "sources_used"] if lang == "he" else [])
     missing = [k for k in req if not doc.get(k)]
     if missing:
         return f"missing {missing}"
@@ -87,6 +96,13 @@ def _check(doc: dict, lang: str) -> str:
         return "video_scenes shape wrong (7-9 scenes, title first, one image, outro last)"
     if any(not s.get("narration") for s in sc):
         return "every scene needs narration"
+    vis = doc["visuals"]
+    kinds = {v.get("kind") for v in vis if isinstance(v, dict)}
+    if not (2 <= len(vis) <= 5) or not kinds <= {"steps", "stat", "compare", "d2"} or not any(v.get("after") for v in vis):
+        return "visuals shape wrong (3-4 items, kinds steps|stat|compare|d2, each with after)"
+    for v in vis:
+        if v["kind"] == "stat" and not re.match(r"^\D{0,3}\d", str(v.get("value", ""))):
+            return "stat value must start with a number"
     if lang == "he" and not re.search(r"[֐-׿]", doc["body_md"]):
         return "body is not Hebrew"
     return ""
@@ -119,13 +135,13 @@ def write_post(term: str, key: str, sources: list[dict], usage_log: list) -> dic
     if len(src_out) < 3:  # model was lazy about listing — keep the top ones it was given
         src_out = [{"title": s.get("title") or s["url"], "url": s["url"], "date": s.get("date") or ""} for s in sources[:6]]
 
-    prompt_en = ("HEBREW POST (JSON):\n" + json.dumps({k: he[k] for k in ("title", "description", "body_md", "opinion_md", "video_scenes")}, ensure_ascii=False)
+    prompt_en = ("HEBREW POST (JSON):\n" + json.dumps({k: he[k] for k in ("title", "description", "body_md", "opinion_md", "video_scenes", "visuals")}, ensure_ascii=False)
                  + "\n\nSOURCES: " + json.dumps(src_out, ensure_ascii=False))
     print("  writer: EN edition")
     en = _call(prompt_en, SYSTEM_EN, "en", usage_log)
 
     return {
         "key": key, "term": term, "tags": he.get("tags") or [], "sources": src_out, "diagram_d2": he["diagram_d2"],
-        "he": {k: he[k] for k in ("title", "description", "body_md", "opinion_md", "video_scenes")},
-        "en": {k: en[k] for k in ("title", "description", "body_md", "opinion_md", "video_scenes")},
+        "he": {k: he[k] for k in ("title", "description", "body_md", "opinion_md", "video_scenes", "visuals")},
+        "en": {k: en[k] for k in ("title", "description", "body_md", "opinion_md", "video_scenes", "visuals")},
     }

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from datetime import date
 from pathlib import Path
@@ -46,13 +47,33 @@ def write_mdx(post: dict, media: dict, model: str, pub: date, draft: bool = Fals
         fm.append(f"madeWith: {{ model: {_yaml_str(model)}, sourceCount: {len(post['sources'])}, reviewedBy: \"Koby Almog\" }}")
         if draft: fm.append("draft: true")
         body = p["body_md"].strip()
-        if media.get("diagram"):
-            cap = "איך זה עובד" if lang == "he" else "How it fits together"
-            body = body.replace("\n## ", f"\n\n<figure><img src=\"{media['diagram']}\" alt=\"{cap}\" /><figcaption>{cap}</figcaption></figure>\n\n## ", 1) if "\n## " in body else body
+        figs = [{"after": 1, "src": media["diagram"], "caption": "איך זה עובד" if lang == "he" else "How it fits together"}] if media.get("diagram") else []
+        figs += media.get(f"visuals_{lang}") or []
+        body = _insert_figures(body, figs)
         f = d / f"{lang}.mdx"
         f.write_text("---\n" + "\n".join(fm) + "\n---\n\n" + body + "\n", encoding="utf-8")
         out.append(f)
     return out
+
+
+def _insert_figures(body: str, figs: list[dict]) -> str:
+    """Insert each figure at the END of its target section. `after` is a 1-based ## index or a heading substring."""
+    parts = re.split(r"(?m)^(?=## )", body)  # parts[0] = preamble, then one chunk per ## section
+    heads = [re.match(r"## (.*)", c).group(1).strip() if c.startswith("## ") else "" for c in parts]
+    for f in figs:
+        idx = None
+        a = f.get("after")
+        if isinstance(a, int):
+            idx = a if 0 < a < len(parts) else None
+        elif isinstance(a, str) and a.strip():
+            key = a.strip().lower()
+            idx = next((i for i, h in enumerate(heads) if i > 0 and (key in h.lower() or h.lower() in key)), None)
+        if idx is None:
+            idx = len(parts) - 1
+        cap = f.get("caption") or ""
+        fig = f"\n<figure><img src=\"{f['src']}\" alt=\"{cap}\" loading=\"lazy\" /><figcaption>{cap}</figcaption></figure>\n\n"
+        parts[idx] = parts[idx].rstrip() + "\n" + fig
+    return "".join(parts)
 
 
 def build() -> bool:
@@ -70,8 +91,8 @@ def deploy() -> bool:
     subprocess.run(["aws", "s3", "sync", str(dist / "_astro"), f"s3://{BLOG_S3_BUCKET}/_astro", "--cache-control", "public,max-age=31536000,immutable", *base])
     # Videos are gitignored (11MB/post) so a fresh clone has none locally: upload the ones we have
     # WITHOUT --delete, then sync everything else with --delete but never touch remote .mp4s.
-    subprocess.run(["aws", "s3", "sync", str(dist / "posts"), f"s3://{BLOG_S3_BUCKET}/posts", "--exclude", "*", "--include", "*.mp4", *base])
-    r = subprocess.run(["aws", "s3", "sync", str(dist), f"s3://{BLOG_S3_BUCKET}", "--delete", "--exclude", "*.mp4", *base])
+    subprocess.run(["aws", "s3", "sync", str(dist / "posts"), f"s3://{BLOG_S3_BUCKET}/posts", "--exclude", "*", "--include", "*.mp4", "--include", "*.gif", *base])
+    r = subprocess.run(["aws", "s3", "sync", str(dist), f"s3://{BLOG_S3_BUCKET}", "--delete", "--exclude", "*.mp4", "--exclude", "*.gif", *base])
     if r.returncode != 0:
         print("  publish: s3 sync failed"); return False
     subprocess.run(["aws", "cloudfront", "create-invalidation", "--distribution-id", BLOG_CLOUDFRONT_DIST_ID, "--paths", "/*", "--profile", AWS_PROFILE], capture_output=True)

@@ -688,13 +688,16 @@ The maintainer's deployment has two extra components in the public repo's tracke
 
 ## Blog (blog.aibriefing.dev)
 
-A companion blog — one AI-engineering term a week, explained in Hebrew (English mirror
-under `/en/`) with a diagram, a hero card and a narrated Remotion explainer video.
+A companion blog — one AI-engineering term a day, explained in Hebrew (English mirror
+under `/en/`) with diagrams, animated GIFs (step reveals, stat count-ups), comparison
+cards and a hero card. A narrated Remotion explainer video exists behind `--video`
+(off by default — Koby 2026-09-30: not in its current form).
 Plan + rationale: `docs/BLOG_PLAN.md`.
 
 - **Site:** `blog/` (Astro 7, MDX content collection `src/content/posts/<key>/{he,en}.mdx`,
   schema in `src/content.config.ts`). Assets per post in `blog/public/posts/<key>/`.
-- **Video:** `blog/video/` (Remotion; scene contract in `src/props.ts`).
+- **Visuals:** `blog/video/` (Remotion). `Steps`/`Stat` compositions render inline GIFs;
+  `Explainer` is the opt-in narrated video. Compare cards + hero = HTML → Chrome screenshot.
 - **Agent:** `agents/active/blog-agent/` — `discover.py` (term velocity over HN / Arctic
   Shift / arXiv / feeds, seeded by `BACKLOG`), `research.py` (sources via
   `shared.article_reader`), `writer.py` (two `claude -p` calls: HE canonical, EN edition;
@@ -702,11 +705,12 @@ Plan + rationale: `docs/BLOG_PLAN.md`.
   via Chrome screenshot, edge-tts narration, Remotion render), `publish.py` (MDX → astro
   build → S3 `ai-news-briefing-blog` → CloudFront `E30X41I4MDIA4Z`, constants in
   `shared/aws_config.py`).
-- **Run:** `python agents/active/blog-agent/run.py [--term "…"] [--seed URL] [--publish] [--no-video] [--draft]`.
+- **Run:** `python agents/active/blog-agent/run.py [--term "…"] [--seed URL] [--publish] [--video] [--draft] [--reuse]`.
   Default is build-only; `--publish` syncs + invalidates and marks the term covered
-  (`state/covered.json`). Weekly launchd job `com.kobyalmog.ai-briefing-blog`
-  (Sunday 07:00) runs `--publish` and commits the new post.
-- **Editorial rules:** 1 post/week, named author, "how this was made" badge, ≥3 sources,
+  (`state/covered.json`). Runs daily from `local-cycle.sh` (after library-agent,
+  fail-soft); the cycle's commit picks up `blog/src/content`, `blog/public/posts`
+  (mp4/gif are gitignored — S3 is the store for those) and the agent state.
+- **Editorial rules:** named author, "how this was made" badge, ≥3 sources,
   opinion written from `house_positions.md` (edit that file to change the voice).
 - **DNS** for the subdomain is at Cloudflare (token in `private/.env`, `CLOUDFLARE_*`).
 

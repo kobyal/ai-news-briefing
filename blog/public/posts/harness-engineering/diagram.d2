@@ -1,19 +1,17 @@
 direction: right
-spec: Task Spec
-planner: Planner Agent
-progress: Progress File + Task List
-generator: Generator Agent
-sandbox: Sandbox + Tools
-checks: Deterministic Checks
-evaluator: Evaluator Agent
-human: Human Review
-spec -> planner: high-level goal
-planner -> progress: decomposed tasks
-progress -> generator: next task + prior context
-generator -> sandbox: code and tool calls
-sandbox -> checks: output
-checks -> evaluator: passes rules
-checks -> generator: rule failure
-evaluator -> generator: feedback on fail
-evaluator -> progress: mark done
-progress -> human: status for steering
+task: Task spec
+planner: Planner
+generator: Generator agent
+tools: Tools and sandbox
+verifier: Verifier (tests, lint, evaluator)
+artifacts: Progress artifacts
+rules: Harness rules
+task -> planner: spec
+planner -> generator: feature list
+generator -> tools: edit / run
+tools -> verifier: output
+verifier -> generator: fail + feedback
+verifier -> artifacts: pass
+artifacts -> generator: next session context
+verifier -> rules: repeated mistake
+rules -> generator: new constraint

@@ -424,6 +424,13 @@ if LIBRARY_TIME_BUDGET_S="${LIBRARY_TIME_BUDGET_S:-1500}" "$PYTHON_BIN" agents/a
 else
   echo "  ⚠ library-agent failed (skipping; see logs/library-${DATE}.log)"
 fi
+# Blog (blog.aibriefing.dev) — one explained AI-engineering term per day, HE + EN, with
+# diagrams/GIFs; publishes to its own bucket + distribution (2026-09-30). Fail-soft.
+if BLOG_TIME_BUDGET_S="${BLOG_TIME_BUDGET_S:-900}" caffeinate -dimsu "$PYTHON_BIN" agents/active/blog-agent/run.py --publish >"logs/blog-${DATE}.log" 2>&1; then
+  echo "  ✓ blog-agent: $(grep -o 'done in [0-9]*s — .*' "logs/blog-${DATE}.log" | tail -1)"
+else
+  echo "  ⚠ blog-agent failed (skipping; see logs/blog-${DATE}.log)"
+fi
 # Search-index rebuild runs AFTER podcasts + hot_tools so it can index the
 # fresh HF entries from hot_tools.json.
 if [ -f scripts/build_search_index.py ]; then
@@ -564,6 +571,7 @@ if [ "$DO_PUSH" -eq 1 ]; then
   # library/events agents persist small state (done-list, per-talk content, event
   # verdicts); their .gitignore keeps media out.
   git add agents/active/library-agent/state agents/active/library-agent/collections agents/active/events-agent/cache 2>/dev/null || true
+  git add agents/active/blog-agent/state blog/src/content blog/public/posts blog/public/og-default.jpg 2>/dev/null || true
   if git diff --staged --quiet; then
     echo "  (nothing new to commit — skipping push)"
   else

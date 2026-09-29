@@ -4,6 +4,7 @@ Uses Tavily's news search (topic="news", search_depth="advanced") to find
 the latest AI vendor news. Falls back to DuckDuckGo if no Tavily key.
 """
 import os
+import threading
 import concurrent.futures
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -45,6 +46,10 @@ class TavilySearcher:
         self._backup_keys = [k for k in self._backup_keys if k]  # filter empty
         self._client = None
         self._key_index = 0  # 0 = primary, 1+ = backups
+        # One searcher is shared by fetch_all_vendor_news' 6 threads: without the
+        # lock, several threads hitting an exhausted key each rotated, skipping
+        # key #2 straight to #3 (2026-09-29).
+        self._rotate_lock = threading.Lock()
         if self.api_key:
             try:
                 from tavily import TavilyClient
@@ -52,8 +57,15 @@ class TavilySearcher:
             except ImportError:
                 print("  [Tavily] tavily-python not installed — falling back to DuckDuckGo")
 
-    def _switch_to_backup(self):
-        """Switch to next backup Tavily API key."""
+    def _switch_to_backup(self, failed_client=None):
+        """Switch to next backup Tavily API key. If another thread already
+        rotated away from `failed_client`, just retry on the current key."""
+        with self._rotate_lock:
+            if failed_client is not None and self._client is not failed_client:
+                return True
+            return self._rotate()
+
+    def _rotate(self):
         if self._key_index < len(self._backup_keys):
             from tavily import TavilyClient
             next_key = self._backup_keys[self._key_index]
@@ -78,8 +90,9 @@ class TavilySearcher:
     def _tavily_search(self, query: str, days: int, max_results: int) -> List[dict]:
         _RETRY_DELAYS = [3, 8]
         for attempt in range(len(_RETRY_DELAYS) + 1):
+            client = self._client
             try:
-                resp = self._client.search(
+                resp = client.search(
                     query=query,
                     search_depth="advanced",
                     topic="news",
@@ -93,7 +106,7 @@ class TavilySearcher:
                 # Quota/rate limit — try backup key before retrying
                 if ("limit" in err_str or "quota" in err_str or "429" in err_str
                         or "insufficient" in err_str):
-                    if self._switch_to_backup():
+                    if self._switch_to_backup(client):
                         continue  # Retry immediately with backup key
                 if attempt < len(_RETRY_DELAYS):
                     delay = _RETRY_DELAYS[attempt]

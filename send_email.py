@@ -160,36 +160,6 @@ def _per_run_breakdown() -> list[dict]:
     return [{"run": ts, **v} for ts, v in sorted(by_ts.items())]
 
 # ── Check API key health ──────────────────────────────────────────────
-def _pct(used: float, limit: float) -> str:
-    if not limit:
-        return ""
-    p = 100 * used / limit
-    return f" ({p:.0f}%)" if p >= 1 else f" (<1%)"
-
-
-# Mark status "warn" (yellow) when usage hits this percent of the limit
-_WARN_THRESHOLD_PCT = 80
-
-
-def _load_dashboard_mtd() -> dict:
-    """Manual MTD numbers the user refreshes from provider dashboards weekly.
-    Resolution order: DASHBOARD_MTD_JSON env var (set as GH secret for CI),
-    then private/dashboard_mtd.json (gitignored, local only)."""
-    raw = os.environ.get("DASHBOARD_MTD_JSON", "")
-    if raw:
-        try:
-            return json.loads(raw)
-        except Exception:
-            pass
-    for path in ("private/dashboard_mtd.json", os.path.expanduser("~/.ai-news-briefing-mtd.json")):
-        if os.path.exists(path):
-            try:
-                return _load_json(path)
-            except Exception:
-                pass
-    return {}
-
-
 def _cost_by_provider_since(start_date: str) -> dict:
     """Sum cost from every agent's usage*.json files whose directory >= start_date.
     Returns {api_name: usd_total}. Now sums across multi-run days — each run's
@@ -224,250 +194,17 @@ def _cost_by_provider_since(start_date: str) -> dict:
 
 
 def _check_apis() -> list[dict]:
-    """Health + consumption for each API. Returns list of {name, status, detail, console_url, tier}.
-    tier is "paid" or "free" — drives the two-table split in the email."""
-    checks = []
-    mtd = _load_dashboard_mtd().get("providers", {}) or {}
-
-    # Daily + 7-day totals computed from our own per-call usage.json files (authoritative for what WE spent)
-    _today = datetime.now().strftime("%Y-%m-%d")
-    _7d_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-    today_by_api = _cost_by_provider_since(_today)
-    week_by_api = _cost_by_provider_since(_7d_ago)
-
-    def _credits_left(provider_name: str) -> str | None:
-        """Read credits_left_usd from dashboard_mtd, or parse from legacy detail string."""
-        p = mtd.get(provider_name, {}) or {}
-        if "credits_left_usd" in p:
-            try:
-                return f"${float(p['credits_left_usd']):.2f} left"
-            except Exception:
-                pass
-        m = re.search(r'\$([\d.]+)\s+credits?\s+left', p.get("detail", "") or "", re.IGNORECASE)
-        if m:
-            return f"${m.group(1)} left"
-        return None
-
-    def _cost_line(provider_name: str) -> str:
-        """today $X · $Y left  (daily + credits balance only — drops dashboard "detail" cruft)."""
-        parts = []
-        p = mtd.get(provider_name, {}) or {}
-        auto_today = today_by_api.get(provider_name, 0)
-        manual_today = float(p.get("today_usd", 0) or 0)
-        today = auto_today if auto_today > 0 else manual_today
-        if today > 0:
-            parts.append(f"today ${today:.4f}")
-        credits = _credits_left(provider_name)
-        if credits:
-            parts.append(credits)
-        return " · ".join(parts)
-
-    # ── PAID: Anthropic — concise: today api/sub · models · credits left ──
-    # Renders even when ANTHROPIC_API_KEY is unset (subscription-only days).
-    api_today = today_by_api.get("Anthropic", 0)
-    sub_calls = [c for u in usage_data for c in u.get("calls", []) if c.get("via") == "subscription"]
-    api_calls = [c for u in usage_data for c in u.get("calls", []) if c.get("via") != "subscription" and "claude" in (c.get("model", "") or "").lower()]
-    sub_count = len(sub_calls)
-    api_count = len(api_calls)
-    models_used = sorted({_friendly_model(c.get("model", "")) for c in (sub_calls + api_calls) if c.get("model")})
-    parts = []
-    if api_today > 0 or api_count > 0:
-        parts.append(f"today ${api_today:.4f} (api)")
-    if sub_count > 0:
-        parts.append(f"$0 (sub, {sub_count} calls)")
-    if models_used:
-        parts.append("models: " + ", ".join(models_used))
-    credits = _credits_left("Anthropic")
-    if credits:
-        parts.append(credits)
-    checks.append({"name": "Anthropic", "status": "ok",
-                   "detail": " · ".join(parts) or "no calls today",
-                   "console_url": "https://platform.claude.com/settings/keys", "tier": "paid"})
-
-    # ── PAID: Google Gemini / Perplexity / xAI — probe models endpoint ─
-    def _build_probe(method, url, headers, body):
-        req = urllib.request.Request(url, method=method, data=body)
-        for k, v in headers.items():
-            req.add_header(k, v)
-        return req
-
-    google_key = os.environ.get("GOOGLE_API_KEY", "")
-    pplx_key = os.environ.get("PERPLEXITY_API_KEY", "")
-    xai_key = os.environ.get("XAI_API_KEY", "")
-    yt_key = os.environ.get("YOUTUBE_API_KEY", "")
-    PAID_OTHERS = [
-        ("Google Gemini", google_key,
-         ("GET", f"https://generativelanguage.googleapis.com/v1beta/models?key={google_key}", {}, None),
-         "https://aistudio.google.com/spend"),
-        ("Perplexity", pplx_key,
-         ("GET", "https://api.perplexity.ai/v1/models", {"Authorization": f"Bearer {pplx_key}"}, None),
-         "https://console.perplexity.ai/group/10174651-356d-4504-a319-cab5ad331920/billing"),
-        ("xAI (Grok)", xai_key,
-         ("GET", "https://api.x.ai/v1/models", {"Authorization": f"Bearer {xai_key}"}, None),
-         "https://console.x.ai/team/7992d610-7c06-49b6-bf25-153940e9313f/billing"),
-    ]
-    for name, key, (method, url, headers, body), console_url in PAID_OTHERS:
-        if not key:
-            continue
-        try:
-            with urllib.request.urlopen(_build_probe(method, url, headers, body), timeout=8):
-                # Prefer real MTD numbers from dashboard_mtd.json, fall back to plan note
-                detail = _cost_line(name) or "PAYG · update private/dashboard_mtd.json"
-                checks.append({"name": name, "status": "ok", "detail": detail, "console_url": console_url, "tier": "paid"})
-        except Exception as e:
-            err = str(e)
-            status = "exhausted" if ("403" in err or "429" in err or "quota" in err.lower()) else "error"
-            checks.append({"name": name, "status": status, "detail": err[:60], "console_url": console_url, "tier": "paid"})
-
-    # ── FREE: Tavily — one combined row; exhausted keys are expected rotation ──
-    # Show overall status as ok/warn if at least one key is active.
-    # Only marks as exhausted when ALL keys are gone.
-    _tavily_slots = []
-    for i, key_name in enumerate(["TAVILY_API_KEY", "TAVILY_API_KEY2", "TAVILY_API_KEY3"], 1):
-        key = os.environ.get(key_name, "")
-        if not key:
-            continue
-        try:
-            req = urllib.request.Request("https://api.tavily.com/usage")
-            req.add_header("Authorization", f"Bearer {key}")
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                d = json.loads(resp.read())
-            acct = d.get("account", {}) or {}
-            plan_used = acct.get("plan_usage", 0) or 0
-            plan_limit = acct.get("plan_limit", 0) or 0
-            pct = 100 * plan_used / plan_limit if plan_limit else 0
-            if plan_limit and plan_used >= plan_limit:
-                slot_status = "exhausted"
-            elif pct >= _WARN_THRESHOLD_PCT:
-                slot_status = "warn"
-            else:
-                slot_status = "ok"
-            detail = f"#{i} {plan_used:,}/{plan_limit:,}{_pct(plan_used, plan_limit)}"
-        except Exception as e:
-            err = str(e)
-            slot_status = "exhausted" if ("usage limit" in err or "432" in err or "429" in err) else "error"
-            detail = f"#{i} {err[:30]}"
-        _tavily_slots.append({"status": slot_status, "detail": detail})
-    if _tavily_slots:
-        _active = [s for s in _tavily_slots if s["status"] in ("ok", "warn")]
-        if not _active:
-            _tv_status = "exhausted"
-        elif any(s["status"] == "warn" for s in _active):
-            _tv_status = "warn"
-        else:
-            _tv_status = "ok"
-        _tv_detail = " · ".join(s["detail"] for s in _tavily_slots)
-        if len(_tavily_slots) > 1:
-            _tv_detail += f" · {len(_active)}/{len(_tavily_slots)} active"
-        checks.append({"name": "Tavily", "status": _tv_status, "detail": _tv_detail,
-                       "console_url": "https://app.tavily.com/home", "tier": "free"})
-
-    # ── FREE: YouTube — 10k unit/day quota, no programmatic check ──────
-    if yt_key:
-        try:
-            req = urllib.request.Request(f"https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={yt_key}")
-            with urllib.request.urlopen(req, timeout=5):
-                checks.append({"name": "YouTube", "status": "ok", "detail": "10,000 units/day quota",
-                               "console_url": "https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas", "tier": "free"})
-        except Exception as e:
-            err = str(e)
-            status = "exhausted" if ("403" in err or "429" in err or "quota" in err.lower()) else "error"
-            checks.append({"name": "YouTube", "status": status, "detail": err[:60],
-                           "console_url": "https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas", "tier": "free"})
-
-    # ── FREE: Jina — probe Reader endpoint. CRITICAL: urllib's default
-    # User-Agent (Python-urllib/3.x) gets blocked by Jina's bot filter with
-    # 403, even for valid keys. Passing a browser-like UA is enough to pass
-    # the probe reliably.
-    # Probe both keys, then emit ONE aggregate status. article_reader.py rotates
-    # key #1 → key #2 on 402/403/429, so an exhausted key #1 (402, every run once
-    # its paid credits run out) is fully covered if key #2 works. Flagging each key
-    # independently produced a permanent false "❌ Jina #1 402" even though articles
-    # read fine (2026-06-11: jina=35). Only a real failure = BOTH keys down AND zero
-    # jina reads today.
-    firecrawl_present = bool(os.environ.get("FIRECRAWL_API_KEY", ""))
-    jina_keys = [(n, os.environ.get(n, "")) for n in ("JINA_API_KEY", "JINA_API_KEY2")]
-    jina_keys = [(n, k) for n, k in jina_keys if k]
-    if jina_keys:
-        probe = {}  # short label ("#1"/"#2") -> "ok" | "<err>"
-        for i, (key_name, key) in enumerate(jina_keys, 1):
-            try:
-                req = urllib.request.Request("https://r.jina.ai/https://example.com")
-                req.add_header("Authorization", f"Bearer {key}")
-                req.add_header("Accept", "text/markdown")
-                req.add_header("User-Agent", "ai-news-briefing/1.0")  # bypass bot filter
-                with urllib.request.urlopen(req, timeout=8):
-                    probe[f"#{i}"] = "ok"
-            except Exception as e:
-                probe[f"#{i}"] = str(e)[:40]
-
-        ok_keys   = [lbl for lbl, r in probe.items() if r == "ok"]
-        dead_keys = [(lbl, r) for lbl, r in probe.items() if r != "ok"]
-        # How many articles actually read via Jina today (rotation/unauth/cache)?
-        jina_reads = 0
-        try:
-            _ar = sorted(glob.glob(f"agents/active/article-reader-agent/output/{datetime.now().strftime('%Y-%m-%d')}/articles_*.json"))
-            if _ar:
-                jina_reads = int((_load_json(_ar[-1]).get("stats", {}) or {}).get("jina", 0))
-        except Exception:
-            pass
-
-        if ok_keys:
-            detail = "Reader · free tier"
-            if dead_keys:
-                detail = f"key {ok_keys[0]} ok · key {dead_keys[0][0]} exhausted ({dead_keys[0][1]}) — rotation covers"
-            checks.append({"name": "Jina", "status": "ok", "detail": detail,
-                           "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
-        elif jina_reads > 0 or firecrawl_present:
-            cover = f"{jina_reads} reads via unauth/cache" if jina_reads > 0 else "Firecrawl covers"
-            checks.append({"name": "Jina", "status": "warn",
-                           "detail": f"both keys down ({dead_keys[0][1]}) · {cover}",
-                           "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
-        else:
-            checks.append({"name": "Jina", "status": "error",
-                           "detail": f"both keys failed: {dead_keys[0][1]}",
-                           "console_url": "https://jina.ai/api-dashboard", "tier": "free"})
-
-    # ── FREE: X/Twitter scrape — surfaces auth-cookie expiry as ⚠️ ─────
+    """Live health + consumption for every provider, from the shared source
+    registry (shared/sources.py). Returns rows {name, status, detail, console_url,
+    tier}; tier "paid"/"free" drives the email's two-table split."""
+    from shared import sources
     today = datetime.now().strftime("%Y-%m-%d")
-    twitter_files = sorted(glob.glob(f"agents/active/twitter-agent/output/{today}/twitter_*.json"))
-    if twitter_files:
-        try:
-            d = _load_json(twitter_files[-1])
-            b = d.get("briefing", d) or {}
-            n_people = len(b.get("people_highlights", []) or [])
-            n_trending = len(b.get("trending_posts", []) or [])
-            if n_people > 0:
-                detail = f"{n_people} people · {n_trending} trending · auth ok"
-                status = "ok"
-            else:
-                detail = "0 people fetched — cookies likely expired, refresh TWITTER_AUTH_TOKEN/CT0"
-                status = "warn"
-            checks.append({"name": "X scrape", "status": status, "detail": detail,
-                           "console_url": "https://x.com/", "tier": "free"})
-        except Exception as e:
-            checks.append({"name": "X scrape", "status": "error", "detail": str(e)[:50],
-                           "console_url": "https://x.com/", "tier": "free"})
-
-    # ── FREE: Reddit (Arctic Shift no-auth) — surfaces 400/403 as ⚠️ ───
-    rss_files = sorted(glob.glob(f"agents/active/rss-news-agent/output/{today}/rss_*.json"))
-    if rss_files:
-        try:
-            d = _load_json(rss_files[-1])
-            n_reddit = len((d.get("reddit_posts") or d.get("briefing", {}).get("reddit_posts", []) or []))
-            if n_reddit > 0:
-                checks.append({"name": "Reddit (ArcticShift)", "status": "ok",
-                               "detail": f"{n_reddit} posts fetched (no-auth)",
-                               "console_url": "https://arctic-shift.photon-reddit.com/", "tier": "free"})
-            else:
-                checks.append({"name": "Reddit (ArcticShift)", "status": "warn",
-                               "detail": "0 posts — ArcticShift API likely 4xx, Reddit content skipped today",
-                               "console_url": "https://arctic-shift.photon-reddit.com/", "tier": "free"})
-        except Exception as e:
-            checks.append({"name": "Reddit (ArcticShift)", "status": "error", "detail": str(e)[:50],
-                           "console_url": "https://arctic-shift.photon-reddit.com/", "tier": "free"})
-
-    return checks
+    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    ctx = sources.run_context(today)
+    # Our own per-call usage files are authoritative for what WE spent.
+    ctx["today_spend"] = _cost_by_provider_since(today)
+    ctx["week_spend"] = _cost_by_provider_since(week_ago)
+    return sources.check_all(ctx)
 
 
 def _collect_fallbacks() -> list[dict]:
@@ -1261,7 +998,7 @@ if usage_data:
 print("Checking API status...")
 api_checks = _check_apis()
 for c in api_checks:
-    icon = {"ok": "✅", "warn": "⚠️", "exhausted": "🔴", "error": "❌"}.get(c["status"], "?")
+    icon = {"ok": "✅", "warn": "⚠️", "exhausted": "🔴", "error": "❌", "off": "⚪"}.get(c["status"], "?")
     tier_tag = "[$]" if c.get("tier") == "paid" else "[free]"
     print(f"  {icon} {tier_tag} {c['name']}: {c['detail']}")
 

@@ -14,7 +14,10 @@ writing a helper, check whether it already exists — reuse or extend it; do not
 Where shared code belongs:
 - **Python (cross-agent):** `shared/` — e.g. `shared/anthropic_cc.py` (the ONLY
   `claude -p` / Anthropic call wrapper agents should use), `shared/vendors.py`
-  (vendor enum + `classify_vendor`), `shared/article_reader.py`. New cross-cutting
+  (vendor enum + `classify_vendor`), `shared/article_reader.py`,
+  `shared/sources.py` (registry of every external provider: keys in rotation
+  order, fallback, console, live check — the email's provider tables come from it;
+  add a new provider/key HERE, not as another ad-hoc probe). New cross-cutting
   helpers (JSON repair, pricing, story_id, output/usage writing, date formatting)
   go here, not inline in an agent's `pipeline.py`.
 - **Frontend:** `web/src/components/ui/` for shared components (e.g.

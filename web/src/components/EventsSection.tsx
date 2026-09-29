@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLang } from "@/context/LangContext";
 import { FilterCarousel } from "@/components/ui/FilterCarousel";
 import {
-  BUCKET_LABELS, bucketOf, dateBadge, fetchEvents, googleCalendarUrl,
+  BUCKET_LABELS, VENDOR_EVENT_TAG, bucketOf, dateBadge, eventVendors, fetchEvents, googleCalendarUrl,
   type EventBucket, type EventItem,
 } from "@/lib/events";
 
@@ -101,7 +101,16 @@ function EventCard({ ev, isHe }: { ev: EventItem; isHe: boolean }) {
   );
 }
 
-export function EventsSection() {
+interface EventsSectionProps {
+  /** Active chip of the page's vendor ribbon (null = All). Narrows the list
+   *  via VENDOR_EVENT_TAG so the ribbon and the section agree. */
+  vendor?: string | null;
+  /** Fires once the feed loads with the ribbon vendors that have events, so
+   *  the page can light up those chips. */
+  onVendors?: (vendors: Set<string>) => void;
+}
+
+export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) {
   const { isHe } = useLang();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [collapsed, setCollapsed] = useState(false);
@@ -115,9 +124,14 @@ export function EventsSection() {
     fetchEvents().then((feed) => {
       // The feed is regenerated daily but cached up to 5 min; drop anything
       // that has already passed so a morning viewer never sees yesterday.
-      if (alive && feed) setEvents(feed.events.filter((e) => e.date >= today));
+      if (!alive || !feed) return;
+      const upcoming = feed.events.filter((e) => e.date >= today);
+      setEvents(upcoming);
+      onVendors?.(eventVendors(upcoming));
     });
     return () => { alive = false; };
+    // onVendors is a setState from the page — stable, and re-fetching on identity change would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Filter chips: tags carried by ≥2 events, then organizers with ≥3 events.
@@ -135,13 +149,18 @@ export function EventsSection() {
 
   const filtered = useMemo(() => {
     let list = events;
+    if (vendor) {
+      // A ribbon vendor without an event tag (Meta, xAI…) has no events by definition.
+      const tag = VENDOR_EVENT_TAG[vendor];
+      list = tag ? list.filter((e) => e.tags.includes(tag)) : [];
+    }
     if (fmt !== "all") list = list.filter((e) => (fmt === "online" ? e.format === "online" : e.format !== "online"));
     if (filter) {
       const [kind, val] = [filter.slice(0, 3), filter.slice(4)];
       list = list.filter((e) => (kind === "tag" ? e.tags.includes(val) : e.organizer === val));
     }
     return list;
-  }, [events, filter, fmt]);
+  }, [events, filter, fmt, vendor]);
 
   if (events.length === 0) return null;
 

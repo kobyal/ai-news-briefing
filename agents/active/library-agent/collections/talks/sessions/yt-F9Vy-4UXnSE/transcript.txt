@@ -1,0 +1,793 @@
+[0:00] This is Andrew. We both work as engineers in our Applied AI team here at Anthropic.
+[0:05] The topic for this session was inspired by a blog post we put out just a couple of weeks ago, actually,
+[0:13] about how to think about building agents that can actually run for really long, extended period of time.
+[0:22] You know, we're talking five, six hour plus runs.
+[0:25] I think we've all seen these kind of demos, you know,
+[0:28] of like companies being like,
+[0:30] hey, we've like one-shotted a browser, for example,
+[0:33] but not necessarily sharing like some of the details
+[0:35] into what goes into the harness,
+[0:37] and that's what we kind of want to talk about today.
+[0:39] So the first off, my amazing colleague,
+[0:43] Andrew will talk about a little bit about basically
+[0:46] how we've got here, some of the primitives
+[0:48] that we've shipped in code code,
+[0:50] and you know, where we are today.
+[0:52] And then I'll hop back on stage to talk a little bit
+[0:54] about some of the more experimental stuff
+[0:57] that we're playing with harnesses,
+[1:00] as well as a few examples of what we've seen.
+[1:03] But over to you.
+[1:04] Sounds good, thank you Ash.
+[1:06] And yeah, thanks everyone for joining
+[1:08] for a session of the AI engineer conference.
+[1:11] So glad you're spending it with us.
+[1:13] My name's Andrew, I'm on the Applied AI team
+[1:15] based out of London, working as a solution architect
+[1:18] with a lot of our digital native and industries customers.
+[1:21] So yeah, I'm gonna give a little bit of a history tour,
+[1:25] trip down memory lane, but really with the focus
+[1:28] on all the things that we've shipped
+[1:29] that lead to agents being able to run
+[1:32] for multiple hours or even days at a time.
+[1:34] And then I'll hand over to Ash
+[1:35] to do more of the state of the art.
+[1:37] Right, okay, so little quote from, or on Twitter,
+[1:42] from Boris, the creator of Cloud Code.
+[1:44] This was on the one year anniversary of Cloud Code.
+[1:47] Basically saying a year ago,
+[1:49] Claude was struggling just to write bash commands
+[1:51] and escaping strings, and it could run for, you know,
+[1:54] maybe 20 minutes at a time.
+[1:56] And then we're now at the point where almost all of Claude
+[1:58] code is being written by Claude code,
+[2:00] and it can run effectively for days at a time.
+[2:04] So sort of a big swing over just the course of a year,
+[2:07] and I'll walk through that history a little bit now.
+[2:10] But just to, let me zoom in here,
+[2:14] just to sort of frame the problem up.
+[2:17] like why is it that it's really difficult
+[2:19] for these agents to run for extended periods of time?
+[2:23] I think broadly there's three big buckets.
+[2:25] Some are more intuitive than others.
+[2:27] So firstly, context.
+[2:28] I think we all understand context window
+[2:30] is very much finite.
+[2:31] So you start a new session, there's like amnesia.
+[2:34] The agent has to start from scratch,
+[2:35] so you need some sort of memory components.
+[2:38] Also as you're working through a context window,
+[2:40] there's this notion of context rot,
+[2:42] so there's less coherence
+[2:43] as you're getting deeper into that session.
+[2:46] Also, you might get to the point where the model actually exhibits what's called context-sense anxiety.
+[2:52] So it gets kind of nervous as it reaches the end of its context window, and it just quickly hurries up to finish what it's doing.
+[2:58] This kind of leads into planning.
+[3:00] So in general, models are not that great at planning, just out of the box.
+[3:05] They might try and do everything in just one shot, or for example, they might build half a feature and then stop,
+[3:12] or they might just run out of context altogether
+[3:15] and sort of leave a half-finished app built.
+[3:18] But then maybe less intuitively,
+[3:20] models are really bad at judging their own output.
+[3:22] So I know we all know that models can be sycophantic
+[3:26] and sort of tell you what you want to hear,
+[3:27] but this applies as well to coding tasks.
+[3:30] So it might look at a feature and see that it's sort of
+[3:32] half-baked or a little bit implemented and say,
+[3:35] yeah, okay, that looks done,
+[3:37] and then it'll move on to the next thing.
+[3:38] Or it might build a feature like a button,
+[3:41] but actually the back end doesn't exist for it.
+[3:43] There's sort of nothing behind that,
+[3:45] but it looks like the feature is done.
+[3:47] So I know Ash will talk quite extensively
+[3:50] of some of the new techniques we have
+[3:51] to help with this specifically,
+[3:54] so models can become better at judging their own output.
+[3:58] So there's two ways really we can fix these things.
+[4:02] The first one is obviously the model.
+[4:03] So baking it all into the model weights themselves.
+[4:07] And I'm sure you've all seen this meter chart.
+[4:10] basically how long can an agent run for
+[4:12] with a minimal scaffold where it's completing 50%
+[4:16] of the tasks.
+[4:17] And you'll see from Opus 3.7, it's around one hour,
+[4:21] and up to Opus 4.6, one year later, it's at 12 hours,
+[4:25] so an entire day.
+[4:26] And we've of course managed to get that running much longer,
+[4:29] other people have as well,
+[4:30] but this is just a sort of very minimal scaffold.
+[4:34] The second thing that you can do is, of course,
+[4:37] make changes to the harness itself.
+[4:39] So this is the scaffolding around the model.
+[4:42] And we have the agent SDK,
+[4:45] which ships with all the primitives
+[4:47] that we've been building over time.
+[4:48] So there's the core agent loop itself,
+[4:51] where you have Claude model that's determining what to do,
+[4:54] what tools to run,
+[4:56] maybe it's pulling in some tools from MCP servers.
+[4:59] It might delegate some tasks to a sub-agent.
+[5:01] It's bringing in all the context from things like Claude.md
+[5:04] or the skills that are loaded or slash commands.
+[5:06] And there's a whole permission system.
+[5:08] And this will change over time as well
+[5:10] as the models get better and improve.
+[5:12] But these are sort of the core primitives
+[5:14] that we're working with.
+[5:15] And then of course you use this framework
+[5:17] to build your own harness for whatever it is
+[5:20] you're trying to do, such as some of the things
+[5:22] that Ash will show later on
+[5:23] when we get into more long running agents.
+[5:26] I think what's also interesting is just looking back
+[5:29] at the last year of releases,
+[5:31] is that when we've released a model,
+[5:33] we've also released a lot of harness changes
+[5:36] alongside the models.
+[5:38] So really these things are co-evolving together.
+[5:41] So we'll just look back, I suppose firstly,
+[5:43] just pre-history beyond one year ago.
+[5:47] I think we all remember that period where Claude
+[5:49] had the artifact section of Claude.ai
+[5:52] and Sonnet 3.5 was the first model
+[5:55] that really showed promise when it came to coding.
+[5:57] And it can now verify that, it can look at what it had built
+[6:00] and sort of iterate from there.
+[6:01] And that was quite an aha moment, sort of pre-Claude code.
+[6:05] But then also we shipped computer use,
+[6:08] so it could start clicking around, taking screenshots,
+[6:11] testing its own code, as well as MCP spec,
+[6:14] which enabled it to sort of use tools.
+[6:17] So then getting into Cloud Code, this is February 2025.
+[6:20] So this is about just over a year ago.
+[6:23] Sonnet 3.7 was released,
+[6:26] and this was sort of state of the art on Sweebench,
+[6:28] and Cloud Code was released in Research Preview.
+[6:31] And I think an interesting quote
+[6:32] that I pulled from this release actually
+[6:34] is that the goal of Claude code was to better understand
+[6:37] how developers use Claude for coding
+[6:40] to inform future model improvements.
+[6:42] So essentially when we released Claude code,
+[6:44] the whole idea was for it to be somewhat experimental
+[6:47] to inform how we actually improve the base model itself.
+[6:50] And you'll see this trend that over time
+[6:52] the models become better, the harness,
+[6:55] certain aspects of it might become less necessary
+[6:57] or it will evolve.
+[7:00] Just in terms of these slides as well,
+[7:03] In the bottom left corner, these are some of the things
+[7:05] that are sort of the focus of these releases,
+[7:07] whether it's context or planning or verification,
+[7:11] and then some stats, but I'm not gonna sort of
+[7:13] read everything.
+[7:15] So yeah, next, this was around May time of last year.
+[7:18] Opus 4 and Sonnet 4 were released.
+[7:21] And just in general, these tools got much better
+[7:24] at sort of managing their own context
+[7:25] and getting to task completion without reward hacking
+[7:28] or anything like that.
+[7:29] and then CloudCode became GA as well,
+[7:33] and we released the CloudCode SDK,
+[7:35] so sort of the harness powering CloudCode.
+[7:39] Little interlude here from the timeline.
+[7:41] I think everybody now knows about this Ralph Wiggum technique.
+[7:44] You might not know that it was actually last July
+[7:47] that this came out when Jeffrey Huntley
+[7:51] initially released the paper,
+[7:53] because it really sort of gained a lot of traction
+[7:55] around say December or so of last year,
+[7:57] when, for example, people started playing around
+[7:59] with it themselves.
+[8:00] Claude also released our own RELF loop
+[8:03] within the Claude code harness itself.
+[8:07] But essentially it's quite sort of a simple technique
+[8:10] that you're just taking a prompt
+[8:11] and you're feeding it into Claude code CLI, for example,
+[8:15] and then you're just running that on a loop
+[8:17] until all the tasks are complete.
+[8:19] It's a little bit deeper than that.
+[8:21] I think people tend to simplify it.
+[8:23] There's actually a few phases where it first,
+[8:25] would have some kind of planning
+[8:27] where it breaks down that prompt
+[8:28] into a few different features
+[8:30] and then it would pick sort of one task from that
+[8:33] and start a new session
+[8:34] and then work with a fresh context window.
+[8:36] So a lot of those concepts were applied in the RELF loop
+[8:39] but I think why it caught so much attention
+[8:42] is because it sort of seems really simplistic
+[8:44] and he put it deterministically bad
+[8:47] in an undeterministic world.
+[8:48] So the idea being that it's better to fail predictably
+[8:52] than it is to succeed unpredictably.
+[8:55] When we actually created our own plugin for this
+[8:58] in Cloud Code, you'll see, well, I don't know if people
+[9:01] can recognize what the major difference is.
+[9:03] There's some people say that's not a real Ralph loop.
+[9:06] The idea is that this is just running
+[9:08] within a single Cloud Code session.
+[9:10] So it's not creating a fresh context window,
+[9:13] it's just relying on compaction to happen over time.
+[9:16] So maybe it's not considered sort of a real Ralph loop,
+[9:18] but you'd set the max iterations, you'd set a safe word,
+[9:22] and then essentially a stop hook would intercept
+[9:25] when Claude would typically stop, and if it's not finished,
+[9:28] it would just sort of continue until it hits
+[9:29] one of those exit criteria.
+[9:32] Okay, so on to Sonnet 4.5.
+[9:36] This was when the model just generally started
+[9:39] getting better again at handling its own context.
+[9:42] So this is when it became more context aware,
+[9:45] tracking how many tokens had been consumed.
+[9:48] So as it got towards the end of the context window,
+[9:50] it sort of understand that,
+[9:51] and it could manage its own context.
+[9:55] Cloud Code 2.0 also shipped.
+[9:57] This is where we introduced checkpoints,
+[9:59] so actually keeping track of the code over time,
+[10:02] being able to rewind to previous parts of the session,
+[10:05] and then we released,
+[10:07] we just sort of renamed the Cloud Code SDK
+[10:09] to the Agent SDK,
+[10:11] and that's because we realized
+[10:12] it's much more general purpose
+[10:13] than actually just for coding.
+[10:15] So you'll see, we're talking about coding a lot right now,
+[10:17] but I think what's very interesting
+[10:19] is applying these long-running harnesses
+[10:20] to other domains as well.
+[10:23] At this point, we could run for about 30 hours or so
+[10:29] with Claude Sonnet 4.5.
+[10:32] But then, completing the family with Haiku 4.5
+[10:35] and Opus 4.5, this is where it got really interesting
+[10:38] because all of a sudden, running many sub-agents
+[10:41] became really economical.
+[10:43] And Opus 4.5 became really good at planning.
+[10:46] So, we could start doing things like using Opus 4.5
+[10:49] for planning and then using Sonnet 4.5
+[10:52] the workhorse for really executing all of that code.
+[10:56] And then there's a big couple months as well
+[10:59] because this is when we release skills,
+[11:00] which again, very good at making use,
+[11:03] effective use of the context
+[11:04] with this notion of progressive disclosure.
+[11:07] So just the front matter of the skill is loaded in
+[11:10] instead of sort of all of your tool descriptions,
+[11:13] which can consume quite a lot of the context window up front.
+[11:16] And then sort of the entire rest of the body
+[11:18] of the skill is loaded in if it's instantiated,
+[11:21] followed by say some references to even code
+[11:25] that could run more deterministically.
+[11:27] And then more context improvements,
+[11:29] things like programmatic tool calling.
+[11:30] So instead of running a bunch of tools,
+[11:32] pulling all of that into context
+[11:34] and then trying to process it,
+[11:36] actually just writing code on the fly
+[11:38] and being able to sort of run a series of tool calls
+[11:40] and then just get the final result back.
+[11:42] And again, this is all just to improve
+[11:44] the usage of the context window.
+[11:48] Okay, so a lot going on on this slide.
+[11:51] But at this point, this is around November time,
+[11:54] we released our first blog post on long-running agents
+[11:57] and how you would go about building these.
+[12:00] So a lot of the concepts I've already described
+[12:02] should make this fairly easy to understand actually,
+[12:06] where say a human would write something like,
+[12:08] write me a browser or create a Slack clone
+[12:11] or a Salesforce clone, just something really, really vague.
+[12:15] And the first thing that would happen
+[12:18] in this harness that we built
+[12:19] is there's an initializer agent
+[12:21] that would take that simple prompt
+[12:23] and it would break it down into a series
+[12:25] of persistent artifacts.
+[12:27] The first being a feature list of, say, X number of features.
+[12:31] Feature list dot JSON because we actually found
+[12:34] the models might overwrite markdown files
+[12:37] whereas they're less likely to just overwrite JSON files,
+[12:40] which is kind of interesting.
+[12:42] It would also write a progress file,
+[12:44] of course, sort of start the git repo,
+[12:47] build an init script, and then just have a flag for
+[12:51] whether the features are complete or not,
+[12:53] if they sort of pass all the tests.
+[12:55] From there, it would go into this harness loop
+[12:58] where there's multiple different steps here.
+[13:00] So the first one is, again, in a fresh context window,
+[13:04] just getting the bearings,
+[13:05] what's the present working directory,
+[13:07] what's the progress file say, okay,
+[13:10] and then doing a smoke test, so running the init script,
+[13:13] so it didn't have to figure out how to do that
+[13:15] every time get the server up and running, et cetera.
+[13:18] And then picking one feature, only one feature,
+[13:21] that hasn't passed all of the tests.
+[13:23] Implementing that feature, doing some actual tests,
+[13:26] much so verification loop, much like a human would do,
+[13:29] using puppeteer in this case.
+[13:31] And then if everything passes,
+[13:34] actually writing the git commit
+[13:36] and changing the state of this particular feature to passes.
+[13:41] And then if there are any features that are unfinished,
+[13:43] just continuing that loop in a fresh context window.
+[13:46] So we're starting to layer in a lot of these concepts here,
+[13:49] fresh context windows, these sort of persistent artifacts,
+[13:52] verification loops, really good planning up front.
+[13:56] You'll see this is sort of the first iteration
+[13:59] of these long running harnesses here.
+[14:03] Okay, so continuing with the history tour,
+[14:06] so then Opus 4.6, Sonnet 4.6.
+[14:10] These models are really great because Sonnet 4.6
+[14:13] was basically offering that Opus level intelligence
+[14:15] more at the Sonic price and it became again
+[14:17] like very much a workhorse for a lot of cloud code.
+[14:20] And Opus 4.6 just became really good at planning.
+[14:24] We called it very much an agentic model.
+[14:28] So Opus 4.6 was great at deciding like which tools to use
+[14:32] and just being able to run for much longer.
+[14:35] If you recall that meter chart, you'll see that
+[14:38] this was a jump from about four hours up to 12 hours
+[14:40] with sort of that very simple harness.
+[14:42] So this model is very, very agentic.
+[14:44] And then along with that,
+[14:46] with some of the research we've done,
+[14:48] we released agent teams,
+[14:49] which the idea being in Cloud Code,
+[14:51] this sort of more general purpose way for you to say,
+[14:54] scaffold out your own set of custom agents.
+[14:57] And the innovation with agent teams is that,
+[15:00] instead of everything reporting back into the main agent,
+[15:03] the actual sub-agents could communicate with each other.
+[15:07] So they sort of had their own way to coordinate,
+[15:09] and then report back to the main agent
+[15:11] only when it was required.
+[15:14] We also introduced server-side compaction,
+[15:16] which basically meaning that these models
+[15:18] can now just run indefinitely,
+[15:20] and compaction could just sort of happen on the server side.
+[15:23] And then this one million context GA.
+[15:26] So now we have one big context window.
+[15:28] You see the models are getting better.
+[15:30] Maybe you can just run a lot
+[15:31] within a single context window even,
+[15:33] instead of necessarily needing new sessions all the time.
+[15:36] You see how things start shifting over time.
+[15:39] So that's sort of the whole overview.
+[15:42] You can see all of the different releases
+[15:45] that I shared here on this table
+[15:47] and you can see how it's changed from, say,
+[15:49] Sonnet 3.7 at one hour to 12 hours with Opus 4.6.
+[15:54] And then we have our own anecdotes as well
+[15:58] where tasks would take, say, you know,
+[16:00] like 20 minutes when it was Opus 3.5
+[16:04] and now we're building, say, fully-fledged apps
+[16:07] that you don't have to run for, you know, 30 hours.
+[16:09] you can run, typically we're seeing like,
+[16:11] say three to five hours, you can build
+[16:12] like a really, really fully featured application
+[16:15] that runs out of the box.
+[16:19] So, what's really interesting is the harness
+[16:22] doesn't just disappear as the models get better,
+[16:25] it's really evolving as the models change over time.
+[16:29] And it's really fascinating to sort of find the gaps
+[16:32] in the model and then fill that in with the harness
+[16:35] and then you train the model on using that aspect
+[16:38] of the harness, then maybe at some point
+[16:39] you actually remove that entirely
+[16:41] and sort of this iterative loop just keeps happening
+[16:44] over time with more and more of these
+[16:46] sort of co-releases that we have.
+[16:47] So yeah, hopefully that was an interesting little trip
+[16:52] back through the Claude evolution
+[16:54] and how it applies to the long-running agents.
+[16:57] And so I'll hand over to Ash to continue
+[16:59] with where we are today in terms of the state of the art.
+[17:08] All right.
+[17:15] Quick question.
+[17:16] Any of you guys have any agents running at the moment in the background doing work while
+[17:20] you're here?
+[17:21] Just one, two, three.
+[17:23] Okay.
+[17:24] Probably should be more of you.
+[17:27] Hopefully by the end of this you'll have some ideas to take away and put into practice.
+[17:34] So yeah, that's the history.
+[17:37] I quite like that quote that Andrew talked about, where the frontier doesn't really shrink,
+[17:42] it just moves.
+[17:45] And so what I wanted to talk about a little bit is some very simple kind of harness patterns
+[17:51] that we've been playing around with internally that we use to build these very fancy one
+[17:56] shot demo apps.
+[17:58] But also, we're experimenting with this stuff in post training.
+[18:02] in RL, how do we make our models
+[18:05] and just the general behaviors more adept at autonomous work.
+[18:11] So, if you've ever tried to get an agent
+[18:16] to try and review its own PR,
+[18:20] you'll kind of understand where this is going.
+[18:23] So, this general idea is shamelessly kind of stolen
+[18:28] kind of stolen from GANs, generative adversarial networks. So you have this generator kind of
+[18:37] model and then you have some sort of discriminator and you have some sort of adversarial pressure
+[18:43] between them. The generator builds, the evaluator grades, and the whole idea here is we're splitting
+[18:50] up the context, Windows, system prompts, the jobs entirely. The evaluator here isn't just
+[18:59] reading diffs, but it's actually using Playwright to open live pages, click around, try things
+[19:05] out, and then it eventually hands back whatever critique gets decided back to the actual generator
+[19:12] and you kind of continue that loop. Contrast that with what most people today are doing,
+[19:16] which is kind of using one core code session,
+[19:19] telling it to check its own work and kind of loop that way.
+[19:23] So the obvious question for me at least is,
+[19:27] if the evaluator is also just an LLM,
+[19:30] why doesn't it just rubber stamp it too?
+[19:33] And so the key idea that we're kind of exploiting here is,
+[19:39] yes, the evaluator is still a large language model,
+[19:42] and yes, it's still going to be biased
+[19:44] towards liking large language model style outputs,
+[19:49] but tuning a standalone critic to be harsh
+[19:53] is actually very tractable,
+[19:54] but tuning a builder to be somewhat self-critical is not.
+[20:00] I think a really good analogy for this, right,
+[20:02] is same as humans.
+[20:03] It's very easy for me to critique
+[20:08] a lovely piece of artwork or a fine meal.
+[20:12] Much harder for me to actually go ahead
+[20:13] and paint that or cook that meal myself.
+[20:17] So what we're doing here is exploiting the gap
+[20:20] between the ability of an LLM to be a critic
+[20:23] versus a generator.
+[20:26] So the next thing I want to talk about is
+[20:29] how do you actually think about designing these critics?
+[20:32] It's very similar to the process of creating good evals,
+[20:35] but in the context of full stack apps,
+[20:37] there are a lot of fuzzy areas
+[20:39] which go into what makes something good.
+[20:42] It's not just does it work, but does it look good,
+[20:44] does it feel good, is there an element of taste
+[20:48] in these kind of products as well?
+[20:51] So this is where we've been doing a lot of experimental work,
+[20:55] especially when trying to imbue Claude
+[20:57] with design taste in post-training,
+[20:59] but also create these kind of front-end design skills
+[21:04] that we kind of put out there and just generally improve
+[21:06] the front-end design ability of our models.
+[21:10] So the way we think about this is most people say
+[21:15] you can't grade taste, but we think you can
+[21:20] if you have a strong enough opinion on it
+[21:21] and you just kind of write it down.
+[21:23] And so the way we do this at least is with kind of
+[21:26] creating a rubric with four criteria,
+[21:29] design, originality, craft, and functionality.
+[21:32] We actually weight this towards design and originality.
+[21:38] We've kind of shifted the weightings
+[21:39] between these four things depending on which models in play.
+[21:43] But at the moment, Opus 4.6 is pretty good
+[21:46] at functionality already.
+[21:47] So the problem that we're trying to overcome
+[21:50] is how do we prevent things like purple gradients,
+[21:53] general kind of AI slot type aesthetics in general.
+[21:58] And we kind of just go ahead and calibrate this
+[22:00] with a few short examples on reference sites.
+[22:03] So the evaluators kind of taste converges on our own.
+[22:06] And let me show you an example, I guess,
+[22:11] of what this actually looks like kind of in practice.
+[22:14] So this is just an example of a model going through
+[22:21] this similar kind of loop, generator,
+[22:24] evaluator launches playwright, navigates,
+[22:26] screenshots, scores on those kind of four criteria,
+[22:29] writes critique, and then hands back to generator.
+[22:32] So all of these examples are just HTML and CSS only.
+[22:36] that I've gone through for maybe four hours,
+[22:38] five to 15 rounds.
+[22:41] I think the interesting thing here,
+[22:43] which is quite unique and something
+[22:44] which you wouldn't necessarily get
+[22:46] if you're just using a single kind of agent loop,
+[22:49] is that the thing pivots, right?
+[22:51] So imagine the generator gets stuck
+[22:54] on one of the fraud criteria.
+[22:55] Let's say it's like really struggling
+[22:56] and constantly scoring low on originality.
+[23:02] This kind of GAN style harness which we're using
+[23:04] will just throw the whole thing out
+[23:06] and try again from scratch.
+[23:08] Whereas in a single-part generation or a Ralph loop,
+[23:14] it keeps trying to patch the same thing.
+[23:15] And this kind of ability to kind of course correct
+[23:18] over very long kind of time horizons
+[23:21] is something which is quite unique
+[23:23] to kind of breaking down the different roles
+[23:25] that go into building something.
+[23:29] So that was just an insight into, I guess,
+[23:31] how we think about the front-end component.
+[23:33] But how to go from kind of like just nice pages
+[23:37] to fully working apps, we added one more role, a planner.
+[23:42] And so again, sounds very simple.
+[23:46] It's ultimately just taking kind of a one line prompt
+[23:49] and then breaking it down into a very deliberately
+[23:52] high level kind of spec.
+[23:55] So what it does is actually just spec the granular,
+[24:00] sorry, it kind of specs the general workflow
+[24:05] into a series of sprints.
+[24:07] What it doesn't do, and what most harnesses do today,
+[24:11] is necessarily try and plan the granular technical details
+[24:14] of the product.
+[24:16] The reason being is, you know,
+[24:17] one, it's very likely to still make an error,
+[24:19] but when it does make an error,
+[24:21] it's going to cascade through every single one
+[24:24] of these sprints and kind of magnify errors
+[24:26] over a multi-hour time horizon.
+[24:29] If you kind of squint at this,
+[24:33] this is kind of just a very simple kind of like PM,
+[24:36] IC and QA kind of org structure, right?
+[24:39] Like we didn't invent this,
+[24:41] we just kind of gave each role
+[24:43] its own kind of context window.
+[24:47] And the bit which is kind of interesting,
+[24:50] I think to talk about is the glue between the generator
+[24:53] and the evaluator in this kind of setup.
+[24:56] So before the generator actually goes ahead
+[24:59] write a single line, we have the two agents basically negotiate what done actually means.
+[25:07] And so let's say the generator proposes, I'm going to build X feature, and you should verify
+[25:14] it by testing Y. The evaluator might push back and be like, actually, the scope is too
+[25:20] big and those tests that you propose are a bit too weak, and you've missed XYZ edge case.
+[25:26] You basically have this back and forth via files on disk.
+[25:29] One writes the markdown, the other reads it,
+[25:33] and you iterate until both agree.
+[25:36] And then once you kind of reach that kind of condition,
+[25:40] then you actually start building.
+[25:42] And then the evaluator kind of grades against the contract
+[25:46] that those two agents have decided between themselves,
+[25:49] not the original spec which the planner
+[25:51] has kind of one-shotted at the beginning.
+[25:54] And why this matters, as it kind of bridges
+[25:57] this kind of idea of user stories, i.e. the spec,
+[26:02] and kind of converts it into slightly more tangible,
+[26:05] testable kind of assertions, some sort of contract,
+[26:08] without the planner having to over-specify kind of upfront.
+[26:13] And I think this is kind of the key innovation
+[26:15] that the RAL fleet never really had.
+[26:18] It had a kind of fixed plan, .md style kind of thing,
+[26:23] but nobody on the other side is necessarily arguing
+[26:27] with kind of the main loop.
+[26:29] And again, it comes back to like having these separate
+[26:31] context windows and adversarial pressure.
+[26:33] So let me show you an example of a very simple prompt
+[26:38] that we had in a solo kind of loop
+[26:43] versus the harness that we just discussed.
+[26:46] So the prompt was basically build a retro game maker
+[26:51] And that was it.
+[26:53] And I'm not gonna try and convince you
+[26:57] that this is like necessarily the most cost-effective
+[27:00] or most efficient way to try and build an app.
+[27:03] As you can see, one, it takes, at the moment,
+[27:06] an extremely long amount of time.
+[27:09] Two, it's very expensive.
+[27:10] But also, as we'll see in a second,
+[27:13] a lot of the stuff actually starts working
+[27:14] only with this harness when it didn't
+[27:17] in a kind of a solo loop.
+[27:19] So this is what it kind of looked like,
+[27:23] the opening screen, at least when we didn't have the harness.
+[27:27] Pretty simplistic, a little bit boring,
+[27:30] but it still looks nice, right?
+[27:32] If this were the whole app, you'd ship it,
+[27:34] but it's kind of the bait, I guess, if you will.
+[27:38] This was kind of the sprite editor, if you will.
+[27:42] Again, it still looks fine.
+[27:45] The canvas is there, the palette, the frame timeline,
+[27:47] live preview.
+[27:48] Maybe it's a little bit cramped,
+[27:51] and the color picker is just black swatches,
+[27:53] but it kind of works.
+[27:55] Clearly the agent actually did understand
+[27:57] what it was trying to do.
+[27:59] And then the one thing that you actually have to do,
+[28:03] which is play mode.
+[28:05] Entities rendered, score, health,
+[28:08] all the other things which go into an actual game.
+[28:10] Pressing an arrow key does nothing.
+[28:13] Pressing a space key did nothing.
+[28:16] The agent really didn't have any idea
+[28:18] how to test itself, what it actually meant to play a game
+[28:23] and actually succeed.
+[28:27] And yeah, this is kind of the same prompt, same model,
+[28:31] and this is kind of the breaking point.
+[28:34] It kind of looks done on the surface,
+[28:35] but when you try and actually push it to its limits,
+[28:37] it just kind of failed.
+[28:39] And then if we ran the same prompt with the same model,
+[28:42] this is kind of what it looked like when we ran the harness.
+[28:45] So this was about, yeah, 200 bucks, six hours.
+[28:50] First up, it decided to name itself Retroforge.
+[28:55] It decided to create a new project dialogue,
+[28:58] have a very nice canvas.
+[29:00] None of that was in our prompt.
+[29:01] So this was all the planner deciding,
+[29:05] okay, here's what the product decisions should look like,
+[29:08] and then the two other agents deciding,
+[29:11] how am I gonna test this?
+[29:12] If we look at the sprite editor, we have kind of a full 54 color palette, the kind of 8-bit
+[29:21] preset from the project dialogue flowing through.
+[29:25] You see the sprite at actual game scale.
+[29:30] It's a lot more complete as a product in general.
+[29:35] We had a whole new kind of AI level assistant.
+[29:39] This is where it's kind of started to get recursive.
+[29:42] The planner had decided, right, we should have some AI features, which is just a vague
+[29:47] line in the spec.
+[29:49] And the harness turned that into a full AI level assistant inside the app that it was
+[29:53] building.
+[29:54] So, you know, someone could come in and say, hey, create a castle with sprites guarding
+[29:59] it, let's say.
+[30:02] This is something which a solo one would never even attempt to look at.
+[30:07] without a planner, that phrase just becomes,
+[30:09] never even becomes like a work item to look at.
+[30:13] Then finally, I guess,
+[30:16] the actual results kind of applied.
+[30:18] So, play modes.
+[30:22] You know, you have this whole debug HUD in the top left,
+[30:26] which you can clearly tell is to make life easier
+[30:28] for the evaluator, for example.
+[30:30] Those numbers are live, the physics loop is actually running.
+[30:33] Arrow keys work, the player moves,
+[30:37] Collider's Castle Wars,
+[30:40] because the evaluator actually launched the game,
+[30:43] tried to play it, knew necessarily
+[30:45] like what features needs to be tested
+[30:49] to make this game kind of real and successful.
+[30:53] And the difference between this output
+[30:54] and the previous output is entirely just scaffolding.
+[30:57] And it's a very simple loop ultimately,
+[30:58] but the results are quite startlingly different at least.
+[31:01] And so, in case you're curious, the kind of things which the evaluator did catch are pretty
+[31:11] basic kind of stuff.
+[31:12] It's things like, you know, fast IPI route ordering, passes every unit test but might
+[31:20] actually break and prod.
+[31:21] The evaluator catching things like the delete key, having some kind of Boolean logic bug.
+[31:28] Again, these are things which were only caught because the evaluator is actually using the
+[31:32] app.
+[31:33] It's things which might get through CI in a RALF loop, but this isn't, you know, that
+[31:41] level of specificity isn't something which happened by accident.
+[31:45] And so this is the kind of level of detail which these models are kind of going to at
+[31:50] this point in time.
+[31:51] So we talked about the kind of contracts that the generator and the evaluator would write
+[31:56] between themselves.
+[31:57] For this app, it decided that there were 27 contract criteria.
+[32:01] That's a level of granularity which we found
+[32:04] that you really need to make findings actionable.
+[32:08] If you have vague criteria, you have vague critiques,
+[32:10] the generator just shrugs and does things,
+[32:13] whereas if you have granular criteria,
+[32:16] the agent knows, okay, I need to fix this exact line.
+[32:23] What's kind of interesting, I thought,
+[32:25] and I want to be honest about this part,
+[32:27] is that out the box, Claude is a really, really bad
+[32:30] just general QA agent.
+[32:33] Andrew talked about this a little bit in his bit, right?
+[32:36] But the same kind of sycophancy and generosity bias
+[32:40] that everyone hits with,
+[32:42] general element of judge systems also applies here.
+[32:46] Most of the time in early runs,
+[32:48] the QA agent would kind of find a bug
+[32:50] and be like, fix it later, might take two weeks,
+[32:54] and then just kind of like be done with it.
+[32:57] So, we actually had to spend an exorbitant amount of time going through, trying to tune
+[33:04] small layout bugs, edge cases, and feeding that into the prompts.
+[33:10] I wish there was some kind of secret to actually doing this, but realistically, the whole art
+[33:16] to building the system and making it good was reading the traces.
+[33:21] The primary debugging loop was this and not necessarily running more experiments.
+[33:24] It was reading what the agent actually did,
+[33:28] finding where its judgment diverged from ours as humans,
+[33:31] and then tuning the prompt for that.
+[33:34] It was the same kind of muscle
+[33:35] as reading kind of a stack trace.
+[33:40] One kind of tooling tip that we had
+[33:41] was kind of piping agent transcripts into files,
+[33:45] kind of grabbing them with another agent
+[33:47] or having another agent kind of go through them
+[33:49] and then kind of update the prompts itself.
+[33:51] So you have some sort of like closing the loop,
+[33:53] even on just like building this harness out.
+[33:57] So the last thing I kind of wanted to talk about
+[34:00] was how to think about adjusting your harness
+[34:05] as these models kind of get better in time.
+[34:08] I think there's a lot of discussion around
+[34:09] whether harness design is kind of dead or null,
+[34:12] especially with models that,
+[34:14] I mean, when I wrote this, it was just Opus 4.6,
+[34:16] but even like mythos level models.
+[34:20] And I think the key thing that we noted is
+[34:25] it's really important to get a feel
+[34:26] for what the kind of spiky behaviors
+[34:29] of any individual model are,
+[34:30] and then try and adapt your harness to kind of fill the gaps.
+[34:33] So,
+[34:36] Andrew talked about this a bit,
+[34:37] but context resetting between sessions,
+[34:40] we kind of dropped that entirely.
+[34:42] Opus 4.5 used to have really bad kind of context anxiety,
+[34:46] whereas Opus 4.6 just didn't.
+[34:50] as part of post training there.
+[34:52] And so one continuous session and compaction
+[34:54] was more than enough to handle very long sessions.
+[34:58] Sprint decomposition.
+[35:01] We don't have a very strong opinion on this,
+[35:02] but it was something which was really, really critical
+[35:05] to getting Opus 4.5 to work,
+[35:08] but Opus 4.6 was able to kind of hold
+[35:11] a two hour continuous build coherently,
+[35:15] in a way without necessarily having to be force fed
+[35:17] one feature at a time.
+[35:20] the cadence at which the evaluator should run.
+[35:22] Previously, we were running at every single sprint per se,
+[35:25] whereas now we were just running at the end
+[35:28] of a one-shot generation from the model
+[35:29] and then passing back.
+[35:31] So the harness is still the same,
+[35:32] we're just kind of simplifying the specific kind of loops
+[35:37] and the kind of recipe that kind of goes into it.
+[35:40] The lesson isn't necessarily our harness was wrong,
+[35:42] but rather it was right for 4.5, the frontier moved,
+[35:47] and we ran a simplified version to see how it worked.
+[35:51] So this is kind of what the final setup
+[35:54] kind of looks like today.
+[35:58] Having that planner generator evaluator loop
+[36:00] is still the kind of core of our system,
+[36:02] but you can see we kind of ditched a bunch
+[36:04] of the other kind of components
+[36:09] that made this slightly more complicated than it had to be.
+[36:12] We also, as kind of mentioned,
+[36:14] big fan of just using a file system for shared state
+[36:16] instead of kind of leaning on context windows
+[36:19] for very long running agents in general.
+[36:22] And this is an example of the simplified harness running
+[36:27] with one of our latest models.
+[36:31] Again, very, very expensive, but you can see
+[36:34] it's actually roughly like half the cost
+[36:36] of the previous runs just because we're kind of doing things
+[36:42] in a slightly more simplified manner.
+[36:43] but it's still running over a very extended period of time.
+[36:47] And so this is an example of a DAW,
+[36:51] which is basically just like a music rating app, if you will.
+[36:56] The agent sets the tempo, it lays down the melody,
+[37:00] it builds the drum tracks.
+[37:01] This is the evaluator actually going
+[37:05] and testing the app itself.
+[37:10] We did actually listen to the music in this.
+[37:13] Obviously Claude can't hear at the moment,
+[37:17] and so the music was pretty trash,
+[37:19] but the app was really good in general
+[37:22] and pretty fleshed out, which, you know,
+[37:25] a model ago, this is something
+[37:26] which would never have worked.
+[37:28] But this is something which was possible
+[37:29] with just a couple rounds.
+[37:32] And this is kind of that meter curve
+[37:33] which Andrew was talking about, kind of really in action.
+[37:38] And so I kind of wanted to close just by saying
+[37:40] You don't naturally need our internal harness to go away and start thinking about this.
+[37:46] We are constantly trying to ship bits of these primitives into code code directly, but also
+[37:53] there's nothing stopping you from just going ahead and building something similar to this
+[37:57] kind of on your own.
+[37:58] So we just shipped, you know, auto mode is probably my favorite thing for slightly more
+[38:03] safe yellow, if you will, instead of running dangerously skip permissions all the time.
+[38:09] You already have custom subagents as a primitive, right?
+[38:12] Your evaluator, your QA role, give it a harsh system prompt and a very detailed rubric.
+[38:17] Playwright MCP or Call for Chrome MCP, already extremely, extremely good at web app stuff
+[38:26] or just use computer use if you're building kind of native apps.
+[38:29] And skills, again, a very nice way to package your grading rubrics into your general development
+[38:35] flow.
+[38:36] So, yeah. Five things if you're kind of taking a photo, this is the slide I would say to
+[38:42] kind of remember. Self-evaluation, very much a trap. Just use an adversarial evaluator.
+[38:50] Compaction doesn't necessarily, does not equal kind of coherence, right? Lossy summaries
+[38:55] really drift. Structured handoffs and clean context are a very good pattern what we've
+[39:01] Don't think that subjective quality isn't gradable.
+[39:05] If you have a strong view on what something should look like, then kind of force yourself
+[39:10] to write it down.
+[39:12] We found this made kind of a really massive difference to the quality of kind of apps
+[39:17] that a model was able to generate.
+[39:19] And then kind of finally was really just, you know, sit with the model, read the traces.
+[39:25] Only then can you kind of really know what bits of a scaffold to delete, what bits to
+[39:30] to keep, especially as the kind of frontier moves.
+[39:34] But yeah, that's it from me.

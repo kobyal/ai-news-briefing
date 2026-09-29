@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Events agent — upcoming AI / cloud / developer events in central Israel.
 
-Scrapes Meetup, Eventbrite, Luma and the AWS events directory (plain GETs, no
-JS), augments with one Perplexity web-search call for the official/large
+Scrapes Meetup, Eventbrite, Luma, the AWS events directory and the vendors' own
+event pages (AWS Loft TLV, AWS IL user group, Microsoft Reactor, GDG, Google
+Cloud OnAir, Nvidia — plain GETs against the JSON their JS shells load, no
+browser), augments with one Perplexity web-search call for the official/large
 events those listings miss, classifies + translates NEW candidates in a single
 batched Claude call (verdicts cached by id so daily runs only pay for new
 events), merges with the previous docs/data/events.json, and writes the next
@@ -315,6 +317,169 @@ def fetch_aws(today: date, until: date) -> list[dict]:
     return out
 
 
+# ---- Vendor-owned event pages -------------------------------------------------
+# Koby (2026-09-29): "I'm really missing AWS, Google, Azure" — Meetup search never
+# surfaces the vendors' own programmes, so each vendor gets a direct channel.
+# `source` doubles as the forced vendor tag (SOURCE_TAG) after classification.
+
+SOURCE_TAG = {"aws": "aws", "microsoft": "microsoft", "google": "google", "nvidia": "nvidia"}
+ISRAEL_RE = re.compile(r"israel|ישראל|tel[ -]aviv|\btlv\b", re.I)
+
+
+def _strip_html(s: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", s or "")).strip()
+
+
+def fetch_aws_experience() -> list[dict]:
+    # aws-experience.com is a JS shell; its bundle calls this unauthenticated
+    # endpoint (found via /api/session in main.app-bundle.js). Times are naive
+    # local (Asia/Jerusalem), which is what _local() assumes for tz-less ISO.
+    base = "https://aws-experience.com/emea/tel-aviv"
+    r = _get(f"{base}/api/session")
+    if not r or r.status_code != 200:
+        return []
+    out = []
+    for ev in r.json().get("future", []):
+        sd = (ev.get("settingDetails") or [{}])[0]
+        # The SPA routes slugged events to /e/<prefix>/<slug>, the rest to /event/<id>.
+        path = f"e/{ev['prefix']}/{ev['humanReadablePart']}" if ev.get("prefix") else f"event/{ev.get('id')}"
+        rec = _rec(title=ev.get("title"), url=f"{base}/{path}", start=ev.get("start", ""), end=ev.get("end", ""),
+                   city="Tel Aviv", venue=(sd.get("details") or {}).get("address", ""), organizer="AWS Tel Aviv",
+                   desc=_strip_html(ev.get("description", "")), source="aws",
+                   fmt="online" if sd.get("setting") == "virtual" else "in_person", price="free")
+        if rec:
+            out.append(rec)
+    return out
+
+
+def _meetup_group(urlname: str, source: str) -> list[dict]:
+    # Group pages render events client-side; www.meetup.com/gql2 accepts a raw
+    # (non-persisted) query without auth. Only ACTIVE (= upcoming) events.
+    q = ('query($u:String!){groupByUrlname(urlname:$u){name timezone events(first:30,filter:{status:ACTIVE})'
+         '{edges{node{title dateTime eventUrl eventType description venue{name city country} feeSettings{amount}}}}}}')
+    try:
+        r = requests.post("https://www.meetup.com/gql2", json={"query": q, "variables": {"u": urlname}},
+                          headers={**UA, "Content-Type": "application/json"}, timeout=20)
+    except requests.RequestException:
+        return []
+    g = ((r.json() if r.status_code == 200 else {}).get("data") or {}).get("groupByUrlname") or {}
+    out = []
+    for edge in (g.get("events") or {}).get("edges", []):
+        ev = edge.get("node") or {}
+        venue = ev.get("venue") or {}
+        online = ev.get("eventType") == "ONLINE"
+        rec = _rec(title=ev.get("title"), url=ev.get("eventUrl"), start=ev.get("dateTime", ""),
+                   city=venue.get("city", ""), venue=venue.get("name", ""), organizer=g.get("name", ""),
+                   desc=ev.get("description"), source=source, fmt="online" if online else "in_person",
+                   price="paid" if (ev.get("feeSettings") or {}).get("amount") else "free")
+        if rec:
+            out.append(rec)
+    return out
+
+
+def fetch_reactor() -> list[dict]:
+    # developer.microsoft.com/reactor is a React app over /reactor/api/events
+    # (found in publish/app.bundle.js). The catalog has no city facet, so we
+    # search by text and keep events whose location is ours or that carry an
+    # in-person session; online-only Reactor streams stay out (global feed).
+    out: dict[str, dict] = {}
+    for term in ("Tel Aviv", "Israel"):
+        r = _get(f"https://developer.microsoft.com/reactor/api/events?search={quote(term)}&page=1")
+        if not r or r.status_code != 200:
+            continue
+        for ev in r.json().get("items", []):
+            loc = f"{ev.get('locationDisplayCity') or ''} {ev.get('location') or ''}"
+            if not (ev.get("hasInPersonSession") or _canon_city(loc)):
+                continue
+            url = ev.get("primaryRegistrationUrl") or f"https://developer.microsoft.com/reactor/events/{ev.get('id')}"
+            rec = _rec(title=ev.get("title"), url=url, start=ev.get("startDateTimeUtc", ""),
+                       end=ev.get("endDateTimeUtc", ""), city=loc, organizer="Microsoft Reactor Tel Aviv",
+                       desc=ev.get("description"), source="microsoft",
+                       fmt="hybrid" if ev.get("isHybrid") else "in_person", price="free")
+            if rec:
+                out[rec["id"]] = rec
+    return list(out.values())
+
+
+def fetch_gdg() -> list[dict]:
+    # Bevy's public listing (500/page). GDG Tel Aviv is chapter 1444, but
+    # matching the chapter title against our city table also catches any
+    # other Israeli chapter that starts posting. Slim records carry no venue;
+    # the chapter name is the city.
+    out = []
+    for page in (1, 2, 3):
+        r = _get(f"https://gdg.community.dev/api/event_slim/?chapter=&status=Live&page={page}")
+        if not r or r.status_code != 200:
+            break
+        data = r.json()
+        for ev in data.get("results", []):
+            city = _canon_city(ev.get("chapter_title", ""))
+            if not city:
+                continue
+            aud = ev.get("audience_type", "")
+            rec = _rec(title=ev.get("title"), url=ev.get("static_url"), start=ev.get("start_date", ""),
+                       end=ev.get("end_date", ""), city=city, organizer=ev.get("chapter_title", ""),
+                       desc=_strip_html(ev.get("description_short") or ev.get("description", "")),
+                       source="google", fmt="online" if aud == "VIRTUAL" else ("hybrid" if aud == "HYBRID" else "in_person"),
+                       price="free", image=ev.get("cropped_picture_url") or "")
+            if rec:
+                out.append(rec)
+        if not (data.get("links") or {}).get("next"):
+            break
+    return out
+
+
+def fetch_cloudonair(today: date) -> list[dict]:
+    # Google Cloud OnAir's /api/events (from scripts/app.*.js) is newest-first,
+    # 10 per page, no region filter — so we walk pages until we pass today and
+    # keep events whose venue or copy names Israel. `physical` is unreliable
+    # (False on the Expo TLV event); a non-empty physical_location is the signal.
+    out = []
+    for page in range(1, 15):
+        r = _get(f"https://cloudonair.withgoogle.com/api/events?shallow=true&page={page}")
+        if not r or r.status_code != 200:
+            break
+        events = r.json().get("events", [])
+        for ev in events:
+            loc = ev.get("physical_location") or ""
+            text = f"{loc} {ev.get('name', '')} {_strip_html(ev.get('description', ''))}"
+            if ev.get("archived") or ev.get("ended") or not ISRAEL_RE.search(text):
+                continue
+            rec = _rec(title=ev.get("name"), url=f"https://cloudonair.withgoogle.com/events/{ev.get('url_slug')}",
+                       start=ev.get("start", ""), end=ev.get("end", ""), city=loc, venue=loc,
+                       organizer="Google Cloud", desc=_strip_html(ev.get("description", "")), source="google",
+                       fmt="in_person" if loc else "online", price="free")
+            if rec:
+                out.append(rec)
+        if not events or min(e.get("start", "") for e in events)[:10] < today.isoformat():
+            break
+    return out
+
+
+def fetch_nvidia() -> list[dict]:
+    # nvidia.com/en-eu/events renders a static calendar JSON (bundle-events-core.js
+    # XHRs calendar/<lang>.json). Free-text `location`; Israeli entries often
+    # ship without a URL, so fall back to the listing page.
+    r = _get("https://www.nvidia.com/content/dam/en-zz/Solutions/about-nvidia/calendar/en-eu.json")
+    if not r or r.status_code != 200:
+        return []
+    out = []
+    for ev in r.json():
+        loc = ev.get("location") or ""
+        if not ISRAEL_RE.search(loc):
+            continue
+        start = ev.get("startDate", "") + (f"T{ev['startTime']}" if ev.get("startTime") else "")
+        rec = _rec(title=ev.get("title"), url=ev.get("url") or "https://www.nvidia.com/en-eu/events/",
+                   start=start, end=ev.get("endDate", ""), city=loc, venue=ev.get("venue", ""), organizer="NVIDIA",
+                   desc=f"{ev.get('type', '')}. {ev.get('description', '')}", source="nvidia",
+                   fmt="online" if "webinar" in (ev.get("type") or "").lower() else "in_person")
+        if rec:
+            if not ev.get("url"):  # shared fallback URL → id must come from the title instead
+                rec["id"] = hashlib.sha1(f"nvidia|{rec['title']}|{rec['date']}".encode()).hexdigest()[:16]
+            out.append(rec)
+    return out
+
+
 EN_MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august",
              "september", "october", "november", "december"]
 HE_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט",
@@ -395,7 +560,8 @@ For EACH candidate return a verdict keyed by its id. Be strict: quality over qua
 relevant=true ONLY for: AI / ML / LLMs / agents / GenAI / Claude / Copilot / AI infrastructure; data+AI;
 cloud with a clear AI angle; major vendor developer events (AWS, Google, Microsoft, Nvidia, Anthropic,
 OpenAI, Oracle AI); big tech conferences with AI tracks (AI Week, DeepTech Week, TECH1, LLMday, Future of AI);
-AI hackathons/workshops.
+AI hackathons/workshops. source=aws|google|microsoft|nvidia means the vendor's OWN event page (AWS Loft,
+GDG, Cloud OnAir, Reactor, Nvidia): treat as a vendor developer event — relevant unless clearly non-technical.
 relevant=false for: generic language/framework meetups (Node.js monthly, Rust, Go, .NET) unless the talk is
 about AI; WordPress, microservices, service discovery, platform plumbing with no AI angle; pure security
 (AppSec, BSides, Cyber Week, pentesting) unless the title is explicitly AI security; hackerspace socials;
@@ -414,7 +580,8 @@ def classify(candidates: list[dict], cache: dict) -> int:
     for i in range(0, len(new), 40):
         chunk = new[i:i + 40]
         payload = [{"id": c["id"], "title": c["title"], "organizer": c["organizer"], "city": c["city"],
-                    "format": c["format"], "price": c["price"], "description": c["_desc"][:400]} for c in chunk]
+                    "source": c["source"], "format": c["format"], "price": c["price"],
+                    "description": c["_desc"][:400]} for c in chunk]
         raw = anthropic_cc.agent(json.dumps(payload, ensure_ascii=False), instructions=CLASSIFY_INSTRUCTIONS,
                                  json_mode=True, label=f"EventsClassify[{i // 40 + 1}]")
         verdicts = parse_json(raw).get("verdicts", {}) or {}
@@ -428,6 +595,11 @@ def classify(candidates: list[dict], cache: dict) -> int:
 
 def apply_verdict(rec: dict, v: dict) -> dict:
     rec["tags"] = [t for t in (v.get("tags") or []) if t in TAGS]
+    # A vendor-page event always carries its vendor tag — that's what the
+    # /community vendor ribbon filters on, regardless of the classifier's picks.
+    vendor = SOURCE_TAG.get(rec["source"])
+    if vendor and vendor not in rec["tags"]:
+        rec["tags"].insert(0, vendor)
     for k in ("title_he", "blurb", "blurb_he"):
         rec[k] = (v.get(k) or "")[:200]
     if v.get("price") in ("free", "paid", "unknown"):
@@ -512,6 +684,14 @@ def main() -> int:
         "eventbrite": fetch_eventbrite,
         "luma": fetch_luma,
         "aws": lambda: fetch_aws(today, until),
+        # Vendor-owned pages (see SOURCE_TAG): the AWS Loft calendar + AWS IL
+        # user group, Reactor TLV, GDG/Cloud OnAir, Nvidia's EMEA calendar.
+        "aws_loft": fetch_aws_experience,
+        "aws_ug": lambda: _meetup_group("aws-il", "aws"),
+        "microsoft": fetch_reactor,
+        "gdg": fetch_gdg,
+        "cloudonair": lambda: fetch_cloudonair(today),
+        "nvidia": fetch_nvidia,
         "perplexity": lambda: [] if args.dry_run else fetch_perplexity(today, until),
     }
     candidates: list[dict] = []

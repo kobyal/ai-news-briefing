@@ -1,0 +1,447 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "title": "קורס חינמי של Anthropic בן 4 שעות: prompting ל-Claude והנדסת AI",
+ "subtitle": "לקט של שמונה הרצאות מ-Code with Claude London: איך לתקן prompts, לפרק agents, להוסיף verification, להריץ routines ולנהל זיכרון, ומה כל זה משנה בנורמות של צוות",
+ "meta": [
+  "Margot Van Laar, William Steuk, Arnaud Doko, Ivan Nardini, Kevin Chen ועוד · A.D. Philip · 18.08.2026",
+  "משך: כ-226 דקות · YouTube",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Margot Van Laar, William Steuk, Arnaud Doko, Ivan Nardini, Kevin Chen",
+ "topics": [
+  "Prompt engineering",
+  "Agent architecture",
+  "Claude Code",
+  "Evals"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "למרות הכותרת השיווקית, זה לא קורס אחד רציף. הסרטון מחבר כמה הקלטות מכנס Code with Claude בלונדון, והעלה אותו ערוץ צד שלישי (A.D. Philip). מדברים בו בעיקר אנשי Anthropic: Margot Van Laar (Applied AI) על prompting playbook, מרצה מצוות Claude Code ששמו לא נאמר בתמליל על best practices, William Steuk על פירוק agent שהתנפח, Arnaud Doko על agents שרצים שעות ועל verification, מרצה בשם Maya (לפי מסך ההדגמה) על Routines, Kevin Chen על memory stores ו-dreaming, ומנהלת הנדסה בצוות Claude Code על נורמות צוות. באמצע יש גם הרצאה של Ivan Nardini מ-Google Cloud על הרצת Claude Code ב-GCP.\n\nהטענה שחוזרת בכל ההרצאות: ככל שהמודלים חזקים יותר, צריך להוריד מגבלות ולא להוסיף. זה אומר prompt קצר ומסודר עם tools במקום הוראות בנוסח ״CRITICAL״, primitives בסגנון של מה שעומד לרשות אדם (bash, קבצים, web) במקום עשרות tools ייעודיים, skills במקום system prompt ארוך, ו-verification שמובנה ב-artifact עצמו. ברקע של הכול עומד eval suite שמאפשר hill climbing, כלומר שיפור מדיד מגרסה לגרסה."
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "פרק 1: ",
+     "תקציר מנהלים, ומה לא נאמר בהרצאות."
+    ],
+    [
+     "פרק 2: ",
+     "ה-prompting playbook: תיקון prompt שנשבר במעבר בין מודלים, ובניית agent חדש מאפס."
+    ],
+    [
+     "פרק 3: ",
+     "best practices ל-Claude Code: CLAUDE.md, הרשאות, to-do list ועבודה עם כמה מופעים של Claude במקביל."
+    ],
+    [
+     "פרק 4: ",
+     "tool, skill או subagent: פירוק StockPilot על Claude Managed Agents."
+    ],
+    [
+     "פרק 5: ",
+     "agents שרצים שעות: interview, HTML במקום Markdown, verification בתוך ה-artifact, והרצה על Google Cloud."
+    ],
+    [
+     "פרק 6: ",
+     "Routines, memory stores ו-dreaming: agents יוזמים שזוכרים בין sessions."
+    ],
+    [
+     "פרק 7: ",
+     "איך צוות Claude Code שינה את הנורמות שלו כשהקידוד הפסיק להיות צוואר הבקבוק."
+    ],
+    [
+     "פרקים 8-9: ",
+     "צעדים מעשיים, שאלות פתוחות ומילון מונחים."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך נוצר אוטומטית מהתמליל של ההקלטה ומהשקפים שחולצו ממנה. ה-ASR עלול לשבש שמות ומונחים (למשל ״Cloud Code״ במקום Claude Code, ״Sonic 4.6״ במקום Sonnet 4.6), ושמות שלא ודאי שנקלטו נכון מסומנים ככאלה. הציטוטים מועתקים מילה במילה ונבדקו מול חותמת הזמן שלהם. לא נוסף שום מידע ממקורות חיצוניים."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "כל אחת משמונה ההרצאות עומדת בפני עצמה, אבל יחד הן מתארות מתודולוגיה אחת. מתחילים ב-eval, משנים דבר אחד בכל פעם, נותנים למודל יכולות במקום הוראות, ומעבירים את מה שכבר לא צוואר בקבוק (קוד, קונטקסט, קריאות tools) לתשתית מנוהלת. זה ה-hill climbing ש-Anthropic מתארת כשיטת העבודה שלה."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "Eval לפני כל שינוי ב-prompt: ",
+     "לפי Van Laar, ה-suite צריך לכלול control case שתמיד עובר, edge cases שנכשלו בעבר, ומקרה שבו המודל אמור להעביר לאדם או לסרב. בהדגמה היו 5 מקרים, ובשימוש אמיתי יהיו הרבה יותר [3:05]."
+    ],
+    [
+     "הוראות הגנה ישנות גורמות לזהירות-יתר: ",
+     "המודל ענה 4GB hotspot ללקוח שהחבילה הישנה שלו כוללת 5GB, כי הנחייה ישנה אמרה לו לא לסמוך על נתוני התוכנית. אחרי שהוסרה, ה-test עבר [12:23]."
+    ],
+    [
+     "תנו tool במקום הוראה ״CRITICAL״: ",
+     "חישוב proration נכשל עד שנוסף calculate_proration tool, ואז המודל החזיר $70.00 מדויק [17:13]."
+    ],
+    [
+     "לבעיה קשה, adaptive thinking או לולאה: ",
+     "ב-shift scheduler, מעבר מ-Sonnet 4.6 ל-Opus 4.7 הוריד את מספר ההפרות אבל לא הספיק. Adaptive thinking פתר את הבעיה במחיר של פי 3 ב-tokens וב-latency (כ-100 שניות). לולאת generate, evaluate, repair פתרה את כל המקרים עם פחות tokens ו-latency [26:24, 29:29]."
+    ],
+    [
+     "StockPilot: מ-12 tools ל-primitives ו-skills: ",
+     "prompt של כ-400 שורות, 12 tools ושלושה subagents מוחלפים ב-bash/read/write, חמישה skills ו-callable_agents. לפי השקף התוצאה היא 15 שורות system prompt ו-92% (11/12) [1:28:17]."
+    ],
+    [
+     "משימה אחת עלתה פי 28 פחות: ",
+     "בפלט הטרמינל, task F1 ירד מכ-216K tokens ו-326 שניות לכ-7.6K tokens ו-164 שניות, והסיבה היא שהסינון עבר מהקונטקסט לסקריפט Python ב-sandbox (לפי הצגת המסך בהדגמה)."
+    ],
+    [
+     "Verification הוא חלק מה-artifact: ",
+     "לפי Doko, הרכיב מפרסם את ה-state שלו ל-DOM דרך data attributes, וכך אדם, agent (Playwright MCP) ו-CI מריצים אותה בדיקה [1:49:52, 2:02:29]."
+    ],
+    [
+     "Routines הופכים את Claude Code לחבר צוות: ",
+     "trigger לפי לוח זמנים, אירוע GitHub או webhook, על תשתית מנוהלת. השקף מדווח על עלייה של 200% ב-PRs השבועיים עם מהנדס תיעוד אחד [2:33:32]."
+    ],
+    [
+     "Memory נפתר, ו-dreaming מטפל בגידול שלו: ",
+     "memory store מותקן כ-file system, ו-dream הוא batch job שעושה fact-checking, מאחד כפילויות וכותב ל-store חדש בלי לגעת במקור [2:52:02, 3:08:52]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "אין נתוני עלות בדולרים לפתרונות ה-prompting: ",
+     "ההשוואה בין adaptive thinking ללולאת repair מבוססת על tokens ו-latency בחמישה test cases בלבד, ללא מובהקות וללא מחיר."
+    ],
+    [
+     "מספרי ה-baseline של StockPilot סותרים: ",
+     "Steuk אמר שה-evals עוברים בכ-83% [57:00], אבל בטרמינל רואים 7/12, כלומר כ-62%. אין הסבר לפער."
+    ],
+    [
+     "ה-200% של Routines לא מבודד: ",
+     "לא הוצג baseline, ולא הוצגה איכות ה-PRs או שיעור הדחייה שלהם."
+    ],
+    [
+     "המדדים לאימוץ הם כיוון ולא תוצאה: ",
+     "הרצאת הנורמות ממליצה למדוד ramp-up, PR cycle time ו-Claude-assisted commits, אבל לא הציגה ערכים של הצוות עצמו."
+    ],
+    [
+     "אין שום התייחסות לעלות או למגבלות של Claude Managed Agents: ",
+     "התמחור, ה-lock-in וה-SLA לא הוזכרו. רק בהרצאת Google Cloud דובר על תמחור per-token ללא caps."
+    ],
+    [
+     "הכותרת מבטיחה משכורות של $500K: ",
+     "שום דבר בתוכן לא קשור לזה. זה תיוג של הערוץ שהעלה את הסרטון, לא של Anthropic."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. Prompting playbook: תיקון prompt ובניית prompt מאפס"
+  },
+  {
+   "kind": "image",
+   "file": "k_012.jpg",
+   "caption": "ה-test set של בוט התמיכה Meridian Mobile: control, proration, prepaid disclaimer, escalation של חיוב כפול ושאלת hotspot, כל אחד עם הפלט שנחשב עובר",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Margot Van Laar מציגה שני תרחישים. בראשון, prompt שנצבר בייצור ״מטלאים״ מתחיל להידרדר אחרי מעבר מודל (Sonnet 4.6 בהדגמה). העבודה מתחלקת לשני שלבים. קודם hygiene: הסרת הטענה שהבוט הוא אדם, ניקוי טקסט שהועתק מאתר (hero image, cookies), ארגון לפי XML tags (role, guidelines, policy) והגדרת output contract. אחר כך טיפול ממוקד בכל כשל בנפרד.\n\nה-hotspot נכשל בגלל הנחייה ישנה ״לא לסמוך על נתוני התוכנית״, וה-proration נכשל בגלל חישוב בראש. המשפט שלה: \"telling the model to do a good job isn't particularly helpful when we don't give the model the capability to actually do a good job\" [17:13]. חיוב כפול תוקן כשכתבו את הנחיית ה-escalation מחדש כך שתציג את שני צדי ה-trade-off: escalation עולה כ-$8, אבל תשובה שגויה בסכסוך חיוב עולה החזר ואמון (לפי שקף v4 ל-v5). העיקרון: \"as models become more intelligent, we need to remember to state both sides of the trade-offs\" [21:49]."
+  },
+  {
+   "kind": "image",
+   "file": "k_116.jpg",
+   "caption": "השוואת גישות ל-shift scheduler: simple prompt, מודל גדול יותר, adaptive thinking, prompt משופר ולולאת generate→evaluate→repair, עם הפרות לכל ריצה, pass, tokens ו-latency",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "בתרחיש השני בונים agent שמשבץ משמרות לשבוע: שמונה עובדים, שתי משמרות ביום ואילוצים קשיחים. ה-checker הוא דטרמיניסטי בקוד. Simple prompt על Sonnet 4.6 נכשל. Opus 4.7 מוריד את מספר ההפרות אבל עדיין נכשל. Adaptive thinking מצליח, אבל \"We're tripling, essentially, the number of tokens that we're using here, and we're tripling the latency\" [26:24]. הפתרון שנבחר: שלושה prompts פשוטים ונפרדים. generator כותב טיוטה, evaluator (LLM, לא קוד) מדווח על כל הפרה עם ראיה, ו-repair מתקן נקודתית. זה פתר את כל המקרים \"with a much lower number of tokens and with a lower latency\" [29:29]. המסקנה שלה היא ששתי הגישות לגיטימיות: Opus 4.7 עם adaptive thinking, או הלולאה."
+  },
+  {
+   "kind": "h1",
+   "text": "3. Best practices ל-Claude Code"
+  },
+  {
+   "kind": "image",
+   "file": "k_133.jpg",
+   "caption": "שקף Environment Setup & Configuration: קובצי CLAUDE.md, permission management, integration setup (gh CLI) ו-context management עם /clear",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "ההרצאה הזו נראית ישנה יותר מהשאר: בהדגמה מופיע המודל claude-sonnet-4-20250514, ושם המרצה לא נאמר בתמליל. ההמלצות: קובץ CLAUDE.md בפרויקט (משותף לצוות דרך git) או בתיקיית הבית, עם הוראות להרצת tests, מבנה הפרויקט ו-style guide. אפשר גם CLAUDE.md נוסף בתת-תיקייה. ניהול הרשאות: קריאה עוברת אוטומטית, כתיבה ו-bash דורשים אישור, ו-Shift+Tab מעביר ל-auto-accept. חשוב לעקוב אחרי ה-to-do list וללחוץ Escape כשהכיוון שגוי.\n\n״Smart vibe coding״ לפי ההרצאה: TDD, שינויים קטנים, בדיקת TypeScript ו-lint, ו-commit תכוף כדי שתמיד תהיה נקודה לחזור אליה. אפשר להדביק screenshots ו-mockups כי המודל multimodal. בשימוש מתקדם: כמה מופעים של Claude במקביל (tmux, טאבים, worktrees), אחד כותב ואחד בודק. להעברת state בין sessions הוא ממליץ לכתוב קובץ כמו ticket.md ש-session אחר יקרא [47:47]. ועצה מעשית: \"I check this once a week and make sure that I'm on top of all the new stuff we're shipping, because even I can't keep up with it\" [43:14], כלומר את ה-changelog בפרויקט Claude Code ב-GitHub."
+  },
+  {
+   "kind": "h1",
+   "text": "4. Tool, skill או subagent: פירוק agent שגדל מעבר ל-prompt שלו"
+  },
+  {
+   "kind": "image",
+   "file": "k_160.jpg",
+   "caption": "הארכיטקטורה המקורית של StockPilot, ״built right for early 2025״: orchestrator עם prompt של כ-400 שורות, 12 inline tools ושלושה subagents (forecasting, procurement, writing) שהם עטיפות דקות",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "William Steuk (בתמליל ״Will״) מציג את StockPilot, agent לניהול מלאי של קמעונאי ציוד שטח: 250 SKUs, 3 מחסנים ו-12 ספקים. כל דרישה עסקית חדשה (forecasting, דוחות) נוספה כ-subagent או כעוד פסקה ב-prompt, וה-evals ירדו בהדרגה. יש 12 משימות eval עם חמישה סוגי graders. ב-R8 ה-agent שלף נכון את ה-baseline (12 יחידות ביום) ואת מכפיל המבצע (3.1x), אבל בחישוב השתמש ב-1.35. \"17% failure is a really expensive failure percentage\" [57:00].\n\nהשיטה היא hill climbing בתוך Claude Code (Opus 4.7, effort extra high), שמריץ את ה-evals ומבצע RCA. יש שלושה מחזורים. במחזור 1, ה-prompt הארוך מוחלף ב-skills (progressive disclosure: רק שורת description נטענת, והגוף נטען לפי צורך). במחזור 2, 12 ה-tools מוחלפים ב-primitives: \"Whenever we build agents, we lean into the same primitives that we as humans have access to\" [1:14:11]. לפי הטבלה בטרמינל, list_low_stock שהחזיר כ-400 שורות CSV לקונטקסט הוחלף בסקריפט Python שמחזיר top-N. במחזור 3, ה-forecaster שהיה tool שמחזיר prose הופך ל-callable_agents של CMA עם JSON contract, observability ו-parallelism. על MCP: \"We see a lot of folks run towards MCP first\" [1:18:52]. ההמלצה שלו היא להתחיל ב-primitives, להוסיף custom tools רק כשצריך, ורק אחר כך MCP."
+  },
+  {
+   "kind": "image",
+   "file": "k_398.jpg",
+   "caption": "התוצאה: agent אחד על Claude Managed Agents עם 15 שורות system prompt, 5 skills שנטענים לפי צורך, 0 subagents מקודדים ו-92% ב-eval (11/12)",
+   "width": 5.6
+  },
+  {
+   "kind": "quote",
+   "text": "If I am writing code, I do not want to be the same person that is writing and also reviewing my code.",
+   "by": "— William Steuk [1:23:39]"
+  },
+  {
+   "kind": "h1",
+   "text": "5. Agents שרצים שעות: ambiguity, תוכניות HTML ו-verification"
+  },
+  {
+   "kind": "image",
+   "file": "k_413.jpg",
+   "caption": "השוואה בין תוכנית ב-Markdown (״yesterday״) לתוכנית ב-HTML (״today״) לאפליקציית bill splitting: scope, open questions ו-flow בתצוגה ויזואלית",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Arnaud Doko (לפי השקף, Member of Technical Staff) יוצא מהנחה שאם agents רצים שעות, טעויות עולות יותר. הוא פותח ב-Bitter Lesson של Richard Sutton: \"the more capable the models get, the more you should try to resist constraining them\" [1:35:58]. יש לו שלושה כלים. הראשון, removing ambiguity: לא לבקש ״build it״, אלא לבקש מה-agent לראיין אותך. בשקף מושווים ״Create a bill-splitting app for friends״ לעומת prompt שמבקש brainstorm על קהל היעד. השני, תוכניות ב-HTML ולא ב-Markdown, כי HTML עשיר יותר ונוח יותר לאדם לבדוק. השלישי, integrated verification. ההמלצות הנלוות: auto mode (Shift+Tab), /effort ברמת xhigh, ו-/fast כשמתאים.\n\nבחלק המעשי משתמשים ב-Storybook fixtures, testing library, data attributes ו-Playwright MCP על אפליקציית React. הרכיב מפרסם את ה-state שלו ל-DOM, נפרד מה-internals של React, כך ש-agent קורא \"DOM contract\" במקום לגרד את ה-DOM [1:49:52]. אותה מטריצת בדיקות רצה ידנית, מתוך Claude Code ו-headless ב-CI. בהדגמה בדיקה נכשלה בכוונה (״4 plus 3 does not equal 10״) ו-Opus 4.7 איתר את הסיבה. לפי השקף העקרונות הם build for it from the start, modularize by verifiability ו-verify across the stack. לדבריו, זו השיטה ש-Tarek וצוותו משתמשים בה ב-Claude Code (השם כפי שנקלט ב-ASR)."
+  },
+  {
+   "kind": "image",
+   "file": "k_467.jpg",
+   "caption": "Claude Code לאורך ה-SDLC ב-Google Cloud: Product Manager (multimodal), UI/UX (Plan Mode, Figma MCP), Software Engineer (skills, subagents), Security Engineer (plugins, hooks), Growth Marketer (BigQuery MCP)",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Ivan Nardini (developer advocate ב-Google Cloud) מדגים את אותו flow ב-GCP. ההתחברות היא דרך Application Default Credentials, יש wizard שמזהה project ו-region, והתמחור per-token \"so you don't receive a message cap\" [2:07:09]. ההדגמה עוברת בין תפקידים: PM הופך סקיצה ל-wireframe ב-HTML, UI/UX עובד ב-plan mode, SWE מריץ שלושה subagents במקביל (Cloud Run, Firestore→BigQuery, dashboard), ה-security engineer מריץ security review שמוצא ומתקן חוסר ב-input validation ואז מבצע deploy, ו-Growth מתשאל ב-BigQuery MCP ובונה Looker. מקור המשאבים לפי השקף: goo.gle/anthropic."
+  },
+  {
+   "kind": "h1",
+   "text": "6. Routines, memory stores ו-dreaming"
+  },
+  {
+   "kind": "image",
+   "file": "k_517.jpg",
+   "caption": "שלוש ההחלטות לכל routine: Trigger (מתי זה רץ), Context (מה ה-agent צריך לדעת), Steering (איך שומרים אותו ישר)",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "ההרצאה על Routines (המרצה מופיעה כ-Maya במסך ההדגמה, ושם המשפחה לא ברור) פותחת כך: \"we believe that coding agents shouldn't wait for you to press enter to get started\" [2:30:25]. Routine מוגדר על ידי prompt, repos, connectors ו-trigger, ורץ על התשתית המנוהלת של Claude Code, כלומר \"Nothing depends on your laptop being opened\" [2:33:32]. ה-trigger יכול להיות לפי לוח זמנים, אירוע GitHub או webhook עם payload. הדוגמה הפנימית: sync שבועי של התיעוד, כל יום שני ב-10:00, שמשווה בין repo הקוד ל-repo התיעוד ופותח PR. אפשר גם להפעיל על PRs עם label ״need docs״. כתרגיל הוצע deploy verifier: ה-CD פולט webhook, Claude מקבל גישה לקוד ולכלי monitoring (Datadog, Grafana) ומתריע ב-Slack או ב-Twilio [2:47:22].\n\nKevin Chen מציג שני מושגים ב-Claude Managed Agents. הראשון הוא memory store, מאגר בסגנון file system שמחובר ל-session. אפשר ליצור store לכל משתמש או workspace. \"we've actually mounted it as a file system because it's such a powerful interface for the model\" [2:56:36], ולכן המודל משתמש ב-grep וב-bash כדי לחפש בו. השני הוא dream: batch job אסינכרוני שעובר על store ועל transcripts של sessions קודמים, עושה fact-checking, מעשיר בתאריכים ובמזהים ומאחד כפילויות. בפועל הוא משכפל את ה-input ל-output memory store חדש, כך שהתהליך non-destructive, ולוקח כדקה [3:08:52]."
+  },
+  {
+   "kind": "image",
+   "file": "k_556.jpg",
+   "caption": "איך Dreaming עובד: input memory store משוכפל, orchestrator מפעיל subagent לכל transcript של session, והם כותבים ל-output memory store",
+   "width": 5.6
+  },
+  {
+   "kind": "h1",
+   "text": "7. צוואר הבקבוק זז: נורמות צוות בעולם AI-native"
+  },
+  {
+   "kind": "image",
+   "file": "k_599.jpg",
+   "caption": "״If these don't shift in six months, adoption isn't working״: onboarding ramp time, PR cycle time ושיעור ה-commits בעזרת Claude",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "ההרצאה האחרונה היא של מנהלת הנדסה בצוות Claude Code, שעבדה קודם ב-Meta וב-Microsoft (שמה לא נאמר בתמליל). הטענה שלה: הקידוד כבר לא צוואר הבקבוק. הבקבוקים החדשים הם verification, review, שותפים cross-functional ו-security, ו-\"rarely do processes kill themselves\" [3:22:48]. יש חמש נורמות שהצוות בנה מחדש (לפי השקף): code review, onboarding, planning (פחות תכנון מראש ויותר prototype), hiring (יצירתיות ושיקול דעת במקום תפוקה גולמית) ו-org shape. במקום יחס של 10 ICs למנהל, כל מנהל התחיל כ-IC. בוויכוחים טכניים הקוד מכריע: \"when building is cheap, arguing expensive\" [3:27:26]. במקרה שהיא תיארה, Claude ייצר שלוש גרסאות PR ל-API כדי להשוות גם את ההשפעה על הקוראים ל-API.\n\nClaude מטפל ב-style, lint, feedback על PRs ו-tests. אדם נשאר ב-legal review, סיכון, trust boundaries וקוד רגיש ל-security, product sense ו-taste. דוגמה: ה-stand-up הוחלף בגיליון, והגיליון הוחלף ב-skill של stand-up. ההמלצה לסיום לפי השקף: \"Pick your noisiest workflow. Ask if it still earns its place.\""
+  },
+  {
+   "kind": "h1",
+   "text": "8. צעדים מעשיים ושאלות פתוחות"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "בנו eval מינימלי לפני כל migration: ",
+     "control, edge cases ו-escalate/refuse, עם שינוי אחד בכל פעם והרצה מלאה אחרי כל שינוי."
+    ],
+    [
+     "עברו על ה-system prompt ומחקו טלאים: ",
+     "הוראות הגנה שנכתבו בשביל מודל קודם יוצרות זהירות-יתר. כתבו trade-off דו-צדדי במקום ״NEVER/CRITICAL״."
+    ],
+    [
+     "החליפו חישוב בראש ב-tool: ",
+     "כל מקום שבו ה-prompt דורש ״לחשב נכון״ הוא מועמד ל-tool או ל-code execution."
+    ],
+    [
+     "לבעיות עם אילוצים, השוו adaptive thinking ללולאת repair: ",
+     "מדדו tokens ו-latency על ה-eval שלכם, לא על הדוגמה בהרצאה."
+    ],
+    [
+     "בצעו audit ל-tools של ה-agent: ",
+     "כל tool שמזרים נתונים גולמיים לקונטקסט צריך להפוך לסקריפט ב-sandbox. כל policy ארוך צריך להפוך ל-skill."
+    ],
+    [
+     "הוסיפו DOM contract ו-verification לתוך ה-artifact: ",
+     "כך אותה בדיקה רצה ידנית, דרך agent וב-CI."
+    ],
+    [
+     "התחילו מ-routine אחד: ",
+     "sync תיעוד או deploy verifier, עם trigger, context ו-steering מוגדרים."
+    ],
+    [
+     "קבעו baseline לשלושה מדדים: ",
+     "onboarding ramp, PR cycle time ו-Claude-assisted commits, ובדקו אותם שוב בעוד שישה חודשים."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "למה היא חשובה"
+   ],
+   "rows": [
+    [
+     "מה המחיר בפועל של adaptive thinking לעומת לולאת repair בקנה מידה גדול?",
+     "ההשוואה הוצגה על 5 test cases בלבד, בלי עלות בדולרים."
+    ],
+    [
+     "למה ה-baseline של StockPilot הוא 83% בדבריו ו-62% בטרמינל?",
+     "בלי baseline עקבי אי אפשר להעריך את השיפור ל-92%."
+    ],
+    [
+     "איך מוודאים ש-dreaming לא ״מתקן״ עובדות נכונות?",
+     "ה-fact-checking עצמו נעשה על ידי LLM ולא הוצג לו eval."
+    ],
+    [
+     "כמה עולה Claude Managed Agents ומה מידת ה-lock-in?",
+     "הנושא לא הוזכר בהרצאות של Anthropic."
+    ],
+    [
+     "כמה רחוק אפשר לדחוף review אוטומטי לגמרי?",
+     "המרצה עצמה הציגה את זה כשאלה שהיא עוד עובדת עליה (״fast enough״ מול ״lost something important״)."
+    ],
+    [
+     "האם עדיין צריך ארגוני iOS ו-Android נפרדים?",
+     "שאלה פתוחה שהמרצה העלתה על מבנה צוותים כשהתפקידים מיטשטשים."
+    ]
+   ],
+   "widths": [
+    2.6,
+    3.4
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "9. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "eval / grader",
+     "חבילת בדיקות למודל ו-grader שקובע אם פלט עבר, דטרמיניסטי או LLM"
+    ],
+    [
+     "control case",
+     "בדיקה חד-משמעית שאמורה לעבור תמיד, ומשמשת בקרה"
+    ],
+    [
+     "hill climbing",
+     "מחזור של baseline, שינוי ארכיטקטורה והרצה חוזרת של evals, לשיפור הדרגתי"
+    ],
+    [
+     "adaptive thinking",
+     "מצב שבו המודל מחליט בעצמו כמה reasoning להשקיע"
+    ],
+    [
+     "effort (xhigh)",
+     "פרמטר שקובע את עומק ה-reasoning ב-Claude Code, ומומלץ ברמת extra high"
+    ],
+    [
+     "generate-evaluate-repair",
+     "לולאה של שלושה prompts נפרדים: טיוטה, איתור הפרות ותיקון נקודתי"
+    ],
+    [
+     "CLAUDE.md",
+     "קובץ הוראות קבוע שנטען לכל session ב-Claude Code"
+    ],
+    [
+     "auto mode / plan mode",
+     "עבודה בלי אישור לכל פעולה, או מצב שבו Claude מציע תוכנית לפני שהוא כותב קוד"
+    ],
+    [
+     "skill",
+     "חבילת מידע שנטענת לקונטקסט רק כשהמודל מזהה שהיא נחוצה"
+    ],
+    [
+     "progressive disclosure",
+     "חשיפה הדרגתית של מידע במקום system prompt ארוך"
+    ],
+    [
+     "subagent / callable_agents",
+     "מופע Claude נפרד לעבודה מקבילית או לבדיקה בעיניים רעננות, ו-callable_agents הוא המימוש הטבעי שלו ב-CMA"
+    ],
+    [
+     "Claude Managed Agents (CMA)",
+     "תשתית מנוהלת שמפרידה בין agent, session ו-sandbox"
+    ],
+    [
+     "MCP",
+     "פרוטוקול לחיבור agents למערכות חיצוניות"
+    ],
+    [
+     "DOM contract",
+     "state שהרכיב מפרסם ל-DOM דרך data attributes, כדי ש-agent יוכל לאמת אותו"
+    ],
+    [
+     "routine",
+     "session מרוחק של Claude Code שמופעל לפי לוח זמנים, אירוע או webhook"
+    ],
+    [
+     "memory store",
+     "אחסון מתמשך בסגנון file system שמחובר ל-sessions"
+    ],
+    [
+     "dreaming",
+     "batch job שמאחד, מתקן ומעשיר memory store לתוך store חדש"
+    ],
+    [
+     "shift left",
+     "העברת verification לשלבים מוקדמים יותר בתהליך"
+    ]
+   ],
+   "widths": [
+    1.8,
+    4.2
+   ]
+  }
+ ]
+}

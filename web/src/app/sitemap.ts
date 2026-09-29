@@ -72,7 +72,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Library docs ride in the search index as extras but live at
     // /library/<slug>/ — emitting /story/<slug>/ for them would put dead URLs
     // in the sitemap (the soft-404 failure mode). They're added below instead.
-    if (s.type === "library") return [];
+    // Same for events: external registration URLs, no /story/ page.
+    if (s.type === "library" || s.type === "event") return [];
     const enUrl = `${base}/story/${s.story_id}/`;
     const heUrl = `${base}/he/story/${s.story_id}/`;
     const lastModified = s.date ? new Date(s.date) : undefined;

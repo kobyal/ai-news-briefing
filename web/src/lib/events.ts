@@ -20,7 +20,7 @@ export interface EventItem {
   venue: string;
   organizer: string;
   url: string;
-  source: "meetup" | "eventbrite" | "luma" | "aws" | "perplexity";
+  source: "meetup" | "eventbrite" | "luma" | "aws" | "microsoft" | "google" | "nvidia" | "perplexity";
   format: EventFormat;
   price: EventPrice;
   tags: string[];
@@ -46,6 +46,20 @@ export async function fetchEvents(): Promise<EventsFeed | null> {
   } catch {
     return null;
   }
+}
+
+/** Vendor ribbon name (VENDOR_LIST in vendors.ts) → event tag the agent emits.
+ *  "Azure" and "Microsoft" both mean the microsoft tag; ribbon vendors with no
+ *  event tag (Meta, xAI…) simply hide the section's events when selected. */
+export const VENDOR_EVENT_TAG: Record<string, string> = {
+  AWS: "aws", Google: "google", Azure: "microsoft", Microsoft: "microsoft",
+  NVIDIA: "nvidia", Anthropic: "anthropic", OpenAI: "openai",
+};
+
+/** Ribbon vendor names carried by at least one of `events` (via VENDOR_EVENT_TAG). */
+export function eventVendors(events: EventItem[]): Set<string> {
+  const tags = new Set(events.flatMap((e) => e.tags));
+  return new Set(Object.keys(VENDOR_EVENT_TAG).filter((v) => tags.has(VENDOR_EVENT_TAG[v])));
 }
 
 export type EventBucket = "this_week" | "next_two_weeks" | "later";

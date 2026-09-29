@@ -13,7 +13,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO = Path("/Users/kobyalmog/vscode/projects/ai-news-briefing")
+# Resolved from this file so a git worktree builds ITS OWN docs/data, not the
+# main checkout's (the old absolute path silently wrote to main, 2026-09-29).
+REPO = Path(__file__).resolve().parents[1]
 DATA_DIR = REPO / "docs/data"
 KEY = "data/search-index.json"
 
@@ -458,6 +460,33 @@ if lib_path.exists():
                 "thumbnail":    doc.get("cover") or "",
                 "url":          f"/library/{doc.get('slug')}/",
             })
+
+# ── Upcoming events ───────────────────────────────────────────────────────────
+# agents/active/events-agent → docs/data/events.json. Only future events: a
+# past meetup in search is noise, and the feed itself is rebuilt daily. Like
+# library docs they are NOT stories — the card links out to the registration
+# URL (type == "event" has no anchor type on /search, so href stays external)
+# and the sitemap skips them.
+events_path = REPO / "docs/data/events.json"
+if events_path.exists():
+    for ev in json.loads(events_path.read_text(encoding="utf-8")).get("events", []):
+        if ev.get("date", "") < today_iso:
+            continue
+        extras.append({
+            "type":         "event",
+            "date":         ev.get("date") or "",
+            "posted_date":  ev.get("date") or "",
+            "story_id":     ev.get("id") or "",
+            "headline":     ev.get("title") or "",
+            "headline_he":  ev.get("title_he") or "",
+            "summary":      ev.get("blurb") or "",
+            "summary_he":   ev.get("blurb_he") or "",
+            "vendor":       ev.get("organizer") or "",
+            "thumbnail":    ev.get("image") or "",
+            "url":          ev.get("url") or "",
+            "tags":         ev.get("tags") or [],
+            "city":         ev.get("city") or "",
+        })
 
 payload = {"stories": stories, "extras": extras}
 

@@ -474,11 +474,17 @@ Keeps `/library/` alive: every cycle adds **one** reviewed long-form talk (YouTu
 speaker's slides, timestamped quotes, glossary). Runs in `local-cycle.sh` [3b] before the
 web build so the new `/library/<slug>/` page is statically generated.
 
-- **Discover + rank:** `yt-dlp` lists 11 curated channels (Anthropic, AI Engineer, YC, AWS
-  Events, DeepMind, OpenAI, Latent Space, Sequoia, a16z, Microsoft Developer, Stanford) plus
-  a few searches; 15–100 min, ≤120 days old, not yet done. One `claude -p` call scores
-  relevance (Claude Code / agents / AI engineering) and quality (talk vs. tutorial).
+- **Discover + rank:** `yt-dlp` lists 12 curated channels (Anthropic `@anthropic-ai` +
+  `@claude`, AI Engineer, YC, AWS Events, DeepMind, OpenAI, Latent Space, Sequoia, a16z,
+  Microsoft Developer, Stanford), a few searches, and `EXTRA_FEEDS` — non-YouTube RSS feeds
+  whose media yt-dlp downloads (currently InfoQ presentations; missing date/duration filled
+  from the page's JSON-LD). Same funnel for all: 15–100 min, ≤120 days old, not yet done.
+  One `claude -p` call scores relevance (official Anthropic / Claude Code engineering
+  content is top tier, then agents / AI engineering) and quality (talk vs. clickbait
+  tutorial); `CHANNEL_BOOST` (+0.5) breaks ties toward the official Anthropic channels.
   Scores <5 are remembered in `state/state.json` so they're not re-fetched daily.
+  Tested + dropped: Vimeo (yt-dlp needs a login), USENIX/ACM (YouTube embeds),
+  anthropic.com (YouTube only).
 - **Produce:** `prep.py` (under the `recording-to-review` skill venv, `R2R_HOME`) does
   fetch → whisper (local, free) → slide frames; `writer.py` calls `claude -p` with the
   `Read` tool so the model *looks at* the contact sheets before writing `content.json`;

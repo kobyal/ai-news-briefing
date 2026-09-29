@@ -1,0 +1,412 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "title": "לשלוט ב-Claude Code ב-30 דקות",
+ "subtitle": "Boris Cherny, שבנה את Claude Code, מציג טיפים מעשיים: להתחיל בשאלות על הקוד, לחבר כלים, לתת context ולהריץ כמה סשנים במקביל",
+ "meta": [
+  "Boris Cherny · Anthropic · 22.05.2025",
+  "משך: כ-28 דקות · YouTube",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Boris Cherny",
+ "topics": [
+  "Claude Code",
+  "Agentic coding",
+  "Developer workflows",
+  "Context engineering"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זו הרצאה טכנית ומעשית מכנס Code w/ Claude של Anthropic. מרצה Boris Cherny, חבר Technical Staff ב-Anthropic, שבנה את Claude Code. הוא מוותר מראש על היסטוריה ותיאוריה ועובר לטיפים לפי הסדר שבו משתמש לומד את הכלי: הגדרת סביבה, שאלות על ה-codebase, עריכת קוד וחיבור כלים, ניהול context ושיתוף עם הצוות, קיצורי מקלדת, ה-SDK ועבודה עם כמה סשנים במקביל. בסוף יש כמה דקות של שאלות מהקהל.\n\nהטענה המרכזית: Claude Code הוא agent כללי ולא כלי השלמת קוד. לכן הוא לא כופה workflow. ההצלחה תלויה בשלושה דברים: לחבר אותו לכלים שהצוות כבר משתמש בהם, לתת לו דרך לבדוק את העבודה של עצמו, ולהשקיע ב-context משותף (CLAUDE.md, slash commands, MCP) שנכתב פעם אחת ומשרת את כל הצוות. לאורך ההרצאה Cherny חוזר על זה שהרבה מהיכולות לא הוגדרו ב-system prompt, והן מגיעות מהמודל עצמו."
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות העיקריות וה-timestamps שלהן, ומה חסר בהרצאה."
+    ],
+    [
+     "2. התחלה: ",
+     "הגדרת הסביבה ו-Codebase Q&A, שהוא נקודת הפתיחה המומלצת."
+    ],
+    [
+     "3. עריכת קוד וכלים: ",
+     "הכלים המובנים, חיבור CLI ו-MCP של הצוות, ושלושת ה-workflows."
+    ],
+    [
+     "4. Context: ",
+     "CLAUDE.md, slash commands ומטריצת ההגדרות מרמת enterprise ועד רמת הפרויקט."
+    ],
+    [
+     "5. כלים מתקדמים: ",
+     "קיצורי מקלדת, claude -p כ-SDK, הרצת כמה סשנים במקביל, ושאלות הקהל."
+    ],
+    [
+     "6. מה לעשות עכשיו: ",
+     "צעדים מעשיים וטבלת שאלות פתוחות."
+    ],
+    [
+     "7. מילון מונחים: ",
+     "המונחים באנגלית שמופיעים במסמך."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך נוצר אוטומטית מה-transcript של ההקלטה ומהשקפים שהוצגו בה. ייתכן ששמות ומונחים שובשו בתמלול האוטומטי (ASR). למשל, Claude Code מופיע בתמלול כ-QuadCode או Cloud Code, ובמקומות כאלה הושווה הנוסח לשקפים. הציטוטים מועתקים מילה במילה מה-transcript ונבדקו מול ה-timestamp שלהם, ולכן חלקם כוללים את שיבושי התמלול. לא נוסף מידע ממקורות חיצוניים."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "ההרצאה בנויה כמו מסלול למידה, מהשימוש הפשוט ביותר (לשאול שאלות על הקוד) עד המתקדם (כמה agents במקביל ושילוב ב-pipelines). כמעט כל הטענות נתמכות בדוגמאות מהשימוש הפנימי ב-Anthropic. נתונים כמותיים יש מעט, בעיקר על זמן ה-onboarding ועל היקף השימוש בחברה."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "Claude Code הוא agent ולא כלי השלמת קוד: ",
+     "לפי Cherny הוא נועד לבנות פיצ'רים שלמים ולתקן באגים שלמים, ועובד עם כל IDE וכל terminal, גם מעל SSH ו-tmux, בלי לשנות את ה-workflow [1:30]."
+    ],
+    [
+     "כדאי להתחיל ב-Codebase Q&A: ",
+     "לפי Cherny, ה-onboarding הטכני ב-Anthropic התקצר משבועיים-שלושה ליומיים-שלושה, כי עובדים חדשים שואלים את Claude Code במקום את הצוות [4:33]."
+    ],
+    [
+     "אין indexing והקוד נשאר מקומי: ",
+     "אין מסד נתונים מרוחק ואין שלב הגדרה, וגם לא מאמנים מודלים גנרטיביים על הקוד [4:33]."
+    ],
+    [
+     "לבקש תוכנית לפני קוד: ",
+     "בפיצ'רים גדולים התוצאה בניסיון הראשון היא לפעמים לא מה שרצית. הפתרון הוא לבקש תוכנית ואישור לפני כתיבת קוד, בלי plan mode ובלי כלי מיוחד [9:07]."
+    ],
+    [
+     "לתת ל-Claude דרך לבדוק את עצמו: ",
+     "unit tests, צילומי מסך ב-Puppeteer או ב-iOS simulator. לדבריו, אחרי שניים-שלושה סבבי iteration התוצאה \"almost perfect\" [10:39]."
+    ],
+    [
+     "לחבר את הכלים של הצוות: ",
+     "CLI פנימי או MCP server, מספיק לספר ל-Claude שהם קיימים. קובץ ‎.mcp.json בתוך ה-repo משתף אותם עם כל הצוות [9:07, 16:55]."
+    ],
+    [
+     "CLAUDE.md קצר ושמור ב-repo: ",
+     "נטען אוטומטית בכל סשן. יש היררכיה של enterprise, global, project ו-local, והיא חלה גם על permissions ועל slash commands [12:16, 15:20]."
+    ],
+    [
+     "claude -p הוא \"Unix utility\": ",
+     "ה-SDK שעליו בנוי Claude Code עצמו. אפשר להעביר אליו קלט ב-pipe ולקבל JSON. ב-Anthropic משתמשים בו ב-CI, ב-incident response וב-pipelines אחרים [21:27]."
+    ],
+    [
+     "משתמשים כבדים מריצים כמה סשנים במקביל: ",
+     "כמה checkouts של אותו repo, git worktrees, או SSH ו-tmux [22:59]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "אין מדדים מעבר לשניים: ",
+     "זמן ה-onboarding וכ-80% מהעובדים הטכניים ב-Anthropic שמשתמשים בכלי מדי יום. אין נתונים על איכות, שיעור הצלחה, עלות או צריכת tokens."
+    ],
+    [
+     "אין ניתוח כשלים: ",
+     "ההרצאה כמעט לא מתארת מקרים שבהם Claude Code נכשל, מלבד האזהרה על פיצ'ר של 3,000 שורות בניסיון אחד."
+    ],
+    [
+     "\"almost perfect\" אחרי 2-3 סבבים: ",
+     "זו התרשמות אישית, בלי מדידה."
+    ],
+    [
+     "התחזית על סוף עידן ה-IDE: ",
+     "Cherny אמר שייתכן שעד סוף השנה אנשים יפסיקו להשתמש ב-IDE, בלי לתמוך בזה בנתונים."
+    ],
+    [
+     "בטיחות bash: ",
+     "ה-static analysis וה-permissions המדורגות תוארו רק ברמה כללית."
+    ],
+    [
+     "פריטים בשקפים שלא הוסברו: ",
+     "למשל /vibe בשקף הקיצורים, ו-TypeScript ו-Python SDKs שמסומנים בשקף \"coming soon\"."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. התחלה: הגדרת סביבה ו-Codebase Q&A"
+  },
+  {
+   "kind": "image",
+   "file": "k_013.jpg",
+   "caption": "השקף Optimize your setup: ‏/allowed-tools להגדרת הרשאות כלים, ‏/terminal-setup ל-Shift+Enter, ‏/install-github-app לתיוג Claude ב-issues וב-PRs, ‏/theme, ו-/config להפעלת התראות, לצד הפעלת הכתבה קולית ב-macOS",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "ההתקנה היא npm install -g @anthropic-ai/claude-code, ודרוש רק Node.js [0:00]. אחרי ההתקנה Cherny ממליץ על כמה פעולות: ‏/terminal-setup כדי ש-Shift+Enter ייתן שורה חדשה, ‏/theme, ו-/install-github-app, שמאפשר לתייג את Claude ב-issue או ב-PR ב-GitHub (האפליקציה הוכרזה ביום ההרצאה). כדאי גם להתאים את רשימת הכלים המותרים, כדי שפעולות חוזרות לא יבקשו אישור בכל פעם [3:01].\n\nטיפ אישי: את רוב ה-prompts שלו הוא לא מקליד. הוא מפעיל dictation ב-macOS (Accessibility), לוחץ פעמיים על מקש ההכתבה ומדבר. לדבריו זה מוביל ל-prompts ספציפיים יותר, כמו כשמדברים עם מהנדס אחר [3:01]."
+  },
+  {
+   "kind": "image",
+   "file": "k_018.jpg",
+   "caption": "השקף Use Claude Code to answer questions about your codebase עם דוגמאות prompt: איך משתמשים ב-‎@RoutingController.py, למה פונקציה מקבלת כל כך הרבה ארגומנטים (עם הנחיה לחפש ב-git history), באיזו גרסה שוחרר API מסוים, ו-What did I ship last week?",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "ההמלצה העיקרית למשתמשים חדשים ולצוותים: להתחיל בשאלות על הקוד, לא בעריכה ולא בכלים מתוחכמים. Claude Code לא רק מחפש טקסט. הוא מחפש דוגמאות לאופן שבו מחלקה נוצרת ומשמשת, ונותן תשובה ברמה של wiki [4:33]. Cherny משתמש בו גם לחקירת git history, למשל כדי להבין למה לפונקציה יש 15 ארגומנטים, מי הוסיף אותם ולאילו issues ה-commits מקושרים. לדבריו אין שום הנחיה כזו ב-system prompt: \"It knows it because the model is awesome.\" [6:06]. הוא גם שולף issues מ-GitHub באמצעות web fetch, ובכל יום שני, לפני ה-standup, שואל \"what did I ship this week?\" ומעתיק את הסיכום למסמך.\n\nהסיבה להתחיל כך: שאלות מלמדות לכתוב prompts ומראות היכן עובר הגבול, כלומר מה אפשר לבקש בניסיון אחד, מה דורש שניים-שלושה ניסיונות, ומה עדיף לעשות במצב אינטראקטיבי ב-REPL [7:36]. בנוסף, אין indexing ואין שלב הגדרה. Claude Code עובד מיד, והקוד לא נשלח לשום מקום: \"We do not train generative models on the code.\" [4:33]."
+  },
+  {
+   "kind": "quote",
+   "text": "And so, at Anthropic, onboarding used to take about two or three weeks for technical hires. It's now about two or three days.",
+   "by": "— Boris Cherny [4:33]"
+  },
+  {
+   "kind": "h1",
+   "text": "3. עריכת קוד, כלים ו-workflows"
+  },
+  {
+   "kind": "image",
+   "file": "k_021.jpg",
+   "caption": "השקף Use tools to get things done: ‏Claude Code מגיע עם כתריסר כלים מובנים, ביניהם bash, חיפוש קבצים, הצגת רשימת קבצים, קריאה וכתיבה, web fetch ו-search, ‏TODOs ו-sub-agents, ולצידם צילום מסך של diff בזמן עריכה",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "לפי Cherny, סט הכלים של Claude Code קטן: עריכת קבצים, הרצת פקודות bash וחיפוש. המודל משלב אותם בעצמו כדי לחקור, לחשוב על פתרונות ולבסוף לערוך [7:36]. הטעות הנפוצה היא לבקש פיצ'ר ענק של 3,000 שורות בבת אחת. התיקון פשוט: \"So just say, before you write code, make a plan. That's it.\" [9:07]. גם הביטוי commit push PR עובד בלי הסבר: Claude בודק את ה-git log כדי להבין את פורמט ה-commits, יוצר branch, דוחף ופותח pull request.\n\nהשלב הבא הוא לחבר את הכלים של הצוות. הם מגיעים בשני סוגים: כלי bash, כמו ה-barley CLI הבדיוני מהשקף (בתמלול: Burley), שעליו אפשר לומר ל-Claude \"Use -h to check how to use it\", ו-MCP servers שמוסיפים עם claude mcp add. כלי שמשתמשים בו הרבה כדאי לתעד ב-CLAUDE.md כדי שייזכר בין סשנים [9:07, 10:39]. שלושה workflows מוצגים בהרצאה: לחקור, לתכנן ולבקש אישור לפני כתיבת קוד; לכתוב tests ולהריץ iterations מולם; ולבנות UI מ-mock ולהשוות אליו עם צילומי מסך. העיקרון המשותף: \"So the trick is give it some sort of tool that it can use for feedback to check its work.\" [10:39]."
+  },
+  {
+   "kind": "h1",
+   "text": "4. Context: ‏CLAUDE.md, ‏slash commands והיררכיית ההגדרות"
+  },
+  {
+   "kind": "image",
+   "file": "k_030.jpg",
+   "caption": "השקף Give Claude more context: קבצי CLAUDE.md שנטענים אוטומטית בכל סשן, ‏‎/enterprise-root/CLAUDE.md ו-‎~/.claude/CLAUDE.md שמשותפים לכל הפרויקטים, ו-CLAUDE.md מול CLAUDE.local.md בשורש הפרויקט (הראשון נשמר ב-repo, השני לא). קיצור: הקלדת #",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "CLAUDE.md הוא קובץ עם שם מיוחד. הוא נטען אוטומטית לתחילת כל סשן, בפועל כחלק מתור המשתמש הראשון. את הקובץ בשורש הפרויקט שומרים ב-repo ומשתפים עם הצוות. CLAUDE.local.md הוא אישי ולא נכנס ל-source control. מה כדאי לכתוב בו: פקודות bash נפוצות, כלי MCP, החלטות ארכיטקטורה, קבצים חשובים ו-style guide. הכלל החשוב: \"Try to keep it pretty short, because if it gets too long, it's going to use up a bunch of context, and it's usually not that useful.\" [12:16]. קבצי CLAUDE.md בתיקיות משנה נטענים רק כש-Claude עובד בתיקייה המתאימה, וארגון יכול להגדיר קובץ ברמת enterprise [13:47].\n\nslash commands נשמרים בתיקייה ‎.claude/commands, בתיקיית הבית או בפרויקט. השקף מראה דוגמאות מה-repo של Claude Code עצמו, כמו create-release-pr, ‏fix-github-issue ו-label-github-issues. את האחרונה מריץ GitHub Action שמתייג issues בלי מעורבות אנושית [13:47]. Cherny ממליץ גם להעביר את ה-context דרך prompt improver ולחשוב בשביל מי הוא נכתב [15:20]."
+  },
+  {
+   "kind": "image",
+   "file": "k_037.jpg",
+   "caption": "מטריצת Share with your team: עמודות Enterprise policy, ‏Global, ‏Project (shared) ו-Project (just me), מול שורות Memory ‏(CLAUDE.md / CLAUDE.local.md), ‏Slash commands ‏(‎.claude/commands), ‏Permissions ‏(policies.json, ‏settings.json, ‏settings.local.json) ו-MCP servers ‏(claude mcp, ‏‎.mcp.json)",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "אותה היררכיה של enterprise, global ו-project (משותף או אישי) חלה גם על הרשאות ועל MCP servers [15:20]. ברמת enterprise אפשר לאשר מראש פקודה שכל העובדים מריצים, למשל פקודת הבדיקות, וגם לחסום: URL שאסור לשלוף ייחסם ברמה שעובד לא יכול לעקוף. קובץ ‎.mcp.json בתוך ה-repo יציע לכל מי שמריץ Claude Code להתקין את השרתים. דוגמה מ-Anthropic: ב-repo של קוד ה-web וה-apps שמור Puppeteer MCP server, כך שכל מהנדס יכול להריץ בדיקות end-to-end ולצלם מסך בלי להתקין בעצמו [16:55, 18:26].\n\nCherny מודה שהמטריצה מורכבת (\"kind of an insane matrix\") וממליץ על נקודת פתיחה אחת: \"I would recommend start with shared project context.\" [16:55]. ההיגיון הוא אפקט רשת: אחד כותב, וכל הצוות מרוויח. הפקודה /memory מציגה את כל קבצי ה-memory שנטענים ומאפשרת לערוך אותם, וכשמקלידים # כדי לשמור משהו בזיכרון בוחרים לאיזה קובץ הוא ייכנס."
+  },
+  {
+   "kind": "h1",
+   "text": "5. קיצורי מקלדת, SDK ועבודה במקביל"
+  },
+  {
+   "kind": "image",
+   "file": "k_042.jpg",
+   "caption": "השקף Interlude: Keybindings עם שמונה צירופים: Shift+Tab ל-auto-accept, ‏# ליצירת memory, ‏! ל-bash mode, ‏@ להוספת קובץ או תיקייה, Esc לביטול, Esc כפול לחזרה בהיסטוריה (ו---resume), ‏Ctrl+R לפלט מלא, ו-/vibe",
+   "width": 5.6
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "Shift+Tab: ",
+     "מצב auto-accept לעריכות. פקודות bash עדיין דורשות אישור. Cherny משתמש בו כשהכיוון נכון או בזמן iteration על tests [18:26]."
+    ],
+    [
+     "#: ",
+     "לשמור הנחיה בזיכרון. היא נכנסת אוטומטית ל-CLAUDE.md [18:26]."
+    ],
+    [
+     "!: ",
+     "להריץ פקודת bash ישירות. הפקודה והפלט שלה נכנסים ל-context, וזה שימושי לפקודות ארוכות [18:26]."
+    ],
+    [
+     "Esc: ",
+     "לעצור בכל רגע בלי לקלקל את הסשן, למשל כשרוצים לתקן שורה אחת מתוך עריכה של 20. \"No matter what Claude is doing, you can always safely hit escape.\" [19:57]"
+    ],
+    [
+     "Esc פעמיים, ‎--resume, ‎--continue, ‏Ctrl+R: ",
+     "חזרה אחורה בהיסטוריה, המשך של סשן קודם, והצגת הפלט המלא כפי ש-Claude רואה אותו ב-context [19:57]."
+    ]
+   ]
+  },
+  {
+   "kind": "image",
+   "file": "k_044.jpg",
+   "caption": "שקף ה-SDK: גישה תכנותית ל-Claude Code, מתאים ל-CI, להקשרים לא-אינטראקטיביים ולאוטומציה. כרגע יש CLI, ו-TypeScript ו-Python SDKs מסומנים \"coming soon\". דוגמה: claude -p \"what did I do this week?\" --allowedTools Bash(git log:*) --output-format json",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "ה-SDK הוא מה שמפעילים עם הדגל ‎-p, והוא אותו SDK שעליו בנוי Claude Code עצמו. מעבירים prompt, רשימת כלים מותרים (כולל פקודות bash ספציפיות) ופורמט פלט, JSON או streaming JSON. ב-Anthropic משתמשים בו ב-CI, ב-incident response וב-pipelines שונים. בעיני Cherny זה \"It's like a super intelligent Unix utility.\" [21:27]: אפשר להזרים לתוכו פלט של git status ולסנן את התוצאה עם jq, להזרים log גדול מ-GCP bucket ולבקש ממנו למצוא בו משהו מעניין, או לעבד נתונים מה-Sentry CLI. הוא הפנה לסשן מעמיק על ה-SDK באותו כנס, עם מרצה ששמו בתמלול Sid (השם לא אומת)."
+  },
+  {
+   "kind": "image",
+   "file": "k_048.jpg",
+   "caption": "השקף Interlude: Multi-claude, שמציג כמה דרכים להריץ כמה סשנים במקביל: כמה checkouts בטאבים נפרדים, ‏checkout אחד עם git worktrees, ‏SSH ו-TMUX, והרצה של כמה במקביל דרך GitHub Actions (הטקסט בשקף קטן והקריאה משוערת)",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Cherny מתאר את עצמו כ-\"Claude normie\": סשן אחד בכל פעם, ולכל היותר כמה טאבים ל-repos שונים. משתמשים כבדים, בתוך Anthropic ומחוצה לה, עובדים עם SSH ו-tmux, מחזיקים כמה checkouts של אותו repo או משתמשים ב-git worktrees לבידוד, ומריצים כמה סשנים במקביל. לדבריו Anthropic עובדת על כך שיהיה קל יותר [22:59].\n\nשאלות מהקהל. החלק הקשה ביותר במימוש היה לאפשר פקודות bash בבטחה בלי לבקש אישור על כל פקודה. הפתרון: זיהוי פקודות read-only, ‏static analysis שקובע אילו צירופי פקודות בטוחים, ומערכת permissions מדורגת עם allow ו-block lists [24:29]. Claude Code גם multimodal מההתחלה: \"Yeah, so Cloud Code is fully multimodal.\" [24:29]. אפשר לגרור תמונה, להדביק אותה או לתת נתיב לקובץ, ו-Cherny מגדיר לו mock יחד עם Puppeteer server לצורך iteration. למה CLI ולא IDE? ב-Anthropic משתמשים בהרבה עורכים שונים (VS Code, ‏Zed, ‏Xcode, ‏Vim, ‏Emacs), ובנוסף \"I think there's a good chance that by the end of the year, people aren't using IDs anymore.\" [26:00]. בשאלה על machine learning הוא ענה שכ-80% מהעובדים הטכניים ב-Anthropic משתמשים בכלי מדי יום, כולל חוקרים שעורכים ומריצים notebooks עם כלי ה-notebook [26:00]."
+  },
+  {
+   "kind": "h1",
+   "text": "6. מה לעשות עכשיו"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "Onboarding: ",
+     "לתת לעובדים חדשים להתחיל ב-Codebase Q&A ולא בעריכת קוד, כולל שאלות על git history."
+    ],
+    [
+     "CLAUDE.md קצר ב-repo: ",
+     "פקודות נפוצות, קבצים מרכזיים, style guide. ‏CLAUDE.local.md להעדפות אישיות."
+    ],
+    [
+     "לשתף כלים: ",
+     "לשמור ‎.mcp.json ב-repo (למשל Puppeteer) ולהגדיר permissions משותפות ב-‎.claude/settings.json."
+    ],
+    [
+     "לולאת משוב בכל משימה: ",
+     "tests, צילומי מסך או simulator, כדי ש-Claude יוכל לבדוק את עצמו ולשפר את התוצאה."
+    ],
+    [
+     "תוכנית לפני פיצ'ר גדול: ",
+     "להתחיל כל משימה רחבה ב-\"before you write code, make a plan\"."
+    ],
+    [
+     "להפוך תהליכים חוזרים ל-slash commands: ",
+     "ולהריץ אותם דרך claude -p ב-CI או ב-GitHub Actions."
+    ],
+    [
+     "לנסות עבודה במקביל: ",
+     "git worktrees או כמה checkouts למשימות שאינן תלויות זו בזו."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "למה זה חשוב"
+   ],
+   "rows": [
+    [
+     "כמה iterations צריך בפועל, ומה שיעור ההצלחה בלי לולאת משוב?",
+     "\"almost perfect\" אחרי 2-3 סבבים היא התרשמות ולא מדידה"
+    ],
+    [
+     "כמה ארוך CLAUDE.md יכול להיות לפני שהוא מזיק?",
+     "ההמלצה היא \"קצר\", בלי מספר ובלי מדידה של עלות ה-context"
+    ],
+    [
+     "עד כמה ה-static analysis של פקודות bash מחזיק במקרי קצה?",
+     "המנגנון תואר רק ברמה כללית, והוא מה שמאפשר auto-approve בארגון"
+    ],
+    [
+     "מה העלות, ב-tokens ובכסף, של כמה סשנים במקביל או של claude -p ב-CI?",
+     "ההרצאה לא עסקה בעלויות בכלל"
+    ],
+    [
+     "האם התחזית על סוף ה-IDE עד סוף השנה התממשה?",
+     "זו ההצדקה האסטרטגית ל-CLI, ולא הוצגה לה תמיכה"
+    ]
+   ],
+   "widths": [
+    3.2,
+    3.0
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "7. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "Agentic",
+     "כלי שמתכנן ומבצע רצף פעולות בעצמו באמצעות כלים, ולא רק משלים שורות קוד"
+    ],
+    [
+     "CLAUDE.md / CLAUDE.local.md",
+     "קובץ context שנטען אוטומטית לכל סשן: הגרסה המשותפת נשמרת ב-repo, הגרסה המקומית היא אישית"
+    ],
+    [
+     "MCP / ‏‎.mcp.json",
+     "פרוטוקול לחיבור כלים חיצוניים, וקובץ שמשתף את ה-MCP servers של הפרויקט עם הצוות"
+    ],
+    [
+     "Slash commands",
+     "prompts שמורים בתיקייה ‎.claude/commands שמפעילים עם /"
+    ],
+    [
+     "Enterprise policy",
+     "הגדרות גלובליות שהארגון מחיל על כל העובדים, לאישור או לחסימה של פעולות"
+    ],
+    [
+     "Auto-accept",
+     "מצב שבו עריכות מאושרות אוטומטית ופקודות bash עדיין דורשות אישור (Shift+Tab)"
+    ],
+    [
+     "claude -p / SDK",
+     "הרצה לא-אינטראקטיבית של Claude Code מסקריפטים, CI ו-pipelines"
+    ],
+    [
+     "One-shot",
+     "משימה שהמודל מבצע נכון בניסיון הראשון"
+    ],
+    [
+     "REPL",
+     "מצב אינטראקטיבי של שיחה ועבודה איטרטיבית בטרמינל"
+    ],
+    [
+     "Git worktrees",
+     "כמה תיקיות עבודה של אותו repo, שמאפשרות להריץ כמה סשנים במקביל בבידוד"
+    ],
+    [
+     "tmux / SSH",
+     "ריבוב סשנים בטרמינל וגישה מרוחקת, לסשנים ארוכים ומקביליים"
+    ],
+    [
+     "Puppeteer",
+     "ספרייה לשליטה בדפדפן, משמשת כאן לצילומי מסך ולבדיקות end-to-end"
+    ]
+   ],
+   "widths": [
+    1.8,
+    4.4
+   ]
+  }
+ ]
+}

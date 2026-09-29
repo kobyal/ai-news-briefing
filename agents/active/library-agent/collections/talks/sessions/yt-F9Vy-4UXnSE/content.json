@@ -1,0 +1,432 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "title": "Harness design ל-agents שרצים שעות: איך מהנדסי Anthropic בונים אפליקציה שלמה מאפס בלולאה של planner, generator ו-evaluator",
+ "subtitle": "מה שקובע את התוצאה הוא מבנה הלולאה, לא רק ה-model: agent אחד מתכנן, אחד בונה, אחד שופט, ומוחקים חלקים מה-harness כשה-model משתפר",
+ "meta": [
+  "Ash ו-Andrew (Anthropic, Applied AI) · AI News & Podcast · 21.06.2026",
+  "משך: כ-40 דקות · YouTube",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Ash, Andrew",
+ "topics": [
+  "Long-running agents",
+  "Harness design",
+  "Claude Code",
+  "Agent evaluation"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זו הרצאה של שני מהנדסים מצוות Applied AI של Anthropic, שהוקלטה בכנס AI Engineer Europe (כך כתוב ברקע הבמה) ועלתה מחדש בערוץ AI News & Podcast. ההרצאה מבוססת על פוסט בבלוג של Anthropic על בניית agents שרצים ברציפות חמש-שש שעות ויותר. Andrew, שהוא solution architect בלונדון, פותח בסקירה היסטורית: מה Anthropic שחררה ב-model וב-harness במשך שנה, ואיך זה הביא את Claude מריצות של 20 דקות לריצות של ימים. אחריו Ash מציג את ה-harness הניסיוני שהם עובדים איתו היום. שמות המשפחה של הדוברים לא נאמרו בהקלטה.\n\nהטענה המרכזית: מודלים גרועים בשיפוט של העבודה של עצמם, ולכן צריך להפריד בין מי שבונה למי ששופט. מגדירים evaluator נפרד, קשוח, שעובד לפי rubric ובודק את האפליקציה החיה דרך Playwright. מוסיפים לו planner ו-\"חוזה\" שמנוהל עליו משא ומתן לפני כתיבת הקוד. הטענה השנייה: ה-harness לא נעלם כשה-model משתפר, הוא משתנה. כשיצא Opus 4.6 הם מחקו חצי מהרכיבים, והעלות ירדה בערך בחצי."
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות העיקריות, הראיות שהוצגו, ומה לא נאמר."
+    ],
+    [
+     "2. למה agents מאבדים את הדרך: ",
+     "שלושה כשלים (context, תכנון, שיפוט עצמי) ושתי דרכים לטפל בהם."
+    ],
+    [
+     "3. שנה של model ו-harness שמתפתחים יחד: ",
+     "ציר הזמן מ-Sonnet 3.7 ועד Opus 4.6, ה-Ralph loop וה-harness הראשון לריצות ארוכות."
+    ],
+    [
+     "4. להפריד בין הבונה לשופט: ",
+     "לולאת generator/evaluator בהשראת GAN, ו-rubric שהופך טעם לדבר שאפשר לתת לו ציון."
+    ],
+    [
+     "5. Planner ו-sprint contracts: ",
+     "מקרה הבוחן של retro game maker, ומה ה-evaluator תפס בפועל."
+    ],
+    [
+     "6. Harness בדיאטה: ",
+     "מה הוסר במעבר ל-Opus 4.6, ומקרה הבוחן של ה-DAW עם פירוט עלויות."
+    ],
+    [
+     "7. מסקנות ופעולות: ",
+     "חמש המסקנות מהשקף האחרון, צעדים מעשיים ושאלות פתוחות."
+    ],
+    [
+     "8. מילון מונחים: ",
+     "המונחים באנגלית שמופיעים במסמך."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך נוצר אוטומטית מהתמלול של ההקלטה ומהשקפים שהוצגו בה. זיהוי הדיבור האוטומטי (ASR) עלול לשבש שמות ומונחים; במקומות שבהם השקף סותר את התמלול (למשל \"Opus 3.7\" בתמלול מול Sonnet 3.7 בשקף) ציינו זאת. הציטוטים מועתקים מילה במילה מהתמלול ונבדקו מול חותמת הזמן שלהם. לא נוסף מידע ממקורות חיצוניים."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "ההרצאה עוסקת בשאלה איך גורמים ל-agent לבנות אפליקציה שלמה ועובדת מפרומפט של שורה אחת, בריצה של שעות, בלי שהוא יסיים באמצע, יפסיק לשמור על קוהרנטיות או יכריז על עבודה חלקית כגמורה. לפי Anthropic, מה שהביא את השיפור הוא לא רק model חזק יותר. הוא הגיע מחלוקה של התפקידים לחלונות context נפרדים, עם לחץ אדוורסרי ביניהם."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "שיפוט עצמי הוא מלכודת: ",
+     "מודלים נוטים ל-sycophancy גם בקוד. הם מסמנים פיצ'ר חצי-גמור כמושלם, או בונים כפתור שאין מאחוריו backend [3:05]. גם כ-QA, Claude \"out the box\" הוא \"a really, really bad just general QA agent\" [32:01]."
+    ],
+    [
+     "להפריד בין הבונה לשופט: ",
+     "generator ו-evaluator עם context, system prompt ותפקיד נפרדים, בהשראת GAN. ה-evaluator פותח את האפליקציה החיה דרך Playwright ולא מסתפק בקריאת diffs [18:23]. הרציונל: קל יחסית לכייל critic נפרד שיהיה קשוח, וקשה לגרום לבונה להיות ביקורתי כלפי עצמו."
+    ],
+    [
+     "אפשר לתת ציון גם לטעם: ",
+     "rubric עם ארבעה קריטריונים (design, originality, craft, functionality), כשהמשקל מוטה לעיצוב ולמקוריות כי Opus 4.6 כבר טוב ב-functionality. הכיול נעשה עם few-shot של אתרי ייחוס [21:26]."
+    ],
+    [
+     "Sprint contracts: ",
+     "לפני שורת הקוד הראשונה, ה-generator וה-evaluator מנהלים משא ומתן על ההגדרה של \"done\" דרך קבצים על הדיסק, וה-evaluator נותן ציון מול החוזה ולא מול ה-spec [24:26]. ב-sprint אחד היו 27 קריטריונים [32:01]."
+    ],
+    [
+     "ההבדל נובע מה-harness: ",
+     "על אותו פרומפט (\"build a retro game maker\") ועם אותו model, agent בודד רץ 20 דקות בעלות של 9 דולר, ומצב המשחק לא עבד. ה-harness המלא רץ 6 שעות בעלות של 200 דולר, ונוצר משחק שעובד [27:27]."
+    ],
+    [
+     "Model ו-harness מתפתחים יחד: ",
+     "לפי METR, ה-time horizon ב-scaffold מינימלי עלה מכשעה ב-Sonnet 3.7 לכ-12 שעות ב-Opus 4.6 [3:05]. במקביל כל שחרור model לווה בשינויי harness [4:37]."
+    ],
+    [
+     "Harness בדיאטה: ",
+     "עם Opus 4.6 הסירו את איפוסי ה-context בין sessions, את הפירוק ל-sprints ואת הרצת ה-evaluator בכל sprint. ה-planner נשאר. העלות ירדה בערך בחצי [33:34], וריצת ה-DAW עלתה 124.70 דולר ונמשכה 3 שעות ו-50 דקות [36:36]."
+    ],
+    [
+     "קריאת ה-traces היא לולאת הדיבאג העיקרית: ",
+     "לדבריהם אין קיצור דרך. קוראים מה ה-agent עשה, מוצאים איפה השיפוט שלו סוטה מהשיפוט האנושי, ומעדכנים את ה-prompt [32:01]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "אין נתונים סטטיסטיים: ",
+     "ההשוואה בין solo ל-harness מבוססת על דוגמה אחת (retro game maker) ועוד הדגמה אחת (DAW). לא הוצגו אחוזי הצלחה על פני הרבה ריצות או benchmark."
+    ],
+    [
+     "אין מספרים על ה-evaluator עצמו: ",
+     "לא נמסר כמה false positives או false negatives יש לו, וכמה זמן כיול נדרש, מעבר לתיאור \"an exorbitant amount of time\"."
+    ],
+    [
+     "ה-rubric לא נחשף: ",
+     "לא נמסרו המשקלות המדויקים ולא ה-prompts של ה-evaluator."
+    ],
+    [
+     "לא ברור על איזה model רצה ה-DAW: ",
+     "נאמר רק \"one of our latest models\". גם \"mythos level models\" הוזכר בלי פירוט, והשם אינו ודאי."
+    ],
+    [
+     "התחום מוגבל: ",
+     "כל הדוגמאות הן web apps. לא הוצגו תוצאות לתחומים שאינם קוד, אף שנטען שה-Agent SDK מתאים גם להם."
+    ],
+    [
+     "ה-harness הפנימי לא שוחרר: ",
+     "נאמר רק שחלקים ממנו עוברים בהדרגה ל-Claude Code."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. למה agents מאבדים את הדרך"
+  },
+  {
+   "kind": "image",
+   "file": "k_005.jpg",
+   "caption": "שקף \"Three reasons agents lose the plot\": שלוש עמודות. Context: לא מסוגל לשמור מצב, אמנזיה בין sessions, קוהרנטיות שיורדת ככל שהחלון מתמלא. Planning: לא מסוגל להעריך את גודל העבודה, מנסה לעשות הכול ב-one-shot או מסיים באמצע. Verification: לא מסוגל לשפוט את הפלט של עצמו, בודק רק ב-curl ולא בקליקים ומאשר עבודה בינונית.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Andrew מחלק את הבעיה לשלושה סוגי כשלים. הראשון הוא context. החלון סופי, ובכל session חדש ה-agent מתחיל מאפס, כך שצריך רכיב זיכרון. ככל שה-session מתארך יש context rot, ומגיע גם שלב שהוא מכנה context anxiety: ה-model \"נלחץ\" לקראת סוף החלון וממהר לסיים. השני הוא תכנון. מודלים מנסים לעשות הכול ב-one-shot, בונים חצי פיצ'ר ועוצרים, או נגמר להם ה-context באמצע האפליקציה. השלישי, והפחות אינטואיטיבי, הוא שיפוט עצמי: ה-model מסתכל על פיצ'ר חצי-אפוי ואומר שהוא מוכן, או בונה כפתור שאין מאחוריו backend [3:05].\n\nיש שתי דרכים לטפל בזה. הראשונה היא לאמן את ההתנהגות לתוך ה-weights. הגרף של METR מודד כמה זמן agent יכול לרוץ ב-scaffold מינימלי ועדיין להשלים 50% מהמשימות. הוא עולה מכשעה ל-12 שעות בתוך שנה. בתמלול נשמע \"Opus 3.7\", אבל לפי השקף מדובר ב-Sonnet 3.7. הדרך השנייה היא ה-harness. ה-Agent SDK כולל את ה-primitives: agent loop, tools, שרתי MCP, sub-agents, CLAUDE.md, skills, slash commands ומערכת הרשאות [4:37]."
+  },
+  {
+   "kind": "image",
+   "file": "k_007.jpg",
+   "caption": "\"Fix #1: Train the behavior into the weights\": הגרף של METR ל-time horizon ב-50% הצלחה ב-scaffold מינימלי. קו הזמן כולל את Sonnet 3.5, 3.7, 4 ו-4.5 ואת Opus 4 ו-4.5, ומגיע לכ-12 שעות ב-Opus 4.6. בשקף כתוב שהערך מוכפל בערך כל 129 ימים.",
+   "width": 5.6
+  },
+  {
+   "kind": "h1",
+   "text": "3. שנה של model ו-harness שמתפתחים יחד"
+  },
+  {
+   "kind": "image",
+   "file": "k_017.jpg",
+   "caption": "תרשים ה-harness מהפוסט של Anthropic Engineering מנובמבר 2025, \"Effective harnesses for long-running agents\". initializer agent מרחיב את הפרומפט ל-feature list בפורמט JSON. בכל session ה-agent מתמצא בסביבה, מריץ smoke test, בוחר פיצ'ר אחד שנכשל, מממש אותו, מאמת עם Puppeteer, ובסוף עושה commit ומעדכן את קובץ ה-progress.",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "Andrew מתחיל מציטוט של Boris, יוצר Claude Code, ביום השנה הראשון של הכלי. לפני שנה Claude התקשה לכתוב פקודות bash ולעשות escaping למחרוזות, ורץ בערך 20 דקות. היום כמעט כל הקוד של Claude Code נכתב על ידי Claude Code, והוא רץ ימים [1:32]. אלה הצמתים בציר הזמן: Sonnet 3.5 עם artifacts, computer use ו-MCP. בפברואר 2025 יצאו Sonnet 3.7 ו-Claude Code כ-research preview, ולפי ההכרזה המטרה הייתה \"to better understand how developers use Claude for coding to inform future model improvements\" [6:08]. במאי יצאו Opus 4 ו-Sonnet 4, ו-Claude Code הפך ל-GA יחד עם ה-SDK. אחר כך Sonnet 4.5 עם context awareness ו-Claude Code 2.0 עם checkpoints, וה-SDK קיבל את השם Agent SDK. בשלב הזה ריצות הגיעו לכ-30 שעות. Haiku 4.5 ו-Opus 4.5 הפכו ריצה של הרבה sub-agents לכדאית כלכלית: Opus מתכנן ו-Sonnet מבצע. באותה תקופה יצאו גם skills עם progressive disclosure ו-programmatic tool calling [10:43]. ב-Opus 4.6 ו-Sonnet 4.6 נוספו agent teams, שבהם ה-sub-agents מדברים זה עם זה ולא רק עם ה-agent הראשי, server-side compaction ו-context של מיליון tokens כ-GA [13:46].\n\nבאמצע הסקירה מופיע ה-Ralph Wiggum loop. השם שנשמע בתמלול הוא Jeffrey Huntley, והאיות לא ודאי. הטכניקה פורסמה ביולי ותפסה תאוצה בסביבות דצמבר. הרעיון הוא לרוץ על אותו פרומפט בלולאה, כל פעם עם context נקי, לפי העיקרון \"it's better to fail predictably than it is to succeed unpredictably\" [7:41]. ב-plugin של Anthropic הלולאה רצה בתוך session יחיד, עם stop hook, מספר איטרציות מקסימלי ו-safe word, והיא נשענת על compaction. לכן יש מי שטוען שזה \"לא Ralph loop אמיתי\" [9:13]. ה-harness הראשון לריצות ארוכות מנובמבר התבסס על initializer שכותב artifacts קבועים. בחירה מעניינת שם היא קובץ JSON לרשימת הפיצ'רים: \"we actually found the models might overwrite markdown files whereas they're less likely to just overwrite JSON files\" [12:15]. היום, לדבריו, אפליקציה מלאה נבנית בדרך כלל ב-3 עד 5 שעות."
+  },
+  {
+   "kind": "quote",
+   "text": "the harness doesn't just disappear as the models get better, it's really evolving as the models change over time.",
+   "by": "— Andrew [15:18]"
+  },
+  {
+   "kind": "h1",
+   "text": "4. להפריד בין הבונה לשופט"
+  },
+  {
+   "kind": "image",
+   "file": "k_024.jpg",
+   "caption": "\"Separate the builder from the judge\": תיבת Generator (בונה) ותיבת Evaluator (נותן ציון), עם חיצים של output ו-critique ביניהן. הערת השוליים: בהשראת GANs, וה-evaluator משתמש ב-Playwright כדי לנווט בדף החי לפני שהוא נותן ציון.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Ash מתאר תבנית שלקוחה, בלשונו \"shamelessly\", מ-GANs. ה-generator בונה, ה-evaluator נותן ציון, ולכל אחד יש context, system prompt ותפקיד משלו. ה-evaluator לא קורא diffs. הוא פותח דפים חיים ב-Playwright, לוחץ ומנסה דברים, ומחזיר ביקורת ל-generator [18:23]. ההשוואה היא לדרך שבה רוב האנשים עובדים היום: session אחד שמתבקש לבדוק את עצמו. לשאלה למה evaluator שהוא גם LLM לא פשוט יאשר הכול, הוא עונה ש-\"tuning a standalone critic to be harsh is actually very tractable\", ושלגרום לבונה להיות ביקורתי כלפי עצמו לא ניתן באותה קלות. הוא ממשיל את זה לבני אדם: קל לבקר ציור או ארוחה, וקשה לצייר או לבשל [19:54].\n\nעל מדדים סובייקטיביים הוא אומר: \"most people say you can't grade taste, but we think you can if you have a strong enough opinion on it and you just kind of write it down\" [19:54]. לכן ה-rubric מוטה ל-design ול-originality, במטרה למנוע גרדיאנטים סגולים ואסתטיקה של \"AI slop\" (בתמלול נשמע \"AI slot\"). הכיול נעשה עם דוגמאות few-shot של אתרי ייחוס, כדי שהטעם של ה-evaluator יתקרב לטעם שלהם [21:26]. בהדגמה של ה-frontend (שקף: \"Create a website for a Dutch art museum\") כל ריצה כללה 5 עד 15 איטרציות ונמשכה עד כ-4 שעות. יתרון שאין בלולאת agent יחיד הוא היכולת לשנות כיוון. אם ה-generator תקוע עם ציון נמוך ב-originality, ה-harness זורק את התוצר ומתחיל מאפס, בזמן ש-Ralph loop ממשיך להטליא את אותו דבר [22:56]."
+  },
+  {
+   "kind": "image",
+   "file": "k_027.jpg",
+   "caption": "\"Making subjective quality gradable\": ארבעת הקריטריונים של ה-rubric. Design quality: האם זה מרגיש שלם וקוהרנטי. Originality: החלטות מותאמות או ברירות מחדל של ספריות. Craft: טיפוגרפיה, ריווח, ניגודיות, ביצוע טכני. Functionality: האם המשתמש מצליח להשלים משימות בלי לנחש. בתחתית: המשקל מוטה ל-Design ול-Originality.",
+   "width": 5.6
+  },
+  {
+   "kind": "h1",
+   "text": "5. Planner ו-sprint contracts: מקרה הבוחן של retro game maker"
+  },
+  {
+   "kind": "image",
+   "file": "k_033.jpg",
+   "caption": "\"Sprint contracts\": לפני כתיבת קוד, ה-generator וה-evaluator מנהלים משא ומתן על ההגדרה של \"done\" ב-chunk הנוכחי, ומשכתבים את הקבצים עד שהם מסכימים. ה-spec מכוון להיות high-level, החוזה מתרגם user stories להתנהגויות שאפשר לבדוק, וה-evaluator נותן ציון מול החוזה ולא מול ה-spec. התקשורת עוברת דרך קבצים: agent אחד כותב, השני קורא ומגיב.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "כדי לעבור מדפים יפים לאפליקציות שעובדות, נוסף תפקיד שלישי: planner. הוא הופך פרומפט של שורה אחת ל-spec בכוונה high-level, שמחולק ל-sprints. הוא לא מתכנן פרטים טכניים גרנולריים, כי טעות בשלב הזה \"is going to cascade through every single one of these sprints\" לאורך ריצה של שעות [22:56]. Ash מסכם שבמבט מלמעלה זה מבנה ארגוני פשוט של PM, IC ו-QA, רק שלכל תפקיד יש context משלו [24:26]. החידוש, לדבריו, הוא החוזה בין ה-generator ל-evaluator. ה-generator מציע מה יבנה ואיך לבדוק אותו, וה-evaluator יכול להשיב שה-scope גדול מדי, שהבדיקות חלשות ושחסר edge case. את זה, לדבריו, ה-Ralph loop \"never really had\" (בתמלול נשמע \"RAL fleet\"): היה לו plan קבוע, ואף אחד לא התווכח איתו [25:57].\n\nעל אותו פרומפט ועם אותו model, ה-agent הבודד בנה מסך פתיחה ועורך sprites שנראים סבירים, אבל במצב המשחק \"Pressing an arrow key does nothing. Pressing a space key did nothing.\" [27:27]. ה-harness קרא לאפליקציה Retroforge והוסיף דיאלוג פרויקט חדש, פלטה של 54 צבעים, ו-AI level assistant בתוך האפליקציה. כל אלה לא הופיעו בפרומפט. ה-assistant צמח משורה עמומה ב-spec על \"AI features\". במצב המשחק יש debug HUD, שלדברי Ash נוצר כנראה כדי להקל על ה-evaluator, והפיזיקה והמקשים עובדים. הסיכום שלו: \"the difference between this output and the previous output is entirely just scaffolding\" [30:30]."
+  },
+  {
+   "kind": "image",
+   "file": "k_034.jpg",
+   "caption": "\"Example: retro game maker, solo vs full harness\": טבלת השוואה. Solo agent: 20 דקות, 9 דולר, מצב המשחק לא עובד (entity wiring broken), עורך sprites בסיסי. Full harness: 6 שעות, 200 דולר, מצב המשחק עובד, פלטה מלאה, זום ועזרת AI.",
+   "width": 5.6
+  },
+  {
+   "kind": "image",
+   "file": "k_036.jpg",
+   "caption": "\"What the evaluator actually caught\": טבלה של קריטריון מול ממצא. מילוי מלבן ב-click-drag מציב tiles רק בנקודות ההתחלה והסיום של הגרירה. מקש Delete דורש גם selection וגם selectedEntityId, כשהתנאי היה צריך להיות OR. PUT /frames/reorder מוגדר אחרי /{frame_id}, ולכן FastAPI מפרש את 'reorder' כ-frame_id.",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "לפי Ash, הבאגים שה-evaluator תפס הם באגים שעוברים unit tests ו-CI ונשברים ב-production. הם נתפסו רק כי ה-evaluator השתמש באפליקציה בפועל [30:30]. החוזה של sprint אחד, עורך השלבים לפי השקף, כלל 27 קריטריונים. זו רמת הגרנולריות שנדרשת כדי שהממצאים יהיו actionable: \"If you have vague criteria, you have vague critiques\" [32:01]. הוא גם מודה שבריצות הראשונות ה-QA agent מצא באג, החליט שאפשר לתקן אותו מאוחר יותר, ואישר את העבודה. הכיול דרש זמן רב, והשיטה הייתה לקרוא traces, למצוא איפה השיפוט של ה-agent סוטה מהשיפוט האנושי ולעדכן את ה-prompt. טיפ כלים שנתן: לשמור transcripts של agents לקבצים ולתת ל-agent אחר לעבור עליהם ולעדכן את ה-prompts בעצמו [33:34]."
+  },
+  {
+   "kind": "h1",
+   "text": "6. Harness בדיאטה: מה הוסר במעבר ל-Opus 4.6"
+  },
+  {
+   "kind": "image",
+   "file": "k_041.jpg",
+   "caption": "\"Opus 4.5 to 4.6: harness on a diet\": טבלה של רכיב, מצבו ב-4.5 ומצבו ב-4.6. איפוסי context בין sessions: הכרחיים ב-4.5 (context anxiety), הוסרו לגמרי ב-4.6. פירוק ל-sprints: נושא עומס ב-4.5, הוסר ב-4.6 לטובת build רציף אחד. תדירות ה-evaluator: בכל sprint ב-4.5, מעבר יחיד בסוף ב-4.6. Planner: נדרש ב-4.5, עדיין נדרש ב-4.6.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "הדיון עונה על השאלה אם harness design מת. לפי Ash, צריך להכיר את ה-\"spiky behaviors\" של כל model ולהתאים את ה-harness לפערים שלו. ל-Opus 4.5 הייתה context anxiety חמורה, ול-Opus 4.6 אין. לכן session רציף אחד עם compaction מספיק. Opus 4.6 גם שומר על קוהרנטיות בבנייה רציפה של שעתיים בלי שצריך להאכיל אותו פיצ'ר אחרי פיצ'ר, וה-evaluator רץ רק בסוף ה-generation [33:34]. המסקנה שלו: \"The lesson isn't necessarily our harness was wrong, but rather it was right for 4.5, the frontier moved\" [35:05]. בתצורה הסופית, planner, generator ו-evaluator עדיין נמצאים בליבה, והמצב המשותף נשמר במערכת הקבצים ולא בחלונות ה-context. בשקף התצורה (k_044) מופיעים קבצים כמו spec.md ו-findings.md, והטקסט הקטן אינו קריא לגמרי.\n\nההדגמה היא DAW, אפליקציית הפקת מוזיקה בדפדפן, שנבנתה עם ה-harness המפושט ו-\"one of our latest models\". לדבריו העלות הייתה בערך חצי מבריצות הקודמות. ה-agent קובע טמפו, מניח מלודיה ובונה ערוצי תופים, וה-evaluator בודק את האפליקציה בעצמו. \"Obviously Claude can't hear at the moment, and so the music was pretty trash\", אבל האפליקציה עצמה הייתה מלאה, ולדבריו \"a model ago, this is something which would never have worked\" [36:36]."
+  },
+  {
+   "kind": "image",
+   "file": "k_045.jpg",
+   "caption": "\"Example: browser music production app (simplified harness)\": פירוק הריצה לפי שלב, משך ועלות. Planner: 4.7 דקות, 0.46 דולר. Build round 1: שעתיים ו-7 דקות, 71.08 דולר. QA round 1: 8.8 דקות, 3.24 דולר. Build ו-QA בסבבים 2 ו-3: שעה ו-30 דקות, 50 דולר. סה\"כ: כ-3 שעות ו-50 דקות, 124.70 דולר.",
+   "width": 5.6
+  },
+  {
+   "kind": "h1",
+   "text": "7. מסקנות ופעולות"
+  },
+  {
+   "kind": "image",
+   "file": "k_054.jpg",
+   "caption": "שקף \"Takeaways\" עם חמש מסקנות: 1. שיפוט עצמי הוא מלכודת, ולכן צריך evaluator אדוורסרי. 2. compaction לא פותר drift בקוהרנטיות, handoffs מובנים כן. 3. להפוך איכות סובייקטיבית למשהו שאפשר לתת לו ציון בעזרת rubrics. 4. לקרוא traces, כי הם לולאת הדיבאג העיקרית. 5. למחוק scaffolding כשה-model משיג אותו, כי ה-frontier זז.",
+   "width": 5.6
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "להפריד בין evaluator ל-generator: ",
+     "להגדיר ב-Claude Code custom subagent לתפקיד ה-QA, עם system prompt קשוח ו-rubric מפורט. זה ה-primitive ש-Ash הפנה אליו [38:09]."
+    ],
+    [
+     "לבדוק את האפליקציה החיה ולא את ה-diff: ",
+     "ב-web apps דרך Playwright MCP או Claude in Chrome MCP, ובאפליקציות native דרך computer use [38:09]."
+    ],
+    [
+     "לארוז את ה-rubric כ-skill: ",
+     "כך קריטריוני הציון הופכים לחלק מזרימת הפיתוח הרגילה [38:09]."
+    ],
+    [
+     "לכתוב חוזה לפני הקוד: ",
+     "לנהל משא ומתן על קריטריונים גרנולריים וניתנים לבדיקה, ברמת 27 לכל sprint, ולתת ציון מולם ולא מול ה-spec."
+    ],
+    [
+     "לשמור מצב משותף בקבצים: ",
+     "feature list בפורמט JSON, קובץ progress ו-git במקום להסתמך על context. JSON נדרס פחות מ-markdown [12:15]."
+    ],
+    [
+     "להריץ ב-auto mode: ",
+     "עדיף על dangerously-skip-permissions לריצות ארוכות ללא השגחה [36:36]."
+    ],
+    [
+     "לבדוק את ה-harness מחדש בכל model חדש: ",
+     "לנסות להסיר רכיבים (איפוסי context, sprints, תדירות evaluator) ולמדוד."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "למה זה חשוב",
+    "מה נאמר בהרצאה"
+   ],
+   "rows": [
+    [
+     "האם יתרון ה-harness מחזיק על פני הרבה ריצות?",
+     "ההשוואה מבוססת על דוגמה אחת בלבד",
+     "לא הוצגו נתונים סטטיסטיים"
+    ],
+    [
+     "מה שיעור הטעויות של ה-evaluator?",
+     "critic שמאשר הכול מבטל את כל הרעיון",
+     "נאמר רק שהכיול לקח זמן רב ונעשה דרך traces"
+    ],
+    [
+     "האם העלות (124 עד 200 דולר לריצה) מוצדקת מול agent בודד?",
+     "ה-solo עלה 9 דולר",
+     "Ash עצמו אמר שזו לא הדרך הכי חסכונית"
+    ],
+    [
+     "איך מתרגמים את זה לתחומים שאינם web?",
+     "נטען שה-Agent SDK כללי",
+     "כל הדוגמאות היו web apps"
+    ],
+    [
+     "מתי מסירים גם את ה-planner?",
+     "הוא הרכיב היחיד שנשאר נדרש ב-4.6",
+     "לא נדון"
+    ]
+   ],
+   "widths": [
+    2.2,
+    2.0,
+    2.2
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "8. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "Harness / scaffold",
+     "הקוד והמבנה שעוטפים את ה-model: לולאה, כלים, context, תפקידים"
+    ],
+    [
+     "Long-running agent",
+     "agent שרץ שעות או ימים ברציפות ללא התערבות אנושית"
+    ],
+    [
+     "Context rot",
+     "ירידה בקוהרנטיות ככל שחלון ה-context מתמלא"
+    ],
+    [
+     "Context anxiety",
+     "נטייה של ה-model למהר ולסיים כשהוא מתקרב לסוף החלון"
+    ],
+    [
+     "Compaction",
+     "סיכום אוטומטי של ה-context כדי להמשיך באותו session"
+    ],
+    [
+     "Sub-agent / agent teams",
+     "agents משנה, ובגרסת agent teams הם מתקשרים גם ביניהם ישירות"
+    ],
+    [
+     "Ralph (Wiggum) loop",
+     "הרצה חוזרת של אותו פרומפט בלולאה, כל פעם עם context נקי"
+    ],
+    [
+     "Stop hook",
+     "hook שמיירט את העצירה של Claude וממשיך את הריצה אם העבודה לא הסתיימה"
+    ],
+    [
+     "Progressive disclosure",
+     "טעינה של ה-frontmatter של skill בלבד, והגוף המלא רק בעת הצורך"
+    ],
+    [
+     "Programmatic tool calling",
+     "ה-model כותב קוד שמריץ סדרת קריאות לכלים ומחזיר רק את התוצאה"
+    ],
+    [
+     "Planner / Generator / Evaluator",
+     "מתכנן spec, בונה, ושופט שבודק את האפליקציה החיה"
+    ],
+    [
+     "Sprint contract",
+     "הסכם בין ה-generator ל-evaluator על ההגדרה של done לפני שמתחילים לכתוב קוד"
+    ],
+    [
+     "Rubric",
+     "קריטריונים ומשקלות לציון, כאן design, originality, craft ו-functionality"
+    ],
+    [
+     "Sycophancy",
+     "נטייה של ה-model לרצות ולאשר, גם כשמדובר בפלט של עצמו"
+    ],
+    [
+     "METR time horizon",
+     "משך המשימה ש-agent משלים בהצלחה של 50% עם scaffold מינימלי"
+    ],
+    [
+     "Traces",
+     "תיעוד מלא של הצעדים וההחלטות של ה-agent לאורך הריצה"
+    ],
+    [
+     "Auto mode",
+     "מצב הרשאות אוטומטי ובטוח יותר ב-Claude Code לריצות ללא השגחה"
+    ]
+   ],
+   "widths": [
+    1.8,
+    4.4
+   ]
+  }
+ ]
+}

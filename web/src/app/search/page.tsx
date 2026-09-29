@@ -31,6 +31,7 @@ const TYPE_META: Record<NonNullable<SearchResult["type"]>, TypeMeta> = {
   twitter:   { label: "X",         label_he: "X",       color: "#0f172a", bg: "rgba(15,23,42,0.08)" },
   tool:      { label: "TOOL",      label_he: "כלי",     color: "#b45309", bg: "rgba(180,83,9,0.08)" },
   library:   { label: "DOCUMENT",  label_he: "מסמך",    color: "#4a4a6a", bg: "rgba(74,74,106,0.08)" },
+  event:     { label: "EVENT",     label_he: "אירוע",   color: "#0f766e", bg: "rgba(15,118,110,0.08)" },
 };
 
 function videoIdFromUrl(url: string): string {
@@ -202,6 +203,7 @@ const TYPE_FILTERS: { value: TypeFilter; label: string; label_he: string }[] = [
   { value: "repo",      label: "GitHub",    label_he: "GitHub" },
   { value: "tool",      label: "Tools",     label_he: "כלים" },
   { value: "library",   label: "Library",   label_he: "ספרייה" },
+  { value: "event",     label: "Events",    label_he: "אירועים" },
 ];
 
 function SearchContent() {

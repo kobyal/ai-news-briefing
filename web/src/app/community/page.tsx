@@ -735,9 +735,16 @@ function CommunityPageInner() {
   }, [hasMoreOlderDays, loadingOlder, loadNextOlderDay]);
 
   // Must be before conditional returns — hooks must be called unconditionally
+  // Vendors with an upcoming event (reported by EventsSection once its feed
+  // loads) light up the ribbon too — selecting AWS then shows AWS events even
+  // on a day with no AWS pulse item.
+  const [eventVendors, setEventVendors] = useState<Set<string>>(new Set());
   const todayVendors = useMemo(
-    () => new Set((data?.community_pulse_items || []).map((i) => i.related_vendor).filter(Boolean) as string[]),
-    [data]
+    () => new Set([
+      ...((data?.community_pulse_items || []).map((i) => i.related_vendor).filter(Boolean) as string[]),
+      ...eventVendors,
+    ]),
+    [data, eventVendors]
   );
 
   const vendors = useMemo(() => {
@@ -791,7 +798,7 @@ function CommunityPageInner() {
         />
 
         {/* Upcoming events — one section, above the day blocks */}
-        <EventsSection />
+        <EventsSection vendor={activeVendor} onVendors={setEventVendors} />
 
         {/* Today's block */}
         <CommunityDayBlock data={data} vendorFilter={activeVendor} />

@@ -1,0 +1,641 @@
+[0:00] Hello.
+[0:16] Hey everyone.
+[0:18] I'm Boris.
+[0:20] I'm a member of technical staff here at Anthropic, and I created QuadCode.
+[0:25] And here to talk to you a little bit about some practical tips and tricks for using QuadCode.
+[0:29] quad code. It's going to be very practical. I'm not going to go too much into the history
+[0:33] or the theory or anything like this. And yeah, before we start, actually, can we get a quick
+[0:39] show of hands who has used quad code before? Yeah. All right. That's what we like to see.
+[0:45] For everyone that didn't raise your hands, I know you're not supposed to do this while
+[0:49] people are talking, but if you can open your laptop and type this,
+[0:53] And this will help you install quad code, just so you can follow along for the rest of the talk.
+[1:06] All you need is Node.js, if you have it, this should work.
+[1:15] Yeah, you don't have to follow along, but if you don't have it yet,
+[1:20] this is your chance to install it so you can follow along.
+[1:23] So what is quad code?
+[1:27] Quad code is a new kind of AI assistant.
+[1:30] And there's been different generations of AI assistants for coding.
+[1:34] Most of them have been about completing a line at a time,
+[1:37] completing a few lines of code at a time.
+[1:40] Quad code is not for that.
+[1:41] It's fully agentic.
+[1:42] So it's meant for building features, for writing entire functions,
+[1:46] entire files, fixing entire bugs at the same time.
+[1:52] And what's kind of cool about Cloud Code is it works with all of your tools.
+[1:56] And you don't have to change out your workflow.
+[1:58] You don't have to swap everything to start using it.
+[1:59] So whatever IDE you use, if you use VS Code or if you use X Code or if you use JetBrains IDE's,
+[2:08] there's some people at Anthropic that you can't pry them from their cold, dead hands.
+[2:11] But they use Cloud Code because Cloud Code works with every single IDE, every terminal out there.
+[2:17] It'll work locally over remote SSH, over Tmux, whatever environment you're in.
+[2:22] you can run it. It's general purpose and this is something where if you haven't used these kind of
+[2:30] free-form coding assistants in the past, it can be kind of hard to figure out how to get started
+[2:35] because you open it up and you just see a prompt bar and you might wonder like what do I do with
+[2:39] this? What do I type in? It's a power tool so you can use it for a lot of things but also because it
+[2:45] can do so much, we don't try to guide you towards a particular workflow because really you should be
+[2:49] to use it however you want as an engineer.
+[2:57] As you open up Cloud Code for the first time,
+[2:58] there's a few things that we recommend doing
+[3:01] to get your environment set up.
+[3:02] And these are pretty straightforward.
+[3:04] So run terminal setup, this will give you
+[3:05] shift enter for new lines, so you don't have to do
+[3:08] like backslashes to enter new lines.
+[3:09] This is, you know, it makes it a little bit nicer to use.
+[3:13] Do slash theme to set light mode or dark mode
+[3:15] or adultanize themes.
+[3:17] You can do slash install GitHub app.
+[3:20] So today we announced a GitHub app
+[3:23] where you can mention Claude on any GitHub issue
+[3:27] or pull request.
+[3:28] So to install it, just run this command in your terminal.
+[3:33] You can customize the set of allowed tools
+[3:35] that you can use so you're not prompted for it every time.
+[3:37] This is pretty convenient.
+[3:38] For stuff that I'm prompted about a bunch,
+[3:40] I'll definitely customize it in this way
+[3:41] so I don't have to accept it every time.
+[3:44] And something that I actually do is,
+[3:45] For a lot of my prompts, I won't hand type them
+[3:48] into a quad code.
+[3:49] If you're on Mac OS, you can go into your system settings
+[3:52] under accessibility as dictation, and you can enable it.
+[3:55] And so something I do is you just hit
+[3:57] like that dictation key twice,
+[3:59] and you can just speak your prompt.
+[4:01] And it helps a lot to have specific prompts.
+[4:03] So this is actually pretty awesome.
+[4:04] You can just talk to quad code
+[4:05] and like you would another engineer,
+[4:08] and you don't have to type a lot of code.
+[4:10] So, when you're starting out with Cloud Code, it's so freeform and it can do everything,
+[4:18] what do you start with?
+[4:19] The thing I recommend above everything else is starting with code base Q&A.
+[4:23] So just asking questions to your code base.
+[4:26] This is something that we teach new hires at Anthropic.
+[4:29] So on the first day in technical onboarding, you learn about Cloud Code, you download it,
+[4:33] you get it set up, and then you immediately start asking questions about the code base.
+[4:38] And in the past, when you were doing technical onboarding, it's something that taxes the
+[4:41] team a lot.
+[4:42] You have to ask other engineers on the team questions.
+[4:46] You have to look around the code, and this takes a while.
+[4:47] You have to figure out how to use the tools.
+[4:49] This takes a long time.
+[4:52] With quad code, you can just ask quad code.
+[4:53] And it'll explore the code base.
+[4:55] It'll answer these kind of questions.
+[4:56] And so, at Anthropic, onboarding used to take about two or three weeks for technical hires.
+[5:00] It's now about two or three days.
+[5:05] What's also kind of cool about Q&A is we don't do any sort of indexing.
+[5:09] So there's no remote database with your code.
+[5:11] We don't upload it anywhere.
+[5:12] Your code stays local.
+[5:13] We do not train generative models on the code.
+[5:17] So it's there.
+[5:17] You control it.
+[5:18] There's no indices or anything like this.
+[5:21] And what that means is also there's no setup.
+[5:23] So you start Claude.
+[5:24] You download it.
+[5:25] You start it.
+[5:26] There's no indexing.
+[5:27] You don't have to wait.
+[5:28] You can just use it right away.
+[5:30] This is a technical talk.
+[5:31] So I'm going to show some very specific prompts and very specific code samples that you can
+[5:35] and hopefully improve and up-level your quad-code experience.
+[5:39] So some kind of questions that you can ask is,
+[5:41] you know, like how is this particular piece of code used?
+[5:44] Or how do I instantiate this thing?
+[5:46] And quad-code, it won't just do like a text search
+[5:48] and try to answer this.
+[5:49] It'll often go a level deeper, and it'll try to find examples
+[5:52] of how is this class instantiated, how is it used.
+[5:55] And it'll give you a much deeper answer,
+[5:57] so something that you would get out of a wiki or documentation
+[5:59] instead of just like Command F.
+[6:02] Something that I do a lot also is ask it about git history.
+[6:06] So, for example, why does this function have 15 arguments?
+[6:10] And why are the arguments named this weird way?
+[6:13] And this is something I bet in all of our code bases,
+[6:15] you have some function like this or some class like this.
+[6:18] And Cloud Code can look through git history.
+[6:20] And it'll look to figure out how did these arguments
+[6:23] get introduced and who introduced them
+[6:24] and what was the situation, what are the issues
+[6:26] that those commits link to.
+[6:28] And it'll look through all this and summarize it.
+[6:29] And you don't have to tell it that in all this detail.
+[6:33] You just ask it.
+[6:34] So just say look through Git history
+[6:35] and it will know to do this.
+[6:38] The reason it knows, by the way,
+[6:39] is not because we prompted it to.
+[6:40] There's nothing in the system prompt
+[6:41] about looking through Git history.
+[6:43] It knows it because the model is awesome.
+[6:45] And if you tell it to use Git,
+[6:46] it'll know how to use Git.
+[6:48] So we're lucky to be building on such a good model.
+[6:52] I often ask about GitHub issues.
+[6:55] So it can use web fetch and it can fetch issues
+[6:59] and look up context on issues too, and this is pretty awesome.
+[7:03] And this is something that I do every single Monday
+[7:05] in our weekly standup, is I ask, what did I ship this week?
+[7:08] And quad code looks at the log, it knows my username,
+[7:11] and it'll just give me a nice readout of everything I
+[7:13] shipped.
+[7:14] And I'll just copy and paste that into a doc.
+[7:20] So yeah, that's tip number one.
+[7:22] For people that have not used quad code before,
+[7:24] if you're just showing it to someone for the first time,
+[7:26] onboarding your team, the thing we definitely recommend
+[7:28] is start with code base Q&A.
+[7:29] Don't start by using fancy tools,
+[7:31] don't start by editing code,
+[7:33] just start by asking questions about the code base
+[7:34] and that'll teach people how to prompt.
+[7:36] And it'll start teaching them this boundary of like,
+[7:38] what can Cloud Code do, what is it capable of,
+[7:41] versus what do you need to hold his hand with
+[7:43] a little bit more?
+[7:44] What can be one-shotted, what can be two-shotted,
+[7:45] three-shotted, what do you need to use
+[7:47] interactive mode for in a REPL?
+[7:52] Once you're pretty comfortable with Q&A,
+[7:53] you can dive into editing code.
+[7:55] This is the next thing.
+[7:57] And the cool thing about any sort of agentic,
+[8:01] you know, like using an LM in an agentic way
+[8:04] is you give it tools and it's just like magical.
+[8:05] It figures out how to use the tools.
+[8:07] And with Cloud Code, we give it a pretty small set of tools.
+[8:10] It's not a lot.
+[8:11] And so it has a tool to edit files.
+[8:13] It has a tool to run bash commands.
+[8:15] It has a tool to search files.
+[8:17] And it'll string these together to explore the code,
+[8:20] brainstorm, and then finally make edits.
+[8:23] And you don't have to prompt it specifically
+[8:25] to use this tool and this tool and this tool.
+[8:26] So you just say, do this thing,
+[8:28] and it'll figure out how to do it.
+[8:29] It'll string it together in the right way
+[8:31] that makes sense for quad code.
+[8:37] There's a lot of ways to use this.
+[8:38] Something I like to do sometimes
+[8:39] is before having quad jump in to write code,
+[8:43] I'll ask it to brainstorm a little bit or make a plan.
+[8:47] This is something we highly recommend,
+[8:48] and something I see sometimes is people,
+[8:50] they take quad code and they ask it,
+[8:53] hey, implement this enormous 3,000 line feature,
+[8:56] And sometimes it gets this right on the first shot,
+[8:59] but sometimes what happens is the thing that it builds
+[9:01] is not at all the thing that you wanted.
+[9:03] And the easiest way to get the result you want
+[9:06] is ask it to think first.
+[9:07] So brainstorm ideas, make a plan, run it by me,
+[9:10] ask for approval before you write code.
+[9:13] And you don't have to use plan mode,
+[9:14] you don't have to use any special tools to do this,
+[9:16] all you have to do is ask Claude,
+[9:18] and it'll know to do this.
+[9:19] So just say, before you write code, make a plan.
+[9:22] That's it.
+[9:22] This is also, I want to think for this one, this commit push PR, this is a really common
+[9:28] incantation that I use.
+[9:29] There's nothing special about it, but Quad is kind of smart enough to interpret this,
+[9:32] so it'll make a commit, it'll push it to the branch, make a branch, and then make a pull
+[9:35] request from you on GitHub.
+[9:37] You don't have to explain anything.
+[9:38] It'll look through the code, it'll look through the history, it'll look through the Git log
+[9:41] by itself to figure out the commit format and all the stuff, and it'll make the commit
+[9:45] and push it the right way.
+[9:47] Again, we're not system prompting it to do this, it just knows how to do this.
+[9:52] The model is good.
+[9:56] As you get a little bit more advanced,
+[9:57] you're going to want to start to plug in your team's tools.
+[10:00] And this is where Cloud Code starts to really shine.
+[10:03] And there's generally two kinds of tools.
+[10:04] So one is batch tools.
+[10:06] And an example of this, I just made up this like Burley CLI.
+[10:09] This isn't a real thing.
+[10:10] But you can say use the CLI to do something.
+[10:12] And you can tell Cloud Code about this.
+[10:14] And you can tell it to use, for example,
+[10:16] like dash dash help to figure out how to use it.
+[10:19] And this is efficient.
+[10:20] If you find yourself using it a lot,
+[10:22] you can also dump this into your CloudMD, which
+[10:24] we'll talk about in a bit, so Cloud can remember this
+[10:26] across sessions.
+[10:27] But this is a common pattern we follow at Anthropic,
+[10:29] and we see external customers use, too.
+[10:32] And same thing with MCP.
+[10:34] CloudCode can use batch tools.
+[10:36] It can use MCP tools.
+[10:37] So just tell it about the tools.
+[10:39] And you can add the MCP tool, and you
+[10:41] can tell it how to use it.
+[10:42] And it'll just start using it.
+[10:45] And this is extremely powerful, because when you start to use
+[10:48] code on a new code base, you can just
+[10:50] give it all of your tools, all the tools your team already
+[10:53] uses for this code base, and Cloud Code
+[10:55] can use it on your behalf.
+[11:02] There's a few common workflows.
+[11:05] And this is the one that I talked about already.
+[11:06] So kind of do a little bit of exploration,
+[11:08] do a little bit of planning, and ask me for confirmation
+[11:11] before you start to write code.
+[11:14] These other two on the right are extremely powerful.
+[11:17] When Cloud has some way to check its work,
+[11:19] So for example, by writing unit tests or screenshotting in Puppeteer or screenshotting the iOS simulator,
+[11:25] then it can iterate.
+[11:27] And this is incredible because if you give it, for example, a mock and you say build this web UI,
+[11:31] it'll get it pretty good.
+[11:33] But if you let it iterate two or three times, often it gets it almost perfect.
+[11:37] So the trick is give it some sort of tool that it can use for feedback to check its work.
+[11:42] And then based on that, it will iterate by itself and you're going to get a much better result.
+[11:46] So whatever your domain is, if it's unit test or integration test or screenshots for apps or web or anything, just give it a way to see its result and it'll iterate and get better.
+[12:00] So these are the next steps. Teach Quad how to use your tools and figure out the right workflow.
+[12:04] If you want Quad to jump into code, if you want it to brainstorm a little bit, make a plan, if you want it to iterate, kind of have some sense of that so you know how to prompt Quad to do what you want.
+[12:16] As you go deeper, beyond tools, you want to start to give Claude more context.
+[12:22] And the more context, the smarter the decisions will be because as an engineer working in
+[12:25] a codebase, you have a ton of context in your head about your systems and all the history
+[12:29] and everything else.
+[12:31] So there's different ways to give this to Claude.
+[12:33] And as you give Claude more context, it'll do better.
+[12:37] There's different ways to do this.
+[12:39] The simplest one is what we call ClaudeMD.
+[12:42] And Claude.MD is the special file name.
+[12:45] The simplest place to put it is in the project root.
+[12:48] So the same directory you start plot in, put a plot MD in there.
+[12:51] And that'll get automatically read into context at the start of every session.
+[12:55] And essentially the first user turn will include the plot MD.
+[12:59] You can also have a local plot MD.
+[13:02] And this one you don't usually check into source control.
+[13:05] So plot MD you should check into source control, share with your team so that you can write
+[13:09] it once and share it with your team.
+[13:11] one you don't check in, it's just for you. The kinds of things you put in CloudMD, common
+[13:17] bash commands, common MCP tools, architectural decisions, important files, anything that
+[13:23] you would typically need to know in order to work in this code base. Try to keep it
+[13:27] pretty short, because if it gets too long, it's going to use up a bunch of context, and
+[13:31] it's usually not that useful. So just try to keep it as short as you can. For example,
+[13:36] For example, in our code base we have common bash commands, we have a style guide, we have
+[13:40] a few core files, kind of things like that.
+[13:43] All the other CloudMDs, you can put them in other nested child directories, and Cloud
+[13:47] will pull them in on-demand.
+[13:50] So these are the CloudMDs that will get pulled in automatically, but then also you can put
+[13:55] CloudMDs in nested directories, and those will get automatically pulled when Cloud works
+[14:00] in those directories.
+[14:03] And of course, if you're a company,
+[14:05] maybe you want a QuadMD that's shared across all the different code bases,
+[14:08] and you want to manage it on behalf of your users,
+[14:10] and you can put in your enterprise route,
+[14:11] and that'll get pulled in automatically.
+[14:17] There's a ton of ways to pull in context.
+[14:19] I actually had a lot of trouble putting this slide together
+[14:21] just to communicate the breadth of ways you can do this.
+[14:24] But QuadMD is pulled in automatically.
+[14:27] You can also use slash commands.
+[14:28] So this is .quad slash commands, and this
+[14:30] can be in your home directory, or it
+[14:32] can be checked into your project, and this is for slash commands.
+[14:35] And over here, we have a few examples of the slash commands
+[14:40] that we have in Cloud Code itself.
+[14:43] And so for example, if you're in the Cloud Code repo
+[14:45] and you see issues getting labeled,
+[14:48] that's actually this workflow running here.
+[14:49] It's labeled GitHub issues.
+[14:52] And we have a GitHub action running,
+[14:53] the same one we talked about this morning,
+[14:56] where Cloud Code will run this command,
+[14:58] and it's just a slash command.
+[14:59] It'll run, and it'll label the issues,
+[15:00] so humans don't have to.
+[15:02] It just saves us a bunch of time.
+[15:04] And of course, you can add mention files
+[15:06] to pull them into context.
+[15:08] And like I said before, quadmd's in a nested directory
+[15:11] get pulled in when quad works in that directory.
+[15:18] So give quad more context.
+[15:20] And it's definitely worth taking the time to tune context.
+[15:23] You can run it through a prompt improver.
+[15:24] Consider who the context is for.
+[15:27] If you want to pull it in every time,
+[15:28] if you want to pull it in on demand,
+[15:30] if you want to share it with a team,
+[15:31] if it's a personal preference,
+[15:33] definitely take the time to tune it.
+[15:34] This will improve performance dramatically
+[15:36] if you do it right.
+[15:42] As you get more advanced,
+[15:43] you're gonna wanna think about this a little bit more,
+[15:45] this kind of hierarchy of different ways
+[15:47] to pull in everything.
+[15:48] So like not just CloudMD, but also config
+[15:51] and kind of everything about Cloud,
+[15:54] you can pull in in this hierarchical way.
+[15:56] So projects are specific to your Git repo,
+[16:00] and this you can check in or you can make it just for you.
+[16:02] You can also have global configs
+[16:04] that are across all your projects,
+[16:06] or you can have enterprise policies.
+[16:07] And this is essentially a global config
+[16:09] that you roll out for all of your employees,
+[16:11] everyone on your team automatically.
+[16:14] And this slide is pretty information dense,
+[16:16] but the point is this applies to a lot of stuff.
+[16:18] So you can do this for slash commands,
+[16:20] you can do it for permissions.
+[16:21] So for example, if you have a bash command
+[16:23] that you would run for all your employees,
+[16:26] like all your employees use this test command for example,
+[16:29] You can actually just check it into this enterprise policies file, and then any employee, when
+[16:34] they run this command, it will be auto-approved, which is pretty convenient.
+[16:37] You can also use this to block commands.
+[16:39] For example, let's say there's a URL that should never be fetched.
+[16:42] Just add it to this config, and that'll make it so an employee cannot override it, and
+[16:47] that URL can never be fetched.
+[16:50] So pretty convenient, both to unblock people and also just to keep your code base safe.
+[16:55] And then same thing for MCP servers.
+[16:56] Have an MCP JSON file, check it into the code base.
+[16:59] That way, any time someone runs quad code in your code base, they'll be prompted to
+[17:02] install the MCP servers and share it with the team.
+[17:10] If you're not sure which of these to use, this is kind of an insane matrix because we
+[17:13] support a lot of stuff and engineer workflows are very flexible and every company is different,
+[17:17] so we kind of want to support everything.
+[17:19] So if you're not sure how to get started, I would recommend start with shared project
+[17:22] context.
+[17:24] You write this once and then you share it with everyone on the team and you get this
+[17:26] kind of network effect where someone does a little bit of work and everyone on the team
+[17:30] benefits.
+[17:31] There's a lot of tools built into Cloud to manage this.
+[17:38] So as an example, if you run slash memory, you can see all the different memory files
+[17:41] that are getting pulled in.
+[17:43] So maybe I have an enterprise policy, I have my user memory, I have project CloudMD, and
+[17:48] then maybe there's a nested CloudMD that's only pulled in for certain directories.
+[17:54] And then similarly, when you do slash memory,
+[17:56] you can edit particular memory files.
+[17:57] When you type pound sign to remember something,
+[17:59] you can pick which memory you want it to go to.
+[18:06] So yeah, that's the next step.
+[18:07] Take the time to configure QuadMD, MCP servers,
+[18:11] all the stuff that your team uses,
+[18:13] so that you can use it once, configure it once,
+[18:15] and then share it with everyone.
+[18:19] An example of this is in our apps repo for Anthropic.
+[18:23] This is like the repo that we have all of our web
+[18:26] and apps code in.
+[18:27] There's a Puppeteer MCP server,
+[18:29] and we share this with the team.
+[18:30] And there's an MCP JSON checked in,
+[18:32] so any engineer working in that repo
+[18:34] can use Puppeteer in order to pilot end-to-end tests
+[18:37] and to screenshot automatically and iterate
+[18:39] so that every engineer doesn't have to install it themselves.
+[18:46] This is a talk about pro tips,
+[18:47] so I just want to take a quick interlude
+[18:48] to talk about some common key bindings
+[18:50] that people may not know.
+[18:51] It's very hard to build for terminal.
+[18:53] It's also very fun.
+[18:54] It feels like rediscovering this new design language.
+[18:57] But something about terminals, it's extremely minimal.
+[19:01] And so sometimes it's hard to discover these key bindings.
+[19:03] And here's just a quick reference sheet.
+[19:05] So anytime, you can hit Shift-Tab to accept edits.
+[19:09] And this switches you into auto-accept edits mode.
+[19:11] So bash commands still need approval,
+[19:13] but edits are auto-accepted.
+[19:15] And you can always ask Quad to undo them later.
+[19:18] For example, I'll do this if I know Quad's on the right track,
+[19:20] or if it's writing unit tests and iterating on tests,
+[19:23] I'll usually just switch into auto accept mode
+[19:25] so I don't have to OK every single edit.
+[19:28] Anytime you want Cloud to remember something,
+[19:30] so for example, if it's not using a tool correctly
+[19:33] and you wanted to use it correctly from then on,
+[19:35] just type the pound sign and then tell it what to remember,
+[19:37] and it'll remember it.
+[19:38] It'll incorporate it into CloudMD automatically.
+[19:42] If you ever want to drop down to bash mode,
+[19:44] so just run a bash command, you can hit the exclamation mark
+[19:46] and type in your command.
+[19:47] That'll run locally, but that also goes into the context
+[19:49] window, so Claude will see it on the next turn.
+[19:53] And this is pretty good for long running commands
+[19:55] if you know exactly what you want to do
+[19:57] or any command that you want to get into context.
+[19:59] And Claude will see the command and the output.
+[20:03] You can add mention files and folders.
+[20:05] Any time you can hit escape to stop what Claude is doing.
+[20:08] No matter what Claude is doing, you can always
+[20:10] safely hit escape.
+[20:10] It's not going to corrupt the session.
+[20:12] It's not going to mess anything up.
+[20:14] So maybe Claude is doing a file edit.
+[20:15] I'll hit escape.
+[20:16] I'll tell it what to do differently.
+[20:18] Or maybe it suggested a 20 line edit,
+[20:20] and I'm like, actually 19 of these lines look perfect,
+[20:22] but one line you should change.
+[20:23] I'll hit escape, I'll tell it that,
+[20:25] and then I'll tell it to redo the edit.
+[20:29] You can hit escape twice to jump back in history.
+[20:31] And then after you're done with the session,
+[20:33] you can start quad with a resume to resume that session
+[20:36] if you want, or dash, dash, continue.
+[20:40] And then anytime if you want to see more output,
+[20:42] hit Control R, and that'll show you the entire output,
+[20:44] the same thing that quad sees in its context window.
+[20:48] The next thing I want to talk about is the Cloud Code SDK.
+[20:56] So we talked about this at the top.
+[20:58] Right after this, Sid is doing a session, I think, just across the hallway, and he's
+[21:02] going to go super deep on the SDK.
+[21:04] If you hadn't played around with this, if you used the dash P flag in Cloud, this is
+[21:08] what the SDK is.
+[21:09] And we've been planning a bunch of features over the last few weeks to make it even better.
+[21:14] So, yeah, you can build on top of this.
+[21:17] You can do cool stuff.
+[21:17] This is exactly the thing that Claude code uses.
+[21:20] It's exactly the same SDK.
+[21:22] And so for example, something you can do is Claude-P, so this is the CLI SDK.
+[21:27] You can pass a prompt.
+[21:30] You can pass some allowed tools which could include specific bash commands.
+[21:34] You can tell it which format you want.
+[21:35] So you might want JSON or you might want streaming JSON if you want to process this somehow.
+[21:41] So this is awesome for building on.
+[21:43] We use this in CI all the time.
+[21:45] We use this for incident response.
+[21:46] We use this in all sorts of pipelines.
+[21:48] So really convenient.
+[21:49] Just think of it as like a Unix utility.
+[21:51] You give it a prompt, it gives you JSON.
+[21:53] You can use this in any way.
+[21:54] You can pipe into it, you can pipe out of it.
+[22:00] The piping is also pretty cool.
+[22:01] So you can use, for example, git status and pipe this in
+[22:05] and use JQ to select the result.
+[22:08] The combinations are endless.
+[22:10] And it's sort of this new idea.
+[22:11] It's like a super intelligent Unix utility.
+[22:13] And I think we've barely scratched the surface
+[22:15] of how to use this.
+[22:16] We're just figuring this out.
+[22:18] You can read from a GCP bucket,
+[22:20] read a giant log and pipe it in
+[22:23] and tell Claude to figure out
+[22:24] what's interesting about this log.
+[22:26] You can fetch data from the Sentry CLI.
+[22:29] You can also pipe it in and have Claude do something with it.
+[22:38] The final thing, and this is probably
+[22:40] the most advanced use case as we see,
+[22:41] I'm sort of a Claude normie,
+[22:42] so I'll have usually one Claude running at a time
+[22:45] and maybe I'll have a few terminal tabs
+[22:47] for a few different repos running at a time.
+[22:49] When I look at power users in and out of Anthropic,
+[22:53] almost always they're gonna have SSH sessions,
+[22:55] they'll have Tmux tunnels into their quad sessions.
+[22:59] They're gonna have a bunch of checkouts of the same repo
+[23:01] so that they can run a bunch of quads in parallel
+[23:03] in that repo, or they're using Git work trees
+[23:05] to have some kind of isolation as they do this.
+[23:08] And we're actively working on making this easier to use,
+[23:10] but for now, these are some ideas
+[23:14] for how to do more work in parallel with Quad.
+[23:16] You can run as many sessions as you want,
+[23:20] and there's a lot that you can get done in parallel.
+[23:24] So yeah, that's it.
+[23:26] I wanted to also leave some time for Q&A.
+[23:28] So I think this is the last slide that I have.
+[23:31] And yeah, if folks have questions,
+[23:33] there's mics on both sides.
+[23:35] And yeah, we'd love to answer any questions.
+[23:44] I did.
+[23:56] Thanks for building a cloud code.
+[24:03] I was wondering what was the hardest implementation, like part of the implementation for you of
+[24:08] building it?
+[24:09] I think there's a lot of tricky parts. I think one part that is especially tricky is
+[24:18] the things that we do to make bash commands safe. Bash is inherently pretty dangerous
+[24:23] and it can change system state in unexpected ways. But at the same time, if you have to
+[24:29] manually approve every single bash command, it's super annoying as an engineer. And you
+[24:33] can't really be productive because you're just constantly approving every command. And
+[24:37] just kind of navigating how to do this safely in a way that scales across the different kinds of
+[24:41] code bases people have, because not everyone runs their code in a Docker container, was pretty
+[24:47] tricky. And essentially the thing we landed on is there's some commands that are read-only,
+[24:50] there's some static analysis that we do in order to figure out which commands can be combined in
+[24:55] safe ways, and then we have this pretty complex tiered permission system so that you can allow
+[25:00] and block list commands at different levels.
+[25:05] Hi Boris, you mentioned giving an image to Cloud Code,
+[25:09] which made me wonder if there's some sort of
+[25:11] multimodal functionality that I'm not aware of.
+[25:13] Is that, are you just pointing it at an image
+[25:15] on the file system or something?
+[25:17] Yeah, so Cloud Code is fully multimodal.
+[25:19] It has been from the start, it's in a terminal,
+[25:21] so it's a little hard to discover.
+[25:24] But yeah, you can take an image and just drag
+[25:26] and drop it in, that'll work.
+[25:27] You can give it a file path that'll work.
+[25:30] You can copy and paste the image in, and that works too.
+[25:35] So I'll use this pretty often for if I have a mock of something,
+[25:37] I'll just drag and drop in the mock.
+[25:39] I'll tell it to implement it.
+[25:40] I'll give it up a tier server so it can iterate against it.
+[25:43] And yeah, it's just fully automated.
+[25:48] Hey, why did you build a CLI tool instead of an IDE?
+[25:54] Yeah, it's a good question.
+[25:55] I think there's probably two reasons.
+[25:56] One is we started this at Anthropic,
+[26:00] and at Anthropic people use a broad range of IDEs.
+[26:03] And some people use VS Code,
+[26:05] other people use Zed or Xcode or Vim or Emacs.
+[26:09] And it was just hard to build something
+[26:11] that works for everyone.
+[26:12] And so terminal is just the common denominator.
+[26:15] The second thing is at Anthropic,
+[26:17] we see up close how fast the model is getting better.
+[26:22] And so I think there's a good chance
+[26:23] that by the end of the year,
+[26:24] people aren't using IDs anymore.
+[26:27] And so we want to get ready for this future,
+[26:29] and we want to avoid over-investing in UI
+[26:31] and other layers on top, given that the way the models are
+[26:35] progressing, it just may not be useful work pretty soon.
+[26:43] How much have you used for machine learning modeling
+[26:50] and almost that AutoML experience?
+[26:52] I was curious what the experience has been so far with that.
+[26:56] Yeah, I think the question was how much are we using quad code for
+[26:59] machine learning and modeling?
+[27:01] We actually use it for this a bunch.
+[27:03] So both engineers and researchers at Anthropik use quad code every day.
+[27:08] I think about 80% of people at Anthropik that are technical use quad code every day.
+[27:13] And hopefully you can see that in the product and
+[27:15] kind of the amount of love and dog fooding we've put into it.
+[27:18] But this includes researchers who use tools like the notebook,
+[27:21] notebook tool to edit and run notebooks.
+[27:23] Okay, very cool, thank you.
+[27:27] All right, I think that's it, thanks.
+[27:51] I can do the right.
+[27:52] I have a right.
+[27:53] I have a right.
+[27:52] I have a right.
+[27:52] I have a right.
+[27:52] I have a right.
+[27:52] I have a right.
+[27:52] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] I have a right.
+[27:53] 
+[27:53] I have a right.
+[27:53] I can do the right.
+[27:55] I can do the right.
+[27:55] I can do the right.
+[27:55] I can do the right.
+[27:55] I can do the right.
+[27:54] I can do the right.
+[27:54] I can do the right.
+[27:54] I can do the right.
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] 
+[27:54] I can do the right.
+[27:54] I can do the right.
+[27:54] 
+[27:54] 
+[27:54] 

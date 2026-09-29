@@ -70,9 +70,11 @@ Reliability + newsletter + photos (2026-06-25 → 27):
   forward-look, single-lang editions, image-deduped). NOT auto-sending yet (needs API
   key + weekly schedule). `/main` editorial published to CDN + linked in nav (Phase 0 done).
 - ✅ Community-bleed stopword fix; build_search_index import guard; stop committing output/.
-- ⏳ OPEN root cause: **ingest skipped daily** — pipeline waits on GitHub Pages freshness
-  (3-min timeout) before ingest, but the site is S3/CloudFront-primary → DDB goes stale.
-  Re-gate on S3/CF (or drop the wait).
+- ✅ **Ingest retired (2026-09-29)** — it had been skipped daily since 09-10 (GH Pages builds
+  10-12 min vs a 3-min wait) with no visible effect: the site is static-first. Removed
+  local-cycle [5a]-[5c], the email's ingest row, and the frontend `/api/stories` + `/api/archive`
+  fallbacks. ⏳ Later: `cdk destroy` the ingest/API Lambdas + `ai-news-stories` DynamoDB table,
+  and consider disabling GitHub Pages (it only fed the ingest).
 
 Source-relevance defense-in-depth (2026-06-23) — credibility guard:
 - Trigger: `/story/2127eaa27275` showed a Grok-4.3 headline sourced from an AWS

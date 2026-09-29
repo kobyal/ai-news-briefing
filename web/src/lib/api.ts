@@ -40,21 +40,13 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
   // Falls back to absolute API URL only if relative path returns nothing.
   let res = await safeFetch<{ date: string; stories: NewsItem[] }>(`/data/${d}.json`);
   if (!res && API) res = await safeFetch<{ date: string; stories: NewsItem[] }>(`${API}/data/${d}.json`);
-  // Extract static JSON aggregates BEFORE res is overwritten by Lambda response.
-  // Static JSON: briefing.{tldr,community_pulse,news_items,...} + top-level {twitter,youtube,github,...}
-  // Lambda: per-story embedding of all aggregates. When Lambda returns null we
-  // synthesise stories from news_items — those bare items carry no aggregates,
-  // so we must read aggregates from the static JSON instead.
+  // Static JSON: briefing.{tldr,community_pulse,news_items,...} + top-level {twitter,youtube,github,...}.
+  // Stories come from briefing.news_items. (The Lambda /api/stories fallback was
+  // removed 2026-09-29 with the ingest — its DynamoDB copy had been empty since 09-10.)
   const staticBriefing = ((res as unknown as Record<string, unknown>)?.briefing as Record<string, unknown>) || {};
   const staticDoc     = (res as unknown as Record<string, unknown>) || {};
   const staticCpi = staticBriefing.community_pulse_items as DayData["community_pulse_items"] || [];
   const staticTwitter = (staticBriefing.twitter || staticDoc.twitter) as DayData["twitter"] | undefined;
-  // Fall back to Lambda API if static file not yet available
-  if (!res || !res.stories || !res.stories.length) {
-    res = await safeFetch<{ date: string; stories: NewsItem[] }>(`${API}/api/stories?date=${d}`);
-  }
-  // Second fallback: Lambda failed but static JSON has news_items — synthesize stories
-  // so community_pulse_items from staticCpi can still be served (e.g. yesterday's data).
   if ((!res || !res.stories || !res.stories.length) && (staticBriefing.news_items as unknown[])?.length) {
     res = { date: d, stories: staticBriefing.news_items as NewsItem[] };
   }
@@ -123,11 +115,7 @@ export async function fetchDayData(date?: string): Promise<DayData | null> {
 }
 
 export async function fetchArchive(): Promise<string[]> {
-  // Try static S3 JSON first, fall back to Lambda API
-  let res = await safeFetch<{ dates: string[] }>(`${API}/data/archive.json`);
-  if (!res?.dates?.length) {
-    res = await safeFetch<{ dates: string[] }>(`${API}/api/archive`);
-  }
+  const res = await safeFetch<{ dates: string[] }>(`${API}/data/archive.json`);
   return res?.dates || [];
 }
 

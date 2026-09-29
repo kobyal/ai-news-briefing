@@ -995,24 +995,6 @@ def _add_sidedata_rows(rows: list) -> None:
                 "site": "—", "status": status, "note": note}
     rows.append(_indexnow_row())
 
-    # ingest lambda ([5b], AFTER email) — best-effort: read the last lambda response
-    # file. Like QA, the email reflects the PRIOR run since ingest runs after send.
-    def _ingest_row() -> dict:
-        p = Path("/tmp/ingest_response.json")
-        if not p.exists():
-            return {"agent": "ingest (lambda)", "raw": "—", "json": "—", "site": "—",
-                    "status": "warn", "note": "no recent response (skipped / --no-ingest / GH-Pages timeout)"}
-        try:
-            resp = json.loads(p.read_text())
-        except Exception:
-            resp = {}
-        err = resp.get("errorMessage") or resp.get("FunctionError")
-        if err:
-            return {"agent": "ingest (lambda)", "raw": "—", "json": "✗", "site": "—",
-                    "status": "error", "note": f"last invoke errored: {str(err)[:50]}"}
-        return {"agent": "ingest (lambda)", "raw": "ok", "json": "✓", "site": "—",
-                "status": "ok", "note": "last invoke returned without error (prior run)"}
-    rows.append(_ingest_row())
     # Mark the build/publish steps so the email renders them under their own
     # sub-header instead of mixed into the content-agent raw→JSON→site table.
     for _r in rows[_pipeline_start:]:

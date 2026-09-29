@@ -42,7 +42,7 @@ shared/        cross-agent helpers — the anti-copy-paste layer
                  anthropic_cc (the one claude -p wrapper), vendors, story_id,
                  image_fallback, json_repair, pricing, repo_root, …
 web/           Next.js frontend (static export → S3/CloudFront → aibriefing.dev)
-infra/         AWS CDK (ai-news-ingest Lambda → DynamoDB)
+infra/         AWS CDK (legacy ai-news-ingest Lambda → DynamoDB; unused since 2026-09-29)
 private/       QA evaluator + auto-fix
 docs/          this documentation (see docs/learn/ for the chapter walkthrough)
 ```
@@ -50,7 +50,7 @@ docs/          this documentation (see docs/learn/ for the chapter walkthrough)
 Agents are resolved by name via `shared.repo_root.agent_dir()`, so they can be
 moved between `active/` and `inactive/` without editing the launcher or consumers.
 The daily driver is `local-cycle.sh` (orchestrates `run_all.py` → `publish_data.py`
-→ editorial → build → deploy → email → ingest → QA).
+→ editorial → build → deploy → QA → email).
 
 ---
 
@@ -245,7 +245,7 @@ python3 run_all.py --skip xai
 
 The flag is honored by the four LLM-using agents (`merger-agent`, `perplexity-news-agent`, `rss-news-agent`, `tavily-news-agent`) via `shared/anthropic_cc.py`. On success, the merger writes a marker file `agents/active/merger-agent/output/<date>/.via_subscription.done`; if CI sees that marker dated within 5 hours, it skips the daily run so you don't double-bill.
 
-The maintainer wraps this whole flow (subscription run → publish → email → AWS Lambda ingest) in `private/LOCAL_RUN.md` (gitignored). For a fork, the three lines above are enough — wire the rest to your own publish target.
+The maintainer wraps this whole flow (subscription run → publish → deploy → email) in `private/LOCAL_RUN.md` (gitignored). For a fork, the three lines above are enough — wire the rest to your own publish target.
 
 ### C. Re-running just the merger
 
@@ -453,7 +453,7 @@ Three small Python scripts in `scripts/` produce auxiliary JSON files alongside 
   iTunes Search API → cover art + feedUrl + latest releaseDate; then parses the RSS for the latest episode title + duration. Falls back to Spotify oEmbed for cover-only when iTunes doesn't index the show (mostly Hebrew shows). Powers the Podcasts grid on `/media/`.
 
 - **`scripts/build_search_index.py`** → `docs/data/search-index.json` (+ run-log `_search_index_runs.jsonl`).
-  Walks every `docs/data/<date>.json`, extracts ~7 resource types (articles, videos, GitHub, community pulse, reddit, X, tools) plus the library documents, normalizes dates to ISO + deduplicates by URL, uploads to S3, invalidates CloudFront. Powers `/search/` (the type-filter chips + in-site deep links). **Must run AFTER ingest** since the ingest Lambda overwrites the index with its own stories-only version on every invoke. ⚠ **It uploads to S3 and invalidates by default** — set `SKIP_S3_UPLOAD=1` to build the index locally without touching the live site.
+  Walks every `docs/data/<date>.json`, extracts ~7 resource types (articles, videos, GitHub, community pulse, reddit, X, tools) plus the library documents, normalizes dates to ISO + deduplicates by URL, uploads to S3, invalidates CloudFront. Powers `/search/` (the type-filter chips + in-site deep links). (The legacy ingest Lambda used to overwrite this with a stories-only version; it was retired 2026-09-29.) ⚠ **It uploads to S3 and invalidates by default** — set `SKIP_S3_UPLOAD=1` to build the index locally without touching the live site.
 
 ### Library scripts (added 2026-09-16)
 
@@ -617,7 +617,7 @@ The maintainer's AWS account has two EventBridge rules wired to drive a daily ru
 | Israel Time | UTC | Lambda | Purpose |
 |-------------|-----|--------|---------|
 | 09:00 | 06:00 | `ai-news-trigger` | Dispatches the GitHub Actions workflow |
-| 09:30 | 06:30 | `ai-news-ingest` | Reads `docs/data/<date>.json` from GH Pages → DynamoDB → CloudFront |
+| 09:30 | 06:30 | `ai-news-ingest` | Legacy: reads `docs/data/<date>.json` from GH Pages → DynamoDB. Unused since 2026-09-29 (site is static-first) — don't re-enable |
 
 **Both rules are disabled as of 2026-04-26** to avoid double-runs while the maintainer was iterating locally. Re-enable with:
 ```bash
@@ -631,7 +631,7 @@ For a fork, you don't need EventBridge at all — uncomment a `cron` trigger in 
 
 ## Local daily wrapper (subscription-path power user)
 
-The maintainer runs the daily pipeline locally on a Claude Max subscription via a wrapper script `local-cycle.sh` (gitignored — personal runner). The script chains: install deps → `python3 run_all.py --skip xai` (subscription path) → copy HTML to `docs/` → `publish_data.py` → `send_email.py` → git push → wait for GH Pages → invoke AWS ingest Lambda.
+The maintainer runs the daily pipeline locally on a Claude Max subscription via a wrapper script `local-cycle.sh` (gitignored — personal runner). The script chains: install deps → `python3 run_all.py --skip xai` (subscription path) → copy HTML to `docs/` → `publish_data.py` → S3 upload + frontend deploy → git push → `send_email.py`. (The GH Pages wait + AWS ingest Lambda step was retired 2026-09-29 — the site reads the static S3 files directly.)
 
 If you have a Claude Max account and want to do the same, the **full operational playbook** (env layout, marker semantics, recovery commands, common gotchas) lives in **`private/LOCAL_RUN.md`** (also gitignored — copy out of the maintainer's repo if you have access, or write your own from the recipe in [Two ways to run the merger → B](#b-claude-max-subscription-zero-per-call-cost) above).
 

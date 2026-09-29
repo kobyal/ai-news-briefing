@@ -52,12 +52,11 @@ echo "Python: $PYTHON_BIN ($($PYTHON_BIN --version 2>&1))"
 
 DATE=$(date +%Y-%m-%d)
 DO_PUSH=1
-DO_INGEST=1
 FORCE=0
 for arg in "$@"; do
   case "$arg" in
-    --no-push)   DO_PUSH=0; DO_INGEST=0 ;;
-    --no-ingest) DO_INGEST=0 ;;
+    --no-push)   DO_PUSH=0 ;;
+    --no-ingest) ;;  # no-op since the ingest step was retired (2026-09-29)
     --force)     FORCE=1 ;;
     *) echo "unknown flag: $arg" >&2; exit 2 ;;
   esac
@@ -161,7 +160,7 @@ export AI_NEWS_NO_OPEN=1
 echo "================================================================"
 echo " Local cycle · $DATE"
 echo " ANTHROPIC_API_KEY: <UNSET>   MERGER_VIA_CLAUDE_CODE: 1"
-echo " push=$DO_PUSH  ingest=$DO_INGEST"
+echo " push=$DO_PUSH"
 # ── POWER / WAKE STATE ────────────────────────────────────────────────────────
 # 2026-09-10 took 3h29m instead of ~30min. Root cause was NOT the code: the
 # 05:30 launchd slot fired inside a Power-Nap **DarkWake** (a coincidental
@@ -540,7 +539,6 @@ fi
 if [ "$DO_PUSH" -eq 1 ]; then
   echo
   echo "[4/6] git add + commit + push..."
-  push_ok=1
   # NOTE: agent output/ dirs are intentionally NOT committed. They're per-run
   # scratch (gitignored; consumed once by that morning's merger, never read
   # again) and force-adding them daily bloated the repo to ~80 days deep across
@@ -548,22 +546,21 @@ if [ "$DO_PUSH" -eq 1 ]; then
   # committed below. If you ever need a day's raw agent output in git, add it
   # manually for that one day.
   git add -f docs/ 2>/dev/null || true
+  # library/events agents persist small state (done-list, per-talk content, event
+  # verdicts); their .gitignore keeps media out.
+  git add agents/active/library-agent/state agents/active/library-agent/collections agents/active/events-agent/cache 2>/dev/null || true
   if git diff --staged --quiet; then
     echo "  (nothing new to commit — skipping push)"
-    push_ok=0
   else
     if ! git commit -m "briefing: ${DATE} local subscription run"; then
-      push_ok=0
       echo "  ⚠ git commit failed — continuing to email"
     elif ! git push; then
-      push_ok=0
       echo "  ⚠ git push failed — continuing to email"
     fi
   fi
 else
   echo
   echo "[4/6] git push SKIPPED (--no-push)"
-  push_ok=0
 fi
 
 echo
@@ -622,95 +619,11 @@ echo "[5/6] Sending email (subject will be tagged [LOCAL])..."
 # macOS has no GNU timeout; send_email.py has internal urllib timeouts (10s/8s/5s)
 "$PYTHON_BIN" send_email.py || echo "  ⚠ send_email.py failed (exit $?)"
 
-if [ "$DO_INGEST" -eq 1 ] && [ "$push_ok" -eq 1 ]; then
-  echo
-  echo "[5a/6] Waiting for GitHub Pages to serve TODAY'S content (hash match)..."
-  # Two race conditions to defend against:
-  #  1. GH Pages takes 30-60s to publish after `git push` — lambda would 404.
-  #  2. GH Pages CDN can serve a STALE cached copy (200 but yesterday's bytes).
-  #     2026-05-02 incident: lambda saw 21 stories instead of 23 because the
-  #     CDN was still serving the morning's run when the second cycle pushed.
-  # Solution: compare sha256 of the locally-published file vs the served body
-  # and only proceed when they match exactly.
-  GH_URL="https://kobyal.github.io/ai-news-briefing/data/${DATE}.json"
-  LOCAL_DATA_FILE="docs/data/${DATE}.json"
-  if [ ! -f "$LOCAL_DATA_FILE" ]; then
-    echo "  ⚠ Local $LOCAL_DATA_FILE missing — skipping ingest"
-    gh_ok=0
-  else
-    LOCAL_HASH=$(shasum -a 256 "$LOCAL_DATA_FILE" | awk '{print $1}')
-    gh_ok=0
-    for i in $(seq 1 36); do  # max 3 min (36 × 5s)
-      REMOTE_HASH=$(curl -s --max-time 8 "$GH_URL" 2>/dev/null | shasum -a 256 | awk '{print $1}')
-      if [ "$REMOTE_HASH" = "$LOCAL_HASH" ]; then
-        echo "  ✓ GH Pages serving fresh ${DATE}.json after ~$((i*5))s (hash match)"
-        gh_ok=1
-        break
-      fi
-      printf "  · waiting for fresh content (%ds)\\r" $((i*5))
-      sleep 5
-    done
-  fi
-  if [ "$gh_ok" -eq 0 ]; then
-    echo "  ⚠ GH Pages didn't serve fresh content within 3 minutes — skipping ingest, email will show stale site data"
-    echo "    Re-run manually when ready:"
-    echo "      aws --profile koby-personal lambda invoke --function-name ai-news-ingest --region us-east-1 --cli-binary-format raw-in-base64-out --payload '{}' /tmp/ingest_response.json"
-  else
-    echo
-    echo "[5b/6] Invoking ai-news-ingest lambda (koby-personal)..."
-    if ! aws --profile koby-personal lambda invoke \
-        --function-name ai-news-ingest --region us-east-1 \
-        --cli-binary-format raw-in-base64-out --payload '{}' \
-        /tmp/ingest_response.json > /dev/null; then
-      echo "  ⚠ lambda invoke CLI failed — continuing to email"
-    else
-      RESP=$(cat /tmp/ingest_response.json)
-      echo "  response: $RESP"
-      # Surface lambda-level errors that StatusCode=200 hides
-      if echo "$RESP" | grep -q '"error"'; then
-        echo "  ⚠ Lambda reported an error — continuing to email"
-      fi
-    fi
-    # Brief pause so CloudFront sees the freshly-written DynamoDB state
-    # before send_email.py fetches /data/${DATE}.json for its site snapshot.
-    sleep 3
-    # ── Rebuild search-index AGAIN after ingest ────────────────────────
-    # The ingest lambda overwrites /data/search-index.json with its own
-    # (stories-only) version on every invoke. Our expanded index uploaded
-    # in [3b/6] gets clobbered. Rerun the local builder + S3 cp so the
-    # site keeps the videos/repos/community/reddit/X/tools entries until
-    # the lambda is redeployed with the matching code.
-    # Established 2026-05-11 after the search "Tools" filter went blank.
-    if [ -f scripts/build_search_index.py ]; then
-      echo "[5c/6] Post-ingest: rebuilding expanded search-index..."
-      if "$PYTHON_BIN" scripts/build_search_index.py >/dev/null 2>&1; then
-        echo "  ✓ search-index.json re-rebuilt + uploaded (overrides lambda)"
-        aws cloudfront create-invalidation --distribution-id "$CF_DIST" \
-          --paths "/data/search-index.json" --profile "$S3_PROFILE" \
-          >/dev/null 2>&1 \
-          && echo "  ✓ CloudFront invalidated for /data/search-index.json"
-      else
-        echo "  ⚠ post-ingest search-index rebuild failed"
-      fi
-    fi
-    # ── Re-upload full briefing JSON after ingest ──────────────────────────
-    # The ingest lambda uploads a stories-only data/${DATE}.json to S3,
-    # clobbering the rich local format (briefing, twitter, youtube_channel_latest
-    # etc.) uploaded in [3/6]. Re-upload the local format so the frontend
-    # gets all aggregates (fixes media page "No video available" regression).
-    # Established 2026-05-21 after youtube_channel_latest went missing.
-    if [ -f "docs/data/${DATE}.json" ]; then
-      aws s3 cp "docs/data/${DATE}.json" "s3://${S3_BUCKET}/data/${DATE}.json" \
-        --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
-        --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
-        && echo "  ✓ docs/data/${DATE}.json re-uploaded to S3 (overrides lambda stories-only format)" \
-        || echo "  ⚠ post-ingest data/${DATE}.json re-upload failed"
-    fi
-  fi
-else
-  echo
-  echo "[5/6] ingest SKIPPED ($([ "$DO_INGEST" -eq 0 ] && echo "--no-ingest" || echo "no push"))"
-fi
+# The ai-news-ingest Lambda step ([5a] GH-Pages wait → [5b] invoke → [5c]
+# re-upload what it clobbered) was retired 2026-09-29: the site is static-first
+# (reads S3 files uploaded in [3b]/[3c]), the Lambda's DynamoDB copy wasn't read
+# by anything, and GH Pages builds (10-12 min) had outgrown the 3-min wait, so it
+# was skipped every day since 09-10 anyway. AWS resources are left in place.
 
 # NOTE: the QA evaluator moved UP to [4b/6], before the email — see the rationale
 # there. Don't move it back after the email without also giving it its own alert.

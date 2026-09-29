@@ -202,7 +202,8 @@ if [ -f "$DEPS_MARKER" ]; then
   for req in agents/active/adk-news-agent/requirements.txt agents/active/perplexity-news-agent/requirements.txt \
              agents/active/tavily-news-agent/requirements.txt agents/active/merger-agent/requirements.txt \
              agents/active/rss-news-agent/requirements.txt agents/active/twitter-agent/requirements.txt \
-             agents/active/linkedin-agent/requirements.txt; do
+             agents/active/linkedin-agent/requirements.txt \
+             agents/active/events-agent/requirements.txt agents/active/library-agent/requirements.txt; do
     [ -f "$req" ] && [ "$req" -nt "$DEPS_MARKER" ] && { deps_stale=1; break; }
   done
 fi
@@ -225,7 +226,8 @@ else
   # without taking down the others. The 2026-04-27 ADK silent failure was
   # caused by the old batched form.
   for req in agents/active/adk-news-agent agents/active/perplexity-news-agent agents/active/tavily-news-agent \
-             agents/active/merger-agent agents/active/rss-news-agent agents/active/twitter-agent agents/active/linkedin-agent; do
+             agents/active/merger-agent agents/active/rss-news-agent agents/active/twitter-agent agents/active/linkedin-agent \
+             agents/active/events-agent agents/active/library-agent; do
     # Filter known-harmless 'x-client-transaction' upstream-unreachable error
     # (twitter-agent's git+https dep). Memory: package is already installed
     # locally; the per-requirement loop ensures one failed dep doesn't take
@@ -394,6 +396,22 @@ if "$PYTHON_BIN" scripts/fetch_hot_tools.py >/dev/null 2>&1; then
     || echo "  ⚠ hot_tools.json S3 upload failed (skipping)"
 else
   echo "  ⚠ scripts/fetch_hot_tools.py failed (skipping hot tools refresh)"
+fi
+# Upcoming events (central Israel) → docs/data/events.json; the agent uploads +
+# invalidates itself (--publish). Fail-soft like the other side-data (2026-09-29).
+mkdir -p logs
+if "$PYTHON_BIN" agents/active/events-agent/run.py --publish >"logs/events-${DATE}.log" 2>&1; then
+  echo "  ✓ events.json refreshed + uploaded ($(grep -c '"id"' docs/data/events.json 2>/dev/null || echo '?') events)"
+else
+  echo "  ⚠ events-agent failed (skipping; see logs/events-${DATE}.log)"
+fi
+# Library: one reviewed talk per run into /library "talks" (whisper + claude -p,
+# ~5 min). Must run BEFORE the web build so its /library/<slug>/ page is
+# generated; it publishes its own assets + manifest. Budget-capped + resumable.
+if LIBRARY_TIME_BUDGET_S="${LIBRARY_TIME_BUDGET_S:-1500}" "$PYTHON_BIN" agents/active/library-agent/run.py >"logs/library-${DATE}.log" 2>&1; then
+  echo "  ✓ library-agent: $(grep -o 'Done: [0-9]* talk(s)' "logs/library-${DATE}.log" | tail -1)"
+else
+  echo "  ⚠ library-agent failed (skipping; see logs/library-${DATE}.log)"
 fi
 # Search-index rebuild runs AFTER podcasts + hot_tools so it can index the
 # fresh HF entries from hot_tools.json.

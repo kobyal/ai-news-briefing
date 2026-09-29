@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { fetchArchive } from "@/lib/api";
 import { useLang } from "@/context/LangContext";
 
 // /about — who makes the briefing, how, and on what principles.
@@ -13,7 +11,6 @@ import { useLang } from "@/context/LangContext";
 // like the rest of the site.
 
 const LINKEDIN = "https://www.linkedin.com/in/koby-almog-56b50714/";
-const FIRST_ISSUE = "2026-05-11";
 
 type Step = { title: string; body: string };
 type Item = { bold: string; text: string };
@@ -23,10 +20,6 @@ const EN = {
   eyebrow: "About AI Briefing",
   title: "The AI industry, distilled every morning.",
   intro: "A daily intelligence service for developers, founders, investors, and technical leaders who track AI. Gathered by an AI pipeline, checked by a human, sourced to the original reporting — in English and Hebrew.",
-  statDays: "daily briefings",
-  statSince: "publishing since",
-  statLangs: "languages, every day",
-  langsValue: "EN · HE",
   creatorTitle: "Creator",
   creatorName: "Koby Almog",
   creatorRole: "AI tech lead · Cloud & DevOps · Israel",
@@ -69,10 +62,6 @@ const HE: typeof EN = {
   eyebrow: "אודות AI Briefing",
   title: "תעשיית ה-AI, מזוקקת כל בוקר.",
   intro: "שירות מודיעין יומי למפתחים, מייסדים, משקיעים ומנהלים טכנולוגיים שעוקבים אחרי AI. נאסף על ידי מערך AI, נבדק על ידי אדם, ומקושר לדיווח המקורי — בעברית ובאנגלית.",
-  statDays: "בריפינגים יומיים",
-  statSince: "מפרסמים מאז",
-  statLangs: "שפות, כל יום",
-  langsValue: "EN · HE",
   creatorTitle: "יוצר",
   creatorName: "קובי אלמוג",
   creatorRole: "מוביל טכנולוגי AI · ענן ו-DevOps · ישראל",
@@ -145,29 +134,10 @@ function StepIcon({ i }: { i: number }) {
   );
 }
 
-function formatSince(iso: string, isHe: boolean) {
-  const d = new Date(iso + "T00:00:00Z");
-  return d.toLocaleDateString(isHe ? "he-IL" : "en-US", { month: "short", year: "numeric", timeZone: "UTC" });
-}
-
 export default function AboutPage() {
   const { isHe } = useLang();
   const t = isHe ? HE : EN;
   const dir = isHe ? "rtl" : "ltr";
-  const [days, setDays] = useState<number | null>(null);
-
-  useEffect(() => {
-    fetchArchive().then((dates) => setDays(dates.length || null)).catch(() => {});
-  }, []);
-
-  // Fallback when the archive fetch fails (e.g. CORS in local dev): one issue a day since launch.
-  const dayCount = days ?? Math.floor((Date.now() - new Date(FIRST_ISSUE).getTime()) / 86_400_000) + 1;
-  const stats = [
-    { value: String(dayCount), label: t.statDays },
-    { value: formatSince(FIRST_ISSUE, isHe), label: t.statSince },
-    { value: t.langsValue, label: t.statLangs },
-  ];
-
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-base)" }} dir={dir}>
       <Header date={new Date().toISOString().split("T")[0]} archive={[]} />
@@ -198,18 +168,9 @@ export default function AboutPage() {
           }}>
             {t.title}
           </h1>
-          <p style={{ fontSize: 16.5, color: "var(--text-secondary)", lineHeight: 1.7, margin: "0 0 28px", maxWidth: 620 }}>
+          <p style={{ fontSize: 16.5, color: "var(--text-secondary)", lineHeight: 1.7, margin: 0, maxWidth: 620 }}>
             {t.intro}
           </p>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-            {stats.map((s) => (
-              <div key={s.label} style={{ background: "rgba(255,255,255,0.7)", border: "1px solid var(--border-subtle)", borderRadius: 12, padding: "12px 14px" }}>
-                <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-primary)", lineHeight: 1.1 }}>{s.value}</div>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-tertiary)", marginTop: 4 }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
         </section>
 
         {/* ── Creator ──────────────────────────────────────────────────── */}

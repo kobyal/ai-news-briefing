@@ -330,6 +330,25 @@ wrap shared/vendors needlessly).
   locked term map instead of forking it. Each agent still keeps its own persona/
   headline rules; only the contested house-style terms are shared.
 
+Follow-ups from the 2026-09-29 library/events/Pages work
+- ⏳ **Library inset-slide crop is weak**: `recording-to-review/lib/slides.crop_slide` misses
+  dark-edged inset decks (NDC/TALK-003 shows stage shots with the slide embedded). Improve the
+  rectangle detection upstream in `kobyal/recording-to-pdf`.
+- ⏳ `brew upgrade yt-dlp` (installed 2026.03.13 403s on the default client; library-agent pins
+  `YT_CLIENT=web_embedded` as a workaround — remove the pin after upgrading).
+- ⏳ YouTube Data API: key #1 hits 429 daily after the 05:30 youtube agent; rotation covers it but
+  only 2 of 5 supported keys are set — add `YOUTUBE_API_KEY_3` (another GCP project) to
+  `private/.env`. Optional: keyless `yt-dlp ytsearch` fallback for publish_data's per-story
+  video search when all keys are exhausted.
+- ⏳ Events sources that are wired but empty today (re-check monthly): Microsoft Reactor
+  (catalog is livestream-only), GDG Tel Aviv (DevFest 12-07 outside the 60-day window), Nvidia
+  EMEA calendar (only 2023-25 Israel rows), AWS IL user group Meetup (no upcoming).
+- ⏳ Uncommitted hunks of unknown owner in the main checkout since 09-28: `publish_data.py`
+  (`--strict-mcp-config` in `_regen_tldr_over_union`) and `scripts/fetch_hot_tools.py` (same
+  flag in `_translate_via_cli`) — sensible; commit or route both through `shared.anthropic_cc`.
+- ⏳ GitHub Actions workflows (`daily_briefing.yml`, `email_only.yml`) are manual-only fallbacks,
+  untested since Python 3.14; keep as disaster fallback or delete.
+
 Code health 2026-09-28 (post model-upgrade audit)
 - ✅ Dead code removed: `shared/image_fallback.github_org_image` + its denylist
   (caller gone since ea0cc0fb), `shared/article_reader.prepare_writer_context`

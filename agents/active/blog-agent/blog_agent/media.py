@@ -30,7 +30,10 @@ def out_dir(key: str) -> Path:
 def diagram(key: str, d2_src: str) -> str | None:
     d = out_dir(key)
     src = d / "diagram.d2"; svg = d / "diagram.svg"; png = d / "diagram.png"
-    src.write_text(d2_src.strip() + "\n", encoding="utf-8")
+    d2_src = d2_src.strip()
+    if "direction:" not in d2_src:  # wide layouts read better in a 16:9 video frame and a 760px article column
+        d2_src = "direction: right\n" + d2_src
+    src.write_text(d2_src + "\n", encoding="utf-8")
     ok = False
     for layout in (["--layout=elk"], []):
         try:

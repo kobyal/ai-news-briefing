@@ -175,7 +175,7 @@ echo " push=$DO_PUSH"
 #
 # The real fix lives outside this repo and needs sudo — a scheduled wake is a
 # true FullWake, unlike DarkWake:
-#     sudo pmset repeat wake MTWRFSU 05:25:00     # verify: pmset -g sched
+#     sudo pmset repeat wake MTWRFSU 04:40:00     # verify: pmset -g sched
 #
 # These lines exist so the NEXT slow run is diagnosable from the log alone
 # instead of by digging through `pmset -g log`.
@@ -185,7 +185,7 @@ _LAST_WAKE="$(pmset -g log 2>/dev/null | grep -E '\sWake\s+(DarkWake to FullWake
 echo " power=${_PWR:-unknown}  repeat-wake-configured=${_SCHED_WAKE:-0}  last-full-wake=${_LAST_WAKE:-unknown}"
 if [ "${_PWR}" != "AC Power" ]; then
   echo " ⚠ ON BATTERY — caffeinate -s is AC-only and cannot hold a DarkWake awake."
-  echo " ⚠ Expect stalls. Plug in, or run: sudo pmset repeat wake MTWRFSU 05:25:00"
+  echo " ⚠ Expect stalls. Plug in, or run: sudo pmset repeat wake MTWRFSU 04:40:00"
 fi
 echo "================================================================"
 

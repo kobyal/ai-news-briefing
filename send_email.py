@@ -11,6 +11,8 @@ from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+from shared.aws_config import PUBLIC_BASE
+
 RECIPIENT    = "kobyal@gmail.com"
 SENDER       = "kobyal@gmail.com"
 try:

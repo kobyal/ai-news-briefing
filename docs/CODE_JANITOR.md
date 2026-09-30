@@ -1,7 +1,7 @@
 # Code janitor — daily dead-code sweep
 
 `scripts/code_janitor.py` runs every day at 09:00 (launchd:
-`com.kobyalmog.ai-briefing-janitor`), after the 05:30 pipeline has published.
+`com.kobyalmog.ai-briefing-janitor`), after the 04:45 pipeline has published.
 It deletes code nothing uses any more, verifies the repo still works, and opens
 a PR. `scripts/janitor_gate.py` is the verification gate — usable on its own.
 

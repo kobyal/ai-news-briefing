@@ -1,11 +1,11 @@
 ---
-title: "Agentic RAG: when the model does its own searching"
-description: "Agentic RAG gives the model search tools and a loop instead of one retrieval pass. What it is, how to build the loop, and where it costs you."
+title: "Agentic RAG: When the Model Drives the Search"
+description: "What changes when the model runs retrieval itself, in a loop: three tools, ten nodes of guardrails, and what Bayer learned in production."
 lang: en
 key: agentic-rag
 term: "agentic rag"
 pubDate: 2026-09-30
-tags: ["agentic-rag", "rag", "agents", "retrieval", "context-engineering"]
+tags: ["rag", "agents", "retrieval", "context-engineering", "harness-engineering"]
 hero: /posts/agentic-rag/hero-en.jpg
 diagram: /posts/agentic-rag/diagram.svg
 sources:
@@ -13,78 +13,83 @@ sources:
   - { title: "Bayer's PRINCE: a production agentic RAG system", url: "https://martinfowler.com/articles/reliable-llm-bayer.html", date: "2026-06-16" }
   - { title: "How to Build an Agentic RAG with RubyLLM and Rails", url: "https://www.panasiti.me/blog/how-to-build-agentic-rag-with-rubyllm-and-rails", date: "2026-06-10" }
   - { title: "Agentic RAG Explained in 3 Levels of Difficulty", url: "https://machinelearningmastery.com/agentic-rag-explained-in-3-levels-of-difficulty", date: "2026-05-04" }
-opinion: "We think agentic RAG is one of the few terms in this wave that changes something on Monday morning. You stop building a context blob and start designing tools, a budget and stop conditions. But the name doesn't come with a method. What keeps a system like this alive in production is the checker, not the loop. A grounding check after writing is worth more than another round of search. We'd start with a deterministic router that keeps most questions in single-shot, and hand the agent only the questions that really need several steps. For us, every place where we replaced a model decision with a simple rule got cheaper and more reliable. There's no reason retrieval would be different."
+opinion: "We think agentic RAG is one of the few terms that actually changes what you do on Monday: you move retrieval from before the model into the loop. But the value isn't in the loop itself. It's in what checks it: a hallucination guard, citations, a cap on rounds. For us, a loop that checks itself is always worth more than a better first draft. And we don't buy a ten-node graph when one classifier and one rule would do the job. Start with single-shot, measure where the first search misses, and only there let the model search again."
 madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
 ---
 
-## Where it came from
+There's a developer in Italy who runs a RAG app for pension and tax advisors. People ask it about INPS, about pension funds for self-employed professionals, about laws and regulations. It answers from documents uploaded to a knowledge base.
 
-The term has no single inventor and no birth date. Classic RAG has been around for a few years. You embed the question, pull the most similar chunks, put them in the prompt and call the model once. "Agentic RAG" started as a name for the version with a loop in it. It spread first through vendor explainer pages. IBM, for example, has a page of its own on it.
+For a long time it was classic RAG. Take the question, search the DB, push the results into the system prompt, call the model once. It works until the first search misses. Then the answer is bad, and the model can't do anything about it. Retrieval happened before the model even got to think about the question.
 
-In 2026 it moved from marketing to practice. MachineLearningMastery (May 2026) defined it as RAG where an agent breaks the question apart, sends each part to the right source, checks what came back, and keeps going until it has enough grounded context. In June, Panasiti published a post on RubyLLM and Rails. He moved an app for pension and tax advisors in Italy from single-shot to an agent. Around the same time, Bayer described PRINCE on martinfowler.com. It is an agentic RAG system for preclinical research. In August came a Show HN from Ambuj Kumar Tripathi: a LangGraph graph for legal and financial documents in India that runs in under 512MB of RAM. The title says 11 nodes and the page itself says 10, but that matters less.
+So he rebuilt it as an agent, in plain Ruby, and wrote about it in June. That's more or less the whole story of agentic RAG.
 
-The problem the name describes is simple, and Panasiti put it well. In classic RAG, retrieval happens once, before the model has had a chance to think about the question. If the first search missed, the answer comes out bad, and the model has no way to fix it.
+## The model drives the search
+
+The one-line definition: instead of your code searching and then handing results to the model, the model runs the search itself. It decides what to search for, reads what came back, searches again with different words, follows references between documents, and only then writes an answer.
+
+RAG itself came from a 2020 Facebook AI Research paper. The "agentic" part didn't come from any single paper. Nobody invented it. It just stuck once everyone started giving models tools. IBM has an explainer page for it now.
+
+What it isn't: it isn't "RAG with LangChain". The Italian version runs on Rails and RubyLLM, with no LangChain and no Python on the side. It also doesn't have to be multi-agent. One agent, a few tools, a loop. That's it.
+
+Machine Learning Mastery gives an example that shows why you'd want this: "Compare Q3 2025 sales to Q1 2026 and summarize the risk factors from the latest SEC filing." Plain RAG embeds that whole mix and returns chunks that look like the average of three different questions. In other words, like none of them. An agent splits it into three searches, sends each one to the right source, and checks what came back.
 
 <figure><img src="/posts/agentic-rag/diagram.svg" alt="How it fits together" loading="lazy" /><figcaption>How it fits together</figcaption></figure>
 
-## What it actually is
+<figure><img src="/posts/agentic-rag/v1-compare-en.jpg" alt="Single-shot vs agentic" loading="lazy" /><figcaption>Single-shot vs agentic</figcaption></figure>
 
-Agentic RAG is RAG where the model runs retrieval itself. It doesn't get a ready-made block of context. It gets tools, such as `search_knowledge_base`, `fetch_document_section` and `list_documents`, and calls them in a loop. It searches, reads, rewrites the query and follows references between documents. It writes an answer with citations only once it has enough material. The vectors and the index stay the same. What changes is who decides what goes into the context, and when to stop searching.
+## Three tools and a loop
 
-What it isn't:
+The nice thing about panasiti's post is how little changed. Same pgvector through the neighbor gem, same pg_search with an Italian dictionary, same chunks. What moved: the search no longer runs before the model. The model gets three tools:
 
-- It isn't "RAG with a better reranker." A reranker improves a single retrieval pass. It doesn't add any decision.
-- It isn't GraphRAG. GraphRAG is about how the index is structured, and you can run it without an agent.
-- It doesn't have to be multi-agent. Panasiti uses one model with three tools.
-- It isn't a general agent with web search. The knowledge base stays at the center. Web search is a fallback, not the default.
+- `search_knowledge_base`: the same search as before, except now the model presses the button
+- `fetch_document_section`: pull a section from a document when a chunk is cut off
+- `list_documents`: see what's in the knowledge base at all
 
-Relative to context engineering, agentic RAG is a special case: the model builds its own context. Bayer said this outright. Most of the decisions in PRINCE, they write, can now be understood as context engineering and harness engineering. Nobody was using those terms yet when they designed the system.
+The model calls them as many times as it needs. When it has enough material, it writes an answer with citations. Everything runs in a background job, and the agent's steps stream to the browser over Turbo Streams. The user sees what it's searching for in real time.
 
-<figure><img src="/posts/agentic-rag/v1-compare-en.jpg" alt="Classic RAG vs. Agentic RAG" loading="lazy" /><figcaption>Classic RAG vs. Agentic RAG</figcaption></figure>
+MLM breaks this into three moves: query decomposition, multi-hop chaining, self-correction. In standup terms: split the question, follow a lead, and admit when you missed and search again.
 
-## How to do it
+## Ten nodes, mostly guardrails
 
-1. **Tools, not a blob.** Give the model search, section fetch and a document list. A single "fetch everything" tool puts you back in single-shot.
-2. **Hybrid search and rerank.** Panasiti combines pgvector with full-text search in Postgres. The Show HN pulls 100+ candidates, and a Cohere reranker keeps 10.
-3. **A router before the loop.** Classify intent first: simple question, ambiguous question, or out of scope. Ambiguous questions get a clarifying question, up to two rounds. Simple questions don't need an agent at all.
-4. **Budget and stop conditions.** Set a maximum number of tool calls, a token ceiling, and a clear definition of what counts as "enough."
-5. **A grounding check after writing.** Verify that every claim rests on a retrieved chunk. In the Show HN, an answer below 40% confidence is rejected.
-6. **Fallback and circuit breaker.** After three API failures the circuit opens, and the user gets a proper message instead of a frozen screen.
-7. **Observability for every step.** Log every tool call (they use Langfuse), and stream the steps to the UI, the way Panasiti does with Turbo Streams. Without that, you can't debug a loop.
+In August a project called "11-Node Agentic RAG with MCP and PII Shield Under 512MB RAM" showed up on HN. The page itself says 10-Node LangGraph. We won't argue over a node.
 
-Here is a minimal contract. The values are only illustrative:
+The system answers questions about the Indian constitution, state budgets and tax law. Look at what each node does:
 
-```yaml
-tools:
-  - search_knowledge_base
-  - fetch_document_section
-  - list_documents
-limits:
-  max_tool_calls: 8
-  max_context_tokens: 40000
-stop_when: every_claim_has_citation
-grounding_check:
-  required: true
-  reject_below: 0.4
-fallback: single_shot_answer_with_warning
-```
+- Classifier sorts intent: RAG question, greeting, abusive, vague, out of scope
+- CrossQuestioner asks a clarifying question when the query is vague, two rounds max
+- Retriever pulls from Pinecone, and a Cohere reranker keeps 10 chunks out of 100+ candidates
+- Hallucination Guard checks after writing that the answer is grounded in what was retrieved, and rejects it below 40% confidence
+- Fallback with a circuit breaker: three API failures and the circuit opens, no crash and no hang
 
-<figure><img src="/posts/agentic-rag/v2-steps-en.gif" alt="The loop, step by step" loading="lazy" /><figcaption>The loop, step by step</figcaption></figure>
+There's also web search through Tavily that only runs after human approval, and a one-hour Redis cache.
 
-## What it buys you, and what it doesn't
+Wait, where's the agentic part? In the retriever, in tool calling for stock prices, in the decision to go to the web. Everything else is guardrails: classification, checks, retry, cache and a brake. And that's exactly what makes it something you can leave running on its own.
 
-What you get: you can finally answer multi-hop questions. MachineLearningMastery gives a good example: "Compare Q3 2025 sales to Q1 2026 and summarize the risk factors from the latest SEC filing." Single-shot returns a mix of chunks that answers no part of that well. An agent splits it into separate queries. The same goes for comparing versions, like the Show HN comparing a 1961 law to its 2025 version. Most important, the system can recover from a bad first search.
+<figure><img src="/posts/agentic-rag/v2-stat-en.gif" alt="Below this confidence, the Hallucination Guard rejects the answer" loading="lazy" /><figcaption>Below this confidence, the Hallucination Guard rejects the answer</figcaption></figure>
 
-What you pay: latency and tokens grow with every round. The same question can take a different path on each run, so your eval has to check the path too, not just the answer. The loop can also stop too early. It decides it has found enough and returns a confident answer built on half the material.
+## Bayer called it something else
 
-One more point: most of the work isn't the agent. Bayer lists what the harness includes: orchestration, tool boundaries, state persistence, retries, fallbacks, validation, reflection loops, observability and human review. That is a list of entirely ordinary engineering. If most of your questions are direct fact lookups, single-shot will be cheaper, faster and more predictable.
+Martin Fowler's site published the story of PRINCE, Bayer's agentic RAG system for preclinical research. The problem: researchers who need to ask complicated questions over huge amounts of internal data, and keyword search with boolean logic that doesn't hold up.
 
-<figure><img src="/posts/agentic-rag/v3-stat-en.gif" alt="Confidence threshold below which the answer is rejected" loading="lazy" /><figcaption>Confidence threshold below which the answer is rejected</figcaption></figure>
+The interesting part isn't the architecture. It's the admission that when they designed the system, they had no names for what they were doing. Today they describe it as context engineering and harness engineering.
 
-## From our own pipeline
+Context engineering decided what each model gets, what it doesn't get, and how context moves between stages: research, reflection, writing. Harness engineering is all the scaffolding around it: orchestration, tool limits, state, retries, fallbacks, validation, reflection loops, observability and human review.
 
-The daily aibriefing.dev pipeline is not a RAG system. It's a graph of about ten agents with a merger step, and it taught us the lesson that matters most here. Our worst bugs weren't wrong answers. They were silent failures: a step that returns empty or partial output and reports that everything is fine. So we have a QA evaluator that runs after publish and flags P0s. We also have a wrapper around `claude -p` that retries transient errors and repairs broken JSON. That small loop closed three production incidents. Agentic RAG is exactly the same story. A loop that stops after one search because "that looks like enough" is a silent failure, just with citations. Put the checker outside the loop, and don't trust what the model reports about itself.
+Read that list again. It's the same list as the Show HN project, just the pharma version with a paper in Frontiers in AI.
 
-<figure><img src="/posts/agentic-rag/v4-d2-en.svg" alt="Our small loop around claude -p, and the checker outside it" loading="lazy" /><figcaption>Our small loop around claude -p, and the checker outside it</figcaption></figure>
+<figure><img src="/posts/agentic-rag/v3-quote-en.jpg" alt="PRINCE team, Bayer, martinfowler.com" loading="lazy" /><figcaption>PRINCE team, Bayer, martinfowler.com</figcaption></figure>
 
+## When to keep plain RAG
 
+MLM admits it too: plain RAG works fine for simple, clear questions. And the cost of the loop is real:
+
+- Every round is another model call, more tokens, more latency
+- The number of steps varies per question, so do the bill and the response time
+- Evals get harder, because the same question can take a different path on every run
+- Without a cap on rounds, an agent that can't find anything will keep searching long after it should have given up
+
+If most of your questions are "where's the form", you don't have an agent problem. You have an FAQ problem.
+
+And us? The daily aibriefing pipeline has about 10 agents, and every place we swapped a model call for a rule got cheaper and more reliable. Our most useful loop isn't smart at all: the `claude -p` wrapper retries transient failures and repairs broken JSON. Boring and good, and it closed three production incidents. Our worst bugs weren't wrong answers, they were silent failures. An agent that searches six times and returns a confident answer based on nothing is exactly that kind of failure.
+
+The agent decides what to search for. You decide when it stops, and who checks it.

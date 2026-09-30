@@ -1,17 +1,16 @@
 direction: right
-task: Task spec
-planner: Planner
-generator: Generator agent
-tools: Tools and sandbox
-verifier: Verifier (tests, lint, evaluator)
-artifacts: Progress artifacts
-rules: Harness rules
-task -> planner: spec
-planner -> generator: feature list
-generator -> tools: edit / run
-tools -> verifier: output
-verifier -> generator: fail + feedback
-verifier -> artifacts: pass
-artifacts -> generator: next session context
-verifier -> rules: repeated mistake
-rules -> generator: new constraint
+task: Task
+context: Context (AGENTS.md + rules)
+model: Model
+tools: Tools in sandbox
+checks: Checks (lint, tests, hooks)
+done: Done
+rules: New rule
+task -> context: loaded
+context -> model: prompt
+model -> tools: calls
+tools -> checks: output
+checks -> done: pass
+checks -> model: fail + error
+checks -> rules: new mistake
+rules -> context: next session

@@ -1,11 +1,11 @@
 ---
-title: "Agentic RAG: כשהמודל מחפש בעצמו"
-description: "במקום retrieval אחד, המודל מקבל כלים ומחפש בלולאה. מה זה Agentic RAG, איך בונים את הלולאה, ואיפה זה עולה לכם ביוקר."
+title: "Agentic RAG: כשהמודל מחזיק את מנוע החיפוש"
+description: "מה משתנה כשהמודל מפעיל את ה-retrieval בעצמו, בלולאה: שלושה tools, עשרה nodes של גדרות, ומה באייר למדו ב-production."
 lang: he
 key: agentic-rag
 term: "agentic rag"
 pubDate: 2026-09-30
-tags: ["agentic-rag", "rag", "agents", "retrieval", "context-engineering"]
+tags: ["rag", "agents", "retrieval", "context-engineering", "harness-engineering"]
 hero: /posts/agentic-rag/hero.jpg
 diagram: /posts/agentic-rag/diagram.svg
 sources:
@@ -13,76 +13,83 @@ sources:
   - { title: "Bayer's PRINCE: a production agentic RAG system", url: "https://martinfowler.com/articles/reliable-llm-bayer.html", date: "2026-06-16" }
   - { title: "How to Build an Agentic RAG with RubyLLM and Rails", url: "https://www.panasiti.me/blog/how-to-build-agentic-rag-with-rubyllm-and-rails", date: "2026-06-10" }
   - { title: "Agentic RAG Explained in 3 Levels of Difficulty", url: "https://machinelearningmastery.com/agentic-rag-explained-in-3-levels-of-difficulty", date: "2026-05-04" }
-opinion: "אנחנו חושבים ש-agentic RAG הוא אחד המונחים הבודדים בגל הזה שבאמת משנה משהו ביום שני בבוקר: מפסיקים לבנות context blob ומתחילים לתכנן כלים, תקציב ותנאי עצירה. מה שכן, שם זה לא שיטה, ומה שמחזיק מערכת כזו ב-production זה הבודק, לא הלולאה. בדיקת grounding אחרי הכתיבה שווה יותר מעוד סיבוב חיפוש. אנחנו היינו מתחילים עם router דטרמיניסטי שמשאיר את רוב השאלות ב-single-shot, ונותנים ל-agent רק את מה שבאמת צריך כמה צעדים. אצלנו, כל מקום שבו החלפנו החלטה של מודל בכלל פשוט יצא זול ואמין יותר. אין סיבה שב-retrieval זה יהיה אחרת."
+opinion: "אנחנו חושבים ש-agentic RAG הוא מהמונחים הבודדים שבאמת משנים מה עושים ביום שני: מעבירים את ה-retrieval מלפני המודל אל תוך הלולאה. אבל הערך לא בלולאה עצמה, הוא במה שבודק אותה: hallucination guard, ציטוטים, תקרה על מספר הסיבובים. אצלנו לולאה שבודקת את עצמה תמיד שווה יותר מטיוטה ראשונה טובה יותר. ואנחנו לא קונים גרף של עשרה nodes כשסיווג אחד ו-rule אחד היו עושים את העבודה. תתחילו מ-single-shot, תמדדו איפה החיפוש הראשון מפספס, ורק שם תנו למודל לחפש שוב."
 madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
 ---
 
-## מאיפה זה הגיע
+יש בחור באיטליה שמריץ אפליקציית RAG ליועצי פנסיה ומס. שואלים אותה על INPS, על קרנות פנסיה של בעלי מקצוע, על חוקים ותקנות. היא עונה מתוך מסמכים שהועלו לבסיס ידע.
 
-אף אחד לא המציא את המונח. הוא פשוט נדבק. RAG קלאסי אתם מכירים כבר כמה שנים: עושים embedding לשאלה, שולפים את ה-chunks הכי דומים, דוחפים אותם ל-prompt וקוראים למודל פעם אחת. "Agentic RAG" התחיל כשם לגרסה עם לולאה, והתפשט קודם דרך דפי הסבר של ספקים. ל-IBM, למשל, יש עליו עמוד משלה.
+במשך הרבה זמן זה היה ה-RAG הקלאסי: לוקחים את השאלה, מחפשים ב-DB, דוחפים את התוצאות ל-system prompt וקוראים למודל פעם אחת. עובד. עד שהחיפוש הראשון מפספס. ואז התשובה גרועה, והמודל לא יכול לעשות עם זה כלום. ה-retrieval קרה לפני שהוא בכלל הספיק לחשוב על השאלה.
 
-ב-2026 זה עבר מהשיווק לשטח. MachineLearningMastery הגדירו אותו במאי 2026 כ-RAG שבו agent מפרק את השאלה, שולח כל חלק למקור הנכון, בודק מה חזר וממשיך עד שיש מספיק context מבוסס. ביוני Panasiti פרסם פוסט על RubyLLM ו-Rails. הוא העביר אפליקציה ליועצי פנסיה ומס באיטליה מ-single-shot ל-agent. באותה תקופה Bayer תיארו ב-martinfowler.com את PRINCE, מערכת agentic RAG למחקר פרה-קליני. ובאוגוסט הגיע Show HN של Ambuj Kumar Tripathi: גרף LangGraph למסמכים משפטיים ופיננסיים בהודו, שרץ על פחות מ-512MB RAM. בכותרת כתוב 11 nodes, בעמוד עצמו 10. פחות חשוב.
+אז הוא בנה את זה מחדש כ-agent, ב-Ruby נקי, וכתב על זה ביוני. וזה בגדול כל הסיפור של agentic RAG.
 
-רגע, למה זה בכלל בעיה? Panasiti ניסח את זה הכי טוב. ב-RAG קלאסי ה-retrieval קורה פעם אחת, לפני שלמודל יש הזדמנות לחשוב על השאלה. אם החיפוש הראשון פספס, התשובה יוצאת גרועה, ולמודל אין שום דרך לתקן.
+## המודל מחזיק את מנוע החיפוש
+
+ההגדרה בשורה אחת: במקום שהקוד שלכם יחפש ואז ימסור למודל, המודל מפעיל את החיפוש בעצמו. הוא מחליט מה לחפש, קורא מה חזר, מחפש שוב במילים אחרות, עוקב אחרי הפניות בין מסמכים, ורק אז כותב תשובה.
+
+RAG עצמו הגיע מ-paper של Facebook AI Research ב-2020. ה-agentic שהודבק לו לא הגיע מ-paper אחד. אף אחד לא המציא את זה, זה פשוט נדבק ברגע שכולם התחילו לתת למודלים tools. היום כבר יש לזה עמוד הסבר אצל IBM.
+
+מה זה לא: זה לא "RAG עם LangChain". הגרסה האיטלקית רצה על Rails ו-RubyLLM, בלי LangChain ובלי Python בצד. זה גם לא חייב להיות multi-agent. agent אחד, כמה tools, לולאה. זהו.
+
+ב-Machine Learning Mastery נתנו דוגמה שמסבירה למה צריך את זה: "תשווה את המכירות של Q3 2025 ל-Q1 2026 ותסכם את גורמי הסיכון מה-SEC filing האחרון". RAG רגיל עושה embedding לכל הבליל הזה ומחזיר chunks שדומים לממוצע של שלוש שאלות שונות. כלומר, לאף אחת מהן. agent מפרק את זה לשלושה חיפושים, שולח כל אחד למקור הנכון ובודק מה חזר.
 
 <figure><img src="/posts/agentic-rag/diagram.svg" alt="איך זה עובד" loading="lazy" /><figcaption>איך זה עובד</figcaption></figure>
 
-## מה זה באמת
+<figure><img src="/posts/agentic-rag/v1-compare-he.jpg" alt="single-shot מול agentic" loading="lazy" /><figcaption>single-shot מול agentic</figcaption></figure>
 
-בגדול, Agentic RAG זה RAG שבו המודל מנהל את ה-retrieval בעצמו. הוא לא מקבל גוש context מוכן. הוא מקבל כלים, נגיד `search_knowledge_base`, `fetch_document_section` ו-`list_documents`, וקורא להם בלולאה. מחפש, קורא, מנסח את השאילתה מחדש, עוקב אחרי הפניות בין מסמכים. רק כשיש לו מספיק חומר הוא כותב תשובה עם ציטוטים. הוקטורים וה-index נשארים אותו דבר. מה שמשתנה זה מי מחליט מה נכנס ל-context ומתי מפסיקים לחפש.
+## שלושה tools ולולאה
 
-מה זה לא:
+מה שיפה בפוסט של panasiti זה כמה מעט השתנה. אותו pgvector דרך ה-gem של neighbor, אותו pg_search עם מילון איטלקי, אותם chunks. מה שזז: החיפוש כבר לא רץ לפני המודל. המודל מקבל שלושה tools:
 
-- זה לא "RAG עם reranker טוב יותר". reranker משפר שליפה אחת, הוא לא מוסיף אף החלטה.
-- זה לא GraphRAG. GraphRAG זה סיפור של מבנה ה-index, ואפשר להריץ אותו גם בלי agent.
-- זה לא חייב להיות multi-agent. אצל Panasiti זה מודל אחד עם שלושה כלים.
-- זה לא agent כללי עם web search. מאגר הידע נשאר במרכז, ו-web search הוא fallback, לא ברירת מחדל.
+- `search_knowledge_base`: החיפוש שהיה קודם, רק שעכשיו המודל לוחץ על הכפתור
+- `fetch_document_section`: לשלוף סעיף ממסמך כשה-chunk קטוע
+- `list_documents`: לראות מה בכלל יש בבסיס הידע
 
-ומול context engineering, agentic RAG הוא מקרה פרטי: המודל בונה לעצמו את ה-context. Bayer אמרו את זה במפורש. לדבריהם, את רוב ההחלטות ב-PRINCE אפשר להבין היום דרך context engineering ו-harness engineering, למרות שכשתכננו את המערכת אף אחד עוד לא השתמש במונחים האלה.
+המודל קורא להם כמה פעמים שהוא צריך. כשיש לו מספיק חומר, הוא כותב תשובה עם ציטוטים. הכל רץ ב-background job, והצעדים של ה-agent זורמים לדפדפן ב-Turbo Streams. המשתמש רואה בזמן אמת מה הוא מחפש.
 
-<figure><img src="/posts/agentic-rag/v1-compare-he.jpg" alt="RAG קלאסי מול Agentic RAG" loading="lazy" /><figcaption>RAG קלאסי מול Agentic RAG</figcaption></figure>
+ב-MLM מפרקים את זה לשלושה כוחות: query decomposition, multi-hop chaining, self-correction. בשפה של standup: לפרק את השאלה, ללכת אחרי קצה חוט, ולהודות כשפספסת ולחפש שוב.
 
-## איך עושים את זה
+## עשרה nodes, ורובם גדרות
 
-1. **כלים במקום blob.** תנו למודל חיפוש, שליפת סעיף ורשימת מסמכים. כלי אחד של "תביא הכל" ואתם בחזרה ב-single-shot.
-2. **חיפוש היברידי ו-rerank.** Panasiti משלב pgvector עם full-text ב-Postgres. ב-Show HN שולפים יותר מ-100 מועמדים, ו-Cohere reranker משאיר 10.
-3. **Router לפני הלולאה.** קודם מסווגים כוונה: שאלה פשוטה, שאלה עמומה או שאלה מחוץ לתחום. עמומה מקבלת שאלת הבהרה, עד שני סבבים. פשוטה לא צריכה agent בכלל.
-4. **תקציב ותנאי עצירה.** מקסימום tool calls, תקרת tokens, והגדרה ברורה של מה זה "מספיק".
-5. **בדיקת grounding אחרי הכתיבה.** כל טענה צריכה להישען על chunk שנשלף. ב-Show HN תשובה עם ביטחון מתחת ל-40% נזרקת.
-6. **Fallback ו-circuit breaker.** אחרי שלוש תקלות API המעגל נפתח, והמשתמש מקבל הודעה מסודרת ולא מסך תקוע.
-7. **Observability לכל צעד.** לוג לכל קריאת כלי (שם זה Langfuse), והזרמת הצעדים ל-UI, כמו ש-Panasiti עושה עם Turbo Streams. בלי זה אין לכם איך לדבג לולאה.
+באוגוסט עלה ל-HN פרויקט בשם "11-Node Agentic RAG with MCP and PII Shield Under 512MB RAM". בדף עצמו כתוב 10-Node LangGraph. לא נריב על node.
 
-ככה נראה חוזה מינימלי. הערכים פה להמחשה בלבד:
+המערכת עונה על שאלות על החוקה ההודית, תקציבי מדינה וחוקי מס. תסתכלו מה כל node עושה:
 
-```yaml
-tools:
-  - search_knowledge_base
-  - fetch_document_section
-  - list_documents
-limits:
-  max_tool_calls: 8
-  max_context_tokens: 40000
-stop_when: every_claim_has_citation
-grounding_check:
-  required: true
-  reject_below: 0.4
-fallback: single_shot_answer_with_warning
-```
+- Classifier מסווג כוונה: שאלת RAG, ברכה, פוגעני, מעורפל, מחוץ לתחום
+- CrossQuestioner שואל שאלת הבהרה על שאלה מעורפלת, מקסימום שני סבבים
+- Retriever שולף מ-Pinecone, ו-reranker של Cohere מסנן 10 chunks מתוך 100+ מועמדים
+- Hallucination Guard בודק אחרי הכתיבה שהתשובה מבוססת על מה שנשלף, ומתחת ל-40% ביטחון דוחה אותה
+- Fallback עם circuit breaker: שלושה כשלונות API והמעגל נפתח, בלי קריסה ובלי תקיעה
 
-<figure><img src="/posts/agentic-rag/v2-steps-he.gif" alt="הלולאה, צעד אחרי צעד" loading="lazy" /><figcaption>הלולאה, צעד אחרי צעד</figcaption></figure>
+ויש גם web search דרך Tavily שרץ רק אחרי אישור אנושי, ו-cache ב-Redis לשעה.
 
-## מה זה נותן, ומה זה לא
+רגע, איפה פה ה-agentic? ב-retriever, ב-tool calling לשערי מניות, בהחלטה ללכת ל-web. כל השאר זה גדרות: סיווג, בדיקה, retry, cache ובלם. וזה בדיוק מה שהופך את זה למשהו שאפשר להשאיר לרוץ לבד.
 
-מה מקבלים: סוף סוף אפשר לענות על שאלות multi-hop. ל-MachineLearningMastery יש דוגמה טובה: "השווה את מכירות Q3 2025 ל-Q1 2026 וסכם את גורמי הסיכון מהדוח האחרון ל-SEC". ב-single-shot זה מחזיר סלט של chunks שלא עונה טוב על אף חלק. agent מפרק את זה לשאילתות נפרדות. אותו דבר בהשוואת גרסאות, כמו ב-Show HN שמשווה חוק מ-1961 לגרסת 2025. והכי חשוב: המערכת יכולה להתאושש מחיפוש ראשון גרוע.
+<figure><img src="/posts/agentic-rag/v2-stat-he.gif" alt="מתחת לרמת ביטחון כזו, ה-Hallucination Guard דוחה את התשובה" loading="lazy" /><figcaption>מתחת לרמת ביטחון כזו, ה-Hallucination Guard דוחה את התשובה</figcaption></figure>
 
-מה משלמים: ה-latency וה-tokens עולים עם כל סיבוב. אותה שאלה יכולה לעבור מסלול אחר בכל ריצה, אז ה-eval צריך לבדוק גם את המסלול, לא רק את התשובה. ויש עוד פח: הלולאה יכולה לעצור מוקדם מדי. היא מחליטה שמצאה מספיק ומחזירה תשובה בטוחה בעצמה שנשענת על חצי מהחומר.
+## באייר קראו לזה אחרת
 
-ועוד דבר: רוב העבודה היא לא ה-agent. Bayer מונים מה ה-harness כולל: orchestration, גבולות לכלים, שמירת state, retries, fallbacks, validation, לולאות reflection, observability ו-human review. engineering רגיל לגמרי. אם רוב השאלות אצלכם הן שליפה ישירה של עובדה, single-shot יצא זול ומהיר יותר. וגם צפוי יותר.
+אצל Martin Fowler פורסם הסיפור של PRINCE, מערכת agentic RAG של באייר למחקר פרה-קליני. הבעיה שם: חוקרים שצריכים לשאול שאלות מסובכות על כמויות ענק של דאטה פנימי, וחיפוש מילות מפתח עם לוגיקה בוליאנית שלא מחזיק מעמד.
 
-<figure><img src="/posts/agentic-rag/v3-stat-he.gif" alt="סף ביטחון שמתחתיו התשובה נדחית" loading="lazy" /><figcaption>סף ביטחון שמתחתיו התשובה נדחית</figcaption></figure>
+הקטע המעניין הוא לא הארכיטקטורה. זו ההודאה שכשתכננו את המערכת, לא היו להם שמות למה שהם עושים. היום הם מתארים את זה כ-context engineering ו-harness engineering.
 
-## דוגמה מהשטח
+context engineering קבע מה כל מודל מקבל, מה הוא לא מקבל, ואיך context עובר בין השלבים: research, reflection, writing. harness engineering זה כל הפיגומים מסביב: orchestration, גבולות ל-tools, שמירת state, retries, fallbacks, validation, reflection loops, observability ובדיקה אנושית.
 
-ה-pipeline היומי של aibriefing.dev הוא לא מערכת RAG. זה גרף של כעשרה agents עם שלב merger, ומשם הגיע השיעור הכי רלוונטי לפה. הבאגים הכי גרועים שלנו היו silent failures, לא תשובות שגויות: שלב שמחזיר פלט ריק או חלקי ומדווח שהכל בסדר. בגלל זה יש אצלנו QA evaluator שרץ אחרי ה-publish ומסמן P0, ו-wrapper סביב `claude -p` שעושה retry לתקלות חולפות ומתקן JSON שבור. הלולאה הקטנה הזו סגרה שלוש תקלות production. ב-agentic RAG זה בדיוק אותו סיפור. לולאה שעוצרת אחרי חיפוש אחד כי "זה נראה מספיק" היא silent failure, רק עם ציטוטים. את הבודק שמים מחוץ ללולאה. לא סומכים על מה שהמודל מספר על עצמו.
+תקראו את הרשימה הזאת שוב. זו אותה רשימה של ה-Show HN, רק בגרסה של חברת תרופות עם paper ב-Frontiers in AI.
 
-<figure><img src="/posts/agentic-rag/v4-d2-he.svg" alt="הלולאה הקטנה שלנו סביב claude -p, והבודק שמחוץ לה" loading="lazy" /><figcaption>הלולאה הקטנה שלנו סביב claude -p, והבודק שמחוץ לה</figcaption></figure>
+<figure><img src="/posts/agentic-rag/v3-quote-he.jpg" alt="צוות PRINCE, באייר, martinfowler.com" loading="lazy" /><figcaption>צוות PRINCE, באייר, martinfowler.com</figcaption></figure>
+
+## מתי להשאיר את ה-RAG הישן
+
+גם ב-MLM מודים: RAG רגיל עובד טוב לשאלות פשוטות וברורות. והמחיר של הלולאה אמיתי:
+
+- כל סיבוב זה עוד קריאה למודל, עוד tokens, עוד latency
+- מספר הצעדים משתנה משאלה לשאלה, אז גם החשבון וגם זמן התגובה
+- eval נהיה קשה יותר, כי אותה שאלה יכולה לעבור מסלול אחר בכל ריצה
+- בלי תקרה על מספר הסיבובים, agent שלא מוצא ימשיך לחפש הרבה אחרי שהיה צריך לוותר
+
+אם רוב השאלות אצלכם הן "איפה הטופס", אין לכם בעיה של agent. יש לכם בעיה של FAQ.
+
+ואצלנו? ב-pipeline היומי של aibriefing יש בערך 10 agents, וכל מקום שהחלפנו בו קריאה למודל ב-rule נהיה זול ואמין יותר. הלולאה הכי שימושית שיש לנו בכלל לא חכמה: ה-wrapper של `claude -p` עושה retry לכשלונות רגעיים ומתקן JSON שבור. משעמם וטוב, וזה סגר שלוש תקלות production. והבאגים הכי גרועים שלנו לא היו תשובות שגויות, אלא כשלונות שקטים. agent שמחפש שש פעמים ומחזיר תשובה בטוחה בעצמה על בסיס כלום, זה בדיוק כשלון כזה.
+
+ה-agent מחליט מה לחפש. אתם מחליטים מתי הוא מפסיק, ומי בודק אותו.

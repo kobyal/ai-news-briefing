@@ -1,20 +1,19 @@
 direction: right
 question: User question
-router: Intent router
-single_shot: Single-shot RAG
-agent: Retrieval agent
-search_tool: search_knowledge_base
-generator: Generator
-grounding_check: Grounding check
-answer: Cited answer
-fallback: Fallback
-question -> router: classify intent
-router -> single_shot: simple lookup
-router -> agent: multi-hop
-agent -> search_tool: tool call
-search_tool -> agent: chunks
-agent -> agent: rewrite query
-agent -> generator: enough context
-generator -> grounding_check: draft + citations
-grounding_check -> answer: grounded
-grounding_check -> fallback: confidence below 40%
+agent: LLM agent
+search: search_knowledge_base
+fetch: fetch_document_section
+list: list_documents
+check: Enough material?
+answer: Answer with citations
+guard: Grounding check
+question -> agent: ask
+agent -> search: query
+agent -> fetch: section id
+agent -> list: browse
+search -> check: chunks
+fetch -> check: full section
+list -> check: doc list
+check -> agent: no, search again
+check -> answer: yes
+answer -> guard: verify

@@ -1,0 +1,89 @@
+---
+title: "Jev: a model that doesn't write, it decides"
+description: "TypeSafe's Jev doesn't write text. It returns a typed decision with a calibrated probability. What it is, how to clone it in 25 lines, and when it pays."
+lang: en
+key: jev
+term: "Jev"
+pubDate: 2026-09-30
+tags: ["jev", "typesafe", "decision-models", "calibration", "structured-outputs"]
+hero: /posts/jev/hero-en.jpg
+diagram: /posts/jev/diagram.svg
+sources:
+  - { title: "Home - TypeSafe AI", url: "https://typesafe.ai", date: "" }
+  - { title: "Introducing System One Models and Jev", url: "https://typesafe.ai/blog/introducing-system-one-models-and-jev", date: "2026-09-15" }
+  - { title: "Jev in 25 Lines of Python", url: "https://www.nobodywho.ai/posts/jev-in-25-lines", date: "2026-09-23" }
+  - { title: "Ollaya – Ollama for open-source, Jev-style decision models", url: "https://ollaya.dev", date: "2026-09-25" }
+  - { title: "OpenAI is well positioned to fast-follow Jev", url: "https://arcturus-labs.com/blog/2026/09/21/will-openai-eat-jevs-lunch", date: "2026-09-22" }
+  - { title: "Show HN: Jev Plays Pokémon Red", url: "https://jev-pokemon.vercel.app", date: "2026-09-25" }
+opinion: "Jev is the best example this year of a principle we keep repeating: determinism wherever you can, model judgment only where you must. Jev shrinks that judgment down to the size of a function. We don't buy \"zero hallucinations\", and we don't buy \"a new category of models\". 25 lines of Python showed the mechanism is old; the real novelty is the calibration training and the packaging. But there's something here that changes what you do on Monday morning: everywhere in your pipeline where you ask an LLM for JSON just to get an enum, ask whether the model needs to write at all. And if a local open-source model gets nearly the same accuracy, we'd start there and measure calibration ourselves, because verification beats generation even when what's generated is a number."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+## Where it came from
+
+Jev isn't a term someone coined on a blog. It's the name of a model. TypeSafe AI released it on September 15, 2026, after two years in stealth. The founder, Diogo Almeida, worked at OpenAI on the methods that taught language models to follow instructions and hold a conversation, the research that led to ChatGPT. He opens the launch post with a question he says has bothered him for four years: models have been superhuman at chat for a while now, so where is all the automation?
+
+His answer: RLHF optimized for human preferences. The result is a model that writes nice text for people, is overconfident, and isn't reliable enough for software to trust without a human in the loop. TypeSafe calls the new category System One Models. The name points at Kahneman's "System 1": a fast decision, no thinking out loud. The training method is called RLCD, short for Reinforcement Learning for Calibrated Decisions.
+
+Within a week the name became a verb. According to Arcturus Labs, Vercel wrote that Jev was adopted on their AI Gateway faster than any other model that has gone through it. Latent Space counted six clones. On September 22, nobodywho.ai published "Jev in 25 Lines of Python". On September 25 a Show HN went up of Jev playing Pokémon Red all the way to the Hall of Fame, and the same day Ollaya appeared, an open-source project that runs Jev-style models on your own hardware. When people are cloning something and arguing about it in the same week, there's usually something real there.
+
+<figure><img src="/posts/jev/diagram.svg" alt="How it fits together" loading="lazy" /><figcaption>How it fits together</figcaption></figure>
+
+## What it actually is
+
+Jev is a function, not a chatbot. In goes unstructured state, text or JSON, along with a list of questions you defined up front, each with a type: enum, boolean, or scale. Out comes a typed decision, with a calibrated probability for every option. There's no token-by-token text generation, just one forward pass. That's where the speed and the price come from: $42 per billion input tokens. TypeSafe says it's 193.6x faster and 444.6x cheaper than a regular LLM on this kind of task. Those are their numbers, on their workflows.
+
+What it isn't:
+
+- **Not JSON mode, not structured outputs.** There the model still generates a string and you hope it passes the schema. With Jev the possible answers are defined up front, and it has no way to return anything outside them.
+- **Not "zero hallucinations" in the sense the marketing implies.** It won't invent a quote, because it doesn't write. But it can absolutely pick the wrong option, and Arcturus Labs wrote that its probabilities aren't always well calibrated.
+- **Not architectural magic.** Arcturus Labs' estimate is that underneath sits something very close to a regular LLM: read the distribution over the next token and map it to an answer. The early clones are built exactly that way.
+- **Not a classic classifier.** You don't train it on your data. You define questions at runtime, like a prompt.
+
+<figure><img src="/posts/jev/v1-compare-en.jpg" alt="Regular LLM vs Jev" loading="lazy" /><figcaption>Regular LLM vs Jev</figcaption></figure>
+
+## How to do it
+
+1. **Write a closed enum, not an open question.** `intent: refund | cancel | question | other`. Always leave `other`, or the model is forced to confidently pick something wrong.
+2. **Put thresholds in code.** Above 0.9, act on your own. Between 0.6 and 0.9, send for review. Below that, hand off to a big LLM or a human. That's the whole point of a calibrated probability.
+3. **Measure calibration on your own data.** 200 labeled examples are enough to start. When the model says 0.9, it should be right about nine times out of ten.
+4. **Ask several questions about the same state in one request.** Ollaya shows five questions about a complaint email, including intent and churn_risk, in 87 ms.
+5. **Compose decisions in code, not in the prompt.** The Pokémon Jev doesn't "understand" the game. It answers one question at a time, 16,150 times, and the guide, the memory, and the loop live in code.
+6. **Start from the cheap baseline.** nobodywho showed the same mechanism with a local Qwen3-0.6B. The core of it:
+
+```python
+logits = model.scores[model.n_tokens - 1]
+ids = [model.tokenize(l.encode(), add_bos=False)[0] for l in ["A", "B", "C"]]
+x = numpy.asarray([logits[i] for i in ids])
+probs = numpy.exp(x - numpy.logaddexp.reduce(x))
+# {'Legitimate': 0.031, 'Spam': 0.084, 'Phishing': 0.885}
+```
+
+Ollaya measured this more seriously: a local winnow:e4b scores 0.722 on a typed-decisions benchmark, against 0.738 for hosted Jev. Latency is 89 ms on an RTX 4090, against 236 to 276 ms for Jev including the network. The setups differ, so treat it as an order of magnitude.
+
+<figure><img src="/posts/jev/v2-steps-en.gif" alt="Jev in 25 lines" loading="lazy" /><figcaption>Jev in 25 lines</figcaption></figure>
+
+## What it buys you, and what it doesn't
+
+What it buys you:
+
+- **A price that lets you ask a model about every event.** The Pokémon run took 37 hours and 40 minutes, went through about 39.2 million input tokens, and cost about $1.65 in total. Median decision: 0.4 seconds.
+- **Output you don't have to parse.** No "Sure! Here is the JSON", no markdown fences, no JSON repair.
+- **A number you can build policy on.** When the system acts on its own and when it stops and asks.
+
+What it doesn't:
+
+- **Text.** Summaries, translation, code, a reply to a customer: for that you still need an LLM.
+- **Multi-step reasoning.** If the decision needs a chain of steps, you build it yourself.
+- **A clear moat.** Arcturus Labs argues OpenAI has been using its LLMs as implicit classifiers for years and can replicate this fast. TypeSafe's edge is mostly the data and the training process. And when an open-source project gets 0.722 against 0.738 on your own machine, you need a good reason to send your data out.
+- **Guaranteed calibration.** If you haven't measured it on your data, 0.92 is just a number that looks good.
+
+<figure><img src="/posts/jev/v3-stat-en.gif" alt="decisions to finish Pokémon Red, at a total cost of about $1.65" loading="lazy" /><figcaption>decisions to finish Pokémon Red, at a total cost of about $1.65</figcaption></figure>
+
+## From our own pipeline
+
+At aibriefing.dev a graph of about ten agents runs every morning, and a big part of the work is exactly System One: which vendor a story belongs to, whether it's relevant to AI, whether the source matches the headline. Today we do this with cheaper models, and with a rule when we can. The big pain wasn't a wrong decision. It was the output of `claude -p` itself: broken JSON, or an answer that arrives wrapped in prose. We wrote a wrapper that retries transient failures and repairs malformed JSON, and it closed out three production incidents. That whole layer exists only because we asked a model that writes strings to return a decision. A Jev-style model removes the problem at the root, because there's no string to repair. It doesn't remove the QA evaluator that runs after publish, because that's where we caught the silent failures, and no calibrated probability knows what actually went live.
+
+<figure><img src="/posts/jev/v4-d2-en.svg" alt="Two paths to the same decision: a string to repair vs a typed value" loading="lazy" /><figcaption>Two paths to the same decision: a string to repair vs a typed value</figcaption></figure>
+
+

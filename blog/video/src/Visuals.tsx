@@ -4,16 +4,17 @@ import '@fontsource/heebo/500.css';
 import '@fontsource/heebo/800.css';
 import '@fontsource/inter/500.css';
 import '@fontsource/inter/700.css';
-import '@fontsource/space-grotesk/700.css';
+import '@fontsource/frank-ruhl-libre/700.css';
+import '@fontsource/frank-ruhl-libre/800.css';
 
 // Short looping GIFs embedded inline in posts (rendered with --codec=gif).
 // Same brand tokens as the site. 1200×675 @ 15fps keeps a 5s loop under ~2MB.
 
-const INK = '#0f0f1a';
-const MUTED = '#6b6b8a';
+const INK = '#12121c';
+const MUTED = '#6d6d80';
 const ACCENT = '#4f46e5';
 const FONT = (lang: 'he' | 'en') => (lang === 'he' ? "'Heebo', 'Inter', system-ui, sans-serif" : "'Inter', system-ui, sans-serif");
-const DISPLAY = "'Space Grotesk', 'Heebo', sans-serif";
+const DISPLAY = "'Frank Ruhl Libre', Georgia, serif";
 
 export type StepsProps = { lang: 'he' | 'en'; title: string; steps: string[]; loop?: boolean };
 export type StatProps = { lang: 'he' | 'en'; value: string; label: string; source?: string };
@@ -25,8 +26,9 @@ export const statDuration = () => Math.round(STEPS_FPS * 4.5);
 const Shell: React.FC<{ lang: 'he' | 'en'; children: React.ReactNode }> = ({ lang, children }) => (
   <AbsoluteFill
     style={{
-      background: 'linear-gradient(135deg, #ffffff 0%, #f5f4ff 55%, #eeedfb 100%)',
+      background: '#fbfbf9',
       color: INK,
+      borderTop: `3px solid ${INK}`,
       fontFamily: FONT(lang),
       direction: lang === 'he' ? 'rtl' : 'ltr',
       padding: '64px 84px',
@@ -35,8 +37,7 @@ const Shell: React.FC<{ lang: 'he' | 'en'; children: React.ReactNode }> = ({ lan
       justifyContent: 'center',
     }}
   >
-    <div style={{ position: 'absolute', insetInlineStart: 0, top: 0, bottom: 0, width: 12, background: ACCENT }} />
-    <div style={{ position: 'absolute', insetInlineEnd: 72, bottom: 40, fontFamily: DISPLAY, fontSize: 20, fontWeight: 700, color: ACCENT, direction: 'ltr' }}>
+    <div style={{ position: 'absolute', insetInlineEnd: 72, bottom: 32, fontFamily: DISPLAY, fontSize: 18, fontWeight: 800, color: '#a0a0b2', direction: 'ltr' }}>
       blog.aibriefing.dev
     </div>
     {children}
@@ -51,7 +52,7 @@ export const Steps: React.FC<StepsProps> = ({ lang, title, steps }) => {
   return (
     <Shell lang={lang}>
       <div style={{ opacity: tail }}>
-        <div style={{ fontSize: 26, fontWeight: 700, color: ACCENT, letterSpacing: 1, marginBottom: 26 }}>{title}</div>
+        <div style={{ fontFamily: DISPLAY, fontSize: 36, fontWeight: 700, color: INK, marginBottom: 30, lineHeight: 1.15 }}>{title}</div>
         {steps.map((s, i) => {
           const start = fps * (0.8 + i * 1.1);
           const p = spring({ frame: frame - start, fps, config: { damping: 200, stiffness: 140 } });
@@ -59,8 +60,8 @@ export const Steps: React.FC<StepsProps> = ({ lang, title, steps }) => {
           return (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 22, marginBottom: 18, opacity: p, transform: `translateX(${(1 - p) * (lang === 'he' ? 30 : -30)}px)` }}>
               <div style={{
-                width: 46, height: 46, borderRadius: 14, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: active ? ACCENT : 'rgba(79,70,229,0.12)', color: active ? '#fff' : ACCENT, fontFamily: DISPLAY, fontWeight: 700, fontSize: 22,
+                width: 46, height: 46, borderRadius: 23, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: active ? INK : '#fbfbf9', border: `1.5px solid ${INK}`, color: active ? '#fbfbf9' : INK, fontFamily: DISPLAY, fontWeight: 700, fontSize: 22,
                 transition: 'background 0.2s',
               }}>{i + 1}</div>
               <div style={{ fontSize: 36, fontWeight: 500, lineHeight: 1.25 }}>{s}</div>
@@ -88,7 +89,7 @@ export const Stat: React.FC<StatProps> = ({ lang, value, label, source }) => {
   return (
     <Shell lang={lang}>
       <div style={{ opacity: tail, textAlign: 'center' }}>
-        <div style={{ fontFamily: DISPLAY, fontSize: 168, fontWeight: 700, color: ACCENT, letterSpacing: -4, lineHeight: 1, transform: `scale(${0.85 + p * 0.15})`, direction: 'ltr' }}>{shown}</div>
+        <div style={{ fontFamily: DISPLAY, fontSize: 176, fontWeight: 800, color: ACCENT, letterSpacing: -5, lineHeight: 1, transform: `scale(${0.85 + p * 0.15})`, direction: 'ltr' }}>{shown}</div>
         <div style={{ fontSize: 40, fontWeight: 500, marginTop: 26, lineHeight: 1.3, opacity: interpolate(frame, [fps * 0.4, fps * 1.0], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }) }}>{label}</div>
         {source && <div style={{ fontSize: 22, color: MUTED, marginTop: 18 }}>{source}</div>}
       </div>

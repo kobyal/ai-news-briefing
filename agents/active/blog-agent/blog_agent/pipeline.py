@@ -48,9 +48,9 @@ def run_pipeline(args) -> int:
         post_path.write_text(json.dumps(post, ensure_ascii=False, indent=1), encoding="utf-8")
 
     m: dict = {}
-    m["diagram"] = media.diagram(key, post["diagram_d2"])
-    m["hero_he"] = media.hero(key, "he", term, post["he"]["title"], "הבלוג של AI Briefing")
-    m["hero_en"] = media.hero(key, "en", term, post["en"]["title"], "The AI Briefing blog")
+    m["diagram"] = media.diagram(key, post["diagram_d2"]) if post.get("diagram_d2") else None
+    m["hero_he"] = media.hero(key, "he", term, post["he"]["title"], date.today().isoformat())
+    m["hero_en"] = media.hero(key, "en", term, post["en"]["title"], date.today().isoformat())
     for lang in ("he", "en"):
         m[f"visuals_{lang}"] = media.visuals(key, lang, post[lang].get("visuals") or [])
     if args.video:  # narrated explainer — opt-in (Koby 2026-09-30: not in its current form)
@@ -74,6 +74,13 @@ def run_pipeline(args) -> int:
 
 
 def main(argv=None) -> int:
+    import sys
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["polish"]:  # re-voice existing posts' Hebrew in place: run.py polish <key>...
+        _load_env()
+        from . import polish
+        ok = [polish.polish(k) for k in argv[1:]]
+        return 0 if ok and all(ok) else 1
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--term", help="force a term (skips discovery)")
     ap.add_argument("--seed", action="append", help="extra source URL (repeatable)")

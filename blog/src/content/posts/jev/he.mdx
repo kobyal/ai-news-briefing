@@ -1,0 +1,87 @@
+---
+title: "Jev: מודל שלא כותב, רק מחליט"
+description: "Jev של TypeSafe לא כותב טקסט, הוא מחזיר החלטה typed עם הסתברות מכוילת. מה זה באמת, איך משכפלים את זה ב-25 שורות, ומתי זה שווה."
+lang: he
+key: jev
+term: "Jev"
+pubDate: 2026-09-30
+tags: ["jev", "typesafe", "decision-models", "calibration", "structured-outputs"]
+hero: /posts/jev/hero.jpg
+diagram: /posts/jev/diagram.svg
+sources:
+  - { title: "Home - TypeSafe AI", url: "https://typesafe.ai", date: "" }
+  - { title: "Introducing System One Models and Jev", url: "https://typesafe.ai/blog/introducing-system-one-models-and-jev", date: "2026-09-15" }
+  - { title: "Jev in 25 Lines of Python", url: "https://www.nobodywho.ai/posts/jev-in-25-lines", date: "2026-09-23" }
+  - { title: "Ollaya – Ollama for open-source, Jev-style decision models", url: "https://ollaya.dev", date: "2026-09-25" }
+  - { title: "OpenAI is well positioned to fast-follow Jev", url: "https://arcturus-labs.com/blog/2026/09/21/will-openai-eat-jevs-lunch", date: "2026-09-22" }
+  - { title: "Show HN: Jev Plays Pokémon Red", url: "https://jev-pokemon.vercel.app", date: "2026-09-25" }
+opinion: "Jev הוא הדוגמה הכי טובה השנה לעיקרון שאנחנו חוזרים עליו כל הזמן: דטרמיניזם איפה שאפשר, שיקול דעת של מודל רק איפה שחייבים. Jev פשוט מכווץ את שיקול הדעת הזה לגודל של פונקציה. את ה\"אפס הזיות\" אנחנו לא קונים, וגם לא את ה\"קטגוריה חדשה של מודלים\". 25 שורות Python הראו שהמנגנון ישן. החידוש האמיתי הוא האימון לכיול והאריזה. אבל פה יש משהו שמשנה מה אתם עושים ביום ראשון בבוקר: בכל מקום ב-pipeline שבו אתם מבקשים JSON מ-LLM רק כדי לקבל enum, תשאלו את עצמכם אם המודל צריך לכתוב בכלל. ואם מודל open-source מקומי מגיע כמעט לאותו דיוק, אנחנו היינו מתחילים ממנו ומודדים את הכיול בעצמנו. אימות מנצח יצירה, גם כשמה שנוצר הוא מספר."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+## מאיפה זה הגיע
+
+Jev זה לא עוד מונח שמישהו המציא בבלוג. זה מודל. TypeSafe AI הוציאו אותו ב-15 בספטמבר 2026, אחרי שנתיים ב-stealth. המייסד, Diogo Almeida, היה ב-OpenAI ועבד שם על השיטות שלימדו מודלי שפה למלא הוראות ולנהל שיחה, המחקר שבסוף הוביל ל-ChatGPT. פוסט ההשקה שלו נפתח בשאלה שמטרידה אותו כבר ארבע שנים: המודלים על-אנושיים בצ'אט מזמן, אז איפה כל האוטומציה?
+
+התשובה שלו, בגדול: RLHF אופטם להעדפות של בני אדם. מה שיצא זה מודל שכותב לאנשים טקסט יפה, בטוח בעצמו יותר מדי, ולא אמין מספיק כדי שתוכנה תסמוך עליו בלי אדם ב-loop. TypeSafe קוראים לקטגוריה החדשה System One Models, רפרנס ל"מערכת 1" של כהנמן: החלטה מהירה, בלי לחשוב בקול. שיטת האימון נקראת RLCD, קיצור של Reinforcement Learning for Calibrated Decisions.
+
+ותוך שבוע השם כבר הפך לפועל. לפי Arcturus Labs, ב-Vercel כתבו ש-Jev אומץ ב-AI Gateway שלהם מהר יותר מכל מודל אחר שעבר שם. ב-Latent Space ספרו שישה clones. ב-22 בספטמבר nobodywho.ai פרסמו את "Jev in 25 Lines of Python". ב-25 בספטמבר עלה Show HN של Jev שמשחק Pokémon Red עד ה-Hall of Fame, ובאותו יום יצא Ollaya, פרויקט open-source שמריץ מודלים בסגנון Jev על החומרה שלכם. כשאנשים משכפלים משהו ומתווכחים עליו באותו שבוע, בדרך כלל יש שם משהו אמיתי.
+
+<figure><img src="/posts/jev/diagram.svg" alt="איך זה עובד" loading="lazy" /><figcaption>איך זה עובד</figcaption></figure>
+
+## מה זה באמת
+
+Jev הוא פונקציה, לא צ'אטבוט. נכנס state לא מובנה, טקסט או JSON, ואיתו רשימת שאלות שהגדרתם מראש. לכל שאלה יש type: enum, בוליאני או סקאלה. מה שיוצא זה החלטה typed, עם הסתברות מכוילת לכל אפשרות. אין פה ייצור טקסט token אחרי token, יש forward pass אחד. ומשם מגיעים המהירות והמחיר: 42 דולר למיליארד tokens של input. לפי TypeSafe הוא פי 193.6 יותר מהר ופי 444.6 יותר זול מ-LLM רגיל על משימות כאלה. המספרים שלהם, על ה-workflows שלהם.
+
+מה זה לא:
+
+- **לא JSON mode ולא structured outputs.** שם המודל עדיין מייצר מחרוזת, ואתם מקווים שהיא עוברת את ה-schema. ב-Jev התשובות האפשריות מוגדרות מראש, ואין לו איך להחזיר משהו מחוץ להן.
+- **לא "אפס הזיות" במובן שהשיווק רומז.** ציטוט הוא לא ימציא, כי הוא לא כותב. אבל לבחור את האפשרות הלא נכונה הוא בהחלט יכול, ו-Arcturus Labs כתבו שההסתברויות שלו לא תמיד מכוילות כמו שצריך.
+- **לא קסם ארכיטקטוני.** Arcturus Labs מעריכים שמתחת יש משהו קרוב מאוד ל-LLM רגיל: קוראים את ההתפלגות על ה-token הבא וממפים אותה לתשובה. ה-clones הראשונים בנויים בדיוק ככה.
+- **לא classifier קלאסי.** לא מאמנים אותו על הדאטה שלכם. מגדירים שאלות ב-runtime, כמו prompt.
+
+<figure><img src="/posts/jev/v1-compare-he.jpg" alt="LLM רגיל מול Jev" loading="lazy" /><figcaption>LLM רגיל מול Jev</figcaption></figure>
+
+## איך עושים את זה
+
+1. **תנסחו enum סגור, לא שאלה פתוחה.** `intent: refund | cancel | question | other`. תמיד תשאירו `other`, אחרת המודל ייאלץ לבחור משהו לא נכון, ועוד בביטחון.
+2. **תשימו thresholds בקוד.** מעל 0.9 פועלים לבד, בין 0.6 ל-0.9 שולחים לבדיקה, מתחת לזה זורקים ל-LLM גדול או לאדם. בשביל זה בכלל צריך הסתברות מכוילת.
+3. **תמדדו כיול על הדאטה שלכם.** 200 דוגמאות מתויגות מספיקות להתחלה. אם המודל אומר 0.9, הוא אמור לצדוק בערך תשע פעמים מעשר.
+4. **תשאלו כמה שאלות על אותו state בבקשה אחת.** ב-Ollaya מראים חמש שאלות על מייל תלונה, כולל intent ו-churn_risk, ב-87 ms.
+5. **תרכיבו את ההחלטות בקוד, לא ב-prompt.** ה-Jev של Pokémon לא "מבין" את המשחק. הוא עונה על שאלה אחת כל פעם, 16,150 פעמים, והמדריך, הזיכרון והלולאה יושבים בקוד.
+6. **תתחילו מהבייסליין הזול.** nobodywho הראו את אותו מנגנון עם Qwen3-0.6B מקומי. זה הלב של העניין:
+
+```python
+logits = model.scores[model.n_tokens - 1]
+ids = [model.tokenize(l.encode(), add_bos=False)[0] for l in ["A", "B", "C"]]
+x = numpy.asarray([logits[i] for i in ids])
+probs = numpy.exp(x - numpy.logaddexp.reduce(x))
+# {'Legitimate': 0.031, 'Spam': 0.084, 'Phishing': 0.885}
+```
+
+טוב, ב-Ollaya מדדו את זה יותר ברצינות: winnow:e4b מקומי מקבל 0.722 על מבחן typed decisions, מול 0.738 ל-Jev המתארח. זמן תגובה 89 ms על RTX 4090, מול 236 עד 276 ms ל-Jev כולל רשת. הסביבות שונות, אז תקחו את זה כסדר גודל, לא יותר.
+
+<figure><img src="/posts/jev/v2-steps-he.gif" alt="Jev ב-25 שורות" loading="lazy" /><figcaption>Jev ב-25 שורות</figcaption></figure>
+
+## מה זה נותן, ומה זה לא
+
+מה זה נותן:
+
+- **מחיר שמאפשר לשאול מודל על כל אירוע.** הריצה של Pokémon לקחה 37 שעות ו-40 דקות, בערך 39.2 מיליון tokens של input, ועלתה בערך 1.65 דולר בסך הכול. חציון להחלטה: 0.4 שניות.
+- **פלט שלא צריך לפרסר.** אין "Sure! Here is the JSON", אין markdown fences, אין תיקון JSON.
+- **מספר שאפשר לבנות עליו מדיניות.** מתי המערכת פועלת לבד, ומתי היא עוצרת ושואלת.
+
+מה זה לא נותן:
+
+- **טקסט.** סיכום, תרגום, קוד, תשובה ללקוח: לכל אלה עדיין צריך LLM.
+- **הסקה רב-שלבית.** אם ההחלטה דורשת שרשרת של צעדים, את השרשרת אתם בונים.
+- **יתרון תחרותי ברור.** Arcturus Labs טוענים ש-OpenAI משתמשים ב-LLMs שלהם כ-classifiers מרומזים כבר שנים, ויכולים לשכפל את זה מהר. מה שיש ל-TypeSafe זה בעיקר הדאטה ותהליך האימון. וכשפרויקט open-source מגיע ל-0.722 מול 0.738 על המחשב שלכם, צריך סיבה טובה כדי לשלוח את הדאטה החוצה.
+- **כיול מובטח.** אם לא מדדתם אותו על הדאטה שלכם, 0.92 זה סתם מספר שנראה טוב.
+
+<figure><img src="/posts/jev/v3-stat-he.gif" alt="החלטות לסיום Pokémon Red, בעלות כוללת של כ-1.65 דולר" loading="lazy" /><figcaption>החלטות לסיום Pokémon Red, בעלות כוללת של כ-1.65 דולר</figcaption></figure>
+
+## דוגמה מהשטח
+
+אצלנו ב-aibriefing.dev רץ כל בוקר graph של בערך עשרה agents, וחלק גדול מהעבודה שם זה בדיוק System One: לאיזה vendor שייך הסיפור, האם הוא רלוונטי ל-AI, האם המקור מתאים לכותרת. היום אנחנו עושים את זה עם מודלים זולים יותר, ואיפה שאפשר, עם כלל. בפועל, הכאב הגדול לא היה החלטה שגויה. הוא היה הפלט של `claude -p` עצמו: JSON שבור, או תשובה שמגיעה עטופה בטקסט. כתבנו wrapper שעושה retry לתקלות חולפות ומתקן JSON פגום, והוא סגר שלוש תקלות production. כל השכבה הזאת קיימת רק כי ביקשנו ממודל שכותב מחרוזות להחזיר החלטה. מודל בסגנון Jev מעלים את הבעיה מהשורש, כי אין מחרוזת לתקן. את ה-QA evaluator שרץ אחרי ה-publish הוא לא מחליף. שם תפסנו את התקלות השקטות, ושום הסתברות מכוילת לא יודעת מה בסוף עלה לאוויר.
+
+<figure><img src="/posts/jev/v4-d2-he.svg" alt="שני מסלולים לאותה החלטה: מחרוזת לתיקון מול ערך typed" loading="lazy" /><figcaption>שני מסלולים לאותה החלטה: מחרוזת לתיקון מול ערך typed</figcaption></figure>

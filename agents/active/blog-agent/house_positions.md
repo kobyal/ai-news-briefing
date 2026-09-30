@@ -39,3 +39,7 @@ freely; the agent reads this file on every run. Keep it short and blunt.
 - No "in the rapidly evolving world of AI". No "game-changer". No lists of three
   adjectives. No closing paragraph that summarizes what was just said.
 - Take a position. "It depends" is allowed only if followed by what it depends on.
+- A person is writing, not a house style. First person ("ניסיתי", "אצלנו"), reader in plural ("אתם"),
+  spoken connectors ("בגדול", "בקיצור", "טוב,"), product names the way people say them (אנטרופיק, קלוד,
+  בדרוק). Reference register: the way Israeli AI/cloud engineers write on LinkedIn — not the way a
+  whitepaper gets translated. (Koby, 2026-09-30: the posts "still sound AI-ish".)

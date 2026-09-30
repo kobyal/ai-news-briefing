@@ -2,22 +2,48 @@
 import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import PostList from './PostList.astro';
-import { t, type Lang } from '../lib/i18n';
+import { fmtDate, postHref, readingMinutes, t, type Lang } from '../lib/i18n';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const s = t(lang);
 const posts = (await getCollection('posts', (p) => p.data.lang === lang && !p.data.draft))
   .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
+const [featured, ...rest] = posts;
+const terms = [...posts].sort((a, b) => a.data.term.localeCompare(b.data.term));
 ---
 <Base lang={lang} title={`AI Briefing Blog — ${s.heroTitle}`} description={s.heroLede}>
   <main class="wrap-wide">
-    <section class="hero">
-      <span class="term-pill">{s.blog}</span>
+    <section class="front">
       <h1>{s.heroTitle}</h1>
-      <p>{s.heroLede}</p>
+      <p class="lede">{s.heroLede}</p>
     </section>
-    <h2 class="meta" style="margin:8px 0 14px;font-size:12px;text-transform:uppercase;">{s.latest}</h2>
-    <PostList lang={lang} posts={posts} />
+    <hr class="rule heavy" />
+
+    {featured && (
+      <a class="featured" href={postHref(lang, featured.data.key)}>
+        <div class="cover">{featured.data.hero && <img src={featured.data.hero} alt="" width="1200" height="630" />}</div>
+        <div>
+          <div class="byline mono"><span>{s.latest}</span><span class="dot">·</span><span class="term">{featured.data.term}</span><span class="dot">·</span><span>{fmtDate(featured.data.pubDate, lang)}</span></div>
+          <h2>{featured.data.title}</h2>
+          <p>{featured.data.description}</p>
+          <span class="more">{s.readMore} →</span>
+        </div>
+      </a>
+    )}
+
+    {rest.length > 0 && (
+      <>
+        <hr class="rule" />
+        <div class="section-head"><h2>{s.more}</h2><span class="mono">{posts.length}</span></div>
+        <PostList lang={lang} posts={rest} />
+      </>
+    )}
+
+    <hr class="rule" />
+    <div class="section-head"><h2>{s.allTerms}</h2></div>
+    <div class="glossary">
+      {terms.map((p) => <a href={postHref(lang, p.data.key)}>{p.data.term}</a>)}
+    </div>
   </main>
 </Base>

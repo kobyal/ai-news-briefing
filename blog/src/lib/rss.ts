@@ -7,7 +7,7 @@ export async function feed(lang: Lang, site: URL | undefined) {
     .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
   return rss({
     title: lang === 'he' ? 'AI Briefing — בלוג' : 'AI Briefing — Blog',
-    description: lang === 'he' ? 'מונח אחד בשבוע מעולם הנדסת ה-AI, מוסבר בלי באזז.' : 'One AI-engineering term a week, explained without the hype.',
+    description: lang === 'he' ? 'מאחורי כל באזוורד בהנדסת AI יש מנגנון. פה מפרקים אותו.' : 'Behind every AI-engineering buzzword there is a mechanism. We take it apart.',
     site: site ?? 'https://blog.aibriefing.dev',
     items: posts.map((p) => ({
       title: p.data.title,

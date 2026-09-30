@@ -1,25 +1,17 @@
 ---
 import type { CollectionEntry } from 'astro:content';
-import { fmtDate, t, type Lang } from '../lib/i18n';
+import { fmtDate, postHref, type Lang } from '../lib/i18n';
 
 interface Props { lang: Lang; posts: CollectionEntry<'posts'>[] }
 const { lang, posts } = Astro.props;
-const s = t(lang);
-const href = (key: string) => (lang === 'he' ? `/${key}/` : `/en/${key}/`);
 ---
 <div class="grid">
   {posts.map((p) => (
-    <a class="card post-card" href={href(p.data.key)}>
-      {p.data.hero && <img src={p.data.hero} alt="" loading="lazy" />}
-      <div class="body">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
-          <span class="term-pill" dir="ltr">{p.data.term}</span>
-          <span class="meta">{fmtDate(p.data.pubDate, lang)}</span>
-        </div>
-        <h2>{p.data.title}</h2>
-        <p>{p.data.description}</p>
-        <div class="meta" style="margin-top:10px;color:var(--accent)">{s.readMore} →</div>
-      </div>
+    <a class="post-card" href={postHref(lang, p.data.key)}>
+      <div class="cover">{p.data.hero && <img src={p.data.hero} alt="" loading="lazy" width="1200" height="630" />}</div>
+      <div class="byline mono"><span class="term">{p.data.term}</span><span class="dot">·</span><span>{fmtDate(p.data.pubDate, lang)}</span></div>
+      <h3>{p.data.title}</h3>
+      <p>{p.data.description}</p>
     </a>
   ))}
 </div>

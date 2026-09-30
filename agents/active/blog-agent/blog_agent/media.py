@@ -51,33 +51,72 @@ def diagram(key: str, d2_src: str) -> str | None:
     return f"/posts/{key}/diagram.svg"
 
 
-# ── Hero card (1200×630) ───────────────────────────────────────────────────
+# ── Cover (1200×630) ───────────────────────────────────────────────────────
+# Dark ink cover: a seeded "constellation" of nodes in one of six hues (picked by key)
+# behind the term in a big serif italic. The site's one loud element (blog/src/styles/global.css).
 _HERO_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@500;800&family=Space+Grotesk:wght@700&display=swap');
-body{{margin:0;width:1200px;height:630px;overflow:hidden;font-family:Heebo,Inter,system-ui,sans-serif;
-background:linear-gradient(135deg,#ffffff 0%,#f5f4ff 55%,#e9e7fb 100%);color:#0f0f1a;position:relative}}
-.bar{{position:absolute;inset-inline-start:0;top:0;bottom:0;width:16px;background:#4f46e5}}
-.glow{{position:absolute;inset-inline-end:-140px;top:-140px;width:520px;height:520px;border-radius:50%;
-background:radial-gradient(circle,rgba(99,102,241,.22),rgba(99,102,241,0) 70%)}}
-.in{{position:absolute;inset:0;padding:64px 88px;box-sizing:border-box}}
-.term{{display:inline-block;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:26px;letter-spacing:.12em;text-transform:uppercase;
-color:#4f46e5;background:rgba(79,70,229,.12);padding:8px 18px;border-radius:999px;direction:ltr}}
-h1{{font-weight:800;font-size:{fs}px;line-height:1.12;letter-spacing:-.02em;margin:34px 0 0;max-width:1000px;overflow-wrap:anywhere;text-align:start;unicode-bidi:plaintext}}
-.foot{{position:absolute;bottom:56px;inset-inline-start:88px;inset-inline-end:88px;display:flex;justify-content:space-between;align-items:center}}
-.brand{{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:30px;color:#4f46e5;direction:ltr}}
-.sub{{font-size:24px;color:#6b6b8a}}
-.card{{position:relative;width:1200px;height:630px;overflow:hidden;contain:paint}}
-</style></head><body><div class="card"><div class="bar"></div><div class="glow"></div><div class="in">
-<span class="term">{term}</span><h1>{title}</h1>
-<div class="foot"><span class="brand">blog.aibriefing.dev</span><span class="sub">{sub}</span></div></div></div></body></html>"""
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@500;700&family=Frank+Ruhl+Libre:wght@700;800&display=swap');
+body{{margin:0;width:1200px;height:630px;overflow:hidden;background:#12121c;color:#fbfbf9;font-family:Heebo,system-ui,sans-serif;position:relative}}
+svg{{position:absolute;inset:0}}
+.in{{position:absolute;inset:0;padding:52px 72px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between}}
+.top{{display:flex;justify-content:space-between;align-items:center;font-family:ui-monospace,Menlo,monospace;font-size:17px;letter-spacing:.12em;text-transform:uppercase;color:rgba(251,251,249,.62);direction:ltr}}
+.top b{{color:{hue};font-weight:600}}
+.term{{font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:{tfs}px;line-height:.95;letter-spacing:-.025em;direction:ltr;text-align:left;
+color:#fbfbf9;text-shadow:0 2px 40px rgba(0,0,0,.5);margin:0;max-width:1056px;overflow-wrap:anywhere}}
+.term i{{font-style:normal;color:{hue}}}
+h1{{font-weight:700;font-size:{fs}px;line-height:1.25;margin:0;max-width:900px;color:rgba(251,251,249,.86);text-align:start;unicode-bidi:plaintext}}
+.bot{{display:flex;justify-content:space-between;align-items:flex-end;gap:40px}}
+.brand{{font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:22px;color:rgba(251,251,249,.55);direction:ltr;white-space:nowrap}}
+</style></head><body>
+<svg viewBox="0 0 1200 630" width="1200" height="630" xmlns="http://www.w3.org/2000/svg">{art}</svg>
+<div class="in"><div class="top"><span>AI Briefing <b>/</b> Blog</span><span>{date}</span></div>
+<div class="term">{term_html}</div>
+<div class="bot"><h1>{title}</h1><span class="brand">blog.aibriefing.dev</span></div></div></body></html>"""
+
+_HUES = ["#8b83ff", "#3ecfb2", "#ffb454", "#ff7aa8", "#9be15d", "#5fb7ff"]
+
+
+def _seeded(key: str):
+    h = 2166136261
+    for c in key.encode():
+        h = ((h ^ c) * 16777619) & 0xFFFFFFFF
+    def rnd():
+        nonlocal h
+        h = (h * 1103515245 + 12345) & 0x7FFFFFFF
+        return h / 0x7FFFFFFF
+    return h, rnd
+
+
+def _constellation(key: str) -> tuple[str, str]:
+    """Seeded node graph in the key's hue: same key → same artwork, forever."""
+    seed, rnd = _seeded(key)
+    hue = _HUES[seed % len(_HUES)]
+    pts = [(80 + rnd() * 1040, 40 + rnd() * 550, 2 + rnd() * 7) for _ in range(34)]
+    out = [f'<defs><radialGradient id="g" cx="80%" cy="20%" r="80%"><stop offset="0" stop-color="{hue}" stop-opacity=".22"/><stop offset="1" stop-color="{hue}" stop-opacity="0"/></radialGradient></defs>',
+           '<rect width="1200" height="630" fill="url(#g)"/>']
+    for i, (x, y, r) in enumerate(pts):
+        near = sorted(((j, (x - a) ** 2 + (y - b) ** 2) for j, (a, b, _) in enumerate(pts) if j != i), key=lambda t: t[1])[:2]
+        for j, _ in near:
+            if j > i:
+                out.append(f'<line x1="{x:.0f}" y1="{y:.0f}" x2="{pts[j][0]:.0f}" y2="{pts[j][1]:.0f}" stroke="{hue}" stroke-opacity=".28" stroke-width="1"/>')
+    for x, y, r in pts:
+        out.append(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{r:.1f}" fill="{hue}" fill-opacity="{0.35 + r / 12:.2f}"/>')
+    return "".join(out), hue
 
 
 def hero(key: str, lang: str, term: str, title: str, sub: str) -> str | None:
+    """Cover for one language. `sub` is the small top-right line (the ISO publish date)."""
     d = out_dir(key)
     name = "hero.jpg" if lang == "he" else "hero-en.jpg"
-    fs = 60 if len(title) < 40 else 50 if len(title) < 60 else 42
-    page = _HERO_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", term=html.escape(term), title=html.escape(title), sub=html.escape(sub), fs=fs)
+    fs = 34 if len(title) < 50 else 28
+    tl = len(term)
+    tfs = 150 if tl <= 12 else 120 if tl <= 18 else 92 if tl <= 26 else 70
+    words = html.escape(term.lower()).split(" ")
+    term_html = " ".join(words[:-1]) + (" " if len(words) > 1 else "") + f"<i>{words[-1]}</i>"  # last word in the hue
+    art, hue = _constellation(key)
+    page = _HERO_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", term_html=term_html, title=html.escape(title),
+                             fs=fs, tfs=tfs, art=art, hue=hue, date=sub)
     tmp = d / f"_hero-{lang}.html"; tmp.write_text(page, encoding="utf-8")
     try:
         from playwright.sync_api import sync_playwright
@@ -156,19 +195,43 @@ def video(key: str, lang: str, term: str, scenes: list[dict], diagram_png: Path 
 
 # ── Inline visuals (GIF / PNG / SVG per section) ───────────────────────────
 _COMPARE_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@500;800&family=Space+Grotesk:wght@700&display=swap');
-html{{overflow:hidden}} body{{margin:0;font-family:Heebo,Inter,system-ui,sans-serif;color:#0f0f1a}}
-.card{{position:relative;width:1200px;height:675px;overflow:hidden;background:linear-gradient(135deg,#ffffff 0%,#f5f4ff 55%,#eeedfb 100%);padding:56px 72px;box-sizing:border-box}}
-.bar{{position:absolute;inset-inline-start:0;top:0;bottom:0;width:12px;background:#4f46e5}}
-h1{{font-size:30px;font-weight:800;margin:0 0 26px;color:#4f46e5}}
-.cols{{display:grid;grid-template-columns:1fr 1fr;gap:26px}}
-.col{{background:#fff;border:1px solid #ededf5;border-radius:18px;padding:24px 26px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04)}}
-.col.r{{border-top:5px solid #4f46e5}} .col.l{{border-top:5px solid #c7c6ff}}
-h2{{font-size:26px;font-weight:800;margin:0 0 14px}}
-li{{font-size:24px;line-height:1.35;margin-bottom:10px}} ul{{padding-inline-start:26px;margin:0}}
-.brand{{position:absolute;bottom:26px;inset-inline-end:72px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;color:#4f46e5;direction:ltr}}
-</style></head><body><div class="card"><div class="bar"></div><h1>{title}</h1><div class="cols">
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@700;800&display=swap');
+html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#12121c}}
+.card{{position:relative;width:1200px;height:675px;overflow:hidden;background:#fbfbf9;padding:56px 72px 72px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
+h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:44px;font-weight:700;margin:0 0 34px;line-height:1.15}}
+.cols{{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}}
+.col{{border-top:1px solid #12121c;padding-top:18px}}
+h2{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:32px;font-weight:700;margin:0 0 18px}}
+.col.r h2{{color:#3730a3}}
+li{{font-size:28px;line-height:1.4;margin-bottom:14px;color:#3b3b4f}} ul{{padding-inline-start:26px;margin:0}} li::marker{{color:#4f46e5}}
+.brand{{position:absolute;bottom:28px;inset-inline-end:72px;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:18px;color:#a0a0b2;direction:ltr}}
+</style></head><body><div class="card"><h1>{title}</h1><div class="cols">
 <div class="col l"><h2>{lt}</h2><ul>{li}</ul></div><div class="col r"><h2>{rt}</h2><ul>{ri}</ul></div></div>
+<div class="brand">blog.aibriefing.dev</div></div></body></html>"""
+
+
+_CARD_CSS = """@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@500;700;800&display=swap');
+html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#12121c}}
+.card{{position:relative;width:1200px;height:675px;overflow:hidden;background:#fbfbf9;padding:56px 72px 72px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
+.brand{{position:absolute;bottom:28px;inset-inline-end:72px;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:18px;color:#a0a0b2;direction:ltr}}
+"""
+
+_QUOTE_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>""" + _CARD_CSS + """
+.mark{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:140px;line-height:.6;color:#4f46e5;margin-bottom:8px}}
+blockquote{{margin:0;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:500;font-size:{fs}px;line-height:1.3;max-width:1000px}}
+.who{{margin-top:30px;font-size:24px;color:#6d6d80}} .who b{{color:#12121c;font-weight:700}}
+</style></head><body><div class="card"><div class="mark">&ldquo;</div><blockquote>{text}</blockquote><div class="who"><b>{who}</b></div>
+<div class="brand">blog.aibriefing.dev</div></div></body></html>"""
+
+_TIMELINE_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>""" + _CARD_CSS + """
+h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:40px;font-weight:700;margin:0 0 40px;line-height:1.15}}
+.tl{{position:relative;padding-inline-start:36px;border-inline-start:2px solid #12121c}}
+.ev{{position:relative;margin-bottom:26px}} .ev:last-child{{margin-bottom:0}}
+.ev::before{{content:"";position:absolute;inset-inline-start:-44px;top:10px;width:14px;height:14px;border-radius:50%;background:#fbfbf9;border:2.5px solid #12121c}}
+.ev.last::before{{background:#4f46e5;border-color:#4f46e5}}
+.when{{font-family:ui-monospace,Menlo,monospace;font-size:20px;color:#3730a3;letter-spacing:.04em;direction:ltr;display:inline-block}}
+.what{{font-size:28px;line-height:1.3;margin-top:2px}}
+</style></head><body><div class="card"><h1>{title}</h1><div class="tl">{events}</div>
 <div class="brand">blog.aibriefing.dev</div></div></body></html>"""
 
 
@@ -218,6 +281,17 @@ def visuals(key: str, lang: str, items: list[dict]) -> list[dict]:
                 _shoot(_COMPARE_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", title=html.escape(v.get("title", "")),
                                             lt=html.escape(L.get("title", "")), rt=html.escape(R.get("title", "")), li=li, ri=ri), f, 1200, 675)
                 cap = v.get("title", "")
+            elif kind == "quote":
+                f = d / f"{stem}.jpg"
+                q = str(v.get("text", "")); fs = 54 if len(q) < 90 else 44 if len(q) < 150 else 36
+                _shoot(_QUOTE_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", text=html.escape(q), who=html.escape(str(v.get("who", ""))), fs=fs), f, 1200, 675)
+                cap = str(v.get("who", ""))
+            elif kind == "timeline":
+                f = d / f"{stem}.jpg"
+                evs = [e for e in v.get("events", []) if isinstance(e, dict)][:5]
+                ev_html = "".join(f'<div class="ev{" last" if i == len(evs) - 1 else ""}"><span class="when">{html.escape(str(e.get("when", "")))}</span><div class="what">{html.escape(str(e.get("what", "")))}</div></div>' for i, e in enumerate(evs))
+                _shoot(_TIMELINE_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", title=html.escape(str(v.get("title", ""))), events=ev_html), f, 1200, 675)
+                cap = str(v.get("title", ""))
             elif kind == "d2":
                 src = d / f"{stem}.d2"; f = d / f"{stem}.svg"
                 d2 = v.get("d2", "").strip()

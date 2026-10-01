@@ -14,6 +14,7 @@ const posts = defineCollection({
     term: z.string(),                   // the English term/tool this post is about
     kind: z.enum(['explainer', 'fieldnotes', 'warstory', 'faq', 'deepdive']).default('explainer'),
     hook: z.string().optional(),        // opener type the writer used (scene|number|claim|quote|question)
+    cover: z.enum(['type', 'illus', 'photo']).optional(),  // cover layout used (rotation avoids repeating the last ones)
     tldr: z.array(z.string()).max(4).default([]),
     series: z.object({ slug: z.string(), name: z.string(), part: z.number(), total: z.number() }).optional(),
     pubDate: z.coerce.date(),

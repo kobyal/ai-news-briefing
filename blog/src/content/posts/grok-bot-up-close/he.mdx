@@ -1,0 +1,139 @@
+---
+title: "Grok Bot מקרוב: עמית לצוות עם מחשב משלו, וכל הסיסמאות שלכם"
+description: "Grok Bot של SpaceXAI מקרוב: מה הוא עושה לבד, כמה הוא עולה באמת, ולמה המחשב המשותף בענן הוא ההחלטה שהכי צריך להבין."
+lang: he
+key: grok-bot-up-close
+term: "Grok bot"
+kind: deepdive
+pubDate: 2026-10-01
+tags: ["grok", "xai", "agents", "computer-use", "cursor"]
+hook: "number"
+cover: illus
+tldr: ["התחילו מ-Bot אחד read-only שמוציא briefing בוקר ועוצר לפני שליחה", "אל תחברו מערכת פיננסית: כל ה-Bots חולקים מחשב ו-credentials אחד", "בדקו את עמוד המחירים ביום הקנייה, המקורות סותרים בין $20 ל-$300"]
+series: { slug: "the-new-tools", name: "הכלים החדשים, מקרוב", part: 2, total: 4 }
+hero: /posts/grok-bot-up-close/hero.jpg
+diagram: /posts/grok-bot-up-close/diagram.svg
+sources:
+  - { title: "SpaceXAI — Creators of Grok, the AI Chatbot", url: "https://x.ai", date: "" }
+  - { title: "Grok API Documentation", url: "https://docs.x.ai/docs/overview", date: "" }
+  - { title: "SpaceXAI — Creators of Grok, the AI Chatbot", url: "https://x.ai/news", date: "" }
+  - { title: "Grok Bot", url: "https://x.ai/bot", date: "2026-08-11" }
+  - { title: "Grok Bot by SpaceXAI", url: "https://x.ai/news/introducing-grok-bot", date: "2026-08-11" }
+  - { title: "Errand – open-source Grok Bot and Muse alternative, built in a week", url: "https://runta.com/blog/building-errand-in-one-week", date: "2026-09-22" }
+  - { title: "I Run Grok Bot with BotOps", url: "https://granda.org/en/2026/09/06/how-i-run-grok-bot", date: "2026-09-06" }
+  - { title: "What is Grok Bot? SpaceXAI's Computer-Use AI Agent Explained", url: "https://4geeks.com/en/blog/ai-tools/what-is-grok-bot", date: "" }
+  - { title: "A Guide to Grok Bot: How xAI's Always-On AI Teammates Work | Composio", url: "https://composio.dev/content/guide-to-frok-bot", date: "" }
+  - { title: "🎙️ How I AI: Grok Bot + Grok 4.6—what’s great (and what’s still hype) & Lessons from spending $20,000 on Devin in one month", url: "https://www.lennysnewsletter.com/p/how-i-ai-grok-bot-grok-46whats-great", date: "" }
+  - { title: "Grok Bot Guide: Always-On AI Agents, Routines, and Limits", url: "https://www.ai.joaoqueiros.com/blog/grok-bot-always-on-ai-agent-teams-routines-skills-security", date: "" }
+opinion: "אנחנו לא קונים את המילה teammate. Bot עם מחשב, זיכרון ו-routines זה בגדול cron, דפדפן אוטומטי ו-LLM באמצע, והשם החדש לא משנה את מה שאתם עושים ביום שני: מחליטים מה הוא רואה, במה הוא נוגע ואיך בודקים אותו. ב-Grok Bot ההחלטה הראשונה כבר נעשתה בשבילכם, והתשובה היא הכל. אצלנו כל מקום שהחלפנו בו קריאה למודל בכלל דטרמיניסטי נהיה זול ואמין יותר, וכאן הכיוון הפוך: מודל שלוחץ על כפתורים במקום API. זה שווה את זה רק באתרים שבאמת אין להם API, ורק עם לולאת אימות, טיקט, diff או אדם שמאשר, לפני שהעבודה נוחתת."
+madeWith: { model: "claude-opus-5-5", sourceCount: 11, reviewedBy: "Koby Almog" }
+---
+
+מחשב אחד. זה המספר הכי חשוב בתיעוד של Grok Bot, יותר מה-$20 בחודש ויותר מה-$300 של SuperGrok Heavy. כל ה-Bots בחשבון שלכם עובדים על אותה מכונת לינוקס בענן, ואפשר לשים עד שישה מהם באותו שרשור. הם חולקים את אותם קבצים, את אותם sessions בדפדפן ואת אותם credentials ב-CLI.
+
+SpaceXAI, ה-xAI לשעבר, השיקה את Grok Bot ב-11 באוגוסט 2026, בבטא. בשבעה השבועות מאז יצאו אינטגרציה עם X (29 באוגוסט), גרסת Enterprise (3 בספטמבר), פוסט על Bot שמצא להם יותר מ-$100,000 חיסכון ברכש (4 בספטמבר) ו-Team Bots (28 בספטמבר). הקצב יפה. המחיר שלו הוא שחצי מהמדריכים ברשת כבר לא מדויקים. נגיע לזה.
+
+בחלק הקודם ראינו את Codex, כלי שחי ליד הקוד. Grok Bot הולך לכיוון אחר לגמרי. הוא לא נוגע ב-repo, הוא נוגע ב-Zendesk, ב-Gmail וב-CRM.
+
+## Bot עם מחשב משלו, לא צ'אט עם כפתורים
+
+בגדול, Grok Bot הוא agent עם שם, תפקיד וזיכרון, שגר על VM בענן של SpaceXAI. יש לו דפדפן, מערכת קבצים וטרמינל. אתם מתחברים פעם אחת לכלים שלכם מתוך המחשב שלו, ומשם הוא עובד לבד: ממלא טפסים, עונה למיילים, מעדכן את ה-CRM, וחוזר אליכם כשצריך אישור. אפשר להגדיר לו routines לפי לוח זמנים, או להראות לו workflow פעם אחת. הוא שומר את זה ומריץ לבד בפעם הבאה.
+
+פרט שכמעט אף אחד לא מזכיר: מורידים אותו מ-Cursor, לא מ-xAI. ה-installer יושב על downloads.cursor.com, ההתחברות היא Sign In with Cursor, והחיוב מופיע בדשבורד של Cursor.
+
+ועכשיו מה הוא לא:
+
+- **הוא לא Grok on X.** הצ'אט בתוך X וה-@grok שעונה לכם בתגובות הם מוצר אחר. ב-29 באוגוסט SpaceXAI הודיעה על "tighter integration with X" ל-Bot, בלי לפרט מה בדיוק. כשמישהו אומר לכם "Grok bot", תשאלו לאיזה מהשניים הוא מתכוון.
+- **הוא לא API.** אין endpoint של Bot. למפתחים יש את Grok 4.7 ב-API: $2 לקלט ו-$6 לפלט למיליון tokens, context של 500k.
+- **הוא לא אוטונומי לגמרי.** הוא עוצר לאישורים, ואתרים מסוימים חוסמים אותו או זורקים עליו CAPTCHA.
+
+## מה קורה כשנותנים לו עבודה
+
+רגע, גילוי נאות: לא הרצנו את זה אצלנו. גם 4Geeks, שהורידו את כל 14 עמודי התיעוד (1,889 שורות), כתבו במפורש שלא הצליחו לבדוק את המוצר עצמו. מה שלמטה זה התיעוד, ועוד שלושה אנשים שכן עבדו איתו.
+
+הזרימה פשוטה. יוצרים Bot, נותנים לו שם ותפקיד, ושולחים לו הודעה כמו לחבר צוות. הדוגמה בעמוד המוצר היא "Sign in to Zendesk so I can work the support queue". אתם מתחברים לחשבון בתוך המחשב שלו, והוא לוקח את התור. רוצים לראות מה הוא עושה? פותחים את המסך שלו, צופים, או לוקחים שליטה.
+
+ב-Composio הריצו ארבעה Bots עם תפקידים נפרדים שמעבירים עבודה ביניהם בשרשור משותף. אפשר לשים בין שניים לשישה Bots בקבוצה, והם מעבירים בעלות על משימה בלי שתעתיקו context ביד.
+
+מתיו גרנדה כתב ב-6 בספטמבר איך הוא מריץ צי שלם, והגיע לאותה מסקנה שכל מי שהריץ כמה agents מגיע אליה: צ'אט לא עושה scale. הוא מדבר רק עם Bot אחד, Chief of Staff. מתחתיו יש Bots שאחראים על תחום (בית, עבודה, כתיבה, Notion), ומתחתם temps חד-פעמיים שנמחקים בסוף. Notion הוא ה-source of record. והכלל הכי טוב אצלו: אין ממצאים, אין פינג.
+
+ההיררכיה הזו לא מגיעה עם המוצר. הוא בנה אותה מעליו, כי בלעדיה הוא חי בסיידבר.
+
+<figure><img src="/posts/grok-bot-up-close/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/grok-bot-up-close/src4.jpg" alt="עמוד המוצר מבטיח עמית שעובד 24/7. בפועל הוא עוצר בכל אישור ובכל CAPTCHA, וזה דווקא טוב (credit: SpaceXAI)" loading="lazy" /><figcaption>עמוד המוצר מבטיח עמית שעובד 24/7. בפועל הוא עוצר בכל אישור ובכל CAPTCHA, וזה דווקא טוב (credit: SpaceXAI)</figcaption></figure>
+
+## המספרים, והמקורות לא מסכימים
+
+עמוד המוצר היום מציג שלושה מסלולים. $20 לחודש דרך Cursor Pro, עם מחשב משלו, routines ושימוש שבועי כלול. $30 ל-SuperGrok, עם גישה ל-Bot ו-Grok 4.6. ו-$40 למשתמש לחודש ל-Cursor Teams Standard.
+
+אבל 4Geeks, שבדקו ב-12 באוגוסט ווידאו שוב ב-20 באוגוסט, כתבו שהוא לא נמכר בנפרד ומגיע רק עם Cursor Ultra ב-$200, SuperGrok Heavy ב-$300 ו-Cursor Premium Teams ב-$120 למשתמש. גם Composio (20 באוגוסט) מדברים רק על Heavy, Ultra ומסלולי צוות. ופוסט ההשקה עצמו, כבר ב-11 באוגוסט, מונה גם את SuperGrok ואת Cursor Pro.
+
+הקריאה שלי: ההשקה בפועל התחילה מהמסלולים היקרים, ותוך כמה שבועות ירדה ל-$20. אבל זו קריאה, לא עובדה. לפני שאתם מתחייבים, תבדקו את עמוד המחירים ביום הקנייה.
+
+מה שכן ברור: השימוש ב-Bot נספר בנפרד מהמכסה של Grok או של Cursor. משימה שהעברתם ל-Bot לא אוכלת לכם את ה-Cursor.
+
+אותו בלבול בפלטפורמות:
+
+| מקור | תאריך | desktop | מובייל |
+|---|---|---|---|
+| פוסט ההשקה | 11.8.2026 | לא מפורט | iOS |
+| Composio | 20.8.2026 | macOS, Windows | iPhone בלבד |
+| התיעוד (דרך 4Geeks) | 2.9.2026 | macOS, Windows, Linux | iOS 18+, Android 9+ |
+
+אייפד לא נתמך אצל אף אחד. ולגבי המודל: מסלול SuperGrok מציין Grok 4.6, ו-Grok 4.7 יצא ב-21 בספטמבר. איזה מהם מריץ את ה-Bot שלכם היום? העמודים לא אומרים בבירור.
+
+<figure><img src="/posts/grok-bot-up-close/v2-chart-he.jpg" alt="הכניסה ירדה מ-$200 ל-$20 תוך שבועות, או שהמקורות פשוט סותרים. בכל מקרה, בודקים ביום הקנייה (x.ai/bot, 4Geeks)" loading="lazy" /><figcaption>הכניסה ירדה מ-$200 ל-$20 תוך שבועות, או שהמקורות פשוט סותרים. בכל מקרה, בודקים ביום הקנייה (x.ai/bot, 4Geeks)</figcaption></figure>
+
+## איפה הוא באמת חזק
+
+היתרון הכי ברור: אתרים בלי API ובלי MCP. לכל ארגון יש את מערכת הספקים מ-2014 שאף אחד לא יכתוב לה connector. Bot שנכנס עם שם משתמש וסיסמה ולוחץ על כפתורים פותר בדיוק את זה. רומן מצוות המוצר ניסח את זה הכי טוב בפוסט ההשקה:
+
+> There is a huge difference between 90% done and 100% done. Most AI gets you almost there. Grok Bot can finish the swing, because the work lands where a human would put it, in the actual tool.
+>
+> — Roman, Product, SpaceXAI
+
+מה שהוא לא אומר שם: SpaceXAI עצמם ממליצים על connector כשיש אחד, כי הוא אמין יותר. computer use זה ה-fallback, לא הדרך הראשית.
+
+שני: כמה חשבונות על Bot אחד. קלייר וו סיפרה ב-How I AI שיש לה ארבע כתובות מייל ושבעה workspaces של Slack, וכולם מחוברים ל-Bot אחד. לדבריה Codex וקלוד עוד לא שם.
+
+שלישי: זמן הקמה. לא בונים workflow מראש, פשוט שולחים הודעה. אצל SpaceXAI זה נראה כך: Bot מכירות שמעדכן CRM מתמלילי שיחות, Bot אופרציה שמעבד חשבוניות מ-Gmail, ו-Bot הנדסה שמשחזר באג ב-UI, פותח טיקט ומעביר ל-Bot דיבאג. המספרים שלהם, על ה-workflows שלהם.
+
+## איפה הוא נופל: כולם על אותה מכונה
+
+נחזור למספר מההתחלה. מחשב אחד למשתמש, משותף לכל ה-Bots. ה-Bot שכותב לכם פוסטים רואה את אותה session פתוחה של Gmail שה-Bot של החשבוניות עובד איתה, ואת אותם credentials ב-CLI. ז'ואאו קיירוש סיכם את זה במשפט אחד: "Convenience is the product advantage; permission design is the operating responsibility."
+
+עכשיו תחשבו על prompt injection. Bot שקורא את תיבת הדואר שלכם קורא גם מיילים מזרים. אם אחד מהם מצליח לשכנע אותו לעשות משהו, אין שום קיר בינו לבין כל שאר החשבונות שחיברתם.
+
+> **הדעה שלי:** אני לא הייתי נותן לאף Bot בחשבון הזה הרשאת כתיבה במערכת כספית, כל עוד כולם חולקים מכונה. זה לא באג, זו החלטת מוצר שעושה את ההקמה מהירה. אבל ה-blast radius שלה הוא כל החשבון.
+
+אצלנו ב-pipeline היומי רצים כעשרה agents מאז מאי 2026, והבאגים הכי גרועים שהיו לנו לא היו תשובות שגויות. הם היו כשלונות שקטים: agent שדיווח הצלחה והוציא briefing ריק. Bot ש"חוזר רק כשצריך אישור" נשמע מעולה, עד שהוא לא חוזר כי הוא נתקע. השאלה הראשונה לפני שמעבירים לו עבודה אמיתית: איך אני יודע שהוא נכשל?
+
+ועוד כמה:
+
+- **התלות ב-Cursor.** auth, חיוב והגדרות נתונים עוברים דרכם. עוד ספק בשרשרת.
+- **פשוט מדי.** אין בחירת מודל, אין עיצוב אישיות. קלייר אמרה שה-OpenClaw שלה כאוטי ודורש תחזוקה, ובגלל זה היא אוהבת אותו. ל-Grok Bot אין לה במה להתעסק.
+- **"24/7" זה שיווק.** בפועל הוא עובד 24/7 עד האישור הבא או ה-CAPTCHA הבא.
+- **ה-$100,000 ברכש.** יפה. זה פוסט של הספק, על הנתונים של הספק.
+
+## מול Errand ו-OpenClaw
+
+ב-22 בספטמבר Runta פרסמו את Errand, אלטרנטיבה open-source ל-Grok Bot. אדם אחד בנה את הגרסה הראשונה בשבוע: אפליקציית desktop של כ-4,000 שורות TypeScript מעל ה-runtime שלהם. כל teammate מקבל מכונה מבודדת משלו, עם shell, דפדפן ומערכת קבצים שנשארת בין משימות. ה-agent loop הוא Pi Agent כברירת מחדל, ואפשר להחליף. המסך החי הוא VNC, ‏72 שורות.
+
+ההבדל המהותי הוא לא המחיר. הוא הבידוד. ב-Errand כל teammate על מכונה משלו, ב-Grok Bot כולם על אחת. בתמורה Grok Bot נותן Bot עובד תוך דקות, אפליקציה לטלפון ו-connectors שכבר עובדים, בלי שתחזיקו תשתית.
+
+OpenClaw יושב בקצה השני: גמיש, כאוטי, דורש תחזוקה. ובמקביל יש את מה שראינו בחלק הקודם, Codex ו-Claude Code, שהם agents לקוד ולא לאופרציה. אם המשימה שלכם היא PR, אתם בכלי הלא נכון.
+
+<figure><img src="/posts/grok-bot-up-close/v3-svg-he.jpg" alt="אותו רעיון, החלטה הפוכה: Grok Bot קונה מהירות הקמה במחיר הבידוד, Errand משלם בשבוע פיתוח ומקבל מכונה לכל teammate (SpaceXAI, Runta)" loading="lazy" /><figcaption>אותו רעיון, החלטה הפוכה: Grok Bot קונה מהירות הקמה במחיר הבידוד, Errand משלם בשבוע פיתוח ומקבל מכונה לכל teammate (SpaceXAI, Runta)</figcaption></figure>
+
+## מי צריך לבחור בזה ברבעון הזה
+
+אם אתם כבר על Cursor Teams או SuperGrok: כן, תנסו. הניסוי זול, והשימוש לא יוצא מהמכסה הקיימת. תתחילו כמו שז'ואאו ממליץ: Bot אחד, read-only, עם תוצר שאפשר לבדוק. briefing בוקר מהיומן ומהמייל, שעוצר לפני ששולח משהו. מריצים ידנית פעמיים, שומרים כ-skill, ורק אז מתזמנים.
+
+אם אתם באופרציה, מכירות או support, עם הרבה SaaS בלי API: בשבילכם בנו את זה.
+
+אם אתם בחברה מפוקחת, בנק, ביטוח, בריאות: תתכוננו לשיחה עם אבטחת מידע. VM אחד בענן זר שמחזיק sessions של כל המערכות, דרך חשבון Cursor, זו לא שיחה קצרה. לא ראיתי עדיין צוות ישראלי שמספר בפומבי שהעביר review כזה. אם עברתם, אני רוצה לשמוע.
+
+ואם אתם רוצים שמישהו יכתוב לכם קוד, תחזרו לחלק הקודם.
+
+בקיצור: תנו ל-Bot הראשון רק לקרוא. כל עוד יש מחשב אחד, ההרשאות שלו הן ההרשאות של כולם.

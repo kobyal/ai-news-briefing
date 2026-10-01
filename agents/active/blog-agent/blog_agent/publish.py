@@ -38,6 +38,7 @@ def write_mdx(post: dict, media: dict, model: str, pub: date, draft: bool = Fals
             "tags: " + json.dumps(post.get("tags") or [], ensure_ascii=False),
         ]
         if post.get("hook"): fm.append(f"hook: {_yaml_str(str(post['hook']))}")
+        if (post.get("cover") or {}).get("layout") in ("type", "illus", "photo"): fm.append(f"cover: {post['cover']['layout']}")
         if p.get("tldr"): fm.append("tldr: " + json.dumps([str(x) for x in p["tldr"]][:4], ensure_ascii=False))
         if series:
             fm.append(f"series: {{ slug: {_yaml_str(series['slug'])}, name: {_yaml_str(series['name_en'] if lang == 'en' else series['name'])}, part: {series['part']}, total: {series['total']} }}")

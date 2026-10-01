@@ -228,12 +228,13 @@ def _call(prompt: str, system: str, lang: str, kind: str, usage_log: list) -> di
 
 def write_post(term: str, key: str, sources: list[dict], usage_log: list, *, kind: str = "explainer", hook: str = "scene",
                brief: str = "", series_ctx: str = "", avoid_visuals: list[str] | None = None,
-               images: list[dict] | None = None, hue: str = "#4f46e5") -> dict:
+               images: list[dict] | None = None, hue: str = "#4f46e5", avoid_covers: list[str] | None = None) -> dict:
     system_he = SYSTEM_HE.replace("{glossary}", HE_TERM_GLOSSARY).replace("{house}", HOUSE)
     prompt_he = (f"TERM: {term}\nURL KEY: {key}\nKIND (template): {kind}\nHOOK (opening type you MUST use): {hook}\n"
                  + (f"BRIEF (what this post must cover / leave out): {brief}\n" if brief else "")
                  + (f"VISUAL KINDS USED BY THE LAST POSTS — avoid these: {', '.join(avoid_visuals)}\n" if avoid_visuals else "")
                  + f"HUE (the one accent colour for svg figures and the cover motif): {hue}\n"
+                 + (f"COVER LAYOUTS USED BY THE LAST POSTS — pick a different one: {', '.join(avoid_covers)}\n" if avoid_covers else "")
                  + ("IMAGES AVAILABLE (real images mirrored from the sources — use as kind=image or cover.photo):\n"
                     + "\n".join(f"  - {im['url']}  ← {im['title'][:80]}  ({im['source_url']})" for im in images) + "\n" if images else "IMAGES AVAILABLE: none\n")
                  + (f"\nSERIES CONTEXT:\n{series_ctx}\n" if series_ctx else "")

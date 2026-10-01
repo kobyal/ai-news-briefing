@@ -1,0 +1,15 @@
+direction: right
+prompt: merger prompt (Jina markdown)
+hook: UserPromptSubmit hook
+cli: claude -p
+gate: assert gate
+publish: publish
+qa: QA evaluator
+loud: fail loud / quarantine
+prompt -> hook: contains ![Image](url)
+hook -> cli: blocked before model
+cli -> gate: rc=0, num_turns=0
+gate -> loud: turns=0 or items < floor
+gate -> publish: passes
+publish -> qa: after publish
+qa -> loud: P0 below floor

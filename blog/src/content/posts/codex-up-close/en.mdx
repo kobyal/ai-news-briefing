@@ -1,0 +1,121 @@
+---
+title: "Codex up close: ChatGPT with a terminal, and what it means next to Claude Code"
+description: "OpenAI's Codex in late 2026: CLI, cloud agents, phone and Spark. What it costs, where it's strong, where it breaks, and how it sits next to Claude Code."
+lang: en
+key: codex-up-close
+term: "Codex"
+kind: deepdive
+pubDate: 2026-10-01
+tags: ["codex", "openai", "coding-agents", "claude-code", "developer-tools"]
+hook: "claim"
+cover: photo
+tldr: ["On ChatGPT Business? Turn on Codex PR review for one repo for two weeks", "Using Spark? Tell it in AGENTS.md to run tests. It won't do it on its own", "Keep one AGENTS.md and symlink CLAUDE.md to it, so switching tools costs nothing"]
+series: { slug: "the-new-tools", name: "The new tools, up close", part: 1, total: 4 }
+hero: /posts/codex-up-close/hero-en.jpg
+diagram: /posts/codex-up-close/diagram.svg
+sources:
+  - { title: "Codex | AI Coding Partner from OpenAI", url: "https://openai.com/codex", date: "" }
+  - { title: "ChatGPT | ChatGPT Learn", url: "https://developers.openai.com/codex", date: "" }
+  - { title: "GPT-5.3-Codex", url: "https://openai.com/index/introducing-gpt-5-3-codex", date: "2026-02-05" }
+  - { title: "Codex for almost everything", url: "https://openai.com/index/codex-for-almost-everything", date: "2026-04-16" }
+  - { title: "GPT‑5.3‑Codex‑Spark", url: "https://openai.com/index/introducing-gpt-5-3-codex-spark", date: "2026-02-12" }
+  - { title: "The ChatGPT/Codex app bundles a full copy of LibreOffice", url: "https://simonwillison.net/2026/Sep/1/codex-libreoffice", date: "2026-09-01" }
+  - { title: "Codex is now in the ChatGPT mobile app", url: "https://openai.com/index/work-with-codex-from-anywhere", date: "2026-05-14" }
+  - { title: "Codex Micro", url: "https://openai.com/supply/co-lab/work-louder", date: "2026-07-15" }
+  - { title: "OpenAI Codex (AI agent) - Wikipedia", url: "https://en.wikipedia.org/wiki/OpenAI_Codex_(AI_agent)", date: "" }
+opinion: "We don't pick a tool by benchmark. We pick it by what it changes in the work on Monday. With Codex, what changes things isn't the model. It's the automatic PR review and the cloud tasks that keep running without you, meaning the system around the model. A Spark that doesn't run tests by default is exactly the opposite of what we've learned: a loop that checks itself is worth more than a fast draft. We're staying on Claude through a subscription for the heavy writing, because our pipeline is built around it, and silent failures have cost us more than any difference between models. But if you have ChatGPT Business and you're not turning on Codex review, you've left a free reviewer outside."
+madeWith: { model: "claude-opus-5-5", sourceCount: 9, reviewedBy: "Koby Almog" }
+---
+
+Our claim: Codex isn't a coding tool anymore. It's ChatGPT with a terminal, its own mouse, and 1.7GB of runtime on your disk.
+
+That's not a figure of speech. On September 1, 2026, Simon Willison went digging in his `~/.cache` and found a folder called `codex-primary-runtime`. Inside: a full Python, a full Node.js, git, Poppler, and a complete copy of LibreOffice. Around the same time, the Codex desktop app was rebranded. It's now just called ChatGPT.
+
+Now look at the numbers. On April 16, OpenAI talked about more than 3 million developers a week. On May 14, it was more than 4 million people a week. Note the word. Within a month, developers became people. So if you compare Codex to Claude Code on SWE-Bench alone, you miss what OpenAI is building here. We tried to look at it as a product, not as a model.
+
+## Four surfaces, one ChatGPT account
+
+In short, Codex in late 2026 is one agent that runs in several places, all tied to your ChatGPT account. There's an open-source CLI (Apache 2.0, released April 2025) and an IDE extension. There's a cloud agent with an environment per repo that keeps working after you close the laptop. There's a desktop app for Mac and Windows, and since May 14 it's also inside the ChatGPT mobile app. Underneath all of it runs GPT-5.3-Codex. It shipped on February 5, and OpenAI says it's 25% faster than the previous generation. Next to it sits Spark, for real-time work.
+
+What it isn't:
+- It isn't the 2021 Codex, the GPT-3 model that sat behind Copilot. Same name, completely different product.
+- It isn't one model. Codex is the harness, and the model underneath gets swapped.
+- And it isn't only code anymore. Since the April 16 update there's background computer use on the Mac, with its own cursor and several agents in parallel. There's image generation with gpt-image-1.5, and more than 90 new plugins: JIRA through Atlassian Rovo, CircleCI, GitLab Issues, Neon, Render and more. In March, OpenAI also shipped Codex Security, a separate agent for application security.
+
+## What happens when you run it
+
+In the CLI it will feel familiar if you've worked with Claude. Run `npm i -g @openai/codex`, go into a repo, type `codex` and sign in with your ChatGPT account. Its standing instructions live in `AGENTS.md` inside the repo, the same way Claude Code reads `CLAUDE.md`. For runs with no human in the loop there's `codex exec`. That's the equivalent of the `claude -p` we run all through our pipeline.
+
+Lock down the sandbox on day one. The default is reasonable, but we'd rather have it written in a file than in someone's memory:
+
+```toml title="~/.codex/config.toml"
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+network_access = false
+```
+
+In practice, this means it only writes inside the workspace, has no network, and asks before any step outside that. Only open `network_access` when you know exactly why.
+
+In the cloud it feels different. You pick a repo and an environment, fire off several tasks in parallel, and each one comes back with a diff or a PR. The phone never gets the code at all. There's a secure relay, and the files, credentials and permissions stay on the machine running Codex. The phone only receives screenshots, terminal output, diffs, test results and approval requests. You approve a command while standing in line for coffee. That's the story OpenAI is selling, and the product is built for it.
+
+<figure><img src="/posts/codex-up-close/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/codex-up-close/v1-screenshot-en.jpg" alt="The docs place Codex under ChatGPT, not under the API. You buy it as a subscription product, not as a model billed per token (developers.openai.com)" loading="lazy" /><figcaption>The docs place Codex under ChatGPT, not under the API. You buy it as a subscription product, not as a model billed per token (developers.openai.com)</figcaption></figure>
+
+## The numbers: price, limits, and a $230 keyboard
+
+- **Price:** Codex is included in a ChatGPT subscription. Plus is $20 a month, Pro is $200, and Business or Enterprise are priced per seat. There's no separate charge for Codex.
+- **Limits:** counted in 5-hour windows plus a weekly cap, and cloud tasks draw from the same budget. We couldn't find an official table of message counts that stays stable. They keep moving it. If you work in it all day on Plus, you'll hit the wall.
+- **Spark:** a research preview for Pro users only. Over 1000 tokens per second on Cerebras hardware, 128k context, text only. It has separate limits that don't count against the regular quota. Under load, you wait in a queue.
+- **Usage:** 3 million a week on April 16, 4 million a week on May 14.
+- **Hardware:** yes, really. In July, OpenAI released Codex Micro, a 13-key keyboard for $230. Each agent gets an RGB light that shows whether it's thinking, running, waiting or done, and there's a dial that sets the reasoning level. It sold out. We're not judging.
+
+<figure><img src="/posts/codex-up-close/src5.jpg" alt="Over 1000 tokens per second on Cerebras, but Pro only, with 128k context and no automatic tests (credit: OpenAI)" loading="lazy" /><figcaption>Over 1000 tokens per second on Cerebras, but Pro only, with 128k context and no automatic tests (credit: OpenAI)</figcaption></figure>
+
+## Where it's strong
+
+The first strength is long-running background work. A cloud environment per repo, several agents in parallel, they keep going with the laptop closed, and you step in only when needed. According to OpenAI, GPT-5.3-Codex built games on its own over millions of tokens, from generic prompts like "fix the bug". Those are their numbers on their workflows, but the direction is clear.
+
+The second strength is automatic code review on PRs, and here there's third-party evidence. Duolingo ran an internal code review benchmark on backend Python, and they say Codex was "the only one to catch tricky backward compatibility issues". And at Tel Aviv's Wonderful, Chief Architect Daniel Sikorski said Codex CLI "completely replaced every other agentic harness" in their architecture work. Sure, these are quotes from a marketing page. Still, it's a page an Israeli company put its name on.
+
+One more advantage that's easy to miss. If your org already pays for ChatGPT Business, Codex costs you zero extra. That's the whole procurement process.
+
+## Where it falls short
+
+What worries us most is what OpenAI wrote themselves about Spark:
+
+> "Because it's tuned for speed, Codex-Spark keeps its default working style lightweight: it makes minimal, targeted edits and doesn't automatically run tests unless you ask it to."
+> (OpenAI, GPT-5.3-Codex-Spark launch, February 12, 2026)
+
+1000 tokens per second without tests is just a faster way to ship bugs. If you move to Spark, write in `AGENTS.md` that tests run after every change, and don't trust the default.
+
+The rest:
+- **Sprawl.** CLI, IDE, cloud, an app that's now called ChatGPT, phone, and even a keyboard. The docs are split between developers.openai.com and learn.chatgpt.com, and a month in you'll still be hunting for where a given setting lives.
+- **Weight.** 1.7GB of runtime, LibreOffice included, just so it can open an xlsx file for you. Convenient, but it's no longer a lean CLI tool.
+- **Computer use is Mac-first.** The launch only talked about Mac. If you work on Linux or inside WSL, you get part of the experience.
+- **90 plugins means 90 permission grants.** In a regulated org every plugin goes through security review, and anyone who's worked at a bank or in defense knows how long that takes.
+
+## Codex vs. Claude Code on a normal day
+
+Day to day in the CLI, they're really close. Both are a terminal agent with an instructions file in the repo. Both have a sandbox and permissions, and both have a headless mode for scripts. Pricing is similar too: $20 to get in with both, $200 at the top, and Anthropic also has a $100 tier in the middle.
+
+The difference is the bet. OpenAI is betting on breadth: cloud, phone, computer use, plugins, and one agent tied to the ChatGPT account you already have. Anthropic is betting on depth in the terminal: hooks, subagents, MCP, and a tight read, edit, run, fix loop. Codex wants you supervising it remotely. Claude wants you to stay next to it.
+
+A practical tip for a team that hasn't decided yet: keep one `AGENTS.md` as the source of truth, and run `ln -s AGENTS.md CLAUDE.md`. That way switching between tools costs nothing, and nobody maintains two instruction files that drift apart over time. Copy-paste between agents has already taken down our production, so two versions of the same instructions don't excite us.
+
+> **My take:** our pipeline runs on Claude through a subscription, and we're in no rush to switch. But we'd turn on Codex PR review tomorrow on one repo. It's exactly a loop that checks work, and checking is worth more to us than a better first draft.
+
+<figure><img src="/posts/codex-up-close/v3-svg-en.jpg" alt="Same $20 to get in, opposite bet: Codex fans out to six surfaces and 4M users a week, Claude goes deep on one loop in the terminal (OpenAI, May 2026)" loading="lazy" /><figcaption>Same $20 to get in, opposite bet: Codex fans out to six surfaces and 4M users a week, Claude goes deep on one loop in the terminal (OpenAI, May 2026)</figcaption></figure>
+
+## Who should pick it this quarter
+
+- **You have ChatGPT Business:** turn on Codex review for one repo for two weeks. Count how many comments were real bugs and how many were noise. That's the whole experiment.
+- **A small startup that's half the time on reserve duty or on the road:** this is where mobile and cloud agents actually pay off. When you're 4 developers, approving a command from your phone instead of waiting for someone to get back to a laptop is not a gimmick.
+- **A regulated org, like banking, defense or healthcare:** cloud environments mean the code sits with OpenAI. Start with the local CLI, `sandbox_mode = "workspace-write"` and the network closed, and no plugins until infosec signs off.
+- **You're already deep in Claude Code with hooks and subagents:** you have no reason to switch. You do have a reason to give both the same bug once a week and see who finds it.
+
+Bottom line: don't choose by benchmark. Choose by where you want to check the agent's work. And if you don't check at all, you lose with both, at any speed.

@@ -49,7 +49,8 @@ def run_pipeline(args) -> int:
         post = json.loads(post_path.read_text()); print("blog-agent: reusing post.json")
     else:
         post = writer.write_post(term, key, sources, usage, kind=kind, hook=hook, brief=getattr(args, "brief", "") or "",
-                                 series_ctx=getattr(args, "_series_ctx", ""), avoid_visuals=avoid, images=images, hue=hue)
+                                 series_ctx=getattr(args, "_series_ctx", ""), avoid_visuals=avoid, images=images, hue=hue,
+                                 avoid_covers=_cover_avoid())
         post_path.write_text(json.dumps(post, ensure_ascii=False, indent=1), encoding="utf-8")
 
     m: dict = {}
@@ -114,6 +115,10 @@ def _covers(key: str, term: str, post: dict, ser: dict | None, hue: str) -> dict
     """Both covers from the writer's cover choice (type | illus | photo), falling back to type."""
     cov = post.get("cover") or {}
     layout = cov.get("layout") if cov.get("layout") in ("type", "illus", "photo") else "type"
+    used = _cover_avoid()
+    if layout in used and len(set(used)) >= 1:  # the model ignored the avoid list → rotate deterministically
+        layout = next((l for l in ("photo", "type", "illus") if l not in used and (l != "photo" or str(cov.get("image", "")).startswith("/posts/")) and (l != "illus" or cov.get("svg"))), "type")
+        cov = {**cov, "layout": layout}; post["cover"] = cov
     illus = media.valid_svg(str(cov.get("svg", ""))) if layout == "illus" else ""
     photo = ""
     if layout == "photo" and str(cov.get("image", "")).startswith("/posts/"):
@@ -136,7 +141,7 @@ def _recent_posts(n: int = 3) -> list[dict]:
         fm = txt.split("---")[1] if txt.startswith("---") else ""
         g = lambda k: (re.search(rf'^{k}: "?([^"\n]*)"?$', fm, re.M) or [None, ""])[1]
         vis = sorted({m.group(1) for m in re.finditer(r"/v\d+-([a-z0-9]+)-he\.", txt)})
-        rows.append({"key": f.parent.name, "kind": g("kind") or "explainer", "hook": g("hook"), "pub": g("pubDate"), "visuals": vis, "mtime": f.stat().st_mtime})
+        rows.append({"key": f.parent.name, "kind": g("kind") or "explainer", "hook": g("hook"), "cover": g("cover") or "type", "pub": g("pubDate"), "visuals": vis, "mtime": f.stat().st_mtime})
     rows.sort(key=lambda r: (r["pub"], r["mtime"]), reverse=True)
     return rows[:n]
 
@@ -152,6 +157,11 @@ def _rotation(kind: str | None, hook: str | None) -> tuple[str, str, list[str]]:
         hook = next((h for h in ("number", "scene", "claim", "question", "quote") if h not in last_hooks), "scene")
     avoid = sorted({v for r in recent[:2] for v in r["visuals"]} - {"d2"})
     return kind, hook, avoid
+
+
+def _cover_avoid() -> list[str]:
+    """Cover layouts of the last two posts — the writer is told to pick another; _covers enforces it."""
+    return [r["cover"] for r in _recent_posts(2)]
 
 
 def run_series(slug: str, *, all_parts: bool, publish_it: bool, draft: bool) -> int:

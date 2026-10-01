@@ -1,0 +1,96 @@
+---
+title: "ChatGPT for engineers: the features you pay for and don't use"
+description: "Projects, memory, canvas, deep research, connectors, scheduled tasks and ChatGPT Work: what each does, where it stops, and what to turn on Monday."
+lang: en
+key: chatgpt-advanced
+term: "ChatGPT power use"
+kind: faq
+pubDate: 2026-10-01
+tags: ["chatgpt", "openai", "agents", "connectors", "productivity"]
+hook: "scene"
+cover: type
+tldr: ["Open a Project per repo, with the README and instructions, instead of pasting context every time", "Make your first connector read-only, and write the limits into the brief itself", "Agent Mode was replaced by ChatGPT Work. Check the Help Center for what you actually have"]
+series: { slug: "the-new-tools", name: "The new tools, up close", part: 3, total: 4 }
+hero: /posts/chatgpt-advanced/hero-en.jpg
+diagram: /posts/chatgpt-advanced/diagram.svg
+sources:
+  - { title: "ChatGPT | OpenAI Help Center", url: "https://help.openai.com/en/collections/3742473-chatgpt", date: "" }
+  - { title: "Introducing ChatGPT agent: bridging research and action", url: "https://openai.com/index/introducing-chatgpt-agent", date: "" }
+  - { title: "OpenAI News", url: "https://openai.com/news", date: "" }
+  - { title: "ChatGPT Agents Explained: What They Are & How to Use Them in 2026", url: "https://dailybuzzupdate.com/chatgpt-agent-explained-2026", date: "" }
+  - { title: "ChatGPT Agents Explained: How OpenAI’s AI Agent Mode Works", url: "https://plisio.net/ai/chatgpt-agents", date: "" }
+  - { title: "ChatGPT Workspace Agents Explained Simply", url: "https://halmob.com/blog/chatgpt-workspace-agents-explained-simply", date: "" }
+  - { title: "Understanding ChatGPT Agent Mode | Coursiv Blog", url: "https://coursiv.io/blog/chatgpt-agent-mode", date: "" }
+opinion: "We don't get excited about buttons; we look at what the model sees and what it can change. Agent Mode was born and shut down within a year, and anyone who had built a proper brief and read-only permissions moved to Work without pain. In our experience, every place where we replaced a model call with a simple rule got cheaper and more reliable, so before a scheduled task, ask whether cron with a script does the same thing. And checking beats creating: a task that doesn't return verifiable output is a task you don't know ever ran."
+madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
+---
+
+## I used ChatGPT as a chat. What did I miss?
+
+July 17, 2025. OpenAI publishes a post called "Introducing ChatGPT agent". Two separate products merge into one option in the tools menu: Operator, which could click and type on websites, and deep research, which could read and summarize. Suddenly ChatGPT has its own virtual computer: a graphical browser, a fast text browser, a terminal that runs Python, and connectors to Gmail, Drive, Calendar, GitHub and Slack.
+
+Most engineers I know still open a new chat, paste a 300-line log and ask "what's wrong". That works. But it's a pretty poor use of a subscription you pay for every month.
+
+## Wait, does agent mode still exist?
+
+Not in that form. OpenAI's Help Center now says the old Agent Mode is no longer available, and points to ChatGPT Work and cloud browser workflows. According to summaries from July 2026, Work runs on GPT-5.6 and is built for long tasks that touch several apps and return documents, spreadsheets and apps.
+
+In parallel, Workspace Agents launched on April 22, 2026: a team builds an agent once, shares it, triggers it from ChatGPT or Slack, and it keeps running in the cloud with the laptop closed. Under the hood they run on Codex, the same Codex from the first part of this series. Short version: the name moved, the mechanism stayed. A cloud computer, tools, and approval before acting.
+
+> "ChatGPT requests permission before taking actions of consequence, and you can easily interrupt, take over the browser, or stop tasks at any point."
+>
+> — OpenAI, ChatGPT agent launch post
+
+<figure><img src="/posts/chatgpt-advanced/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/chatgpt-advanced/src2.jpg" alt="Operator and deep research merged into one product on July 17, 2025, and within a year that was replaced by ChatGPT Work too (credit: OpenAI)" loading="lazy" /><figcaption>Operator and deep research merged into one product on July 17, 2025, and within a year that was replaced by ChatGPT Work too (credit: OpenAI)</figcaption></figure>
+
+## Custom instructions, memory, Projects: what's the difference?
+
+Roughly, three layers of context, from broad to narrow. Custom instructions are the default for every chat: who you are, what your stack is, how you want answers. Next to them there are now also Characteristics, which set how much warmth, how much formatting and how many emoji.
+
+Memory is what ChatGPT collects on its own from past chats, and that's exactly the problem: you don't always know what it remembers. Projects are where engineers belong: files, instructions and chats for one topic. We keep a Project per repo, with the README and AGENTS.md inside, and we stop explaining the same thing for the tenth time.
+
+One thing, though: once a month, go through memory and delete. Old, wrong context is worse than no context.
+
+## Canvas or deep research: when to use which
+
+They answer opposite questions. Canvas is an editor: a document or code on the side, you select a section and ask for a targeted change, without the model rewriting the whole file every time. Good for a design doc, a runbook, a 200-line script.
+
+Deep research is the opposite. You give it a question, it reads sources on the web and returns a report with citations. It takes minutes, not seconds, so don't burn it on a question Google answers. Where it pays off: comparing three libraries, reviewing CVEs for a specific version, what changed between v2 and v3 of an API.
+
+The limit: it summarizes what's written, not what's true. For every number in the report, open the link.
+
+## Connectors sound risky. What can they actually do?
+
+Whatever you let them. That's the whole point. A GitHub or Gmail connector gives the model real access to your account, with your permissions. In the previous part we saw the extreme case with Grok Bot: one computer and one set of credentials for all the Bots. In ChatGPT, permission is per connector, and the agent asks for approval before actions of consequence.
+
+But wait, who decides what counts as "consequence"? The model. Not you. So two rules. One, start read-only: summarize PRs, don't merge them. Two, write the limits into the brief itself, in words, including where to stop.
+
+<figure><img src="/posts/chatgpt-advanced/v2-svg-en.jpg" alt="Risk rises in the 'acts outside' column, not with model size, and that's where every new feature needs checking (OpenAI, Plisio)" loading="lazy" /><figcaption>Risk rises in the 'acts outside' column, not with model size, and that's where every new feature needs checking (OpenAI, Plisio)</figcaption></figure>
+
+## Can I run something on a schedule?
+
+Yes. Scheduled tasks do exactly that: a prompt that runs at a fixed time and returns a result or a notification. "Every Sunday at 8:00, summarize the open issues labeled P0" is a reasonable use. For teams, the April Workspace Agents are the serious version: a shared agent with memory across sessions, where one person improves it and everyone gets the improvement.
+
+We've had a pipeline of about 10 agents running every morning since May 2026, and we learned this the hard way: the worst bugs were silent failures, not wrong answers. A task that fails without shouting looks exactly like a task with nothing to report. Make sure it returns output even when there's no news.
+
+## What came out of DevDay 2026, and does it matter?
+
+DevDay 2026 was on September 29. The same day OpenAI published GPT-6.1 Sol, an accompanying safety document, and a product called dots. On the ChatGPT side, plugins were announced.
+
+Ignore the name for a moment; it was already here in 2023 and got buried. The only question developers care about: what does the plugin see, what can it change, and who approves. Until there are docs with a proper permissions list, treat every plugin like a connector with write access. Meaning: not on your main account and not on a production repo.
+
+> **Caveat:** right now I mostly have headlines from the recap, not docs. I won't tell you what these plugins can do before I've tried one on a real repo. If you read posts explaining them with confidence already, check where they got it from.
+
+## So what do I do on Monday?
+
+Three things, in order. Open a Project for one repo, with the README and AGENTS.md, and write in the instructions what the stack is and how to run tests. Connect one connector, read-only, GitHub is the simplest, and ask for a summary of open PRs. And set up one scheduled task that returns output even when there's nothing to report.
+
+After two weeks you'll know what saves you time. What doesn't, turn off.
+
+And Agent Mode has already been replaced once within a year. What carried over is the brief and the checks you wrote, not the button.
+
+<figure><img src="/posts/chatgpt-advanced/v3-transcript-en.jpg" alt="The limits are written in the brief, not just on the permissions screen, because 'action of consequence' is the model's call (OpenAI, Coursiv)" loading="lazy" /><figcaption>The limits are written in the brief, not just on the permissions screen, because 'action of consequence' is the model's call (OpenAI, Coursiv)</figcaption></figure>
+
+

@@ -1,0 +1,148 @@
+---
+title: "claude -p בפרודקשן, חלק 1: Claude Code כשלב ב-pipeline, לא כצ'אט"
+description: "איך מריצים Claude Code כשלב ב-pipeline עם claude -p: מנוי מול API, פלט json, retries, JSON repair, hook שחוסם, timeouts ו-caffeinate"
+lang: he
+key: claude-in-production-1-headless
+term: "claude -p"
+kind: fieldnotes
+pubDate: 2026-10-01
+tags: ["claude-code", "headless", "pipelines", "anthropic", "production"]
+hook: "number"
+tldr: ["הריצו claude -p עם --output-format json ובדקו is_error, לא רק returncode.", "retry רק על שגיאות חולפות. refusal או hook block עוצרים מיד.", "על מק, עטפו ריצה ארוכה ב-caffeinate -dimsu. timeout לבד לא מספיק."]
+series: { slug: "claude-in-production", name: "Claude בפרודקשן", part: 1, total: 2 }
+hero: /posts/claude-in-production-1-headless/hero.jpg
+diagram: /posts/claude-in-production-1-headless/diagram.svg
+sources:
+  - { title: "Agent SDK overview - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/sdk", date: "" }
+  - { title: "Agent SDK overview - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/agent-sdk/overview", date: "" }
+  - { title: "Claude subscriptions no longer include Agent SDK and Claude -p usage", url: "https://www.xda-developers.com/anthropics-claude-subscriptions-no-longer-include-agent-sdk-and-claude-p-usage", date: "2026-05-14" }
+  - { title: "Hack: claude -p", url: "https://laughingmeme.org/2026/03/20/hack-claude-p.html", date: "2026-08-17" }
+  - { title: "What is Claude and How to Use It for AI Agents | MindStudio", url: "https://www.mindstudio.ai/blog/what-is-claude-ai-agents", date: "" }
+  - { title: "Claude (AI) - Wikipedia", url: "https://en.wikipedia.org/wiki/Claude_(AI)", date: "" }
+opinion: "אנחנו לא רואים ב-`claude -p` האק. זה שלב ב-pipeline כמו כל שלב אחר, ומגיעה לו אותה משמעת: wrapper אחד, פלט מובנה, retries מוגדרים ובדיקה אחרי. הכישרון האמיתי ב-2026 הוא לא הפרומפט, הוא המערכת סביב המודל: מה הוא רואה, איזה hook יכול לחסום אותו, ומה קורה כשהמחשב נרדם באמצע. כל מקום שבו החלפנו קריאה ל-LLM ב-rule יצא אצלנו זול ואמין יותר, אז לפני שאתם מוסיפים עוד `claude -p`, תשאלו אם regex לא מספיק. ולולאה שבודקת את הפלט שלה שווה יותר מטיוטה ראשונה טובה יותר."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+38 דקות. זה כמה זמן קריאה אחת ל-`claude -p` עמדה ב-8 בספטמבר 2026, בלי שגיאה ובלי שורת לוג, כי המק נכנס ל-sleep על סוללה. בצ'אט הייתם רואים שהסמן לא זז. ב-pipeline שעולה ב-06:07 בבוקר אף אחד לא מסתכל.
+
+אצלנו `claude -p` הוא לא צ'אט, הוא שלב ב-pipeline. בערך 10 agents, ריצה יומית מאז מאי 2026, וכולם קוראים לקלוד דרך wrapper אחד: `shared/anthropic_cc.py`. בחלק הזה אני עובר על מה שצריך כדי שזה יחזיק בבוקר שאתם עוד ישנים: מי משלם, איזה פורמט פלט, מתי לנסות שוב, איך מתקנים JSON שבור, מה עושים עם hook שחוסם, ולמה timeout לבד לא מציל. התקלות שלא זורקות שגיאה בכלל מחכות לחלק 2.
+
+## 01 · מחליטים מי משלם: מנוי או API key
+
+`claude -p` (או `--print`) מריץ את אותו agent loop של Claude Code, מדפיס תשובה ויוצא. בלי ממשק ובלי שאלות אישור. הדוקס של אנטרופיק אומרים את זה ישר:
+
+> To drive the same agent loop from a language other than Python or TypeScript, run the CLI as a subprocess with the `-p` flag and `--output-format json`.
+> — Agent SDK overview, Claude Code Docs
+
+רגע, אנחנו כותבים Python. אז למה subprocess ולא ה-Agent SDK? כסף ו-auth, לא טכנולוגיה. הפוסט "Hack: claude -p" ב-laughingmeme.org מ-20 במרץ 2026 ניסח את זה הכי טוב: ה-CLI כבר רץ אצלכם, כבר יש לו הרשאה ותקציב, וכל ההוצאה על LLM יושבת על שורה אחת בחשבונית. הוא סיים ב-"Probably this is what the agent sdk is for? This worked."
+
+בפועל זו החלטה כלכלית. ב-API משלמים לפי tokens: סונט 4.5 עולה $3 לקלט ו-$15 לפלט למיליון tokens, אופוס 4.5 עולה $5 ו-$25 (המספרים של MindStudio). במנוי משלמים סכום קבוע, אבל התנאים זזים. XDA דיווחו ב-13 במאי 2026 שהמנויים כבר לא כוללים שימוש ב-Agent SDK וב-`claude -p`. אז תבדקו את התנאים של התוכנית שלכם החודש, לא מה שהיה נכון באביב. אצלנו הכתיבה הכבדה רצה על המנוי, תרגום וסיווג על מודלים זולים יותר, ומה שאפשר לעשות עם rule נעשה עם rule.
+
+גוטצ'ה אחד שעלה לנו: אם ה-subprocess יורש משתני `CLAUDE_CODE_*` מהסשן שהפעיל אותו, ה-auth של המנוי נשבר ומקבלים שגיאה על credit balance. אין לזה שום קשר ליתרה. מנקים את המשתנים האלה לפני הקריאה.
+
+<figure><img src="/posts/claude-in-production-1-headless/src4.jpg" alt="הכלכלה של claude -p זזה מתחת לרגליים: מה שהיה כלול במנוי במרץ כבר לא כלול במאי, אז שווה wrapper שמחליף מנוי ב-API key בקונפיג (credit: XDA Developers)" loading="lazy" /><figcaption>הכלכלה של claude -p זזה מתחת לרגליים: מה שהיה כלול במנוי במרץ כבר לא כלול במאי, אז שווה wrapper שמחליף מנוי ב-API key בקונפיג (credit: XDA Developers)</figcaption></figure>
+
+## 02 · פלט json ולא text
+
+בהאק של laughingmeme יש `--output-format text` ובדיקה של `returncode == 0`. לסקריפט חד-פעמי זה מספיק. ל-pipeline לא. עם `json` מקבלים מעטפה: `result` (הטקסט של המודל), `is_error`, `subtype`, `num_turns`, `duration_ms`, `total_cost_usd`, `session_id`. שלושה דברים יוצאים מזה מיד: עלות לכל קריאה ללוג, דגל שגיאה שלא תלוי ב-exit code, והפרדה בין המטא-דאטה לתשובה עצמה.
+
+```bash title="step.sh"
+claude -p --output-format json --model sonnet < prompt.txt > envelope.json
+```
+
+מה שכן, `result` הוא עדיין מחרוזת. ביקשתם מהמודל JSON? הוא יושב כטקסט בתוך JSON. בקיצור, מפרסרים פעמיים, ולפעם השנייה יש שלב משלו (04).
+
+<figure><img src="/posts/claude-in-production-1-headless/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/claude-in-production-1-headless/v2-transcript-he.jpg" alt="גם כשמבקשים JSON בלבד, הוא חוזר כמחרוזת בתוך שדה result של המעטפה, ולכן מפרסרים פעמיים (Claude Code Docs)" loading="lazy" /><figcaption>גם כשמבקשים JSON בלבד, הוא חוזר כמחרוזת בתוך שדה result של המעטפה, ולכן מפרסרים פעמיים (Claude Code Docs)</figcaption></figure>
+
+## 03 · retry רק על מה שבאמת חולף
+
+ב-9 ביוני 2026 ה-merger נפל על `stream idle timeout`. שום דבר לא היה שבור, הסטרים פשוט נתקע. התיקון: ה-wrapper מנסה שוב עם backoff, אבל רק על רשימה סגורה של שגיאות חולפות. refusal על usage policy (היה לנו כזה יומיים קודם, ב-7 ביוני) או hook שחוסם לא יעברו בניסיון השני. retry עליהם רק שורף זמן ומחביא את הבעיה.
+
+הלולאה הקטנה הזו, יחד עם ה-JSON repair, סגרה לנו שלוש תקלות פרודקשן. זה ה-wrapper בגדול:
+
+```python title="shared/anthropic_cc.py"
+import json, os, subprocess, time
+from shared.json_repair import extract_json
+
+TRANSIENT = ("stream idle timeout", "overloaded", "529", "ECONNRESET", "timed out")
+
+def run_claude(prompt: str, model: str = "sonnet", attempts: int = 3, timeout: int = 600):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE_CODE_")}
+    for i in range(attempts):
+        try:
+            p = subprocess.run(
+                ["claude", "-p", "--output-format", "json", "--model", model],
+                input=prompt, capture_output=True, text=True, timeout=timeout, env=env,
+            )
+            try:
+                envelope = json.loads(p.stdout)
+            except json.JSONDecodeError:
+                envelope = {}
+            if p.returncode == 0 and envelope and not envelope.get("is_error"):
+                return extract_json(envelope.get("result", "")), envelope
+            err = f"{p.stderr} {envelope.get('result', '')}"
+        except subprocess.TimeoutExpired:
+            err = "timed out"
+        if i == attempts - 1 or not any(t in err for t in TRANSIENT):
+            raise RuntimeError(f"claude -p failed: {err[:300]}")
+        time.sleep(10 * 2 ** i)
+```
+
+שימו לב ל-`env`: זה הניקוי מסעיף 01. ול-`envelope` שחוזר החוצה, כדי שה-agent ירשום `total_cost_usd`.
+
+## 04 · JSON repair: לא באשמתכם, כן הבעיה שלכם
+
+גם עם "Return ONLY JSON" בפרומפט, מדי פעם מגיעים fences של markdown, פסיק מיותר לפני `}`, או משפט פתיחה. ב-7 באוגוסט 2026 קלוד התחיל להקדים ל-JSON הערה על audit rules שהוא ראה ב-context, והפרסר שלנו לא ידע מה לעשות עם זה. ניסינו `--bare` כדי להשתיק את זה, וזה שבר את ה-auth של המנוי. אז התיקון ישב בצד שלנו: מורידים fences, חותכים מהסוגר הראשון עד האחרון, מנקים פסיקים מיותרים, ואם עדיין לא עובר, זורקים חריגה. לא מחזירים `{}`.
+
+```python title="shared/json_repair.py"
+import json, re
+
+def extract_json(text: str):
+    t = re.sub(r"^`{3}(?:json)?\s*|\s*`{3}$", "", text.strip(), flags=re.M)
+    starts = [i for i in (t.find("{"), t.find("[")) if i != -1]
+    if not starts:
+        raise ValueError("no JSON in model output")
+    end = max(t.rfind("}"), t.rfind("]"))
+    body = re.sub(r",\s*([}\]])", r"\1", t[min(starts):end + 1])
+    return json.loads(body)  # fails loudly, never returns {}
+```
+
+ולמה זה ב-`shared/`: ב-31 במאי 2026 תיקנו באג ב-JSON repair והתברר שיש לו כמה עותקים ב-agents שונים. אחד מהם נשאר בלי תיקון. מאז אף agent לא מחזיק פרסר משלו. ובקטנה: הפרומפט שכתב את הטיוטה של הפוסט הזה כולל שורה שאומרת לא להקדים את ה-JSON בהערות על audit rules. זו לא פרנויה, זו צלקת.
+
+## 05 · ה-hook שחסם את ה-merger
+
+ב-9 בספטמבר 2026 ה-merger לא הוציא כלום. מתברר שבמחשב מוגדר managed hook על `UserPromptSubmit`, והוא חסם את הפרומפט כי היו בו embeds בסגנון `![Image](url)` שהגיעו מ-markdown שגירדנו דרך Jina. ב-headless אין מי שיקליק "אשר". ה-hook מחליט, והריצה ממשיכה בלעדיכם.
+
+שני דברים לעשות. קודם כל, לדעת ש-`claude -p` טוען את אותם settings ו-hooks כמו הסשן האינטראקטיבי, כולל managed settings שאתם לא כתבתם. תריצו פעם אחת ידנית מאותו user ומאותה תיקייה שה-cron מריץ, ותראו מה נטען. שנית, לנקות קלט חיצוני לפני שהוא נכנס לפרומפט. אצלנו זו שורה אחת לפני כל קריאה: `re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)`. לתמונות ב-markdown אין מה לחפש בפרומפט שמסכם חדשות.
+
+איך החסימה הזו נראתה מבחוץ, ולמה טבלת הסיכום של ה-cycle סימנה אותה כירוקה, זה בדיוק החומר של חלק 2.
+
+## 06 · timeout, sleep ו-caffeinate
+
+לפני ה-38 דקות היה בוקר שה-pipeline לקח בערך 2.5 שעות, במקום לסיים בין 06:40 ל-06:55. החשוד הראשון היה המודל: tokens, concurrency, rate limits. מדדנו. tavily לבד רץ ב-172 שניות, ו-8 קריאות `claude -p` במקביל חזרו ב-6 שניות. המודל היה בסדר.
+
+ה-`pmset` log סיפר את הסיפור: המק היה על סוללה עם טיימר sleep של 120 שניות, ונרדם 43 שניות אחרי שה-cron העלה את הריצה ב-06:07. ה-agents נתקעו על sockets עד בערך 08:00. מכסה פתוח זה לא מחשב ער.
+
+ה-timeout ב-`subprocess.run` לא הציל אותנו. מחשב שישן לא מריץ את הקוד שאמור לבדוק אם עבר זמן. התיקון: `local-cycle.sh` מריץ את עצמו מחדש תחת `caffeinate`.
+
+```bash title="local-cycle.sh"
+if [ -z "$CAFFEINATED" ]; then
+  export CAFFEINATED=1
+  exec caffeinate -dimsu "$0" "$@"
+fi
+```
+
+ועוד דבר למי שעל מק: אין `timeout` של GNU. אל תעטפו פקודות ב-`timeout 600` בתוך ה-shell script, זה פשוט ייפול. את ה-timeout שימו בקוד Python, ואת ה-caffeinate מעל הכל.
+
+> **הדעה שלי:** חצי מהזמן שבזבזנו על "קלוד איטי" היה בעצם שאלת DevOps על לפטופ עם סוללה. לפני שאתם מחליפים מודל או מורידים concurrency, תפתחו את `pmset -g log`. אני מעדיף מודל איטי על מחשב ער מאשר מודל מהיר על מחשב ישן.
+
+<figure><img src="/posts/claude-in-production-1-headless/v3-svg-he.jpg" alt="ה-pipeline לא היה איטי, הוא ישן: 43 שניות אחרי ההפעלה המק נכנס ל-sleep, ושום timeout לא העיר אותו (pmset log שלנו)" loading="lazy" /><figcaption>ה-pipeline לא היה איטי, הוא ישן: 43 שניות אחרי ההפעלה המק נכנס ל-sleep, ושום timeout לא העיר אותו (pmset log שלנו)</figcaption></figure>
+
+## מה לקחת
+
+- כל קריאה ל-`claude -p` עוברת ב-wrapper אחד. ככה תיקון נכנס פעם אחת ולא עשר.
+- `--output-format json` תמיד, ו-`total_cost_usd` לכל קריאה בלוג. ככה תדעו אם המנוי עדיין משתלם.
+- retry על רשימה סגורה של שגיאות חולפות. refusal ו-hook block עוצרים מיד.
+- פרסר שנכשל זורק חריגה. `{}` שקט הוא הבאג הכי יקר שיש לכם ב-pipeline.

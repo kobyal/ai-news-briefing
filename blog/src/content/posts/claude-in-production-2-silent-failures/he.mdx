@@ -1,0 +1,112 @@
+---
+title: "claude -p בפרודקשן, חלק 2: הבוקר שבו הכל היה success וכלום לא יצא"
+description: "9 בספטמבר: rc=0, subtype success, טבלת סיכום ירוקה ו-0 סיפורים. hook שחוסם בשקט, תיקיית צל, ומה אנחנו בודקים עכשיו אחרי כל קריאת LLM."
+lang: he
+key: claude-in-production-2-silent-failures
+term: "silent failures"
+kind: warstory
+pubDate: 2026-10-01
+tags: ["silent-failures", "claude-code", "llm-ops", "observability", "hooks", "production"]
+hook: "scene"
+tldr: ["אחרי כל קריאה בדקו num_turns>0 ו-result לא ריק, לא רק rc.", "הגדירו רצפת פריטים לכל agent. מתחתיה זה P0, גם כשהכל success.", "בתחילת כל ריצה חפשו תיקיות מנתיבים ישנים. fail path משאיר מוקשים."]
+series: { slug: "claude-in-production", name: "Claude בפרודקשן", part: 2, total: 2 }
+hero: /posts/claude-in-production-2-silent-failures/hero.jpg
+sources:
+  - { title: "Hooks reference - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/hooks", date: "" }
+  - { title: "Three Silent Failures Between You and Sidecar Injection", url: "https://pandocore.io/blog/sidecar-injection-silent-failures", date: "2026-08-13" }
+  - { title: "AI Agent Observability: Detecting Silent AI Failures", url: "https://engineering.salesforce.com/ai-agent-observability-making-silent-production-failures-visible-and-actionable", date: "" }
+opinion: "אנחנו לא חושבים ש-silent failures הן בעיה של מודלים. אצלנו הן תמיד ישבו במה שמסביב למודל: ה-hook, ה-CLI, ה-fail path שכתבנו בעצמנו. תשובה שגויה של מודל אף פעם לא עלתה לנו בוקר שלם, שתיקה כן. לכן כל קריאה עוברת gate אחד משותף ב-shared/ שבודק תוכן ורצפה, ולא קוד יציאה. ובכל מקום שאפשר להחליף שיפוט של מודל בכלל דטרמיניסטי, אנחנו מחליפים, כי לולאה שבודקת את הפלט שווה יותר מ-prompt טוב יותר."
+madeWith: { model: "claude-opus-5-5", sourceCount: 3, reviewedBy: "Koby Almog" }
+---
+
+## 9 בספטמבר, 06:07
+
+ב-2026-09-09 ב-06:07 launchd העיר את המק והריץ את `local-cycle.sh`, כמו כל בוקר מאז מאי. זה גרף של בערך 10 agents. יש מקורות, יש merger שמאחד הכל לבריפינג אחד, יש publish, ובסוף QA evaluator שרץ על מה שכבר עלה לאתר. ביום רגיל יוצאים בערך 11 סיפורים. זה התכנון, לא תקלה.
+
+ה-merger הוא השלב הכבד. קריאת `claude -p` אחת, על המנוי, שמקבלת את כל מה שה-agents אספו. זה כולל טקסט מלא של כתבות שקראנו דרך Jina. מה שחוזר זה JSON עם `news_items`.
+
+בחלק הקודם דיברנו על איך עוטפים את הקריאה הזאת: retries, JSON repair, ולמה לא עושים retry על hook block. הפעם הסיפור הוא מה קורה כשכל העטיפה הזאת עובדת בדיוק כמו שתכננו, והתוצאה עדיין ריקה.
+
+## המייל אמר שהכל ירוק
+
+קצת לפני שבע הגיע מייל הסיכום. טבלה עם שורה לכל שלב, ו-success בכל השורות. ה-merger סיים, ה-publish סיים, הקבצים עלו ל-S3.
+
+רק שבבריפינג של היום היו 0 סיפורים.
+
+בפועל כל שכבה דיווחה אמת על עצמה. התהליך יצא עם rc=0. הפלט של `claude -p` היה JSON תקין, עם `subtype: "success"`. ה-wrapper לא ראה שגיאה חולפת, אז לא עשה retry. ה-publish קיבל מבנה תקין והעלה אותו. אף אחד לא שיקר. פשוט אף אחד לא שאל את השאלה היחידה שחשובה: יצא משהו?
+
+ב-Salesforce, שבנו מערכת ניטור ל-Agentforce, קוראים לזה deceptive green metrics. אצלנו זה היה ממש ירוק, בטבלה, במייל.
+
+אליוט פרסטל מ-Pandocore כתב ב-13 באוגוסט על באג אחר לגמרי: label של Kubernetes ששמים על ה-Deployment במקום על ה-pod template. אבל המשפט שלו מתאר בדיוק את הבוקר הזה:
+
+> It's an easy mistake to ship because nothing anywhere tells you it didn't work.
+
+<figure><img src="/posts/claude-in-production-2-silent-failures/v1-svg-he.jpg" alt="ארבע שכבות אמרו success. רק שתי השורות התחתונות סיפרו את האמת, ואף בדיקה לא הגיעה אליהן (הלוג שלנו, 09-09)" loading="lazy" /><figcaption>ארבע שכבות אמרו success. רק שתי השורות התחתונות סיפרו את האמת, ואף בדיקה לא הגיעה אליהן (הלוג שלנו, 09-09)</figcaption></figure>
+
+## התיקון הראשון: הבאג של אוגוסט
+
+ב-5, 6 ו-7 באוגוסט כבר היו לנו בריפינגים ריקים. שם `claude -p` הקדים ל-JSON פסקה של הערות, ה-parser החזיר `{}`, וה-agents של RSS ו-editorial שלחו בריפינג ריק. אותו סימפטום בדיוק.
+
+אז הלכתי ישר ל-JSON repair. בדקתי את ה-parser, הרצתי אותו על הפלט הגולמי, חיפשתי preamble. לא היה. לא היה מה לתקן, כי ב-`result` לא היה בכלל תוכן של בריפינג.
+
+טוב, אז הרצה חוזרת של ה-merger בלבד. גם ריק. ופה הבנתי שאני מתקן את הבאג הקודם, לא את זה.
+
+> **הדעה שלי:** הטעות הכי יקרה בתחקיר היא לזהות סימפטום מוכר. "בריפינג ריק" נראה אותו דבר בשלוש תקלות שהיו לנו מיוני עד ספטמבר, ובכל אחת הסיבה ישבה במקום אחר. מאז אני מתחיל מהשדות הגולמיים, לא מהזיכרון.
+
+## num_turns=0
+
+השדה שסיפר הכל היה `num_turns`. אפס. המודל לא ענה רע. הוא לא ענה בכלל, כי הוא אף פעם לא ראה את ה-prompt.
+
+על המכונה רץ hook מסוג `UserPromptSubmit` שמוגדר ברמת המכונה (managed), לא אצלנו בריפו. לפי ה-docs של אנטרופיק הוא רץ "When you submit a prompt, before Claude processes it". ה-hook ראה בטקסט של הכתבות embeds של תמונות בפורמט `![Image](url)`, שזה בדיוק מה ש-Jina מחזיר, וחסם. ו-`claude -p` דיווח על החסימה כמו על turn שהסתיים: rc=0, success, אפס turns.
+
+זה פגם אחד. השני היה ה-fail path שלנו. ב-14 ביולי הזזנו את כל ה-agents ל-`agents/active/`. ענף אחד בקוד הכישלון של ה-merger לא עודכן ועדיין כתב לנתיב הישן. התוצאה: תיקייה `merger-agent/` בשורש הריפו. תיקיית צל. מאותו רגע הריצות הבאות מצאו אותה, וה-merger פשוט לא רץ. בלי שגיאה, בלי שורה אדומה בלוג, לכל ריצה שאחרי, עד שמישהו מוחק אותה ביד.
+
+הפגם השלישי היה האמון בטבלת הסיכום. היא מודדת אם תהליך יצא, לא מה הוא הוציא.
+
+בקיצור: hook שחוסם בשקט, CLI שמדווח על חסימה כהצלחה, ו-fail path שהשאיר מוקש. כל אחד לבד היה באג קטן. שלושתם ביחד היו בוקר בלי בריפינג.
+
+<figure><img src="/posts/claude-in-production-2-silent-failures/v2-screenshot-he.jpg" alt="UserPromptSubmit רץ לפני שקלוד רואה את ה-prompt. לכן חסימה מגיעה עם num_turns=0 ולא עם שגיאה (Claude Code hooks reference)" loading="lazy" /><figcaption>UserPromptSubmit רץ לפני שקלוד רואה את ה-prompt. לכן חסימה מגיעה עם num_turns=0 ולא עם שגיאה (Claude Code hooks reference)</figcaption></figure>
+
+## מה אנחנו בודקים עכשיו אחרי כל קריאה
+
+הכלל החדש פשוט: הצלחה של קריאת LLM נמדדת בתוכן, לא בקוד יציאה. כל קריאה עוברת דרך אותו gate ב-`shared/`, כי copy-paste של בדיקות כאלה בין agents כבר עלה לנו בתקלות.
+
+```python title="assert_llm.py"
+import json
+from pathlib import Path
+
+
+class SilentFailure(RuntimeError):
+    pass
+
+
+def assert_llm_result(raw: str, *, floor: int, key: str = 'news_items') -> dict:
+    env = json.loads(raw)  # claude -p --output-format json
+    if env.get('is_error'):
+        sub = env.get('subtype')
+        raise SilentFailure(f'is_error, subtype={sub}')
+    if env.get('num_turns', 0) < 1:
+        raise SilentFailure('num_turns=0: the model never saw the prompt (hook block?)')
+    text = (env.get('result') or '').strip()
+    if not text:
+        raise SilentFailure('rc=0 but result is empty')
+    payload = json.loads(text)  # after your JSON repair step
+    items = payload.get(key) or []
+    if len(items) < floor:
+        raise SilentFailure(f'{key}={len(items)} below floor {floor}')
+    return payload
+
+
+def assert_no_shadow_dirs(repo: Path) -> None:
+    stray = sorted(p.name for p in repo.glob('*-agent') if p.is_dir())
+    if stray:
+        raise SilentFailure(f'pre-migration agent dirs at repo root: {stray}')
+```
+
+שימו לב לסדר. `num_turns` לפני ה-parse, כי ב-hook block אין מה לפרסר. ה-floor אחרון. בגדול, גם refusal מנומס של usage policy וגם preamble שנבלע מגיעים בסוף לאותו מקום: מבנה תקין עם רשימה ריקה. ה-floor תופס את שניהם בלי לדעת מה קרה, וזה בדיוק מה שאנחנו רוצים ממנו.
+
+ה-QA evaluator שרץ אחרי ה-publish הוא שכבה שנייה, לא תחליף. יש לו רצפה לכל agent: כמה פריטים מינימום, כמה ישן הקובץ, האם המערכים בעברית מקבילים לאנגלית. מתחת לרצפה זה P0, גם כשכל השלבים אמרו success. ו-`assert_no_shadow_dirs` רץ בתחילת המחזור, לפני ה-agent הראשון, ולא אחרי שהוא כבר דילג על משהו.
+
+זה משעמם. זה גם הדבר היחיד שהיה תופס את 9 בספטמבר בשבע בבוקר.
+
+rc=0 אומר שהתהליך יצא. לא שמשהו קרה.

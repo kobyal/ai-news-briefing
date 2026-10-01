@@ -1,0 +1,10 @@
+---
+import { getCollection } from 'astro:content';
+import Series from '../../../components/Series.astro';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts', (p) => p.data.lang === 'en' && !p.data.draft && !!p.data.series);
+  return [...new Set(posts.map((p) => p.data.series!.slug))].map((slug) => ({ params: { slug } }));
+}
+---
+<Series lang="en" slug={Astro.params.slug!} />

@@ -2,6 +2,7 @@
 import { getCollection, render, type CollectionEntry } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import PostList from './PostList.astro';
+import SeriesNav from './SeriesNav.astro';
 import { fmtDate, postHref, readingMinutes, t, type Lang } from '../lib/i18n';
 import { marked } from 'marked';
 
@@ -9,12 +10,14 @@ interface Props { lang: Lang; post: CollectionEntry<'posts'> }
 const { lang, post } = Astro.props;
 const s = t(lang);
 const d = post.data;
-const { Content } = await render(post);
+const { Content, headings } = await render(post);
 const opinionHtml = marked.parse(d.opinion);
+const words = (post.body ?? '').split(/\s+/).length;
 const minutes = readingMinutes(post.body ?? '');
+const toc = words > 1100 ? headings.filter((h) => h.depth === 2) : [];
 const path = postHref(lang, d.key);
 const site = 'https://blog.aibriefing.dev';
-const related = (await getCollection('posts', (p) => p.data.lang === lang && !p.data.draft && p.data.key !== d.key))
+const related = (await getCollection('posts', (p) => p.data.lang === lang && !p.data.draft && p.data.key !== d.key && p.data.series?.slug !== d.series?.slug))
   .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime())
   .slice(0, 3);
 const jsonLd = {
@@ -31,10 +34,12 @@ const jsonLd = {
   publisher: { '@type': 'Organization', name: 'AI Briefing', url: 'https://aibriefing.dev' },
   keywords: [d.term, ...d.tags].join(', '),
   citation: d.sources.map((x) => x.url),
+  ...(d.series ? { isPartOf: { '@type': 'CreativeWorkSeries', name: d.series.name, url: site + (lang === 'he' ? `/series/${d.series.slug}/` : `/en/series/${d.series.slug}/`) }, position: d.series.part } : {}),
 };
 ---
 <Base lang={lang} title={`${d.title} — AI Briefing Blog`} description={d.description} image={d.hero} type="article" jsonLd={jsonLd}>
   <main class="wrap article">
+    {d.series && <SeriesNav lang={lang} post={post} />}
     <div class="byline mono"><span class="term">{d.term}</span><span class="dot">·</span><span>{fmtDate(d.pubDate, lang)}</span><span class="dot">·</span><span>{minutes} {s.minutes}</span></div>
     <h1>{d.title}</h1>
     <p class="lede">{d.description}</p>
@@ -49,6 +54,20 @@ const jsonLd = {
           <source src={d.video} type="video/mp4" />
         </video>
       </div>
+    )}
+
+    {d.tldr.length > 0 && (
+      <aside class="tldr">
+        <div class="label mono">{s.tldr}</div>
+        <ul>{d.tldr.map((x) => <li>{x}</li>)}</ul>
+      </aside>
+    )}
+
+    {toc.length > 2 && (
+      <nav class="toc">
+        <div class="label mono">{s.contents}</div>
+        <ol>{toc.map((h) => <li><a href={`#${h.slug}`}>{h.text}</a></li>)}</ol>
+      </nav>
     )}
 
     <div class="prose">
@@ -78,6 +97,7 @@ const jsonLd = {
         <div class="r">{s.authorRole} · <a href="https://aibriefing.dev/about/">{s.about}</a></div>
       </div>
     </div>
+    {d.series && <SeriesNav lang={lang} post={post} />}
   </main>
 
   {related.length > 0 && (

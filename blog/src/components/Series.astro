@@ -1,0 +1,27 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import PostList from './PostList.astro';
+import { t, type Lang } from '../lib/i18n';
+
+// Series hub: /series/<slug>/ — cover of part 1, name, the parts in order.
+interface Props { lang: Lang; slug: string }
+const { lang, slug } = Astro.props;
+const s = t(lang);
+const parts = (await getCollection('posts', (p) => p.data.lang === lang && !p.data.draft && p.data.series?.slug === slug))
+  .sort((a, b) => a.data.series!.part - b.data.series!.part);
+if (!parts.length) return Astro.redirect(lang === 'he' ? '/' : '/en/');
+const ser = parts[0].data.series!;
+const alt = lang === 'he' ? `/en/series/${slug}/` : `/series/${slug}/`;
+---
+<Base lang={lang} title={`${ser.name} — AI Briefing Blog`} description={parts[0].data.description} image={parts[0].data.hero} altHref={alt}>
+  <main class="wrap-wide">
+    <section class="front series-front">
+      <div class="mono">{s.series} · {parts.length}/{ser.total}</div>
+      <h1>{ser.name}</h1>
+      <p class="lede">{parts[0].data.description}</p>
+    </section>
+    <hr class="rule heavy" />
+    <PostList lang={lang} posts={parts} numbered />
+  </main>
+</Base>

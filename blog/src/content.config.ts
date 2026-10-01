@@ -11,7 +11,11 @@ const posts = defineCollection({
     description: z.string().max(200),
     lang: z.enum(['he', 'en']),
     key: z.string(),                    // shared between he/en, = folder name = URL slug
-    term: z.string(),                   // the English term this post explains
+    term: z.string(),                   // the English term/tool this post is about
+    kind: z.enum(['explainer', 'fieldnotes', 'warstory', 'faq', 'deepdive']).default('explainer'),
+    hook: z.string().optional(),        // opener type the writer used (scene|number|claim|quote|question)
+    tldr: z.array(z.string()).max(4).default([]),
+    series: z.object({ slug: z.string(), name: z.string(), part: z.number(), total: z.number() }).optional(),
     pubDate: z.coerce.date(),
     updatedDate: z.coerce.date().optional(),
     tags: z.array(z.string()).default([]),

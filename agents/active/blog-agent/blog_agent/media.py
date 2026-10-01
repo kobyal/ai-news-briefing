@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import html
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -88,13 +89,35 @@ def _seeded(key: str):
     return h, rnd
 
 
-def _constellation(key: str) -> tuple[str, str]:
-    """Seeded node graph in the key's hue: same key → same artwork, forever."""
+def _art(key: str, style: str | None = None, hue: str | None = None) -> tuple[str, str]:
+    """Seeded cover artwork. style ∈ constellation|grid|bars|rings (default: by key hash);
+    `hue` pins a colour (a series keeps one hue + one style so its parts look like a set)."""
     seed, rnd = _seeded(key)
-    hue = _HUES[seed % len(_HUES)]
+    hue = hue or _HUES[seed % len(_HUES)]
+    style = style or ["constellation", "grid", "bars", "rings"][(seed >> 8) % 4]
+    g = [f'<defs><radialGradient id="g" cx="80%" cy="20%" r="80%"><stop offset="0" stop-color="{hue}" stop-opacity=".22"/><stop offset="1" stop-color="{hue}" stop-opacity="0"/></radialGradient></defs>',
+         '<rect width="1200" height="630" fill="url(#g)"/>']
+    if style == "grid":  # swarm of cells, a few lit
+        for r in range(9):
+            for c in range(18):
+                lit = rnd() < 0.12
+                g.append(f'<rect x="{60 + c * 60}" y="{40 + r * 60}" width="38" height="38" rx="6" fill="{hue}" fill-opacity="{0.9 if lit else 0.10 + rnd() * 0.08:.2f}"/>')
+        return "".join(g), hue
+    if style == "bars":  # horizontal bars of random length, one accent
+        for i in range(11):
+            w = 120 + rnd() * 900; acc = rnd() < 0.18
+            g.append(f'<rect x="60" y="{40 + i * 50}" width="{w:.0f}" height="26" rx="4" fill="{hue}" fill-opacity="{0.85 if acc else 0.12 + rnd() * 0.1:.2f}"/>')
+        return "".join(g), hue
+    if style == "rings":  # concentric rings off-centre
+        cx, cy = 900 + rnd() * 200, 120 + rnd() * 200
+        for i in range(14):
+            g.append(f'<circle cx="{cx:.0f}" cy="{cy:.0f}" r="{40 + i * 48}" fill="none" stroke="{hue}" stroke-opacity="{0.55 - i * 0.035:.2f}" stroke-width="{1 + (i % 3 == 0) * 2}"/>')
+        return "".join(g), hue
+    return _constellation_body(rnd, hue, g), hue
+
+
+def _constellation_body(rnd, hue: str, out: list[str]) -> str:
     pts = [(80 + rnd() * 1040, 40 + rnd() * 550, 2 + rnd() * 7) for _ in range(34)]
-    out = [f'<defs><radialGradient id="g" cx="80%" cy="20%" r="80%"><stop offset="0" stop-color="{hue}" stop-opacity=".22"/><stop offset="1" stop-color="{hue}" stop-opacity="0"/></radialGradient></defs>',
-           '<rect width="1200" height="630" fill="url(#g)"/>']
     for i, (x, y, r) in enumerate(pts):
         near = sorted(((j, (x - a) ** 2 + (y - b) ** 2) for j, (a, b, _) in enumerate(pts) if j != i), key=lambda t: t[1])[:2]
         for j, _ in near:
@@ -102,11 +125,11 @@ def _constellation(key: str) -> tuple[str, str]:
                 out.append(f'<line x1="{x:.0f}" y1="{y:.0f}" x2="{pts[j][0]:.0f}" y2="{pts[j][1]:.0f}" stroke="{hue}" stroke-opacity=".28" stroke-width="1"/>')
     for x, y, r in pts:
         out.append(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{r:.1f}" fill="{hue}" fill-opacity="{0.35 + r / 12:.2f}"/>')
-    return "".join(out), hue
+    return "".join(out)
 
 
-def hero(key: str, lang: str, term: str, title: str, sub: str) -> str | None:
-    """Cover for one language. `sub` is the small top-right line (the ISO publish date)."""
+def hero(key: str, lang: str, term: str, title: str, sub: str, style: str | None = None, hue: str | None = None) -> str | None:
+    """Cover for one language. `sub` is the small top-right line (the ISO publish date); style/hue pin a series identity."""
     d = out_dir(key)
     name = "hero.jpg" if lang == "he" else "hero-en.jpg"
     fs = 34 if len(title) < 50 else 28
@@ -114,7 +137,7 @@ def hero(key: str, lang: str, term: str, title: str, sub: str) -> str | None:
     tfs = 150 if tl <= 12 else 120 if tl <= 18 else 92 if tl <= 26 else 70
     words = html.escape(term.lower()).split(" ")
     term_html = " ".join(words[:-1]) + (" " if len(words) > 1 else "") + f"<i>{words[-1]}</i>"  # last word in the hue
-    art, hue = _constellation(key)
+    art, hue = _art(key, style, hue)
     page = _HERO_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", term_html=term_html, title=html.escape(title),
                              fs=fs, tfs=tfs, art=art, hue=hue, date=sub)
     tmp = d / f"_hero-{lang}.html"; tmp.write_text(page, encoding="utf-8")
@@ -204,7 +227,7 @@ h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:44px;font-weight:700;
 h2{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:32px;font-weight:700;margin:0 0 18px}}
 .col.r h2{{color:#3730a3}}
 li{{font-size:28px;line-height:1.4;margin-bottom:14px;color:#3b3b4f}} ul{{padding-inline-start:26px;margin:0}} li::marker{{color:#4f46e5}}
-.brand{{position:absolute;bottom:28px;inset-inline-end:72px;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:18px;color:#a0a0b2;direction:ltr}}
+.brand{{position:absolute;bottom:28px;right:72px;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:18px;color:#a0a0b2;direction:ltr}}
 </style></head><body><div class="card"><h1>{title}</h1><div class="cols">
 <div class="col l"><h2>{lt}</h2><ul>{li}</ul></div><div class="col r"><h2>{rt}</h2><ul>{ri}</ul></div></div>
 <div class="brand">blog.aibriefing.dev</div></div></body></html>"""
@@ -213,7 +236,7 @@ li{{font-size:28px;line-height:1.4;margin-bottom:14px;color:#3b3b4f}} ul{{paddin
 _CARD_CSS = """@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@500;700;800&display=swap');
 html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#12121c}}
 .card{{position:relative;width:1200px;height:675px;overflow:hidden;background:#fbfbf9;padding:56px 72px 72px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
-.brand{{position:absolute;bottom:28px;inset-inline-end:72px;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:18px;color:#a0a0b2;direction:ltr}}
+.brand{{position:absolute;bottom:28px;right:72px;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:18px;color:#a0a0b2;direction:ltr}}
 """
 
 _QUOTE_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>""" + _CARD_CSS + """
@@ -233,6 +256,83 @@ h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:40px;font-weight:700;
 .what{{font-size:28px;line-height:1.3;margin-top:2px}}
 </style></head><body><div class="card"><h1>{title}</h1><div class="tl">{events}</div>
 <div class="brand">blog.aibriefing.dev</div></div></body></html>"""
+
+
+_STRIP_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@700;800&display=swap');
+html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#fbfbf9}}
+.card{{width:1200px;height:420px;background:#12121c;padding:56px 72px;box-sizing:border-box;display:grid;grid-template-columns:repeat({n},1fr);gap:40px;align-items:center;position:relative}}
+.it{{border-inline-start:2px solid rgba(251,251,249,.18);padding-inline-start:26px}}
+.v{{font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:96px;line-height:1;letter-spacing:-.03em;color:{hue};direction:ltr;text-align:start}}
+.l{{font-size:24px;line-height:1.3;margin-top:14px;color:rgba(251,251,249,.85)}}
+.brand{{position:absolute;bottom:22px;right:72px;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:16px;color:rgba(251,251,249,.4);direction:ltr}}
+</style></head><body><div class="card">{items}<div class="brand">blog.aibriefing.dev</div></div></body></html>"""
+
+_BOXES_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@700;800&display=swap');
+html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#12121c}}
+.card{{position:relative;width:1200px;height:675px;background:#fbfbf9;padding:52px 72px 64px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
+h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:40px;font-weight:700;margin:0 0 6px;line-height:1.15}}
+.sub{{font-family:ui-monospace,Menlo,monospace;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:#6d6d80;margin-bottom:34px;unicode-bidi:plaintext}}
+.row{{display:flex;align-items:center;gap:14px;margin-bottom:22px;flex-wrap:wrap}}
+.lab{{font-family:ui-monospace,Menlo,monospace;font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:#3b3b4f;min-width:230px}}
+.bx{{font-family:ui-monospace,Menlo,monospace;font-size:17px;padding:10px 16px;border-radius:5px;white-space:nowrap;unicode-bidi:plaintext}}
+.ink{{background:#12121c;color:#fbfbf9}} .accent{{background:{hue};color:#12121c}} .muted{{background:#e9e9e2;color:#6d6d80}} .ghost{{border:1.5px dashed #cfcfc6;color:#a0a0b2}}
+.note{{font-family:ui-monospace,Menlo,monospace;font-size:15px;color:#3730a3;margin-inline-start:auto;white-space:nowrap;direction:ltr;unicode-bidi:isolate}}
+.tag{{position:absolute;bottom:24px;left:72px;font-family:ui-monospace,Menlo,monospace;font-size:13px;letter-spacing:.12em;text-transform:uppercase;background:#12121c;color:#fbfbf9;padding:6px 12px;direction:ltr}}
+.brand{{position:absolute;bottom:24px;right:72px;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:18px;color:#a0a0b2;direction:ltr}}
+</style></head><body><div class="card"><h1>{title}</h1><div class="sub">{sub}</div>{rows}
+<div class="tag">{tag}</div><div class="brand">blog.aibriefing.dev</div></div></body></html>"""
+
+_CHART_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@700;800&display=swap');
+html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#12121c}}
+.card{{position:relative;width:1200px;height:675px;background:#fbfbf9;padding:52px 72px 72px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
+h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:40px;font-weight:700;margin:0 0 30px;line-height:1.15}}
+.r{{display:grid;grid-template-columns:300px 1fr 150px;align-items:center;gap:22px;margin-bottom:18px}}
+.k{{font-size:22px;color:#3b3b4f;text-align:end}} .b{{height:34px;border-radius:4px;background:#12121c}} .b.acc{{background:{hue}}}
+.v{{font-family:ui-monospace,Menlo,monospace;font-size:22px;color:#12121c;direction:ltr;text-align:start}}
+.src{{position:absolute;bottom:26px;left:72px;font-size:15px;color:#6d6d80;max-width:760px}}
+.brand{{position:absolute;bottom:24px;right:72px;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:18px;color:#a0a0b2;direction:ltr}}
+</style></head><body><div class="card"><h1>{title}</h1>{rows}<div class="src">{source}</div><div class="brand">blog.aibriefing.dev</div></div></body></html>"""
+
+_TRANSCRIPT_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&display=swap');
+html{{overflow:hidden}} body{{margin:0;font-family:ui-monospace,Menlo,monospace;color:#e6e6f0}}
+.card{{position:relative;width:1200px;min-height:420px;background:#12121c;padding:0;box-sizing:border-box}}
+.bar{{display:flex;align-items:center;gap:10px;padding:16px 24px;background:#1c1c2a;font-size:14px;color:#9a9ab8}}
+.bar i{{width:12px;height:12px;border-radius:50%;background:#3b3b4f;display:inline-block}}
+.body{{padding:28px 32px 64px;font-size:17px;line-height:1.6;white-space:pre-wrap;direction:ltr;text-align:left}}
+.p{{color:{hue}}} .p::before{{content:"$ "}} .o{{color:#e6e6f0;margin-top:18px;display:block;font-family:Heebo,system-ui,sans-serif;unicode-bidi:plaintext}}
+.foot{{position:absolute;bottom:18px;left:32px;right:32px;display:flex;justify-content:space-between;font-size:13px;color:#6b6b8a}}
+</style></head><body><div class="card"><div class="bar"><i></i><i></i><i></i><span>{label}</span></div>
+<div class="body"><span class="p">{prompt}</span><span class="o">{output}</span></div>
+<div class="foot"><span>{meta}</span><span>blog.aibriefing.dev</span></div></div></body></html>"""
+
+
+def _screenshot(url: str, out: Path, crop: str | None = None) -> None:
+    """Real screenshot of a source page (Simon Willison style) with a house frame: 1200 wide, top of page."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        b = p.chromium.launch(channel="chrome")
+        pg = b.new_page(viewport={"width": 1200, "height": 675}, device_scale_factor=1)
+        pg.goto(url, wait_until="domcontentloaded", timeout=25000); pg.wait_for_timeout(1800)
+        for sel in ("[id*=cookie] button", "[class*=cookie] button", "button:has-text('Accept')"):  # best effort
+            try: pg.locator(sel).first.click(timeout=600)
+            except Exception: pass
+        if crop:
+            pg.locator(crop).first.screenshot(path=str(out), type="jpeg", quality=86)
+        else:
+            pg.screenshot(path=str(out), type="jpeg", quality=86)
+        b.close()
+
+
+def _transcript(prompt: str, lang: str) -> tuple[str, str]:
+    """Actually run the writer's prompt once (subscription) so the card shows a REAL output, not an imagined one."""
+    from shared import anthropic_cc
+    t0 = __import__("time").time()
+    text = anthropic_cc.agent(prompt, instructions="Answer in at most 90 words. Plain text, no markdown, no preamble.", label="BLOG-transcript", effort="low")
+    return text.strip(), f"claude · {__import__('time').time() - t0:.1f}s"
 
 
 def _shoot(page_html: str, out: Path, w: int, h: int):
@@ -292,6 +392,43 @@ def visuals(key: str, lang: str, items: list[dict]) -> list[dict]:
                 ev_html = "".join(f'<div class="ev{" last" if i == len(evs) - 1 else ""}"><span class="when">{html.escape(str(e.get("when", "")))}</span><div class="what">{html.escape(str(e.get("what", "")))}</div></div>' for i, e in enumerate(evs))
                 _shoot(_TIMELINE_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", title=html.escape(str(v.get("title", ""))), events=ev_html), f, 1200, 675)
                 cap = str(v.get("title", ""))
+            elif kind == "strip":
+                f = d / f"{stem}.jpg"
+                its = [x for x in v.get("items", []) if isinstance(x, dict)][:4]
+                items = "".join(f'<div class="it"><div class="v">{html.escape(str(x.get("value", "")))}</div><div class="l">{html.escape(str(x.get("label", "")))}</div></div>' for x in its)
+                _shoot(_STRIP_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", n=max(1, len(its)), items=items, hue=_HUES[_seeded(key)[0] % len(_HUES)]), f, 1200, 420)
+                cap = v.get("caption", "")
+            elif kind == "boxes":
+                f = d / f"{stem}.jpg"
+                rows = ""
+                for r in [x for x in v.get("rows", []) if isinstance(x, dict)][:5]:
+                    bx = "".join(f'<span class="bx {html.escape(str(b.get("tone", "muted")))}">{html.escape(str(b.get("text", "")))}</span>' for b in r.get("boxes", [])[:8] if isinstance(b, dict))
+                    note = f'<span class="note">{html.escape(str(r["note"]))}</span>' if r.get("note") else ""
+                    rows += f'<div class="row"><span class="lab">{html.escape(str(r.get("label", "")))}</span>{bx}{note}</div>'
+                _shoot(_BOXES_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", title=html.escape(str(v.get("title", ""))), sub=html.escape(str(v.get("sub", ""))),
+                                          rows=rows, tag=html.escape(str(v.get("tag", ""))), hue=_HUES[_seeded(key)[0] % len(_HUES)]), f, 1200, 675)
+                cap = v.get("caption") or v.get("title", "")
+            elif kind == "chart":
+                f = d / f"{stem}.jpg"
+                bars = [x for x in v.get("bars", []) if isinstance(x, dict) and str(x.get("value", "")).strip()][:6]
+                nums = []
+                for x in bars:
+                    m = re.search(r"[\d.,]+", str(x["value"])); nums.append(float(m.group(0).replace(",", "")) if m else 0.0)
+                mx = max(nums) or 1.0
+                rows = "".join(f'<div class="r"><div class="k">{html.escape(str(x.get("label", "")))}</div><div><div class="b{" acc" if x.get("highlight") else ""}" style="width:{max(2, 100 * n / mx):.0f}%"></div></div><div class="v">{html.escape(str(x["value"]))}</div></div>' for x, n in zip(bars, nums))
+                _shoot(_CHART_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", title=html.escape(str(v.get("title", ""))), rows=rows, source=html.escape(str(v.get("source", ""))), hue=_HUES[_seeded(key)[0] % len(_HUES)]), f, 1200, 675)
+                cap = v.get("caption") or v.get("title", "")
+            elif kind == "screenshot":
+                f = d / f"{stem}.jpg"
+                _screenshot(str(v.get("url", "")), f, v.get("crop"))
+                cap = v.get("caption", "")
+            elif kind == "transcript":
+                f = d / f"{stem}.jpg"
+                prompt = str(v.get("prompt", "")).strip()
+                output, meta = _transcript(prompt, lang)
+                _shoot(_TRANSCRIPT_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", label=html.escape(str(v.get("label", "claude -p"))), prompt=html.escape(prompt),
+                                               output=html.escape(output), meta=html.escape(meta), hue=_HUES[_seeded(key)[0] % len(_HUES)]), f, 1200, 420)
+                cap = v.get("caption", "")
             elif kind == "d2":
                 src = d / f"{stem}.d2"; f = d / f"{stem}.svg"
                 d2 = v.get("d2", "").strip()
@@ -302,6 +439,7 @@ def visuals(key: str, lang: str, items: list[dict]) -> list[dict]:
                 cap = v.get("caption", "")
             else:
                 continue
+            cap = v.get("caption") or cap  # captions argue (writer rule); fall back to the title/label
             out.append({"after": v.get("after"), "src": f"/posts/{key}/{f.name}", "caption": cap})
             print(f"  media: visual {stem} ok ({f.stat().st_size // 1024} KB)")
         except subprocess.CalledProcessError as e:

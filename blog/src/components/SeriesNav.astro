@@ -1,0 +1,35 @@
+---
+import { getCollection, type CollectionEntry } from 'astro:content';
+import { postHref, seriesHref, t, type Lang } from '../lib/i18n';
+
+// Part N/M chip + previous/next within a series; rendered on post pages when `series` is set.
+interface Props { lang: Lang; post: CollectionEntry<'posts'> }
+const { lang, post } = Astro.props;
+const s = t(lang);
+const ser = post.data.series!;
+const parts = (await getCollection('posts', (p) => p.data.lang === lang && !p.data.draft && p.data.series?.slug === ser.slug))
+  .sort((a, b) => (a.data.series!.part - b.data.series!.part));
+const idx = parts.findIndex((p) => p.data.key === post.data.key);
+const prev = idx > 0 ? parts[idx - 1] : null;
+const next = idx >= 0 && idx < parts.length - 1 ? parts[idx + 1] : null;
+---
+<nav class="series-nav">
+  <a class="series-chip" href={seriesHref(lang, ser.slug)}>
+    <span class="mono">{s.series}</span>
+    <b>{ser.name}</b>
+    <span class="part">{s.partOf.replace('{n}', String(ser.part)).replace('{m}', String(ser.total))}</span>
+  </a>
+  <div class="series-steps" aria-hidden="true">
+    {Array.from({ length: ser.total }, (_, i) => {
+      const p = parts.find((x) => x.data.series!.part === i + 1);
+      const cls = i + 1 === ser.part ? 'on' : p ? 'done' : '';
+      return p ? <a class={cls} href={postHref(lang, p.data.key)} title={p.data.title}>{i + 1}</a> : <span class={cls}>{i + 1}</span>;
+    })}
+  </div>
+  {(prev || next) && (
+    <div class="series-pn">
+      {prev ? <a href={postHref(lang, prev.data.key)}><span class="mono">{s.prevPart}</span><span>{prev.data.title}</span></a> : <span />}
+      {next ? <a class="nx" href={postHref(lang, next.data.key)}><span class="mono">{s.nextPart}</span><span>{next.data.title}</span></a> : <span />}
+    </div>
+  )}
+</nav>

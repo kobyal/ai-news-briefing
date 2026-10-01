@@ -2,7 +2,7 @@
 import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import PostList from './PostList.astro';
-import { fmtDate, postHref, readingMinutes, t, type Lang } from '../lib/i18n';
+import { fmtDate, postHref, seriesHref, t, type Lang } from '../lib/i18n';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -11,6 +11,10 @@ const posts = (await getCollection('posts', (p) => p.data.lang === lang && !p.da
   .sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
 const [featured, ...rest] = posts;
 const terms = [...posts].sort((a, b) => a.data.term.localeCompare(b.data.term));
+// Series hubs: one card per series, cover of its first part, newest series first.
+const seriesMap = new Map<string, typeof posts>();
+for (const p of posts) if (p.data.series) seriesMap.set(p.data.series.slug, [...(seriesMap.get(p.data.series.slug) ?? []), p]);
+const series = [...seriesMap.values()].map((parts) => parts.sort((a, b) => a.data.series!.part - b.data.series!.part));
 ---
 <Base lang={lang} title={`AI Briefing Blog — ${s.heroTitle}`} description={s.heroLede}>
   <main class="wrap-wide">
@@ -30,6 +34,28 @@ const terms = [...posts].sort((a, b) => a.data.term.localeCompare(b.data.term));
           <span class="more">{s.readMore} →</span>
         </div>
       </a>
+    )}
+
+    {series.length > 0 && (
+      <>
+        <hr class="rule" />
+        <div class="section-head"><h2>{s.seriesAll}</h2></div>
+        <div class="series-grid">
+          {series.map((parts) => {
+            const ser = parts[0].data.series!;
+            return (
+              <a class="series-card" href={seriesHref(lang, ser.slug)}>
+                <div class="cover">{parts[0].data.hero && <img src={parts[0].data.hero} alt="" loading="lazy" width="1200" height="630" />}</div>
+                <div class="body">
+                  <div class="mono">{s.series} · {parts.length}/{ser.total}</div>
+                  <h3>{ser.name}</h3>
+                  <ol>{parts.map((p) => <li>{p.data.title}</li>)}</ol>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </>
     )}
 
     {rest.length > 0 && (

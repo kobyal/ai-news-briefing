@@ -19,7 +19,8 @@ def _yaml_str(s: str) -> str:
     return json.dumps(s, ensure_ascii=False)
 
 
-def write_mdx(post: dict, media: dict, model: str, pub: date, draft: bool = False) -> list[Path]:
+def write_mdx(post: dict, media: dict, model: str, pub: date, draft: bool = False, series: dict | None = None) -> list[Path]:
+    """`series` = {slug, name, name_en, part, total} when the post is a series part."""
     key = post["key"]
     d = POSTS / key
     d.mkdir(parents=True, exist_ok=True)
@@ -32,9 +33,14 @@ def write_mdx(post: dict, media: dict, model: str, pub: date, draft: bool = Fals
             f"title: {_yaml_str(p['title'])}",
             f"description: {_yaml_str(p['description'][:200])}",
             f"lang: {lang}", f"key: {key}", f"term: {_yaml_str(post['term'])}",
+            f"kind: {post.get('kind') or 'explainer'}",
             f"pubDate: {pub.isoformat()}",
             "tags: " + json.dumps(post.get("tags") or [], ensure_ascii=False),
         ]
+        if post.get("hook"): fm.append(f"hook: {_yaml_str(str(post['hook']))}")
+        if p.get("tldr"): fm.append("tldr: " + json.dumps([str(x) for x in p["tldr"]][:4], ensure_ascii=False))
+        if series:
+            fm.append(f"series: {{ slug: {_yaml_str(series['slug'])}, name: {_yaml_str(series['name_en'] if lang == 'en' else series['name'])}, part: {series['part']}, total: {series['total']} }}")
         if hero: fm.append(f"hero: {hero}")
         if media.get("diagram"): fm.append(f"diagram: {media['diagram']}")
         if vid:
@@ -47,7 +53,9 @@ def write_mdx(post: dict, media: dict, model: str, pub: date, draft: bool = Fals
         fm.append(f"madeWith: {{ model: {_yaml_str(model)}, sourceCount: {len(post['sources'])}, reviewedBy: \"Koby Almog\" }}")
         if draft: fm.append("draft: true")
         body = p["body_md"].strip()
-        figs = [{"after": 1, "src": media["diagram"], "caption": "איך זה עובד" if lang == "he" else "How it fits together"}] if media.get("diagram") else []
+        # The diagram lands after the section whose heading mentions the mechanism (2nd section by default so the
+        # opening isn't always "text → diagram"); its caption is the post's own description of the mechanism.
+        figs = [{"after": 2, "src": media["diagram"], "caption": p.get("diagram_caption") or ("איך המנגנון עובד" if lang == "he" else "How the mechanism works")}] if media.get("diagram") else []
         figs += media.get(f"visuals_{lang}") or []
         body = _insert_figures(body, figs)
         f = d / f"{lang}.mdx"

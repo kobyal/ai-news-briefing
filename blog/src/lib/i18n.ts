@@ -8,6 +8,14 @@ const STRINGS = {
     heroTitle: 'מאחורי כל באזוורד יש מנגנון.',
     heroLede: 'המונחים שכולם זורקים בהנדסת AI, מפורקים לחלקים: מאיפה זה הגיע, מה זה עושה בפועל, ומה אנחנו חושבים אחרי שהרצנו את זה בעצמנו.',
     latest: 'החדש ביותר',
+    series: 'סדרה',
+    seriesAll: 'סדרות',
+    partOf: 'חלק {n} מתוך {m}',
+    prevPart: 'החלק הקודם',
+    nextPart: 'החלק הבא',
+    tldr: 'אמ;לק',
+    contents: 'בפוסט הזה',
+    figure: 'איור',
     more: 'עוד מונחים',
     allTerms: 'כל המונחים',
     readMore: 'לקריאה',
@@ -28,6 +36,14 @@ const STRINGS = {
     heroTitle: 'Behind every buzzword there is a mechanism.',
     heroLede: 'The terms everyone throws around in AI engineering, taken apart: where it came from, what it actually does, and what we think after running it ourselves.',
     latest: 'Latest',
+    series: 'Series',
+    seriesAll: 'Series',
+    partOf: 'Part {n} of {m}',
+    prevPart: 'Previous part',
+    nextPart: 'Next part',
+    tldr: 'TL;DR',
+    contents: 'In this post',
+    figure: 'Fig.',
     more: 'More terms',
     allTerms: 'All terms',
     readMore: 'Read',
@@ -63,3 +79,4 @@ export function readingMinutes(text: string): number {
 }
 
 export const postHref = (lang: Lang, key: string) => (lang === 'he' ? `/${key}/` : `/en/${key}/`);
+export const seriesHref = (lang: Lang, slug: string) => (lang === 'he' ? `/series/${slug}/` : `/en/series/${slug}/`);

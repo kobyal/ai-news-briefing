@@ -1,9 +1,16 @@
 """Two LLM calls per post via shared.anthropic_cc: Hebrew post (canonical), then English mirror.
 
 Output contract (post.json) — everything publish.py/media.py need:
-  key, term, tags[], sources[{title,url,date}], diagram_d2,
-  he: {title, description, body_md, opinion_md, video_scenes[]},
-  en: {title, description, body_md, opinion_md, video_scenes[]}
+  key, term, kind, hook, tags[], sources[{title,url,date}], diagram_d2,
+  he: {title, description, tldr[], body_md, opinion_md, visuals[], video_scenes[]},
+  en: {title, description, tldr[], body_md, opinion_md, visuals[], video_scenes[]}
+
+Post kinds (templates) — picked by the series plan or by the model, never the same as the last post:
+  explainer   a term, 700–1100 words, sections chosen from a menu
+  fieldnotes  numbered "01 · " steps with a real transcript/code, 900–1400 words (Ricker / Simon Willison)
+  warstory    one incident told in order → what it taught → what to assert, 700–1100 words
+  faq         6–9 real questions as ## headings, 600–1000 words (Stratechery)
+  deepdive    a product/tool up close: what it is, hands-on, limits, vs. the obvious alternative, 1100–1700 words
 """
 from __future__ import annotations
 
@@ -18,7 +25,11 @@ from shared.json_repair import parse_json
 HERE = Path(__file__).resolve().parent.parent
 HOUSE = (HERE / "house_positions.md").read_text(encoding="utf-8")
 
-SYSTEM_HE = """You write the AI Briefing blog (blog.aibriefing.dev): one AI-engineering term a week, explained
+KINDS = ("explainer", "fieldnotes", "warstory", "faq", "deepdive")
+HOOKS = ("scene", "number", "claim", "quote", "question")
+VISUAL_KINDS = {"steps", "stat", "compare", "quote", "timeline", "d2", "strip", "boxes", "chart", "screenshot", "transcript"}
+
+SYSTEM_HE = """You write the AI Briefing blog (blog.aibriefing.dev): AI-engineering terms and tools explained
 in HEBREW for Israeli engineers, with a clear house opinion. Author of record: Koby Almog.
 
 VOICE — this is the whole point, get it right:
@@ -52,53 +63,81 @@ HOW ISRAELI ENGINEERS ACTUALLY WRITE (calibrate on this — the reader must not 
 HOUSE POSITIONS (the opinion section MUST come from these, first person plural, never invent a stance):
 {house}
 
-STRUCTURE of body_md (Markdown, ## headings, 700–1100 Hebrew words total) — CHOOSE IT FOR THIS TERM.
-Three posts in a row with the same skeleton is embarrassing; a reader should not be able to predict the next section.
-Pick 4–6 sections from this menu (or invent one that fits better), in the order that tells THIS story, and write
-each heading for this post (short, specific, Hebrew — never the generic menu labels):
-  origin (who/when/what problem)  ·  definition + what it is NOT  ·  the mechanism step by step  ·  a worked example
-  with real numbers  ·  a short incident/war story from a source  ·  how to do it (practices)  ·  tradeoffs / when
-  NOT to  ·  who is using it in production  ·  a comparison to the neighbouring term  ·  what to try this week
-  ·  a first-hand paragraph from our own pipeline (from HOUSE POSITIONS "Things we actually do")
-Also vary the opening: sometimes a concrete scene from a source, sometimes a number, sometimes the definition in one
-line — not the same "the term came from..." every time. A code block ONLY if the reader would paste it; a table only
-if it compares ≥3 things. Do NOT put the opinion inside body_md; it goes in opinion_md (3–6 sentences, "אנחנו").
+STRUCTURE of body_md — THE TEMPLATE IS GIVEN IN THE PROMPT AS `KIND`. Follow it; do not blend templates.
+  explainer  → 4–6 ## sections picked from: origin · definition + what it is NOT · the mechanism step by step ·
+               worked example with real numbers · a short incident from a source · how to do it · tradeoffs / when
+               NOT to · who runs it in production · vs. the neighbouring term · what to try this week · a first-hand
+               paragraph from our pipeline. Headings are specific to THIS post, never the menu labels. 700–1100 words.
+  fieldnotes → numbered steps: every ## heading starts with "01 · ", "02 · " … (4–7 steps). Each step = what you do,
+               what you see, one concrete artefact (command, config, output). One step MUST be backed by a `transcript`
+               visual (a prompt we actually run) or a code block the reader would paste. Close with a short
+               "## מה לקחת" list of 3–4 habits (that heading is fine here). 900–1400 words.
+  warstory   → tell ONE incident in order: the setup (date, system, scale) → what broke → how it looked from
+               outside → the wrong first fix → the real cause → what we assert now. Headings are moments in the story,
+               not topics. Exact numbers and timestamps. 700–1100 words.
+  faq        → 6–9 ## headings that are REAL questions an engineer would ask, escalating from basic to "so what do I
+               do", each answered in 60–140 words with specifics and limits. No intro section. 600–1000 words.
+  deepdive   → a product/tool up close: what it actually is (one paragraph, then what it is NOT) · hands-on: what
+               happens when you use it (screens, commands, output) · the numbers (price, limits, latency) · where it
+               is strong · where it falls down · vs. the obvious alternative · who should pick it this quarter.
+               1100–1700 words. MUST include a `screenshot` visual of an official page and a `compare` card.
+Common rules for every kind:
+- OPENING: the prompt names the HOOK you must use (scene | number | claim | quote | question). scene = a concrete
+  moment from a source with a name and a date; number = a bare figure and why it matters; claim = a counterintuitive
+  one-liner you then defend; quote = a verbatim line from a source + your reaction; question = the exact question a
+  reader typed, then the answer. Never open two posts in a row the same way.
+- The first 300 words contain at least two specific numbers (date, price, count, latency). Adjectives are not evidence.
+- One verbatim blockquote from a PRIMARY source (docs, paper, launch post, HN comment) with who said it — not a paraphrase.
+- Exactly one aside as a blockquote starting with a bold label: "> **הדעה שלי:** …" or "> **הסתייגות:** …"
+  (first person, 2–3 sentences). The pull-quote above has no bold label; the aside does.
+- A code block ONLY if the reader would paste it; fence it with a filename: ```python title="review.py". A table only
+  if it compares ≥3 things.
+- Figure captions ARGUE (one claim + the source), never describe: not "דיאגרמה של הלולאה" but
+  "שלוש קריאות במקום אחת, וזה עדיין זול יותר מ-retrieval שגוי (Panasiti)".
+- Do NOT put the opinion inside body_md; it goes in opinion_md (3–6 sentences, "אנחנו").
+- tldr: 3 bullets, ≤14 words each, that a reader could act on without reading the post.
+- If SERIES CONTEXT is given: refer back to earlier parts naturally ("בחלק הקודם ראינו ש…") where it helps,
+  never repeat what they covered, and leave what the brief says to leave for later parts.
 
 ALSO produce:
-- diagram_d2: a D2 diagram (5–10 nodes, English labels, one concept only — the mechanism, not a mind-map) — OR an
-  empty string "" when the term is not really a mechanism (a product, a practice, a debate) and a box-and-arrow drawing
-  would be filler. Use plain D2: `a -> b: label`, shapes optional. No comments.
+- diagram_d2: a D2 diagram (5–10 nodes, English labels, one concept only — the mechanism, not a mind-map) — OR ""
+  when the subject is not a mechanism and a box-and-arrow drawing would be filler. Plain D2: `a -> b: label`. No comments.
 - video_scenes: 7–9 scenes for a 60–90s narrated explainer. Each scene: {"type": one of
   title|text|bullets|image|quote|opinion|outro, ...fields, "narration": 1–2 spoken Hebrew sentences}.
   Scene fields: title{heading (the English term), sub}; text{heading,text}; bullets{heading,items[3-4]};
-  image{heading, caption} (the diagram is inserted automatically); quote{text,who}; opinion{heading,text};
-  outro{text, url:"blog.aibriefing.dev"}. On-screen text is SHORT (<=14 words per line); narration carries the detail.
-  First scene must be title, one scene must be image, last must be outro.
-- visuals: 1–3 inline visuals, ONLY where one genuinely explains something the prose can't (0 is fine when the diagram
-  and a table already do the work). Each kind at most once per post; do NOT reach for the same kinds every post — a
-  post about a product wants a quote or a timeline, a post about a loop wants steps, a post with a benchmark wants a
-  stat. Each has "after" = the exact ## heading text it belongs to (never two in one section):
-  {"kind":"steps","after":..,"title":..,"steps":[3-5 items, <=7 words each]}      → animated step-reveal
-  {"kind":"stat","after":..,"value":"88%","label":<=12 words,"source":"Marmelab 2026"} → big animated number (value must START with a number, and be a REAL number from a source)
-  {"kind":"compare","after":..,"title":..,"left":{"title":..,"items":[3-4]},"right":{"title":..,"items":[3-4]}} → side-by-side card
-  {"kind":"quote","after":..,"text":<=30 words verbatim or tight paraphrase from a source,"who":"Name, outlet/company"} → pull-quote card
-  {"kind":"timeline","after":..,"title":..,"events":[3-5 of {"when":"2026-06","what":<=9 words}]} → dated timeline card
-  {"kind":"d2","after":..,"caption":..,"d2":"<D2 source, 4-8 nodes, English labels>"}   → a second diagram of a DIFFERENT mechanism than diagram_d2
-  All visible text in the post language. Captions <=12 words.
-Return ONLY JSON with keys: title, description (<=160 chars, no colon at start), tags (3-6 English lowercase),
-body_md, opinion_md, diagram_d2, visuals, video_scenes, sources_used (list of the source URLs you actually relied on).
+  image{heading, caption}; quote{text,who}; opinion{heading,text}; outro{text, url:"blog.aibriefing.dev"}.
+  On-screen text SHORT (<=14 words per line). First scene title, one scene image, last outro.
+- visuals: 2–4 inline visuals, each kind at most once, placed where the prose needs them (never two in one section;
+  NOT always right after the first section). Vary across posts: the prompt lists the kinds the last posts used — avoid
+  those. Each has "after" = the exact ## heading text it belongs to, and "caption" that argues (see above):
+  {"kind":"strip","after":..,"items":[3 of {"value":"300","label":<=5 words}],"caption":..}                → dark 3-number strip (the hook numbers)
+  {"kind":"boxes","after":..,"title":..,"sub":<=8 words mono,"rows":[2-4 of {"label":<=3 words,"boxes":[1-6 of {"text":<=4 words,"tone":"ink|accent|muted|ghost"}],"note":<=4 words}],"tag":<=4 words,"caption":..} → bespoke explainer card (queues, batches, before/after, pipelines)
+  {"kind":"chart","after":..,"title":..,"bars":[3-6 of {"label":..,"value":"$15","highlight":bool}],"source":..,"caption":..} → bar chart from REAL numbers in the sources
+  {"kind":"screenshot","after":..,"url":<an official page from the sources>,"caption":..}                  → real screenshot of that page
+  {"kind":"transcript","after":..,"label":"claude -p","prompt":<a short prompt in the post language we will ACTUALLY run>,"caption":..} → real model output card
+  {"kind":"steps","after":..,"title":..,"steps":[3-5 items, <=7 words each],"caption":..}                  → animated step-reveal
+  {"kind":"stat","after":..,"value":"88%","label":<=12 words,"source":"Marmelab 2026","caption":..}         → one big animated number (REAL number from a source)
+  {"kind":"compare","after":..,"title":..,"left":{"title":..,"items":[3-4]},"right":{"title":..,"items":[3-4]},"caption":..} → side-by-side card
+  {"kind":"quote","after":..,"text":<=30 words verbatim from a source,"who":"Name, outlet","caption":..}    → pull-quote card
+  {"kind":"timeline","after":..,"title":..,"events":[3-5 of {"when":"2026-06","what":<=9 words}],"caption":..} → dated timeline card
+  {"kind":"d2","after":..,"caption":..,"d2":"<D2 source, 4-8 nodes, English labels>"}                     → a second diagram of a DIFFERENT mechanism
+  All visible text in the post language (URLs/code excepted).
+Return ONLY JSON with keys: title, description (<=160 chars, no colon at start), hook (the one you used), tldr,
+tags (3-6 English lowercase), body_md, opinion_md, diagram_d2, visuals, video_scenes,
+sources_used (list of the source URLs you actually relied on).
 """
 
 SYSTEM_EN = """You produce the English edition of a Hebrew blog post from blog.aibriefing.dev.
 This is a faithful edition, not a literal translation: same structure, same claims, same sources, same
 opinion — written the way a sharp engineer writes English. Plain words, short sentences, no hype, no
 "in today's fast-paced world", no closing summary. Keep the same ## sections in the same order, each heading
-translated into a short, specific English heading.
-Keep code/tables identical. Keep the house opinion in first person plural.
+translated into a short, specific English heading (keep "01 · " style numbering if present).
+Keep code/tables/blockquote structure identical (translate the bold aside label to **My take:** / **Caveat:**).
+Keep the house opinion in first person plural. Translate tldr (same count).
 Also produce video_scenes in English with the same scene types/order as the Hebrew ones, narration 1–2 sentences each,
-and visuals: the SAME list (same kinds, same order, same d2 sources) with every visible string in English and
+and visuals: the SAME list (same kinds, same order, same urls/d2/prompt values) with every visible string in English and
 "after" set to the matching English ## heading text.
-Return ONLY JSON with keys: title, description (<=160 chars), body_md, opinion_md, visuals, video_scenes.
+Return ONLY JSON with keys: title, description (<=160 chars), tldr, body_md, opinion_md, visuals, video_scenes.
 """
 
 
@@ -109,14 +148,26 @@ def _sources_block(sources: list[dict]) -> str:
     return "\n".join(parts)
 
 
-def _check(doc: dict, lang: str) -> str:
-    req = ["title", "description", "body_md", "opinion_md", "video_scenes"] + (["tags", "sources_used"] if lang == "he" else [])
+def _check(doc: dict, lang: str, kind: str) -> str:
+    req = ["title", "description", "body_md", "opinion_md", "video_scenes", "tldr"] + (["tags", "sources_used", "hook"] if lang == "he" else [])
     missing = [k for k in req if not doc.get(k)]
     if missing:
         return f"missing {missing}"
-    words = len(re.findall(r"\S+", doc["body_md"]))
-    if words < 450:
-        return f"body too short ({words} words)"
+    body = doc["body_md"]
+    words = len(re.findall(r"\S+", body))
+    lo = {"explainer": 550, "fieldnotes": 700, "warstory": 550, "faq": 450, "deepdive": 850}[kind]
+    if words < lo:
+        return f"body too short for {kind} ({words} words)"
+    if lang == "he" and len(re.findall(r"\d", " ".join(body.split()[:300]))) < 4:
+        return "first 300 words need at least two specific numbers"
+    if lang == "he" and not re.search(r"(?m)^> \*\*[^*]+:\*\*", body):
+        return "missing the one aside blockquote starting with a bold label (הדעה שלי / הסתייגות)"
+    if kind == "fieldnotes" and len(re.findall(r"(?m)^## 0\d · ", body)) < 4:
+        return "fieldnotes needs ≥4 numbered '## 0N · ' step headings"
+    if kind == "faq" and len(re.findall(r"(?m)^## .*\?\s*$", body)) < 5:
+        return "faq needs ≥5 ## headings that are questions"
+    if not isinstance(doc["tldr"], list) or not (2 <= len(doc["tldr"]) <= 4):
+        return "tldr must be 3 bullets"
     sc = doc["video_scenes"]
     if not (6 <= len(sc) <= 10) or sc[0].get("type") != "title" or sc[-1].get("type") != "outro" or not any(s.get("type") == "image" for s in sc):
         return "video_scenes shape wrong (7-9 scenes, title first, one image, outro last)"
@@ -124,51 +175,62 @@ def _check(doc: dict, lang: str) -> str:
         return "every scene needs narration"
     vis = doc.get("visuals") or []
     kinds = [v.get("kind") for v in vis if isinstance(v, dict)]
-    if not isinstance(vis, list) or len(vis) > 3 or not set(kinds) <= {"steps", "stat", "compare", "quote", "timeline", "d2"} \
-            or len(kinds) != len(set(kinds)) or any(not v.get("after") for v in vis):
-        return "visuals shape wrong (0-3 items, kinds steps|stat|compare|quote|timeline|d2, each kind once, each with after)"
+    if not isinstance(vis, list) or not (1 <= len(vis) <= 4) or not set(kinds) <= VISUAL_KINDS or len(kinds) != len(set(kinds)) or any(not v.get("after") for v in vis):
+        return f"visuals shape wrong (2-4 items, kinds {sorted(VISUAL_KINDS)}, each kind once, each with after)"
+    if kind == "deepdive" and lang == "he" and not {"screenshot", "compare"} <= set(kinds):
+        return "deepdive must include a screenshot visual and a compare visual"
+    if kind == "fieldnotes" and lang == "he" and "transcript" not in kinds and "```" not in body:
+        return "fieldnotes needs a transcript visual or a code block"
     for v in vis:
-        if v["kind"] == "stat" and not re.match(r"^\D{0,3}\d", str(v.get("value", ""))):
+        if v.get("kind") == "stat" and not re.match(r"^\D{0,3}\d", str(v.get("value", ""))):
             return "stat value must start with a number"
-    if lang == "he" and not re.search(r"[֐-׿]", doc["body_md"]):
+        if v.get("kind") == "screenshot" and not str(v.get("url", "")).startswith("http"):
+            return "screenshot needs an http url from the sources"
+    if lang == "he" and not re.search(r"[֐-׿]", body):
         return "body is not Hebrew"
     return ""
 
 
-def _call(prompt: str, system: str, lang: str, usage_log: list) -> dict:
+def _call(prompt: str, system: str, lang: str, kind: str, usage_log: list) -> dict:
     err = ""
-    for attempt in (1, 2):
+    for attempt in (1, 2, 3):
         text = anthropic_cc.agent(
-            prompt + (f"\n\nPREVIOUS ATTEMPT WAS REJECTED ({err}) — fix exactly that." if err else ""),
+            prompt + (f"\n\nPREVIOUS ATTEMPT WAS REJECTED ({err}) — fix exactly that, keep everything else." if err else ""),
             instructions=system, json_mode=True, label=f"BLOG-writer-{lang}", usage_log=usage_log, effort="high",
         )
         doc = parse_json(text) or {}
-        err = _check(doc, lang)
+        err = _check(doc, lang, kind)
         if not err:
             return doc
         print(f"    ⚠ writer {lang} attempt {attempt}: {err}")
-    raise RuntimeError(f"writer {lang} failed twice: {err}")
+    raise RuntimeError(f"writer {lang} failed: {err}")
 
 
-def write_post(term: str, key: str, sources: list[dict], usage_log: list) -> dict:
+def write_post(term: str, key: str, sources: list[dict], usage_log: list, *, kind: str = "explainer", hook: str = "scene",
+               brief: str = "", series_ctx: str = "", avoid_visuals: list[str] | None = None) -> dict:
     system_he = SYSTEM_HE.replace("{glossary}", HE_TERM_GLOSSARY).replace("{house}", HOUSE)
-    prompt_he = (f"TERM: {term}\nURL KEY: {key}\nTODAY: use the source dates to reason about the timeline.\n\n"
-                 f"SOURCES ({len(sources)}):\n\n{_sources_block(sources)}")
-    print(f"  writer: HE ({len(prompt_he)} chars, {len(sources)} sources)")
-    he = _call(prompt_he, system_he, "he", usage_log)
+    prompt_he = (f"TERM: {term}\nURL KEY: {key}\nKIND (template): {kind}\nHOOK (opening type you MUST use): {hook}\n"
+                 + (f"BRIEF (what this post must cover / leave out): {brief}\n" if brief else "")
+                 + (f"VISUAL KINDS USED BY THE LAST POSTS — avoid these: {', '.join(avoid_visuals)}\n" if avoid_visuals else "")
+                 + (f"\nSERIES CONTEXT:\n{series_ctx}\n" if series_ctx else "")
+                 + f"\nTODAY: use the source dates to reason about the timeline.\n\nSOURCES ({len(sources)}):\n\n{_sources_block(sources)}")
+    print(f"  writer: HE kind={kind} hook={hook} ({len(prompt_he)} chars, {len(sources)} sources)")
+    he = _call(prompt_he, system_he, "he", kind, usage_log)
 
     used = set(he.get("sources_used") or [])
     src_out = [{"title": s.get("title") or s["url"], "url": s["url"], "date": s.get("date") or ""} for s in sources if s["url"] in used]
     if len(src_out) < 3:  # model was lazy about listing — keep the top ones it was given
         src_out = [{"title": s.get("title") or s["url"], "url": s["url"], "date": s.get("date") or ""} for s in sources[:6]]
 
-    prompt_en = ("HEBREW POST (JSON):\n" + json.dumps({k: he[k] for k in ("title", "description", "body_md", "opinion_md", "video_scenes", "visuals")}, ensure_ascii=False)
+    fields = ("title", "description", "tldr", "body_md", "opinion_md", "video_scenes", "visuals")
+    prompt_en = ("HEBREW POST (JSON):\n" + json.dumps({k: he[k] for k in fields}, ensure_ascii=False)
                  + "\n\nSOURCES: " + json.dumps(src_out, ensure_ascii=False))
     print("  writer: EN edition")
-    en = _call(prompt_en, SYSTEM_EN, "en", usage_log)
+    en = _call(prompt_en, SYSTEM_EN, "en", kind, usage_log)
 
     return {
-        "key": key, "term": term, "tags": he.get("tags") or [], "sources": src_out, "diagram_d2": (he.get("diagram_d2") or "").strip(),
-        "he": {k: he[k] for k in ("title", "description", "body_md", "opinion_md", "video_scenes", "visuals")},
-        "en": {k: en[k] for k in ("title", "description", "body_md", "opinion_md", "video_scenes", "visuals")},
+        "key": key, "term": term, "kind": kind, "hook": he.get("hook") or hook, "tags": he.get("tags") or [], "sources": src_out,
+        "diagram_d2": (he.get("diagram_d2") or "").strip(),
+        "he": {k: he[k] for k in fields},
+        "en": {k: en[k] for k in fields},
     }

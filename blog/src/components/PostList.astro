@@ -2,13 +2,17 @@
 import type { CollectionEntry } from 'astro:content';
 import { fmtDate, postHref, type Lang } from '../lib/i18n';
 
-interface Props { lang: Lang; posts: CollectionEntry<'posts'>[] }
-const { lang, posts } = Astro.props;
+interface Props { lang: Lang; posts: CollectionEntry<'posts'>[]; numbered?: boolean }
+const { lang, posts, numbered = false } = Astro.props;
 ---
 <div class="grid">
-  {posts.map((p) => (
+  {posts.map((p, i) => (
     <a class="post-card" href={postHref(lang, p.data.key)}>
-      <div class="cover">{p.data.hero && <img src={p.data.hero} alt="" loading="lazy" width="1200" height="630" />}</div>
+      <div class="cover">
+        {p.data.hero && <img src={p.data.hero} alt="" loading="lazy" width="1200" height="630" />}
+        {numbered && <span class="num">{String(i + 1).padStart(2, '0')}</span>}
+        {!numbered && p.data.series && <span class="num">{p.data.series.part}/{p.data.series.total}</span>}
+      </div>
       <div class="byline mono"><span class="term">{p.data.term}</span><span class="dot">·</span><span>{fmtDate(p.data.pubDate, lang)}</span></div>
       <h3>{p.data.title}</h3>
       <p>{p.data.description}</p>

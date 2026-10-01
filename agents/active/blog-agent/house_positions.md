@@ -22,15 +22,19 @@ freely; the agent reads this file on every run. Keep it short and blunt.
 - Hype signal: when a term appears in a job title before it appears in a paper, be
   skeptical. When practitioners argue about its definition on HN, it is probably real.
 
-## Things we actually do (usable as first-hand examples)
-- Our `claude -p` wrapper retries transient failures and repairs malformed JSON —
-  a small "loop" that fixed three production outages.
-- The daily run is a graph of ~10 agents with a merger step; a QA evaluator runs after
-  publish and flags P0s. Silent failures were our worst bugs, not wrong answers.
-- We centralize shared logic (`shared/`) because copy-paste across agents caused real
-  incidents. Boring discipline, real payoff.
-- We use Anthropic models via subscription for the heavy writing, cheaper models for
-  translation and classification, and a rule when a rule will do.
+## Examples — the rule (Koby, 2026-10-01: "don't write about our site, nobody cares but us")
+- The reader is the general Israeli tech public. Examples come from the SOURCES and from well-known public
+  cases: named companies, open-source repos, launch posts, HN threads, conference talks, published incidents.
+- Our own pipeline (aibriefing.dev) may appear at most ONCE per post, in ONE sentence, as an aside — never as
+  a section, a figure, a war story, or "the example". Most posts should not mention it at all.
+- Never name internal files, agents, scripts or dates from our repo (no shared/anthropic_cc.py, no merger, no
+  "the 08-07 incident"). If a war story is needed, take a public one (Replit deleting a production DB, 2025;
+  the Vercel AI Gateway adoption numbers; a documented outage from a vendor status page; an HN post-mortem).
+
+## Practical first
+- A reader should be able to DO something after the post: a command to run, a setting to change, a checklist,
+  a pattern to copy, a number to measure against. Theory earns its place only as the minimum needed to act.
+- Every post has a "what to do this week" element, with specifics (names of settings, flags, files, prices).
 
 ## Tone
 - Direct, a little dry, occasionally funny. Israeli tech Hebrew — the way engineers

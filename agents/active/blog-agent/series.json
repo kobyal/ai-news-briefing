@@ -1,5 +1,5 @@
 {
-  "_comment": "Planned series. `run.py series <slug>` writes the next unwritten part (or all with --all). hue/style pin the cover identity so parts look like a set. Each part: term (post subject), key (URL), brief (what THIS part must cover and must leave to other parts), seeds (source URLs).",
+  "_comment": "Planned series. `run.py series <slug> [--all]` writes the next unwritten part(s). hue/style pin the cover identity so parts look like a set. Each part: term (post subject), key (URL), kind (template), brief (what THIS part must cover and leave to others), seeds (source URLs). Examples must be PUBLIC (see house_positions.md).",
   "series": [
     {
       "slug": "prompt-engineering",
@@ -8,28 +8,34 @@
       "hue": "#ffb454", "style": "bars",
       "parts": [
         { "term": "prompt engineering", "key": "prompt-engineering-1-what-still-matters", "kind": "explainer",
-          "brief": "Part 1: what prompt engineering still is in late 2026 now that models follow instructions well. What moved into context engineering / harnesses and what stayed in the prompt. Anthropic's and OpenAI's current prompting guides as primary sources. End with the 5 things that still move the needle.",
+          "brief": "Part 1: what prompt engineering still is in late 2026 now that models follow instructions well. What moved into context engineering / harnesses and what stayed in the prompt. Anthropic's and OpenAI's current prompting guides as primary sources. Practical core: the 5 things that still move the needle, each with a before/after prompt snippet the reader can copy.",
           "seeds": ["https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview", "https://platform.openai.com/docs/guides/prompt-engineering", "https://www.anthropic.com/engineering/claude-code-best-practices"] },
         { "term": "system prompts", "key": "prompt-engineering-2-system-prompts", "kind": "fieldnotes",
-          "brief": "Part 2: system prompts in production. Structure (role, rules, examples, output contract), ordering, XML tags vs markdown, few-shot vs zero-shot, how long is too long, prompt caching economics. Must include a real transcript visual: run a short prompt with and without a system prompt. Draw on our own pipeline's merger/writer system prompts as first-hand examples.",
-          "seeds": ["https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts", "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching"] },
+          "brief": "Part 2: system prompts in production. Structure (role, rules, examples, output contract), ordering, XML tags vs markdown, few-shot vs zero-shot, how long is too long, prompt caching economics with real prices. Must include a real transcript visual: the same short task with and without a system prompt. Use public system prompts as examples (Anthropic's published Claude.ai system prompts, Cursor/Devin leaked prompts on GitHub, Vercel v0's prompt).",
+          "seeds": ["https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts", "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching", "https://docs.anthropic.com/en/release-notes/system-prompts", "https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools"] },
         { "term": "prompt evals", "key": "prompt-engineering-3-evals", "kind": "warstory",
-          "brief": "Part 3: how you know a prompt change helped. Golden sets, LLM-as-judge, pairwise comparison, regression on real traffic, the 2026-08-07 JSON-preamble incident in our pipeline as the war story (a prompt tweak that silently emptied briefings; fixed by a parser, not a prompt). Promptfoo / Braintrust / Anthropic eval cookbook as sources.",
-          "seeds": ["https://www.promptfoo.dev/docs/intro/", "https://docs.anthropic.com/en/docs/test-and-evaluate/develop-tests", "https://www.braintrust.dev/docs"] }
+          "brief": "Part 3: how you know a prompt change helped. Golden sets, LLM-as-judge, pairwise comparison, regression on real traffic. The war story is PUBLIC: pick a documented case from the sources (e.g. a company post-mortem where a prompt tweak regressed quality, or promptfoo/Braintrust customer stories) — not ours. Practical: a promptfoo config the reader can paste.",
+          "seeds": ["https://www.promptfoo.dev/docs/intro/", "https://docs.anthropic.com/en/docs/test-and-evaluate/develop-tests", "https://www.braintrust.dev/docs", "https://hamel.dev/blog/posts/evals/"] }
       ]
     },
     {
-      "slug": "claude-in-production",
-      "name": "Claude בפרודקשן",
-      "name_en": "Claude in production",
+      "slug": "claude-code-in-practice",
+      "name": "Claude Code בפרקטיקה",
+      "name_en": "Claude Code in practice",
       "hue": "#8b83ff", "style": "grid",
       "parts": [
-        { "term": "claude -p", "key": "claude-in-production-1-headless", "kind": "fieldnotes",
-          "brief": "Part 1: running Claude Code headless (claude -p) as a pipeline step instead of a chat. Our daily pipeline (~10 agents) does exactly this. Cover: subscription vs API economics, --output-format json, retries on transient errors, JSON repair, the hook that blocked a run, timeouts and caffeinate. Numbered STEP sections. Include a real transcript visual.",
-          "seeds": ["https://docs.anthropic.com/en/docs/claude-code/sdk", "https://docs.anthropic.com/en/docs/claude-code/cli-reference", "https://docs.anthropic.com/en/docs/agent-sdk/overview"] },
-        { "term": "silent failures", "key": "claude-in-production-2-silent-failures", "kind": "warstory",
-          "brief": "Part 2: the failure modes that don't throw. A model that returns rc=0 with an empty briefing, a usage-policy refusal that looks like success, a hook block reported as a completed turn, stale shadow directories. Our QA evaluator + per-agent floors as the fix. What to assert after every LLM call.",
-          "seeds": ["https://docs.anthropic.com/en/docs/claude-code/hooks", "https://www.anthropic.com/engineering/building-effective-agents"] }
+        { "term": "CLAUDE.md", "key": "claude-code-1-setup-and-memory", "kind": "fieldnotes",
+          "brief": "Part 1: setting up Claude Code for a real team. CLAUDE.md (project / user / local), what belongs in it and what doesn't, memory, permissions and settings.json, /init, slash commands, keyboard habits. Numbered steps, each with the exact file or command. Public examples: Anthropic's best-practices post, well-known open-source repos with a good CLAUDE.md.",
+          "seeds": ["https://docs.anthropic.com/en/docs/claude-code/memory", "https://docs.anthropic.com/en/docs/claude-code/settings", "https://www.anthropic.com/engineering/claude-code-best-practices"] },
+        { "term": "hooks and MCP", "key": "claude-code-2-hooks-mcp-skills", "kind": "explainer",
+          "brief": "Part 2: hooks vs rules vs skills vs MCP — which mechanism for which job ('rules = what must, skills = how, MCP = what's possible, hooks = enforcement'). PreToolUse / PostToolUse hooks with a copy-paste example (block a commit, run a formatter), connecting an MCP server, writing a skill. Public examples from the docs and community repos.",
+          "seeds": ["https://docs.anthropic.com/en/docs/claude-code/hooks", "https://docs.anthropic.com/en/docs/claude-code/mcp", "https://docs.anthropic.com/en/docs/claude-code/skills"] },
+        { "term": "subagents", "key": "claude-code-3-subagents-and-worktrees", "kind": "fieldnotes",
+          "brief": "Part 3: working in parallel. Subagents (when they help, when they burn tokens), git worktrees for parallel sessions, context hygiene (new session per task, the 3-line handoff: what works / what's open / what failed), plan mode. Numbered steps with commands. Public examples: Anthropic's multi-agent research post, community write-ups.",
+          "seeds": ["https://docs.anthropic.com/en/docs/claude-code/sub-agents", "https://docs.anthropic.com/en/docs/claude-code/common-workflows", "https://www.anthropic.com/engineering/built-multi-agent-research-system"] },
+        { "term": "Claude Code in CI", "key": "claude-code-4-ci-headless-sdk", "kind": "explainer",
+          "brief": "Part 4: Claude Code outside the terminal. GitHub Actions integration, headless `claude -p` with --output-format json, the Agent SDK, cost control (subscription vs API, max turns, budgets), what to assert after every run. Public examples: the official GitHub Action, open-source projects using it in CI. Our pipeline may get ONE sentence, no more.",
+          "seeds": ["https://docs.anthropic.com/en/docs/claude-code/github-actions", "https://docs.anthropic.com/en/docs/claude-code/sdk", "https://docs.anthropic.com/en/docs/agent-sdk/overview"] }
       ]
     },
     {
@@ -39,17 +45,37 @@
       "hue": "#3ecfb2", "style": "rings",
       "parts": [
         { "term": "Codex", "key": "codex-up-close", "kind": "deepdive",
-          "brief": "OpenAI Codex (the agentic coding product: CLI + cloud agent + IDE) as it stands in late 2026. What it does well, pricing/limits, how it compares to Claude Code day to day, where it fits for an Israeli team. Must include at least one real screenshot visual of the official docs/product page and a compare card vs Claude Code.",
+          "brief": "OpenAI Codex (CLI + cloud agent + IDE) as it stands in late 2026. What it does well, pricing/limits, how it compares to Claude Code day to day, who should pick it. Hands-on: the exact commands and screens. Must include a real screenshot of the official docs/product page and an authored comparison figure vs Claude Code.",
           "seeds": ["https://openai.com/codex/", "https://developers.openai.com/codex/", "https://github.com/openai/codex"] },
         { "term": "Grok bot", "key": "grok-bot-up-close", "kind": "deepdive",
-          "brief": "xAI's Grok agent/bot product (the standalone agent people call 'Grok bot', and Grok on X). What it actually is, what it can do unattended, pricing, what's hype, how Israeli engineers are using it. Include a real screenshot visual. Be concrete about availability and limits; if sources disagree, say so.",
+          "brief": "xAI's Grok agent/bot product. What it actually is, what it can do unattended, pricing, what's hype, concrete use cases people report publicly. Real screenshot visual. Be concrete about availability and limits; if sources disagree, say so.",
           "seeds": ["https://x.ai/", "https://docs.x.ai/docs/overview", "https://x.ai/news"] },
         { "term": "ChatGPT power use", "key": "chatgpt-advanced", "kind": "faq",
-          "brief": "The advanced ChatGPT features engineers under-use: projects, custom instructions and memory, canvas, deep research, agent mode/operator, connectors/MCP apps, scheduled tasks, plugins announced at DevDay 2026. FAQ format: real questions an engineer asks, answered with specifics and limits.",
+          "brief": "The advanced ChatGPT features engineers under-use: projects, custom instructions and memory, canvas, deep research, agent mode, connectors/MCP apps, scheduled tasks, DevDay 2026 announcements. FAQ: real questions an engineer asks, answered with specifics, limits and a concrete 'do this' each.",
           "seeds": ["https://help.openai.com/en/collections/3742473-chatgpt", "https://openai.com/index/introducing-chatgpt-agent/", "https://openai.com/news/"] },
         { "term": "Claude Design", "key": "claude-design-up-close", "kind": "deepdive",
-          "brief": "Anthropic's Claude Design (design canvas / artifacts for websites, screens, decks). What it is, who it is for, how it relates to Claude artifacts and Claude Code, what it produces, limits. Include a real screenshot of the official page. First-hand: we used it this week while redesigning this very blog and chose to code directly instead — say why, honestly.",
+          "brief": "Anthropic's Claude Design (design canvas / artifacts for websites, screens, decks). What it is, who it is for, how it relates to artifacts and Claude Code, what it produces, limits, pricing. Real screenshot of the official page. Public examples of what people built with it. Do NOT use our blog redesign as the example.",
           "seeds": ["https://www.anthropic.com/news", "https://claude.ai/", "https://docs.anthropic.com/en/docs/build-with-claude/artifacts"] }
+      ]
+    },
+    {
+      "slug": "the-assistants",
+      "name": "העוזרים של 2026, אחד-אחד",
+      "name_en": "The 2026 assistants, one by one",
+      "hue": "#ff7aa8", "style": "constellation",
+      "parts": [
+        { "term": "OpenAI dots", "key": "openai-dots-up-close", "kind": "deepdive",
+          "brief": "OpenAI's dots — the always-on desktop/background agents announced at DevDay 2026 for ChatGPT Pro and Business Premium. What they are, what runs unattended, how tasks are set up, pricing and the Pro-plan limit changes, privacy/permissions, how they compare to OpenClaw/Instinct-style agents and to Claude Code. Real screenshot of the official page. Practical: three tasks worth handing to a dot this week, and two not to.",
+          "seeds": ["https://openai.com/index/introducing-dots/", "https://mashable.com/tech/openai-devday-2026-biggest-announcements", "https://mixed-news.com/en/chatgpt-pro-500-tier-pro-200-lower-allowance", "https://openai.com/news/"] },
+        { "term": "Gemini", "key": "gemini-assistant-up-close", "kind": "deepdive",
+          "brief": "Google's Gemini app and agent features as of late 2026: Gemini Live, agent mode / calling businesses, Workspace integration, Gemini CLI for developers, pricing tiers. What it does better than ChatGPT and Claude, where it lags. Real screenshot. Practical: when an Israeli team should pick it.",
+          "seeds": ["https://gemini.google/", "https://blog.google/products/gemini/", "https://github.com/google-gemini/gemini-cli"] },
+        { "term": "Microsoft Copilot", "key": "microsoft-copilot-up-close", "kind": "deepdive",
+          "brief": "Microsoft Copilot in 2026: the consumer app, Microsoft 365 Copilot, Copilot Studio agents, GitHub Copilot's agent mode. What's actually useful in an office that runs on Microsoft, pricing per seat, governance. Real screenshot. Practical: a rollout checklist for a 50-person company.",
+          "seeds": ["https://www.microsoft.com/en-us/microsoft-copilot", "https://learn.microsoft.com/en-us/copilot/", "https://github.blog/changelog/"] },
+        { "term": "Perplexity Comet", "key": "perplexity-comet-up-close", "kind": "deepdive",
+          "brief": "Perplexity's Comet agentic browser and Perplexity Pro/Max as a research assistant. What browsing-as-an-agent actually does, pricing, privacy, how it compares to ChatGPT agent mode and OpenAI dots. Real screenshot. Practical: five research tasks it does well, with the exact phrasing.",
+          "seeds": ["https://www.perplexity.ai/comet", "https://www.perplexity.ai/hub", "https://docs.perplexity.ai/"] }
       ]
     }
   ]

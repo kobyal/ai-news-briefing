@@ -20,8 +20,8 @@ export type StepsProps = { lang: 'he' | 'en'; title: string; steps: string[]; lo
 export type StatProps = { lang: 'he' | 'en'; value: string; label: string; source?: string };
 
 export const STEPS_FPS = 15;
-export const stepsDuration = (p: StepsProps) => STEPS_FPS * (1.2 + p.steps.length * 1.1 + 1.6);
-export const statDuration = () => Math.round(STEPS_FPS * 4.5);
+export const stepsDuration = (p: StepsProps) => STEPS_FPS * (0.6 + p.steps.length * 0.9 + 2.4);
+export const statDuration = () => Math.round(STEPS_FPS * 5.5);
 
 const Shell: React.FC<{ lang: 'he' | 'en'; children: React.ReactNode }> = ({ lang, children }) => (
   <AbsoluteFill
@@ -48,13 +48,13 @@ export const Steps: React.FC<StepsProps> = ({ lang, title, steps }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   // Fade out at the end so the loop restarts cleanly.
-  const tail = interpolate(frame, [durationInFrames - fps * 0.6, durationInFrames - 1], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const tail = interpolate(frame, [durationInFrames - fps * 0.3, durationInFrames - 1], [1, 0.35], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
   return (
     <Shell lang={lang}>
       <div style={{ opacity: tail }}>
         <div style={{ fontFamily: DISPLAY, fontSize: 36, fontWeight: 700, color: INK, marginBottom: 30, lineHeight: 1.15 }}>{title}</div>
         {steps.map((s, i) => {
-          const start = fps * (0.8 + i * 1.1);
+          const start = fps * (0.3 + i * 0.9);
           const p = spring({ frame: frame - start, fps, config: { damping: 200, stiffness: 140 } });
           const active = frame >= start && frame < start + fps * 1.1;
           return (
@@ -77,7 +77,7 @@ export const Stat: React.FC<StatProps> = ({ lang, value, label, source }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const p = spring({ frame, fps, config: { damping: 18, stiffness: 90 } });
-  const tail = interpolate(frame, [durationInFrames - fps * 0.6, durationInFrames - 1], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const tail = interpolate(frame, [durationInFrames - fps * 0.3, durationInFrames - 1], [1, 0.35], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
   // Count-up for a leading integer/percent, e.g. "88%" or "1,500"
   const m = value.match(/^(\D*)(\d[\d,]*)(.*)$/);
   let shown = value;

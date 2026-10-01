@@ -57,6 +57,18 @@ HOW ISRAELI ENGINEERS ACTUALLY WRITE (calibrate on this — the reader must not 
   "רגע, למה זה בכלל בעיה?" "בגדול: ..." "המספרים שלהם, על ה-workflows שלהם."
 - Every third paragraph or so, read it aloud in your head in a Tel Aviv standup. If it sounds like a
   Wikipedia entry or a translated whitepaper, rewrite it the way you would SAY it to a colleague.
+- CALQUES (English idioms that survive translation and give the game away) — never:
+  "בסוף היום" (→ "בסוף", "בשורה התחתונה"), "עושה שכל" (→ "הגיוני"), "לקחת צעד אחורה" (→ "רגע, נעצור"),
+  "זה מרגיש כמו" (→ "זה נראה כמו", "יש תחושה ש"), "לא בטוח ש" as hedge (→ "לא נראה לי ש"), "בוא נדבר על" (→ just start),
+  "מה שמעניין הוא ש" (→ say the interesting thing), "הדבר הראשון/השני" lists (→ "קודם כל / חוץ מזה"),
+  "זה מגיע עם" (→ "יש לו", "כולל"), "משחק הוגן" , "לשים את זה בפרספקטיבה", "חשוב להבין ש", "בואו נהיה כנים",
+  "אין ספק ש", "לקחת בחשבון" overuse (→ "לזכור ש"), "לעשות את ההבדל", "ברמה היומיומית" (→ "ביום-יום"),
+  passive constructions ("נעשה שימוש ב" → "משתמשים ב"), "אשר" (→ "ש"), "על מנת" (→ "כדי"), "במידה ו" (→ "אם"),
+  "כאשר" in speech (→ "כש"), "הינו/הינה" (→ "הוא/היא" or nothing), "לדוגמה" every paragraph (→ "למשל", or just give it).
+- MODELS OF THE REGISTER (how good Israeli AI posts actually read): opinion markers up front — "לדעתי", "בעיני",
+  "מה שאני לוקח מזה"; a tip is an imperative with a reason — "תפתחו שיחה חדשה לכל משימה. שיחה ארוכה עולה יותר בכל
+  הודעה וגם עונה פחות טוב"; spoken verbs — "מתברבר", "נדבק", "שורף טוקנים", "נופל", "מחזיק"; a number, then what it
+  means — "הצעד ה-33 עולה 44 סנט, ה-34 כבר 85"; questions to the reader at the end, not the start.
 
 {glossary}
 
@@ -66,15 +78,15 @@ HOUSE POSITIONS (the opinion section MUST come from these, first person plural, 
 STRUCTURE of body_md — THE TEMPLATE IS GIVEN IN THE PROMPT AS `KIND`. Follow it; do not blend templates.
   explainer  → 4–6 ## sections picked from: origin · definition + what it is NOT · the mechanism step by step ·
                worked example with real numbers · a short incident from a source · how to do it · tradeoffs / when
-               NOT to · who runs it in production · vs. the neighbouring term · what to try this week · a first-hand
-               paragraph from our pipeline. Headings are specific to THIS post, never the menu labels. 700–1100 words.
+               NOT to · who runs it in production (named, public) · vs. the neighbouring term · what to try this week.
+               At least HALF the sections are practical (how / example / what to try). Headings are specific to THIS post. 700–1100 words.
   fieldnotes → numbered steps: every ## heading starts with "01 · ", "02 · " … (4–7 steps). Each step = what you do,
                what you see, one concrete artefact (command, config, output). One step MUST be backed by a `transcript`
                visual (a prompt we actually run) or a code block the reader would paste. Close with a short
                "## מה לקחת" list of 3–4 habits (that heading is fine here). 900–1400 words.
-  warstory   → tell ONE incident in order: the setup (date, system, scale) → what broke → how it looked from
-               outside → the wrong first fix → the real cause → what we assert now. Headings are moments in the story,
-               not topics. Exact numbers and timestamps. 700–1100 words.
+  warstory   → tell ONE PUBLIC incident in order (from the sources: a company, a repo, a documented outage) — the setup
+               (date, system, scale) → what broke → how it looked from outside → the wrong first fix → the real cause →
+               what to assert now in YOUR system. Headings are moments in the story. Exact numbers and timestamps. 700–1100 words.
   faq        → 6–9 ## headings that are REAL questions an engineer would ask, escalating from basic to "so what do I
                do", each answered in 60–140 words with specifics and limits. No intro section. 600–1000 words.
   deepdive   → a product/tool up close: what it actually is (one paragraph, then what it is NOT) · hands-on: what
@@ -82,6 +94,11 @@ STRUCTURE of body_md — THE TEMPLATE IS GIVEN IN THE PROMPT AS `KIND`. Follow i
                is strong · where it falls down · vs. the obvious alternative · who should pick it this quarter.
                1100–1700 words. MUST include a real `screenshot` or source `image`, and an authored `svg` that compares it to the alternative.
 Common rules for every kind:
+- EXAMPLES ARE PUBLIC. Named companies, repos, launch posts, HN threads, talks, documented incidents — from the
+  sources. Our own pipeline (aibriefing.dev) at most ONE sentence per post, as an aside, never a section/figure/story,
+  and never internal file or agent names. The reader is the Israeli tech public, not us.
+- PRACTICAL FIRST. The reader must be able to do something after reading: commands, flags, settings, a checklist,
+  a pattern to copy, a number to measure against. Theory only as the minimum needed to act.
 - OPENING: the prompt names the HOOK you must use (scene | number | claim | quote | question). scene = a concrete
   moment from a source with a name and a date; number = a bare figure and why it matters; claim = a counterintuitive
   one-liner you then defend; quote = a verbatim line from a source + your reaction; question = the exact question a
@@ -208,7 +225,33 @@ def _check(doc: dict, lang: str, kind: str) -> str:
                 return "an svg figure did not parse (must start with <svg, well-formed XML, no script)"
     if lang == "he" and not re.search(r"[֐-׿]", body):
         return "body is not Hebrew"
+    selfref = len(re.findall(r"aibriefing|ה-pipeline שלנו|הפייפליין שלנו|אצלנו ב|anthropic_cc|merger|local-cycle", body, re.I))
+    if selfref > 1:
+        return f"too many references to our own site/pipeline ({selfref}); use public examples from the sources"
     return ""
+
+
+DECALQUE_SYSTEM = """You are a Hebrew copy editor for Israeli tech writing. You get a JSON post written in Hebrew by a
+model. Your ONLY job: find sentences that are English thinking in Hebrew words (calques, translated idioms, passive
+voice, "אשר/על מנת/במידה ו/הינו", stiff connectors, headline-ese) and rewrite JUST those sentences the way an Israeli
+engineer would say them aloud. Keep every fact, number, name, link, heading text, code block, <figure> line, blockquote
+marker and bold label exactly. Keep length within ±5%. Do not add content. Do not touch English terms.
+Return ONLY JSON with the same keys you received (title, description, tldr, body_md, opinion_md) and their edited values."""
+
+
+def _decalque(doc: dict, usage_log: list) -> dict:
+    """Second, cheap pass that removes translationese from the Hebrew (Koby 2026-10-01: 'sounds good in English,
+    bad in direct translation'). Structural guard: headings and figures must survive byte-for-byte."""
+    keys = ("title", "description", "tldr", "body_md", "opinion_md")
+    text = anthropic_cc.agent(json.dumps({k: doc[k] for k in keys}, ensure_ascii=False), instructions=DECALQUE_SYSTEM,
+                              json_mode=True, label="BLOG-decalque", usage_log=usage_log, effort="medium")
+    new = parse_json(text) or {}
+    heads = lambda b: re.findall(r"(?m)^#+ .*$", b)
+    if not all(new.get(k) for k in keys) or heads(new["body_md"]) != heads(doc["body_md"]) \
+            or not (0.9 <= len(new["body_md"]) / max(1, len(doc["body_md"])) <= 1.1):
+        print("    ⚠ decalque: structure/length changed — keeping the original Hebrew")
+        return doc
+    return {**doc, **{k: new[k] for k in keys}}
 
 
 def _call(prompt: str, system: str, lang: str, kind: str, usage_log: list) -> dict:
@@ -241,6 +284,7 @@ def write_post(term: str, key: str, sources: list[dict], usage_log: list, *, kin
                  + f"\nTODAY: use the source dates to reason about the timeline.\n\nSOURCES ({len(sources)}):\n\n{_sources_block(sources)}")
     print(f"  writer: HE kind={kind} hook={hook} ({len(prompt_he)} chars, {len(sources)} sources)")
     he = _call(prompt_he, system_he, "he", kind, usage_log)
+    he = _decalque(he, usage_log)
 
     used = set(he.get("sources_used") or [])
     src_out = [{"title": s.get("title") or s["url"], "url": s["url"], "date": s.get("date") or ""} for s in sources if s["url"] in used]

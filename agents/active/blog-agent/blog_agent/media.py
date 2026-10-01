@@ -32,18 +32,25 @@ def diagram(key: str, d2_src: str, theme: int = 0) -> str | None:
     """Hand-drawn (--sketch) so a flowchart never looks like a default D2 export; theme pinned per series."""
     d = out_dir(key)
     src = d / "diagram.d2"; svg = d / "diagram.svg"; png = d / "diagram.png"
-    d2_src = d2_src.strip()
-    if "direction:" not in d2_src:  # wide layouts read better in a 16:9 video frame and a 760px article column
-        d2_src = "direction: right\n" + d2_src
-    src.write_text(d2_src + "\n", encoding="utf-8")
-    ok = False
-    for layout in (["--layout=elk"], []):
-        try:
-            subprocess.run(["d2", *layout, f"--theme={theme}", "--sketch", "--pad=40", str(src), str(svg)], check=True, capture_output=True, timeout=120)
-            ok = True; break
-        except Exception as e:  # noqa: BLE001
-            print(f"  media: d2 {layout or 'dagre'} failed ({e})")
-    if not ok:
+    d2_src = re.sub(r"(?m)^direction:.*\n?", "", d2_src.strip())
+
+    def _render(direction: str) -> bool:
+        src.write_text(f"direction: {direction}\n" + d2_src + "\n", encoding="utf-8")
+        for layout in (["--layout=elk"], []):
+            try:
+                subprocess.run(["d2", *layout, f"--theme={theme}", "--sketch", "--pad=40", str(src), str(svg)], check=True, capture_output=True, timeout=120)
+                return True
+            except Exception as e:  # noqa: BLE001
+                print(f"  media: d2 {layout or 'dagre'} failed ({e})")
+        return False
+
+    def _aspect() -> float:
+        m = re.search(r'viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"', svg.read_text(encoding="utf-8")[:2000])
+        return float(m.group(1)) / max(1.0, float(m.group(2))) if m else 1.0
+
+    if not _render("right"):
+        return None
+    if _aspect() > 3.2 and not _render("down"):  # a 10:1 strip is unreadable in the article column
         return None
     # PNG for the video (d2's own PNG export needs a Playwright driver download; rsvg is local + instant).
     try:
@@ -350,10 +357,16 @@ def _screenshot(url: str, out: Path, crop: str | None = None) -> None:
 
 def _transcript(prompt: str, lang: str) -> tuple[str, str]:
     """Actually run the writer's prompt once (subscription) so the card shows a REAL output, not an imagined one."""
+    import os, tempfile, time
     from shared import anthropic_cc
-    t0 = __import__("time").time()
-    text = anthropic_cc.agent(prompt, instructions="Answer in at most 90 words. Plain text, no markdown, no preamble.", label="BLOG-transcript", effort="low")
-    return text.strip(), f"claude · {__import__('time').time() - t0:.1f}s"
+    t0 = time.time(); cwd = os.getcwd()
+    try:
+        os.chdir(tempfile.mkdtemp(prefix="blog-transcript-"))  # neutral cwd: no CLAUDE.md, no project memory in the answer
+        text = anthropic_cc.agent(prompt, instructions="Answer in at most 90 words. Plain text, no markdown, no preamble. You have no project context; answer generically.",
+                                  label="BLOG-transcript", effort="low")
+    finally:
+        os.chdir(cwd)
+    return text.strip(), f"claude · {time.time() - t0:.1f}s"
 
 
 _SVG_SHELL = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>

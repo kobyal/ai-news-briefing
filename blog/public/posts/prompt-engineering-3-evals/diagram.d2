@@ -1,15 +1,17 @@
 direction: right
-cron: 06:07 cron
-agent: rss / editorial agent
-model: claude -p
-parse: parse_json
-merger: merger
-qa: QA judge
-email: daily email
-cron -> agent: start run
-agent -> model: prompt + session rules
-model -> parse: preamble + JSON
-parse -> agent: "{} no error"
-agent -> merger: empty briefing, exit 0
-merger -> qa: fewer stories
-qa -> email: all green
+change: Prompt change
+golden: Golden set 30-50 cases
+asserts: Code asserts
+judge: Calibrated LLM judge
+pairwise: Pairwise vs current prompt
+gate: Merge gate
+prod: Production traffic
+sample: Weekly trace sample
+change -> golden: run every case x3
+golden -> asserts: regex, schema, length
+asserts -> judge: only what code cannot check
+judge -> pairwise: candidate vs baseline
+pairwise -> gate: wins or ties
+gate -> prod: deploy
+prod -> sample: 20 traces per week
+sample -> golden: add the weird ones

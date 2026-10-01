@@ -1,18 +1,16 @@
 direction: right
-state: "State (text / JSON)"
-questions: "Typed questions + options"
-fp: "Single forward pass"
-logits: "Logits on option tokens"
-norm: "Normalize to probabilities"
-decision: "Typed decision + confidence"
-gate: "Threshold"
-act: "Act automatically"
-review: "Escalate to human"
-state -> fp
-questions -> fp
-fp -> logits
+state: "State + typed questions"
+pass: "Single forward pass"
+logits: "Logits over option tokens"
+norm: "Renormalize to probabilities"
+cal: "Calibration (RLCD)"
+th: "Threshold"
+act: "Code acts"
+esc: "Human review"
+state -> pass
+pass -> logits: "one step, no generation"
 logits -> norm
-norm -> decision
-decision -> gate
-gate -> act: "p >= 0.95"
-gate -> review: "p < 0.95"
+norm -> cal
+cal -> th
+th -> act: "p >= 0.8"
+th -> esc: "p < 0.8"

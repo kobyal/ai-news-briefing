@@ -1,15 +1,15 @@
 ---
-title: "Claude Design מקרוב: canvas מצוין, ולמה בכל זאת כתבנו קוד"
-description: "Claude Design של אנטרופיק מקרוב: מה הוא מייצר, למי הוא מתאים, איפה הוא נופל, ולמה ב-redesign של הבלוג בחרנו לכתוב קוד."
+title: "Claude Design מקרוב: הכלי שקורא את ה-repo ומצייר לכם deck"
+description: "Claude Design של אנטרופיק: מה הוא בונה, איך הוא לומד את ה-design system מהקוד שלכם, כמה הוא עולה, איפה הוא נופל, ומתי Open Design או Figma עדיפים."
 lang: he
 key: claude-design-up-close
 term: "Claude Design"
 kind: deepdive
 pubDate: 2026-10-01
-tags: ["claude-design", "anthropic", "design-tools", "prototyping", "claude-code"]
-hook: "claim"
-cover: photo
-tldr: ["דקים, one-pagers ו-wireframes ל-PM: Claude Design. UI של מוצר: ישר לקוד", "לפני onboarding תחליטו איפה מקור האמת של העיצוב: canvas או repo", "רוצים canvas בלי לעזוב את ה-agent שלכם? תבדקו את Open Design"]
+tags: ["claude-design", "anthropic", "design-tools", "figma", "prototyping"]
+hook: "scene"
+cover: type
+tldr: ["נקו קובץ tokens אחד ב-repo לפני ה-onboarding, לא אחריו", "התחילו מ-deck או one-pager, לא מהמסך המרכזי של המוצר", "העבירו wireframe ל-Claude Code על branch נפרד וספרו תיקוני review"]
 series: { slug: "the-new-tools", name: "הכלים החדשים, מקרוב", part: 4, total: 4 }
 hero: /posts/claude-design-up-close/hero.jpg
 diagram: /posts/claude-design-up-close/diagram.svg
@@ -19,98 +19,113 @@ sources:
   - { title: "Claude Design", url: "https://www.anthropic.com/news/claude-design-anthropic-labs", date: "2026-04-17" }
   - { title: "Thoughts and feelings around Claude Design", url: "https://samhenri.gold/blog/20260418-claude-design", date: "2026-04-18" }
   - { title: "Figma's woes compound with Claude Design", url: "https://martinalderson.com/posts/figmas-woes-compound-with-claude-design", date: "2026-04-20" }
+  - { title: "Show HN: SeasonMap – when to travel where? visualized with climate data", url: "https://seasonmap.app", date: "2026-09-16" }
   - { title: "The open-source Claude Design alternative has 77k GitHub stars and 1M+ installs", url: "https://okaneland.com/studio/tom-huang", date: "2026-07-18" }
-  - { title: "Claude Design: What It Is & Why It Matters (2026)", url: "https://www.eigent.ai/blog/claude-design", date: "" }
-opinion: "אנחנו שופטים כלי לפי מה שהוא משנה ביום שני. Claude Design משנה הרבה למי שפותח היום פיגמה או PowerPoint, ומעט מאוד למי שה-UI שלו כבר ב-repo. אצלנו כל מקום שבו אותו דבר חי בשני עותקים הפך בסוף לתקלה, ועיצוב שחי גם ב-canvas וגם ב-CSS הוא בדיוק זה. מה שכן, אנטרופיק זיהתה נכון שהעבודה האמיתית היא לא הציור אלא ה-design system ומה שבודק אותו. אנחנו בודקים כל שינוי UI בצילום מסך, וזה עובד רק כשהעיצוב הוא קוד."
-madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
+  - { title: "Show HN: an AI app that settles small couple arguments", url: "https://thepiece.app/en", date: "2026-06-04" }
+  - { title: "Claude (AI) - Wikipedia", url: "https://en.wikipedia.org/wiki/Claude_(AI)", date: "" }
+opinion: "אנחנו לא מתרגשים מהקנבס, אנחנו מתרגשים מה-onboarding. הרגע שבו הכלי קורא את ה-codebase ובונה ממנו design system הוא החלק הדטרמיניסטי, וזה מה שהופך את התוצרים לעקביים, הרבה יותר מאיכות המודל. בעינינו השאלה הנכונה היא לא כמה יפה הגרסה הראשונה, אלא מה בודק אותה: handoff ל-Claude Code עם review וטסטים שווה יותר מעוד slider. אנחנו שופטים כלי לפי מה שהוא משנה ביום ראשון בבוקר, וכאן התשובה ברורה: כלי שמכריח אתכם להחזיק את מקור האמת בקוד עושה טוב לצוות גם אם תפסיקו להשתמש בו אחרי חודש."
+madeWith: { model: "claude-opus-5-5", sourceCount: 9, reviewedBy: "Koby Almog" }
 ---
 
-Claude Design הוא מוצר טוב. בגלל זה בדיוק רוב המפתחים לא צריכים אותו.
+ב-18 באפריל 2026, יום אחרי שאנטרופיק השיקה את Claude Design, המעצב Sam Henri Gold פתח בבלוג שלו קובץ אחד: ה-design system של Figma עצמה. לא של לקוח, של Figma. 946 משתני צבע, מקובצים בתיקיות כמו `bg/desktopBackgrounded`, ולכל משתנה שמונה modes: Light ו-Dark, ועוד גרסאות ל-FigJam, ל-DevMode ול-Slides. הוא כתב את הפוסט כמה שעות אחרי שניסה את Claude Design בפעם הראשונה, והטיעון שלו קצר. המודלים התאמנו על קוד, לא על ה-primitives של Figma. אז מקור האמת של העיצוב חוזר לקוד, והכלי שיודע לקרוא קוד מרוויח.
 
-נשמע הפוך, אז הנה הנימוק. אנטרופיק השיקה אותו ב-17 באפריל 2026 כמוצר של Anthropic Labs, ב-research preview למנויי Pro, Max, Team ו-Enterprise. בהשקה הוא רץ על Opus 4.7, שאנטרופיק הציגה כ-most capable vision model שלה. אחרי 11 יום כבר הייתה לו אלטרנטיבה בקוד פתוח. היום הוא יושב בתפריט של claude.com תחת "Claude apps built for", ליד Science ו-Security, ולא ליד Claude Code. כלומר גם אנטרופיק מוכרת אותו לקהל אחר.
-
-השבוע ישבנו איתו על ה-redesign של הבלוג הזה. אחרי כמה סבבים סגרנו את הטאב וחזרנו לכתוב קוד. לא כי הוא לא עבד. הוא עבד, אבל בשביל מישהו שהוא לא אנחנו. זה החלק האחרון בסדרה, ובניגוד ל-Codex מהחלק הראשון, פה השאלה היא לא איזה agent כותב קוד טוב יותר. השאלה היא אם בכלל צריך שלב לפני הקוד.
+זה החלק הרביעי והאחרון בסדרה. אחרי Codex, Grok Bot ו-ChatGPT, הפעם כלי שאנטרופיק בכלל לא מוכרת למפתחים. ודווקא בגלל זה כדאי שתכירו אותו: הצעד הראשון שלו הוא לבקש גישה ל-repo שלכם.
 
 ## מה זה בעצם, ומה זה לא
 
-Claude Design הוא workspace ויזואלי. אתם מתארים מה צריך, Claude בונה גרסה ראשונה, ומשם מלטשים בארבע דרכים: שיחה, הערות inline על אלמנט, עריכה ישירה, ו-sliders ש-Claude בונה בעצמו לפרויקט הספציפי. מה יוצא: prototypes אינטראקטיביים, wireframes, מצגות, one-pagers, landing pages, ויז'ואלים לקמפיין. גם prototypes עם voice, וידאו, shaders ו-3D. החלק המעניין באמת הוא ה-onboarding: Claude קורא את ה-codebase ואת קבצי העיצוב שלכם, בונה מהם design system, וכל פרויקט אחרי זה כבר משתמש בצבעים, בטיפוגרפיה ובקומפוננטות שלכם. אפשר להחזיק יותר ממערכת אחת.
+Claude Design הוא מוצר של Anthropic Labs, יחידת הניסויים של החברה. בגדול: קנבס שבו אתם מתארים מה אתם צריכים, קלוד בונה גרסה ראשונה, ואתם מלטשים יחד איתו. התוצרים לפי ההודעה הרשמית הם עיצובים, prototypes, מצגות ו-one-pagers. בהשקה הוא רץ על Opus 4.7, שאנטרופיק קראה לו מודל הראייה הכי חזק שלה, והוא עדיין מוגדר research preview.
 
-עכשיו מה זה לא. זה לא artifacts. ה-artifact בצ'אט הוא חלון צד לשיחה, נולד איתה ונשכח איתה. ב-Design הפרויקט הוא העיקר והשיחה היא רק הכלי. זה גם לא Claude Code: הוא לא עובד לכם על ה-repo. כשצריך מימוש, הוא מעביר את זה ל-Claude Code ב-handoff. וזה לא ה-canvas של ChatGPT מהחלק השלישי, שהוא בגדול עורך מסמכים עם מודל בצד.
+עכשיו מה הוא לא, כי פה רוב הבלבול:
 
-<figure><img src="/posts/claude-design-up-close/v1-screenshot-he.jpg" alt="אנטרופיק מוכרת את זה ליד Science ו-Security, לא ליד Claude Code. הקהל המרכזי הוא לא המפתח (claude.com)" loading="lazy" /><figcaption>אנטרופיק מוכרת את זה ליד Science ו-Security, לא ליד Claude Code. הקהל המרכזי הוא לא המפתח (claude.com)</figcaption></figure>
+- **הוא לא artifact.** artifacts בצ'אט של claude.ai הם חתיכת HTML או React אחת בתוך שיחה. Claude Design הוא סביבת עבודה: פרויקטים, design system קבוע, הערות על הקנבס, ייצוא.
+- **הוא לא Claude Code.** הוא קורא את ה-codebase ב-onboarding, אבל לא כותב ל-repo. כשיש wireframe מוכן, מעבירים אותו ל-Claude Code, והוא זה שמממש.
+- **הוא לא Figma.** אין קובץ וקטורי עם components ו-variants. התוצר מבוסס קוד, ולכן prototype יכול לכלול קול, וידאו, shaders, 3D ו-AI מובנה. קובץ Figma לא יודע להריץ את זה.
+- **הוא לא Cowork.** Cowork הוא agent כללי למשימות של לא-מתכנתים. Design הוא כלי אחד, לעבודה ויזואלית.
 
-## יושבים מול זה: מה קורה בפועל
+<figure><img src="/posts/claude-design-up-close/v1-screenshot-he.jpg" alt="אנטרופיק מוכרת את זה למנהלי מוצר, למייסדים ולמשווקים, לא למעצבים, והדף בנוי בהתאם (claude.com)" loading="lazy" /><figcaption>אנטרופיק מוכרת את זה למנהלי מוצר, למייסדים ולמשווקים, לא למעצבים, והדף בנוי בהתאם (claude.com)</figcaption></figure>
 
-ה-onboarding הוא הרגע שבו מבינים אם זה בשבילכם. אצלנו הוא קרא את ה-repo של הבלוג, Astro עם CSS שכתבנו ביד, והוציא ממנו design system: צבעי הנייר והדיו, Frank Ruhl Libre לכותרות, Heebo לטקסט. בלי שביקשנו. יפה.
+## סשן ראשון: מה קורה כשפותחים את זה
 
-משם זה מרגיש כמו עבודה עם מעצב זריז מאוד. ביקשנו עמוד פוסט בעברית, RTL, עם כותרת גדולה ו-pull quote, והגרסה הראשונה הגיעה תוך דקות. מצביעים על אלמנט, כותבים "פחות אוויר פה", והוא מתקן רק את האלמנט הזה. כשמשהו הוא עניין של מינון, הוא בונה slider במקום לנחש, ואתם גוררים עד שזה נראה נכון.
+הזרימה, לפי ההשקה, נראית ככה. קודם onboarding: קלוד קורא את ה-codebase ואת קבצי העיצוב ובונה מהם design system לצוות. צבעים, טיפוגרפיה, components. מכאן כל פרויקט חדש משתמש בהם אוטומטית, ואפשר להחזיק יותר ממערכת אחת, נגיד אחת למוצר ואחת לשיווק.
 
-בסוף יש ארבע יציאות: PDF, URL לשיתוף, PPTX, או שליחה ל-Canva, שם זה נשאר ניתן לעריכה. ובשביל מוצר אמיתי, handoff ל-Claude Code.
+אחר כך ה-prompt. אנטרופיק ניסחה את שלב העבודה ככה:
 
-רגע, פה זה נתקע אצלנו. מה שעובר ב-handoff הוא העיצוב, לא ה-commit. מישהו עדיין צריך להכניס את זה לקובץ ה-CSS שכבר קיים, ולהחליט מה קורה בפעם הבאה שמישהו משנה את הקובץ הזה ולא את ה-canvas.
+> Describe what you need and Claude builds a first version. From there, you refine through conversation, inline comments, direct edits, or custom sliders (made by Claude) until it's right.
+> — Anthropic, הודעת ההשקה, 17 באפריל 2026
+
+ה-sliders הם החלק הכי יפה שם. קלוד בונה לכל עיצוב בקרים משלו: צפיפות, גודל כותרות, כמה צבע. במקום לכתוב "תעשה את זה קצת יותר אוורירי" חמש פעמים, אתם מזיזים slider. רק תבקשו אותם, ותגידו בדיוק אילו.
+
+בפועל, ה-prompt הראשון קובע כמה סבבים תעשו. תכתבו brief כמו שהייתם כותבים למעצב פרילנסר, לא שורה אחת:
+
+```markdown title="brief.md"
+מה: one-pager למוצר, עמוד A4 אחד לאורך
+למי: CTO בחברה של 200 מפתחים, יקרא את זה 40 שניות
+חובה: 3 המספרים מהטבלה המצורפת, הלוגו, CTA אחד
+אסור: תמונות stock, יותר משני צבעי accent מה-design system
+וריאציות: 3 כיוונים שונים באמת, לא 3 גוונים של אותו כיוון
+בקרים: slider לצפיפות, slider לגודל הכותרת הראשית
+```
+
+ובסוף, ייצוא. deck יוצא כ-PPTX או נשלח ל-Canva. prototype משתפים כמו שהוא, אינטראקטיבי, בלי code review ובלי PR. ו-wireframe של פיצ'ר עובר ל-Claude Code למימוש.
 
 <figure><img src="/posts/claude-design-up-close/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
 
-## המספרים, כמה שיש
+## המספרים: מי מקבל, כמה זה עולה
 
-- **17 באפריל 2026**: השקה, research preview, גלגול הדרגתי באותו יום.
-- **4 מסלולים**: Pro, Max, Team, Enterprise. אין מחיר נפרד בפוסט ההשקה, זה חלק מהמנוי. מכסות שימוש? לא מצאנו מספר רשמי, אז אל תבנו על זה תוכנית.
-- **4 פורמטים ליצוא**: PDF, URL, PPTX, Canva.
-- **11 יום**: עד שצוות משנגחאי הוציא את Open Design, אלטרנטיבה בקוד פתוח (Apache-2.0), local-first, שעובדת דרך ה-coding agent שאתם כבר משלמים עליו. הגרסה הראשונה: בערך 18,700 שורות, אדם אחד, יומיים ועוד יממה של debug, ו-subscription של בערך $200. ביולי היו לה 77,000 כוכבים ויותר ממיליון התקנות.
-- **946**: משתני צבע בקובץ ה-design system של פיגמה עצמה, לפי Sam Henri Gold, כל אחד עם 8 modes. זה סדר הגודל של מה ש-Claude Design מנסה לייתר.
+- **השקה:** 17 באפריל 2026, roll-out הדרגתי לאורך אותו יום.
+- **גישה:** מנויי Pro, Max, Team ו-Enterprise. לא בתוכנית החינמית.
+- **מחיר:** אין מחיר נפרד, זה בתוך המנוי. Pro הוא נקודת הכניסה ($20 לחודש במחירון הרגיל). בהודעת ההשקה אין מכסות שימוש ספציפיות, אז תבדקו בדף ה-pricing לפני שאתם מתכננים סדנה של 30 איש.
+- **מודל:** Opus 4.7 בהשקה. מאז יצאו Opus 5.5 (22 בספטמבר) ו-Sonnet 5.5 (28 בספטמבר), וההודעה המקורית לא אומרת מה רץ שם היום.
 
-## איפה הוא חזק
+ולשם השוואה, המספרים של הצד השני. Open Design, החלופה ה-open-source שצוות משנגחאי הוציא ב-28 באפריל, 11 ימים אחרי ההשקה. גרסה ראשונה של כ-18,700 שורות, יומיים של המנכ״ל ועוד 24 שעות דיבאג, וחשבון של בערך $200 על מנוי ל-coding agent. מאז: 77,000 stars ויותר ממיליון התקנות. יחס של 10 ל-1, הפוך מה-funnel הרגיל של GitHub.
 
-> "Designers can turn static mockups into easily-shareable interactive prototypes to gather feedback and user-test, without code review or PRs."
-> — אנטרופיק, פוסט ההשקה של Claude Design
+## איפה זה חזק
 
-without code review or PRs. זה הפיצ'ר המרכזי. ל-PM, למייסד או לאנשי שיווק זה המון: משהו שאפשר ללחוץ עליו מחר בבוקר, בלי לחכות ל-sprint.
+Martin Alderson כתב יומיים אחרי ההשקה את המשפט שמסביר את רוב השוק הזה: מודלים לא מעצבים כמו מעצב מוכשר, אבל לא כל דבר צריך מעצב מוכשר. ה-deck לישיבת דירקטוריון, הדו״ח הרבעוני, ה-proposal ללקוח, דף הנחיתה לכנס. עבודה שאף מעצב לא מתלהב ממנה ושורפת שעות על הלוך-חזור. פה Claude Design הכי חזק, ואנטרופיק עצמה מסדרת ככה את רשימת השימושים: prototypes, wireframes ל-PM, מצגות למייסדים ולאנשי מכירות, חומרי שיווק.
 
-הוא חזק בכל מה שמסביב למוצר. Martin Alderson ניסח את זה הכי טוב: LLMs לא מעצבים כמו מעצב מוכשר, אבל לא כל דבר צריך מעצב מוכשר. מצגת ללקוח, one-pager, landing page לאירוע, דוח רבעוני. דברים שאוכלים שעות של הלוך-חזור ואף מעצב לא מתלהב מהם. עם design system שנבנה מה-repo, זה יוצא עקבי עם המוצר, וזה בדיוק מה שהיה חסר עד עכשיו בעיצוב עם AI.
+דבר שני, ה-design system שנבנה מתוך הקוד. אם ה-tokens שלכם כבר יושבים ב-repo, כל deck יוצא בצבעים ובפונטים של המוצר בלי שמישהו זוכר hex codes. זו בדיוק העקביות שצוותי עיצוב מבזבזים עליה ימים ב-Figma.
 
-והוא חזק בחקירה. פוסט ההשקה אומר את זה ישר: למעצבים אין זמן לעשות prototype לתריסר כיוונים, אז הם מסתפקים בכמה. פה תריסר כיוונים זה זול. מה שכן, את הבחירה ביניהם עדיין עושה בן אדם.
+ויש את ה-exploration. אנטרופיק פותחת את ההודעה בזה שגם מעצבים מנוסים חוסכים בחקירה, כי אין זמן לתריסר כיוונים. כאן תריסר כיוונים זה prompt אחד.
 
-## איפה הוא נופל
+> **הסתייגות:** חיפשתי פרויקט ציבורי שמתעד מקצה לקצה "בנינו את זה ב-Claude Design" ולא מצאתי אחד שאני סומך עליו. דפי Show HN כמו SeasonMap ו-Piece נראים בדיוק כמו מה שהכלי מייצר, mockup של אפליקציה, שלושה צעדים, מחירון, אבל אף אחד מהם לא טוען שזה הכלי. אז הדוגמאות פה הן של אנטרופיק ושל מי שכתב עליה, לא של לקוחות.
 
-הכל מתנקז לשאלה אחת: איפה מקור האמת של העיצוב. Sam Henri Gold, שניסה את המוצר יום אחרי ההשקה, כתב שהצוות שלו מבלה לא מעט זמן בהעתקה של שינויים שנעשו בקוד בחזרה לפיגמה, ושזה "not fun". Claude Design עדיף על פיגמה בנקודה הזו כי הוא יודע לקרוא קוד. אבל אם ה-UI שלכם משתנה ב-repo כל יום, כל שינוי שם הוא עוד דבר לסנכרן ל-canvas. ואם לא מסנכרנים, ה-canvas פשוט מתיישן, ואחרי חודש אף אחד לא סומך עליו.
+## איפה זה נופל
 
-שנית, זה כלי לבן אדם. לא מצאנו דרך להריץ אותו מתוך pipeline, ואצלנו חצי מהעיצוב לא מצויר ביד אלא נוצר כל בוקר על ידי agent.
+קודם כל, התקרה. Alderson עצמו כותב שזה nowhere near מעצב מוכשר, ומוסיף currently. בשביל ה-flow המרכזי של המוצר, המסך שאנשים רואים 50 פעם ביום, אתם עדיין צריכים מעצב.
 
-שלישית, זה עדיין preview. מכסות לא מתועדות, ואין לנו מושג מה יקרה למחיר כשהוא ייצא מזה.
+ה-design system לא יהיה יותר טוב מהקוד שלכם. אם ב-repo יש ארבעה גוונים של כחול hardcoded בארבעה קבצי CSS, הוא ילמד ארבעה גוונים. ה-onboarding לא מנקה בלגן, הוא משכפל אותו.
 
-> **הדעה שלי:** אני לא חושב שזה הורג את פיגמה מחר. אבל Sam Henri Gold צודק בנקודה אחת: הפורמט הסגור של פיגמה השאיר אותה מחוץ ל-training data, ו-Claude Design נולד בצד הנכון של הקו הזה. מה שמעניין אותי זה לא מי ינצח, אלא כמה זמן צוותים יסכימו להחזיק שני מקורות אמת.
+אחר כך, הדרך חזרה. Gold כותב שבעבודה שלו הם מבזבזים הרבה זמן על להחזיר ל-Figma שינויי עיצוב שנעשו ישר בקוד, ושזה לא כיף. אם הארגון שלכם חי ב-Figma, כל דבר ש-Claude Design מייצר יוצר בדיוק את העבודה הזו.
 
-<figure><img src="/posts/claude-design-up-close/src4.jpg" alt="יום אחרי ההשקה Sam Henri Gold כבר הימר שמקור האמת של העיצוב חוזר לקוד, והניסיון שלנו מסכים איתו (credit: Sam Henri Gold)" loading="lazy" /><figcaption>יום אחרי ההשקה Sam Henri Gold כבר הימר שמקור האמת של העיצוב חוזר לקוד, והניסיון שלנו מסכים איתו (credit: Sam Henri Gold)</figcaption></figure>
+ויש תלות בספק. הכלי דורש מנוי של אנטרופיק, רץ על המודלים שלה ויושב בענן שלה. בשביל ה-onboarding הוא צריך גישה ל-codebase. בארגון עם מדיניות מחמירה על קוד שיוצא החוצה, זו שיחה עם אבטחת מידע לפני הפרויקט הראשון, לא אחריו.
 
-## Claude Design מול לכתוב ישר עם Claude Code
+ו-research preview זה research preview. פיצ'רים זזים, וזה לא כלי שבונים עליו תהליך של צוות שלם בלי תוכנית B.
 
-| | Claude Design | Open Design | Claude Code ישר |
-|---|---|---|---|
-| למי | PM, מייסדים, שיווק, מעצבים | מי שרוצה canvas על ה-agent שלו | מפתחים שה-UI שלהם ב-repo |
-| מקור האמת | ה-canvas, ואז handoff | קבצים מקומיים | ה-repo |
-| מה יוצא | prototype, PDF, URL, PPTX, Canva | prototypes ועיצובים כקבצים | commit |
-| כמה עולה | בתוך מנוי Pro ומעלה | חינם, משלמים על ה-agent | בתוך המנוי |
+<figure><img src="/posts/claude-design-up-close/src4.jpg" alt="יום אחרי ההשקה Gold כבר טען שהכאב האמיתי הוא העבודה הכפולה בין קוד ל-Figma, ושם הכלי הזה נכנס (credit: samhenri.gold)" loading="lazy" /><figcaption>יום אחרי ההשקה Gold כבר טען שהכאב האמיתי הוא העבודה הכפולה בין קוד ל-Figma, ושם הכלי הזה נכנס (credit: samhenri.gold)</figcaption></figure>
 
-אז למה סגרנו את הטאב. בגדול, שלוש סיבות.
+## מול Figma ומול Open Design
 
-אחת: הבלוג הוא Astro, ועיצוב ה-paper+ink שלו חי בקובץ CSS אחד. כל מה שהיינו מקבלים מה-canvas היה צריך להיכנס לאותו קובץ בכל מקרה, אז עדיף ש-Claude Code יעבוד עליו ישר ויראה את ה-diff.
+**Figma** היא עדיין מקור האמת ברוב הארגונים, עם collaboration בשלה ו-components שצוותים שלמים מתחזקים. הבעיה היא מה ש-Gold תיאר: פורמט סגור, כמעט לא מתועד, שהמודלים כמעט לא ראו. כל אוטומציה שם עוברת דרך plugins.
 
-שתיים: ה-blog-agent ב-local-cycle מייצר כל בוקר לכל פוסט cover, figures ב-SVG ווידאו, לפי style guide. ה-style guide הזה חייב להיות טקסט ש-agent קורא בכל ריצה, לא design system שחי בכלי שה-agent לא רואה.
+**Open Design** היא ההפך מבחינת פריסה: Apache-2.0, רצה אצלכם במחשב, ומנתבת דרך ה-coding agent שאתם כבר משלמים עליו. אם יש לכם Claude Code או Codex וחשוב לכם שהקוד לא יעזוב את המחשב, היא הבחירה הטבעית. על מה מוותרים: הליטוש של מוצר מנוהל והחיבור הישיר ל-Claude Code.
 
-שלוש: אנחנו בודקים כל שינוי UI בצילום מסך לפני שהוא עולה. זה עובד כשהעיצוב הוא קוד שאפשר לבנות ולצלם. כשיש עותק שני, זה כבר פרויקט.
+ובאמצע יש את v0 של Vercel, שמייצר React ישירות ויושב קרוב יותר לעולם של מפתחי frontend.
 
-בהגינות: הגרסה מה-canvas הציעה כמה רעיונות טובים, ולקחנו אותם ידנית. זה השימוש הנכון בו אצל מפתחים. מראה, לא מקור.
+<figure><img src="/posts/claude-design-up-close/v3-svg-he.jpg" alt="Claude Design לא נכנס לרבע של Figma, הוא פתח רבע חדש בצד של הקוד, ו-11 ימים אחר כך Open Design כבר ישבה ברבע המקומי (Anthropic, samhenri.gold, Okane Land)" loading="lazy" /><figcaption>Claude Design לא נכנס לרבע של Figma, הוא פתח רבע חדש בצד של הקוד, ו-11 ימים אחר כך Open Design כבר ישבה ברבע המקומי (Anthropic, samhenri.gold, Okane Land)</figcaption></figure>
 
-<figure><img src="/posts/claude-design-up-close/v3-svg-he.jpg" alt="בבלוג שה-agent בונה מחדש כל בוקר, כל מסלול שעובר דרך canvas מוסיף מקור אמת שני, וזה מה שהכריע אצלנו (ה-redesign שלנו, ספטמבר 2026)" loading="lazy" /><figcaption>בבלוג שה-agent בונה מחדש כל בוקר, כל מסלול שעובר דרך canvas מוסיף מקור אמת שני, וזה מה שהכריע אצלנו (ה-redesign שלנו, ספטמבר 2026)</figcaption></figure>
+## מי צריך לבחור בזה ברבעון הזה
 
-## מי צריך את זה ברבעון הזה
+- **PM, מייסדים, מפתחים שצריכים deck או דף נחיתה:** כן. זה הקהל שאנטרופיק כיוונה אליו, ושם הכלי באמת עובד.
+- **צוות עיצוב עמוק בתוך Figma:** רק ל-exploration. לא לקבצים שאחר כך מישהו צריך לתחזק.
+- **ארגון בלי מנוי לאנטרופיק או עם מגבלות על קוד בענן:** Open Design, דרך ה-agent שכבר יש לכם.
 
-PM שרוצה להראות flow לפני שהוא פותח ticket: כן. ה-wireframe יוצא מהר, וה-handoff ל-Claude Code חוסך את השלב שבו המפתח מנחש מה התכוונו.
+מה לעשות השבוע:
 
-מייסדים ו-AE שבונים מצגות: כן, ובלי לחשוב פעמיים. PPTX ו-Canva הם בדיוק המקום שבו העבודה הזו ממשיכה.
+1. לפני ה-onboarding, תנקו ב-repo קובץ tokens אחד: צבעים, פונטים, ריווחים. זה מה שהכלי ילמד.
+2. תבחרו artifact אמיתי אחד, ה-deck הבא, לא מסך מוצר. תמדדו זמן מול ה-deck הקודם.
+3. תייצאו ל-PPTX ותפתחו ב-PowerPoint או ב-Keynote. תספרו מה נשבר.
+4. wireframe אחד ל-Claude Code על branch נפרד. תספרו כמה תיקונים ה-review דרש.
 
-מעצבים בצוות שה-design system שלו כבר בקוד: כן, לחקירה. תריסר כיוונים ביום, ואז בוחרים ומעבירים.
+אם אחרי שלושה סבבי הערות זה עדיין לא משהו שהייתם שולחים, תעצרו. הכלי שורף לכם את הזמן שהוא אמור לחסוך.
 
-מפתחים שה-UI שלהם ב-repo ומשתנה כל יום: לא. תעבדו עם Claude Code ישר מול ה-dev server. וגם מי שצריך עיצוב שנוצר בתוך pipeline: לא, זה לא הכלי. מי שרוצה את חוויית ה-canvas בלי תלות בספק יכול לבדוק את Open Design, שרץ מקומית על ה-agent שכבר יש לו.
-
-בקיצור: אם ה-UI שלכם כבר חי ב-repo, ה-canvas הכי טוב שיש לכם הוא ה-dev server. Claude Design בנוי בשביל כל מי שאין לו כזה.
+ואם ה-deck הבא שלכם עדיין נפתח ב-Figma בעוד חודש, זה לא כישלון של הכלי. זה סימן שמקור האמת אצלכם עוד לא בקוד.

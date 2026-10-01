@@ -1,15 +1,15 @@
 ---
-title: "ChatGPT למהנדסים: הפיצ'רים שאתם משלמים עליהם ולא משתמשים בהם"
-description: "Projects, memory, canvas, deep research, connectors, scheduled tasks ו-ChatGPT Work: מה כל אחד עושה, איפה הגבול, ומה להדליק ביום שני."
+title: "ChatGPT מקרוב: הפיצ'רים שמהנדסים משאירים כבויים"
+description: "Projects, memory, canvas, deep research, agent ו-connectors ב-ChatGPT: מה כל אחד עושה, איפה הוא נופל, ומה להפעיל כבר השבוע."
 lang: he
 key: chatgpt-advanced
 term: "ChatGPT power use"
 kind: faq
 pubDate: 2026-10-01
-tags: ["chatgpt", "openai", "agents", "connectors", "productivity"]
-hook: "scene"
-cover: type
-tldr: ["פתחו Project לכל repo, עם README והוראות, במקום להדביק context כל פעם", "connector ראשון בקריאה בלבד, והגבולות כתובים ב-brief עצמו", "Agent Mode הוחלף ב-ChatGPT Work. בדקו ב-Help Center מה זמין אצלכם"]
+tags: ["chatgpt", "openai", "agents", "mcp", "productivity"]
+hook: "number"
+cover: illus
+tldr: ["כתבו custom instructions עם ה-stack, שפת התשובה ומה אסור לעשות", "פתחו Project לכל repo, עם קבצים והוראות משלו, ושיחה חדשה לכל משימה", "תנו ל-agent רק משימה סגורה: בלי login, בלי טפסים, עצירה כשמקורות סותרים"]
 series: { slug: "the-new-tools", name: "הכלים החדשים, מקרוב", part: 3, total: 4 }
 hero: /posts/chatgpt-advanced/hero.jpg
 diagram: /posts/chatgpt-advanced/diagram.svg
@@ -17,80 +17,94 @@ sources:
   - { title: "ChatGPT | OpenAI Help Center", url: "https://help.openai.com/en/collections/3742473-chatgpt", date: "" }
   - { title: "Introducing ChatGPT agent: bridging research and action", url: "https://openai.com/index/introducing-chatgpt-agent", date: "" }
   - { title: "OpenAI News", url: "https://openai.com/news", date: "" }
-  - { title: "ChatGPT Agents Explained: What They Are & How to Use Them in 2026", url: "https://dailybuzzupdate.com/chatgpt-agent-explained-2026", date: "" }
-  - { title: "ChatGPT Agents Explained: How OpenAI’s AI Agent Mode Works", url: "https://plisio.net/ai/chatgpt-agents", date: "" }
-  - { title: "ChatGPT Workspace Agents Explained Simply", url: "https://halmob.com/blog/chatgpt-workspace-agents-explained-simply", date: "" }
+  - { title: "Who Invented ChatGPT? (It Wasn't One Person)", url: "https://www.spurnow.com/en/blogs/who-invented-chatgpt-and-when", date: "" }
+  - { title: "What is a ChatGPT Agent and How Can I Use It | Pluralsight", url: "https://www.pluralsight.com/resources/blog/ai-and-data/what-is-chatgpt-agent", date: "" }
+  - { title: "How to Use ChatGPT’s Agent Mode (and Why It Changes What AI Can Do for You)", url: "https://evakeiffenheim.substack.com/p/how-to-use-chatgpts-agent-mode-and", date: "" }
   - { title: "Understanding ChatGPT Agent Mode | Coursiv Blog", url: "https://coursiv.io/blog/chatgpt-agent-mode", date: "" }
-opinion: "אנחנו לא מתלהבים מהכפתורים, אנחנו מסתכלים על מה המודל רואה ומה הוא יכול לשנות. Agent Mode נולד ונסגר תוך שנה, ומי שבנה brief מסודר והרשאות קריאה בלבד עבר ל-Work בלי כאב. אצלנו, כל מקום שבו החלפנו קריאה למודל בחוק פשוט נהיה זול ואמין יותר, אז לפני scheduled task תשאלו אם cron עם סקריפט לא עושה את אותו דבר. ובדיקה מנצחת יצירה: task שלא מחזיר פלט שאפשר לאמת הוא task שאתם לא יודעים אם בכלל רץ."
+opinion: "אנחנו לא חושבים שהיתרון ב-2026 הוא prompt חכם יותר. הוא במה שמסביב: מה המודל רואה (instructions, Project, memory), במה הוא נוגע (connectors), ואיך בודקים אותו. החלק הקבוע, הוראות שכתבתם וקבצים שבחרתם, שווה יותר מ-memory שהמודל בוחר לבד, ולכן אנחנו משקיעים שם קודם. וכל מה שרץ בלי עין אנושית, agent או משימה מתוזמנת, צריך לסיים בפלט שאפשר לבדוק אוטומטית. בלי זה אין לכם אוטומציה, יש לכם תקווה."
 madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
 ---
 
-## השתמשתי ב-ChatGPT בתור צ'אט. מה פספסתי?
+## אני משתמש ב-ChatGPT כל יום. מה אני מפספס?
 
-17 ביולי 2025. OpenAI מעלה פוסט בשם "Introducing ChatGPT agent". שני מוצרים שהיו נפרדים, Operator שידע ללחוץ ולהקליד באתרים ו-deep research שידע לקרוא ולסכם, מתאחדים לאופציה אחת בתפריט ה-tools. פתאום יש ל-ChatGPT מחשב וירטואלי משלו: browser גרפי, browser טקסטואלי מהיר, טרמינל שמריץ Python, ו-connectors ל-Gmail, Drive, Calendar, GitHub ו-Slack.
+100 מיליון משתמשים בחודשיים. ככה ChatGPT התחיל בנובמבר 2022. ורוב המהנדסים שאני מכיר עדיין עובדים איתו כמו בשבוע הראשון: חלון חדש, prompt, העתק-הדבק, סוגרים.
 
-רוב המהנדסים שאני מכיר עדיין פותחים צ'אט חדש, מדביקים לוג של 300 שורות ושואלים "מה הבעיה". זה עובד. אבל זה ניצול די עלוב של מנוי שמשלמים עליו כל חודש.
+בינתיים צמחה סביב החלון הזה מערכת שלמה: הוראות קבועות, memory, Projects עם קבצים, canvas, deep research, agent עם מחשב משלו, connectors ומשימות מתוזמנות. בגדול, כל פיצ'ר כזה עונה על אחת משתי שאלות: מה המודל רואה לפני שכתבתם מילה, ובמה מותר לו לגעת. זה ה-harness שדיברנו עליו בחלקים הקודמים, רק בגרסה לצרכן.
 
-## רגע, agent mode עוד קיים?
+תעשו: פתחו Settings → Personalization ותבדקו מה מופעל אצלכם ומה כתוב שם. רוב האנשים מגלים שם הפתעות.
 
-לא בצורה הזאת. ה-Help Center של OpenAI כותב היום שה-Agent Mode הקודם כבר לא זמין, ומפנה ל-ChatGPT Work ול-workflows של cloud browser. לפי סיכומים מיולי 2026, Work רץ על GPT-5.6 ומיועד למשימות ארוכות שנוגעות בכמה אפליקציות ומחזירות מסמכים, גיליונות ואפליקציות.
+<figure><img src="/posts/chatgpt-advanced/v1-strip-he.jpg" alt="המוצר גדל מהר יותר מההרגלים של מי שמשתמש בו: הכלים שם, ורובם נשארים כבויים (OpenAI, Spur, Eva Keiffenheim)" loading="lazy" /><figcaption>המוצר גדל מהר יותר מההרגלים של מי שמשתמש בו: הכלים שם, ורובם נשארים כבויים (OpenAI, Spur, Eva Keiffenheim)</figcaption></figure>
 
-ובמקביל, ב-22 באפריל 2026 הושקו Workspace Agents: צוות בונה agent פעם אחת, משתף אותו, מפעיל מ-ChatGPT או מ-Slack, והוא ממשיך לרוץ בענן כשהלפטופ סגור. מתחת למכסה הם רצים על Codex, אותו Codex מהחלק הראשון של הסדרה. בקיצור: השם זז, המנגנון נשאר. מחשב בענן, כלים, ואישור לפני פעולה.
+## מה ההבדל בין custom instructions ל-memory, ומה לשים בכל אחד?
 
-> "ChatGPT requests permission before taking actions of consequence, and you can easily interrupt, take over the browser, or stop tasks at any point."
->
-> — OpenAI, פוסט ההשקה של ChatGPT agent
+את custom instructions אתם כותבים. Memory זה מה שהמודל מחליט לזכור עליכם מהשיחות. הראשון קבוע, השני לא. ב-custom instructions יש שני שדות, עד 1,500 תווים כל אחד, ולידם Characteristics שמכוון חום, התלהבות, פורמט ו-emoji.
+
+בהוראות תשימו רק מה שלא משתנה: ה-stack, שפה, אורך, ומה לא לעשות. את ה-memory תפתחו פעם בחודש ותמחקו מה שכבר לא נכון. memory שזוכר stack של לקוח מלפני שנה ידחוף אותו לכל תשובה.
+
+```text title="custom-instructions.txt"
+אני מהנדס backend. Python 3.12, FastAPI, Postgres 16, AWS (ECS, Lambda), Terraform.
+תענה בעברית, מונחים טכניים באנגלית.
+קוד: קודם הקוד, אחר כך הסבר של שתי שורות. בלי הקדמות.
+אם אתה לא בטוח ב-API או ב-flag, תגיד את זה. אל תמציא.
+אל תציע ספרייה חדשה בלי שביקשתי.
+```
 
 <figure><img src="/posts/chatgpt-advanced/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
 
-<figure><img src="/posts/chatgpt-advanced/src2.jpg" alt="Operator ו-deep research אוחדו למוצר אחד ב-17 ביולי 2025, ותוך שנה גם הוא הוחלף ב-ChatGPT Work (credit: OpenAI)" loading="lazy" /><figcaption>Operator ו-deep research אוחדו למוצר אחד ב-17 ביולי 2025, ותוך שנה גם הוא הוחלף ב-ChatGPT Work (credit: OpenAI)</figcaption></figure>
+## Projects: למה לא פשוט שיחה אחת ארוכה?
 
-## מה ההבדל בין custom instructions, memory ו-Projects?
+כי שיחה ארוכה מתברברת. כל הודעה חדשה נשענת על כל מה שהיה לפניה, כולל הטעויות. Project נותן הוראות וקבצים קבועים לנושא אחד, ושיחות נקיות בתוכו.
 
-בגדול, שלוש שכבות של context, מהרחבה לצרה. Custom instructions הן ברירת המחדל לכל שיחה: מי אתם, מה ה-stack, איך אתם רוצים תשובה. לידן יש היום גם Characteristics, שקובעות כמה חמימות, כמה פורמט וכמה אמוג'י.
+איך זה נראה בפועל: Project לכל repo או לקוח, עם README, סכמת ה-DB ו-ADR אחד או שניים, והוראה כמו "תמיד תניח Postgres 16 ו-Terraform 1.9". ואז שיחה חדשה לכל משימה.
 
-Memory זה מה ש-ChatGPT אוסף לבד משיחות קודמות, ופה בדיוק הבעיה: אתם לא תמיד יודעים מה הוא זוכר. Projects הם המקום של מהנדסים: קבצים, הוראות ושיחות של נושא אחד. אצלנו יש Project לכל repo, עם ה-README וה-AGENTS.md בפנים, ולא מסבירים את אותו דבר בפעם העשירית.
+המגבלה: הקבצים הם snapshot. הם לא מתעדכנים מה-repo לבד, ואחרי חודש הם כבר משקרים. תשימו תזכורת להחליף אותם, או תעברו ל-connector של GitHub.
 
-מה שכן, פעם בחודש תעברו על ה-memory ותמחקו. context ישן ושגוי גרוע יותר מאפס context.
+<figure><img src="/posts/chatgpt-advanced/v2-svg-he.jpg" alt="ה-prompt הוא השכבה הכי דקה. Project הוא המקום היחיד שבו אתם שולטים בקבצים וגם בהוראות, ולכן שם שווה להשקיע (OpenAI Help Center)" loading="lazy" /><figcaption>ה-prompt הוא השכבה הכי דקה. Project הוא המקום היחיד שבו אתם שולטים בקבצים וגם בהוראות, ולכן שם שווה להשקיע (OpenAI Help Center)</figcaption></figure>
 
-## canvas או deep research, מתי כל אחד?
+## Canvas: מתי זה עדיף על תשובה רגילה בצ'אט?
 
-הם עונים על שאלות הפוכות. canvas זה עורך: מסמך או קוד בצד, מסמנים קטע ומבקשים שינוי נקודתי, בלי שהמודל ישכתב את כל הקובץ כל פעם. מתאים ל-design doc, ל-runbook, לסקריפט של 200 שורות.
+כשאתם עורכים, לא כשאתם שואלים. Canvas פותח מסמך או קובץ קוד בצד, ואפשר לסמן שורה ולבקש שינוי רק בה, במקום שהמודל יכתוב מחדש 200 שורות וישנה בדרך שלוש שלא ביקשתם.
 
-deep research זה ההפך. נותנים שאלה, הוא קורא מקורות ברשת ומחזיר דוח עם ציטוטים. זה לוקח דקות, לא שניות, אז אל תשרפו אותו על שאלה שגוגל עונה עליה. איפה הוא שווה: השוואה בין שלוש ספריות, סקירת CVE-ים לגרסה ספציפית, מה השתנה בין v2 ל-v3 של API.
+טוב ל-design doc, ל-README, לסקריפט של 100–300 שורות. לא טוב לפרויקט אמיתי: אין שם tests, אין git, ואין diff מול הקוד שלכם. לזה יש Codex, שכיסינו בחלק הראשון.
 
-הגבול: הוא מסכם מה שכתוב, לא מה שנכון. כל מספר בדוח, תפתחו את הלינק.
+תעשו: את ה-RFC הבא תכתבו ב-canvas, ותבקשו לקצר רק סעיפים שסימנתם. ככה תראו מהר אם הוא באמת יודע לערוך נקודתית.
 
-## connectors נשמעים מסוכן. מה הם בעצם מורשים לעשות?
+## Deep research שווה את ההמתנה?
 
-מה שנתתם להם. זו כל הנקודה. connector ל-GitHub או ל-Gmail נותן למודל גישה אמיתית לחשבון, בהרשאות שלכם. בחלק הקודם ראינו את הקיצון אצל Grok Bot: מחשב אחד ו-credentials אחד לכל ה-Bots. ב-ChatGPT ההרשאה היא פר connector, וה-agent מבקש אישור לפני פעולה עם השלכות.
+לפעמים. Deep research יצא בפברואר 2025, ו-OpenAI דיברו על 5 עד 30 דקות לדוח. הוא קורא עשרות מקורות ומחזיר דוח עם citations.
 
-אבל רגע, מי מחליט מה זה "השלכות"? המודל. לא אתם. אז שני כללים. אחד, מתחילים בקריאה בלבד: לסכם PRs, לא למזג. שתיים, הגבולות נכתבים ב-brief עצמו, במילים, כולל איפה לעצור.
+מצוין לשאלה כמו "תשווה שלושה vector DB מנוהלים לפי מחיר ל-10M וקטורים ו-SLA". בזבוז זמן לשאלה שיש לה תשובה אחת בדוקומנטציה.
 
-<figure><img src="/posts/chatgpt-advanced/v2-svg-he.jpg" alt="הסיכון עולה בעמודה של 'פועל בחוץ', לא עם גודל המודל, ושם צריך לבדוק כל פיצ'ר חדש (OpenAI, Plisio)" loading="lazy" /><figcaption>הסיכון עולה בעמודה של 'פועל בחוץ', לא עם גודל המודל, ושם צריך לבדוק כל פיצ'ר חדש (OpenAI, Plisio)</figcaption></figure>
+הבעיה: הדוח נראה סמכותי גם כשמקור אחד שגוי. אז כלל פשוט: לפני שמשהו מהדוח נכנס ל-doc, פותחים ידנית את שלושת ה-citations החשובים ובודקים שהם אומרים מה שהוא טוען. מספיק שאחד לא.
 
-## אפשר להריץ משהו קבוע, בלי לפתוח צ'אט כל בוקר?
+## Agent mode עוד קיים, ומה הוא בעצם עושה?
 
-כן. scheduled tasks עושים בדיוק את זה: prompt שרץ בשעה קבועה ומחזיר תוצאה או התראה. "כל ראשון ב-8:00, תסכם את ה-issues הפתוחים עם label P0" זה שימוש סביר. לצוות, Workspace Agents מאפריל הם הגרסה הרצינית: agent משותף עם זיכרון בין sessions, מישהו משפר אותו וכולם מקבלים את השיפור.
+השאלה הראשונה כבר לא טריוויאלית. Agent mode עלה ב-17 ביולי 2025 ל-Plus, Pro ו-Team: מחשב וירטואלי שמחבר את Operator מינואר 2025 עם deep research. הוא גולש, לוחץ, מריץ קוד ומחזיר מצגת או גיליון. לפי Coursiv מאוגוסט 2026, דף העזרה של OpenAI כבר אומר שה-Agent mode הישן לא זמין ומפנה ל-ChatGPT Work ול-workflows של cloud browser. תבדקו מה מופיע אצלכם ב-Tools, או נסו `/agent`. המנגנון נשאר, וגם ההבטחה:
 
-אצלנו pipeline של כ-10 agents רץ כל בוקר מאז מאי 2026, ולמדנו את זה בדרך הקשה: הבאגים הכי גרועים היו כשלונות שקטים, לא תשובות שגויות. task שנכשל בלי לצעוק נראה בדיוק כמו task שאין לו מה לדווח. תדאגו שיחזיר פלט גם כשאין חדשות.
+> "ChatGPT requests permission before taking actions of consequence, and you can easily interrupt, take over the browser, or stop tasks at any point." — OpenAI, Introducing ChatGPT agent
 
-## מה הוכרז ב-DevDay 2026, וזה משנה משהו?
+מה שכן, אישור לפני כל צעד לא מחליף brief טוב. Coursiv ניסחו את זה יפה: בלי login, בלי ליצור קשר עם אף אחד, בלי לשלוח טפסים, ועצירה כשמקורות סותרים.
 
-DevDay 2026 היה ב-29 בספטמבר. באותו יום OpenAI פרסמה את GPT-6.1 Sol, מסמך safety נלווה, ומוצר בשם dots. ובצד של ChatGPT הוכרזו plugins.
+<figure><img src="/posts/chatgpt-advanced/src2.jpg" alt="agent עם מחשב וירטואלי משלו לא מסוכן בגלל מה שהוא יודע, אלא בגלל במה הוא נוגע: brief סגור שווה יותר מכפתור אישור (credit: OpenAI)" loading="lazy" /><figcaption>agent עם מחשב וירטואלי משלו לא מסוכן בגלל מה שהוא יודע, אלא בגלל במה הוא נוגע: brief סגור שווה יותר מכפתור אישור (credit: OpenAI)</figcaption></figure>
 
-עזבו רגע את השם, שכבר היה פה ב-2023 ונקבר. השאלה היחידה שמעניינת מפתחים: מה ה-plugin רואה, מה הוא יכול לשנות, ומי מאשר. עד שיש docs עם רשימת הרשאות מסודרת, תתייחסו לכל plugin כמו ל-connector עם הרשאות כתיבה. כלומר, לא על החשבון הראשי ולא על repo של production.
+## אפשר לחבר לו את ה-MCP server שלי?
 
-> **הסתייגות:** כרגע יש לי בעיקר כותרות מה-recap, לא docs. אני לא אגיד לכם מה ה-plugins האלה יודעים לעשות לפני שניסיתי אחד על repo אמיתי. אם תקראו פוסטים שמסבירים אותם בביטחון כבר עכשיו, תבדקו מאיפה הם יודעים.
+כן, עם כוכבית. connectors מובנים יש: Gmail, Google Calendar, GitHub, Dropbox, SharePoint, Canva. בספטמבר 2025 OpenAI פתחו developer mode שמאפשר לחבר MCP server משלכם, וה-Apps SDK מ-DevDay 2025 בנוי מעל MCP. אז אותו server שכתבתם ל-Claude Code יכול לשרת גם את ChatGPT.
 
-## אז מה אני עושה ביום שני?
+הכוכבית: connector עם הרשאות כתיבה הוא agent עם מפתח לבית. בחלק הקודם, עם Grok Bot, ראינו מה קורה כשכל הבוטים חולקים cookies. אותו כלל כאן: חשבון ייעודי, scope מינימלי, read-only עד שהוכח אחרת.
 
-שלושה דברים, לפי הסדר. פותחים Project ל-repo אחד, עם README ו-AGENTS.md, וכותבים בהוראות מה ה-stack ואיך מריצים טסטים. מחברים connector אחד בקריאה בלבד, GitHub הכי פשוט, ומבקשים סיכום PRs פתוחים. ומגדירים scheduled task אחד שמחזיר פלט גם כשאין מה לדווח.
+> **הסתייגות:** אני לא מחבר connector עם write ל-repo או לתיבת מייל של עבודה. לא כי זה לא עובד, אלא כי prompt injection בדף שהוא קרא יכול להפוך "תסכם לי" ל"תשלח". read-only מכסה לי את רוב השימושים.
 
-אחרי שבועיים תדעו מה חוסך לכם זמן. מה שלא, מכבים.
+## Scheduled tasks זה צעצוע או משהו שעובד?
 
-ו-Agent Mode כבר הוחלף פעם אחת תוך שנה. מה שעבר איתכם הלאה זה ה-brief וה-checks שכתבתם, לא הכפתור.
+משעמם וטוב. Tasks יצא בבטא בינואר 2025: "כל יום ראשון ב-08:00, תסכם לי את ה-release notes של FastAPI, Pydantic ו-SQLAlchemy מהשבוע", ומקבלים התראה. יש תקרה של 10 משימות פעילות, וזה מספיק.
 
-<figure><img src="/posts/chatgpt-advanced/v3-transcript-he.jpg" alt="הגבולות כתובים ב-brief ולא רק במסך ההרשאות, כי 'פעולה עם השלכות' זה שיקול של המודל (OpenAI, Coursiv)" loading="lazy" /><figcaption>הגבולות כתובים ב-brief ולא רק במסך ההרשאות, כי 'פעולה עם השלכות' זה שיקול של המודל (OpenAI, Coursiv)</figcaption></figure>
+איפה זה נופל: אין לכם eval. אם המקור שינה מבנה, תקבלו סיכום ריק או ממציא, ותגלו את זה אחרי שלושה שבועות.
 
+תעשו: כל משימה מתוזמנת מסתיימת בשורה קבועה, "מקורות שבדקתי: X, Y, Z". אם השורה חסרה או קצרה מדי, משהו נשבר. בקיצור, checksum של עניים.
 
+## מה יצא ב-DevDay 2026, ומה עושים עם זה השבוע?
+
+ב-29 בספטמבר 2026 OpenAI פרסמו באותו יום את ה-DevDay 2026 Recap, את GPT-6.1 Sol עם safety addendum נפרד, ומוצר חדש בשם dots. אני לא אכתוב לכם מה dots עושה מתוך כותרת בעמוד חדשות. תקראו את ה-recap בעצמכם.
+
+טוב, ובמקביל יש מה לעשות בלי לחכות לאף אחד: להדביק את ההוראות מהבלוק למעלה, לפתוח Project אחד ל-repo שאתם עובדים עליו, ולתת ל-agent משימה סגורה אחת עם תנאי עצירה. אחרי שבוע תספרו כמה תשובות לא הייתם צריכים לתקן. זה המספר היחיד שמעניין.

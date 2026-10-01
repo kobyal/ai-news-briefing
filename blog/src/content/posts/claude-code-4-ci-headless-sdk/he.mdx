@@ -1,0 +1,134 @@
+---
+title: "Claude Code בפרקטיקה, חלק 4: ב-CI, exit 0 זה לא הצלחה"
+description: "claude-code-action, claude -p עם JSON וה-Agent SDK: workflow להעתקה, מנוי מול API, תקרות עלות וחמש בדיקות אחרי כל ריצה."
+lang: he
+key: claude-code-4-ci-headless-sdk
+term: "Claude Code in CI"
+kind: explainer
+pubDate: 2026-10-01
+tags: ["claude-code", "ci-cd", "github-actions", "agent-sdk", "headless"]
+hook: "claim"
+cover: photo
+tldr: ["ב-GitHub מתחילים מ-claude-code-action. בכל CI אחר, claude -p עם JSON.", "אחרי כל ריצה: subtype, num_turns, result לא ריק, עלות, ואז טסטים.", "max-turns, max-budget-usd ו-timeout-minutes ביחד. לצוות, API key ולא מנוי אישי."]
+series: { slug: "claude-code-in-practice", name: "Claude Code בפרקטיקה", part: 4, total: 5 }
+hero: /posts/claude-code-4-ci-headless-sdk/hero.jpg
+diagram: /posts/claude-code-4-ci-headless-sdk/diagram.svg
+sources:
+  - { title: "Claude Code GitHub Actions - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/github-actions", date: "" }
+  - { title: "Agent SDK overview - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/sdk", date: "" }
+  - { title: "Agent SDK overview - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/agent-sdk/overview", date: "" }
+  - { title: "How Claude Code is built - by Gergely Orosz", url: "https://newsletter.pragmaticengineer.com/p/how-claude-code-is-built", date: "" }
+opinion: "אנחנו לא נותנים ל-agent ב-CI להחליט אם הוא הצליח. הוא כותב, ו-jq והטסטים מחליטים. כל בדיקה שעוברת מ'תציץ בפלט' לשורת assert חוסכת עוד ריצה אחת שנראית ירוקה ובפועל ריקה. אנחנו מתחילים כל agent חדש ב-read-only, והרשאת כתיבה הוא מקבל רק אחרי שמדדנו כמה סבבים ודולרים הוא באמת צריך. ומה שאפשר לבדוק עם כלל דטרמיניסטי, לא שולחים לעוד קריאה למודל."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+ה-exit code של `claude -p` הוא הנתון הכי פחות שימושי ב-CI שלכם. אפס אומר שהתהליך נגמר. הוא לא אומר שה-agent עשה משהו.
+
+נשמע קטנוני? Claude Code יצא ל-GA במאי 2025. תוך שלושה חודשים, לפי גרגלי אורוש ב-Pragmatic Engineer, השימוש בו קפץ פי 10, והוא עבר $500M ב-run-rate שנתי. כלי שיושב על כל laptop בצוות מגיע מהר מאוד גם ל-pipeline. מישהו כותב `@claude תתקן את הטסט` בתגובה ל-PR, ו-job בגיטהאב מריץ agent עם הרשאת כתיבה ל-repo. בשלושת החלקים הקודמים קלוד ישב מולכם בטרמינל, ואתם אישרתם או חסמתם. בחלק הזה הוא רץ לבד. מה שנשאר לכם זה מה שאתם בודקים אחרי שהוא סיים.
+
+## שלוש דלתות לאותו agent
+
+בגדול, יש שלוש דרכים להריץ את Claude Code בלי טרמינל. מתחת למכסה המנוע כולן אותה לולאה.
+
+- **claude-code-action**: GitHub Action רשמי. מזכירים `@claude` בתגובה ל-PR או ל-issue, או נותנים לו prompt שרץ על כל event. אנטרופיק כותבים שה-Action בנוי על ה-Agent SDK.
+- **`claude -p`**: מצב headless של ה-CLI. prompt נכנס, תשובה יוצאת, בלי UI. זה מה שמריצים ב-GitLab, ב-Jenkins, ב-cron או בכל runner אחר.
+- **Agent SDK**: אותו agent כספרייה ב-Python או ב-TypeScript, עם tools, הרשאות, sessions ו-hooks.
+
+> To drive the same agent loop from a language other than Python or TypeScript, run the CLI as a subprocess with the `-p` flag and `--output-format json`.
+>
+> — אנטרופיק, Agent SDK overview
+
+אז הכלל פשוט. ב-GitHub מתחילים מה-Action. בכל CI אחר, `claude -p`. ה-SDK רק כשהקוד שלכם צריך לשלוט בלולאה עצמה, למשל לחסום tool באמצע ריצה או לחבר tool פנימי בלי להרים שרת MCP. ושלא תתבלבלו: Code Review של אנטרופיק עושה review על כל PR בלי workflow בכלל, ו-Claude Code בענן זה מוצר אחר לגמרי.
+
+<figure><img src="/posts/claude-code-4-ci-headless-sdk/v1-screenshot-he.jpg" alt="אנטרופיק עצמה מפרידה בין כמה מוצרים עם אותו שם. בוחרים דלת לפי מי מריץ את הלולאה, לא לפי השם (docs.anthropic.com)" loading="lazy" /><figcaption>אנטרופיק עצמה מפרידה בין כמה מוצרים עם אותו שם. בוחרים דלת לפי מי מריץ את הלולאה, לא לפי השם (docs.anthropic.com)</figcaption></figure>
+
+## workflow מינימלי ל-@claude
+
+הדרך הקצרה: פותחים `claude` ב-repo ומריצים `/install-github-app`. הוא מתקין את ה-GitHub App, שם secret ופותח PR עם ה-workflow. צריך `gh` מחובר (`gh auth login`) והרשאת admin על ה-repo, וזה עובד רק מול github.com. ל-GitLab יש מדריך נפרד.
+
+אני מעדיף את הדרך הידנית, כי ככה רואים כל שורה לפני שהיא נכנסת. זה ה-workflow שהייתי מעתיק:
+
+```yaml title=".github/workflows/claude.yml"
+name: claude
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+jobs:
+  claude:
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--max-turns 10 --allowedTools Read,Grep,Glob,Edit,Bash(npm test:*)"
+```
+
+שלוש שורות פה עושות את רוב העבודה. `timeout-minutes: 15` היא התקרה האמיתית: גם אם קלוד נתקע בלולאה, GitHub הורג את ה-job. `--max-turns 10` עוצר את ה-agent אחרי עשרה סבבים. ו-`--allowedTools` מגדיר מה מותר, עם `Bash(npm test:*)` במקום Bash פתוח. רגע, ועוד דבר: הקלט כאן הוא תגובה ב-PR, כלומר טקסט שמישהו אחר כתב. תוודאו שרק משתמשים עם הרשאת כתיבה מפעילים אותו, ואל תריצו אותו על `pull_request_target` מ-forks כשיש secrets ב-job.
+
+<figure><img src="/posts/claude-code-4-ci-headless-sdk/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+## `claude -p` בתוך pipeline, ומה חוזר ב-JSON
+
+מחוץ לגיטהאב הכל מתחיל ב-`claude -p "..." --output-format json`. במקום טקסט חופשי חוזר אובייקט אחד, ובו השדות ש-CI צריך: `subtype` (`success`, או למשל `error_max_turns`), `is_error`, `num_turns`, `result` עם הטקסט עצמו, `session_id`, `duration_ms` ו-`total_cost_usd`. אם אתם רוצים לראות התקדמות בזמן אמת בלוג, `--output-format stream-json` מוציא שורת JSON לכל אירוע.
+
+יש פה מלכודת. `result` הוא תמיד מחרוזת. גם כשביקשתם "תחזיר רק JSON", קלוד יכול לפתוח במשפט הסבר לפני הסוגריים. אז על ה-envelope אפשר לסמוך, אבל את מה שבתוך `result` אתם עושים parse ובודקים מול schema, לא זורקים ישר ל-`json.loads`.
+
+<figure><img src="/posts/claude-code-4-ci-headless-sdk/v2-transcript-he.jpg" alt="גם כשמבקשים רק JSON, מה שחוזר ב-result הוא מחרוזת. מפרסרים ובודקים schema, לא מניחים שהיא מתחילה בסוגר מסולסל" loading="lazy" /><figcaption>גם כשמבקשים רק JSON, מה שחוזר ב-result הוא מחרוזת. מפרסרים ובודקים schema, לא מניחים שהיא מתחילה בסוגר מסולסל</figcaption></figure>
+
+## חמש בדיקות אחרי כל ריצה
+
+זה מה שהכי חסר ב-workflows שאני רואה. ריצה של agent יכולה להיגמר ב-0 בלי לעשות כלום: הגיעה ל-max turns, נחסמה על הרשאה, החזירה תשובה ריקה. ב-pipeline היומי שלנו ראינו פעם ריצה חסומה שחזרה עם 0 ו-`num_turns: 0`, והיא נראתה ירוקה עד שמישהו פתח את הפלט.
+
+אז אחרי כל ריצה, חמש בדיקות, בסדר הזה:
+
+```bash title="ci/run-claude.sh"
+#!/usr/bin/env bash
+set -euo pipefail
+
+claude -p "$PROMPT" \
+  --output-format json \
+  --max-turns 8 \
+  --allowedTools "Read,Grep,Glob,Edit" \
+  > claude-result.json || true
+
+jq -e '.subtype == "success" and .is_error == false' claude-result.json
+jq -e '.num_turns > 0' claude-result.json
+jq -e '(.result | length) > 0' claude-result.json
+jq -e '.total_cost_usd < 0.50' claude-result.json
+npm test
+```
+
+`jq -e` מחזיר exit code שונה מאפס כשהביטוי יוצא false או null, אז כל שורה היא gate. ה-`|| true` אחרי `claude` הוא בכוונה: לא מעניין אותנו מה ה-CLI חושב על עצמו, מעניין אותנו מה ב-JSON. והשורה האחרונה היא החשובה מכולן. הבדיקה הכי טובה לעבודה של agent היא לא מה שהוא כתב ב-`result` שהוא עשה, אלא אם הטסטים עוברים על ה-diff שהוא השאיר.
+
+<figure><img src="/posts/claude-code-4-ci-headless-sdk/v3-svg-he.jpg" alt="ריצה חסומה יכולה לחזור עם 0. השדה num_turns ב-JSON תופס אותה לפני ה-merge, ה-exit code לא (Anthropic headless docs)" loading="lazy" /><figcaption>ריצה חסומה יכולה לחזור עם 0. השדה num_turns ב-JSON תופס אותה לפני ה-merge, ה-exit code לא (Anthropic headless docs)</figcaption></figure>
+
+## מנוי או API, ותקרה שעוצרת לפני החשבונית
+
+ה-installer שואל איך משלמים, ויש שתי תשובות.
+
+**מנוי (Pro או Max).** מריצים `claude setup-token`, מקבלים token ארוך-טווח, שמים אותו ב-secret בשם `CLAUDE_CODE_OAUTH_TOKEN` ומעבירים ל-Action כ-`claude_code_oauth_token`. הריצות יורדות מהמכסה של המנוי, כלומר ה-CI וה-laptop שלכם חולקים את אותן מגבלות. ל-repo אישי או לצוות של שניים, די משתלם.
+
+**API key.** `ANTHROPIC_API_KEY`, משלמים לפי tokens, וכל ריצה מופיעה בחשבון. לצוות, לארגון, ולכל מה שרץ על כל PR, זה הנכון: limits נפרדים, מישהו אחראי על התשלום, ויש מה למדוד. בשני המקרים ה-JSON מחזיר `total_cost_usd`. במנוי תתייחסו אליו כמדד, לא כחשבונית.
+
+התקרות, מהפנימית לחיצונית: `--max-turns` עוצר סבבים. `--max-budget-usd` (ב-SDK זה `max_budget_usd`) עוצר כשהעלות המצטברת עוברת סכום. `timeout-minutes` ב-workflow הורג את ה-job. ו-spend limit בקונסול של אנטרופיק הוא רשת הביטחון האחרונה. בפועל תשימו את כולן, כי יום אחד אחת מהן תפספס.
+
+> **הדעה שלי:** בצוות, API key לכל repo, לא token של מנוי של מישהו. כשהעובד עוזב, ה-token שלו הולך איתו, וה-CI נופל בלילה בלי שאף אחד מבין למה.
+
+## מה לעשות השבוע
+
+- תפתחו GitHub code search עם `path:.github/workflows anthropics/claude-code-action` ותקראו שלושה workflows של פרויקטים ציבוריים לפני שאתם כותבים אחד משלכם.
+- תתחילו read-only: `--allowedTools "Read,Grep,Glob"` ו-prompt שרק מגיב ל-PR. Edit ו-Bash הוא מקבל אחרי שבוע בלי הפתעות.
+- תוסיפו `concurrency` לפי מספר ה-PR, כדי ששלוש תגובות `@claude` ברצף לא יפתחו שלוש ריצות שכותבות לאותו branch.
+- תשמרו את `claude-result.json` כ-artifact בכל ריצה. אחרי 20 ריצות יש לכם ממוצע של `num_turns` ושל `total_cost_usd`, ומזה קובעים את max-turns ואת התקציב, לא מניחוש.
+
+ה-agent ב-CI לא צריך להיות חכם יותר מזה שבטרמינל. הוא צריך שיבדקו אותו יותר.

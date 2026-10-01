@@ -1,0 +1,185 @@
+---
+title: "Claude Code בפרקטיקה, חלק 1: CLAUDE.md קצר, הרשאות קשוחות"
+description: "שלושת קבצי ה-CLAUDE.md, auto memory, הרשאות ב-settings.json ופקודות שכדאי שיהיו באצבעות. צעד אחרי צעד, לצוות אמיתי."
+lang: he
+key: claude-code-1-setup-and-memory
+term: "CLAUDE.md"
+kind: fieldnotes
+pubDate: 2026-10-01
+tags: ["claude-code", "claude-md", "agents-md", "permissions", "developer-tools"]
+hook: "claim"
+cover: photo
+tldr: ["תריצו /init, ואז תמחקו כל שורה שקלוד יכול להסיק מהקוד.", "כל כלל NEVER עובר ל-deny ב-.claude/settings.json.", "פקודת הבדיקה המלאה בראש CLAUDE.md, והקובץ עובר code review."]
+series: { slug: "claude-code-in-practice", name: "Claude Code בפרקטיקה", part: 1, total: 5 }
+hero: /posts/claude-code-1-setup-and-memory/hero.jpg
+diagram: /posts/claude-code-1-setup-and-memory/diagram.svg
+sources:
+  - { title: "How Claude remembers your project - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/memory", date: "" }
+  - { title: "Settings files and precedence - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/settings", date: "" }
+  - { title: "Best practices for Claude Code - Claude Code Docs", url: "https://www.anthropic.com/engineering/claude-code-best-practices", date: "" }
+  - { title: "Claude Code now reads AGENTS.md if there is no Claude.md", url: "https://code.claude.com/docs/en/changelog", date: "2026-09-18" }
+  - { title: "Claude Code as a Daily Driver: Claude.md, Skills, Subagents, Plugins, and MCPs", url: "https://arps18.github.io/posts/claude-code-mastery", date: "2026-05-27" }
+  - { title: "I am morally opposed to updating my Claude.md", url: "https://alex-jacobs.com/posts/claudemd", date: "2026-08-20" }
+  - { title: "Compress Your Claude.md: Cut 60-70% of System Prompt Bloat in Claude Code", url: "https://techloom.it/blog/compress-claude-md.html", date: "2026-02-24" }
+  - { title: "`bun init` automatically creates a Claude.md file by default", url: "https://bun.com/docs/runtime/templating/init", date: "2026-07-28" }
+  - { title: "AGENTS.md, SKILL.md, DESIGN.md: How AI Instructions Split into Three Layers | AWS Builder Center", url: "https://builder.aws.com/content/3Fn9XceqvLb9capjSjqtClrA4Ea/agentsmd-skillmd-designmd-how-ai-instructions-split-into-three-layers", date: "" }
+opinion: "אנחנו מסתכלים על CLAUDE.md כמו על כל מונח חדש: שם הוא לא שיטה, והקובץ שווה משהו רק אם הוא משנה מה קלוד עושה ביום שני. שורת NEVER בלי deny מאחוריה היא תקווה, לא מדיניות. בכל מקום שהחלפנו הוראה בכלל דטרמיניסטי, הרשאה או linter או בדיקה, זה יצא זול ואמין יותר מכל ניסוח חכם. השורה היחידה שאנחנו מתעקשים עליה היא פקודת הבדיקה, כי לולאה שבודקת את עצמה שווה יותר מטיוטה ראשונה טובה. כל השאר: לקצר, להעביר ב-review, ולמחוק בלי רגשות."
+madeWith: { model: "claude-opus-5-5", sourceCount: 9, reviewedBy: "Koby Almog" }
+---
+
+ה-CLAUDE.md הכי טוב בצוות שלכם הוא כנראה הקצר ביותר. לא זה ש-/init ייצר, ולא זה שכל אחד בצוות הוסיף לו שורה אחרי יום רע.
+
+זה נשמע הפוך, אבל גם אנטרופיק שמים תקרה. ה-auto memory של Claude Code נטען לכל session רק עד 200 שורות או 25KB, מה שמגיע קודם. Matt Pocock הוציא סרטון שנקרא פשוט "Never Run claude /init". ובפברואר 2026 מישהו ב-techloom דחס את ה-CLAUDE.md שלו ב-60–70%, ואחר כך הריץ benchmark ומצא שהקובץ עוזר פחות ממה שהקהילה מניחה.
+
+ובמקביל, הקובץ הזה נהיה ברירת מחדל. `bun init` יוצר CLAUDE.md אוטומטית כשהוא מזהה את ה-CLI של קלוד, ולפי ה-changelog מספטמבר, Claude Code קורא AGENTS.md אם אין CLAUDE.md. כלומר יהיה לכם קובץ כזה בכל מקרה. השאלה רק אם הוא עובד בשבילכם או נגדכם.
+
+זה חלק 1 בסדרה: ההתקנה לצוות אמיתי. קבצים, זיכרון, הרשאות, פקודות. hooks, skills ו-MCP מחכים לחלק 2.
+
+## 01 · למפות את שלוש הרמות לפני שכותבים שורה
+
+Claude Code טוען CLAUDE.md משלוש רמות, וכל אחת שייכת למישהו אחר:
+
+- `./CLAUDE.md` בשורש הריפו. של הצוות. נכנס ל-git ועובר review כמו כל קובץ אחר.
+- `~/.claude/CLAUDE.md`. שלכם, בכל פרויקט במחשב. פה הולכים ההרגלים האישיים: סגנון commit messages, באיזו שפה לענות.
+- `CLAUDE.local.md` בשורש הפרויקט. שלכם, רק בפרויקט הזה. תוסיפו ל-`.gitignore`.
+
+מעל זה יש שכבה ארגונית (managed) ש-IT מפיץ ואי אפשר לדרוס. ו-CLAUDE.md בתת-תיקייה נטען כשקלוד עובד על קבצים שם, וזה די משתלם ב-monorepo.
+
+אם הריפו כבר עובד עם AGENTS.md (הסטנדרט של OpenAI, גוגל, Cursor ואחרים, שנתרם ל-Linux Foundation בדצמבר 2025), אל תשכפלו. מספיק import:
+
+```markdown title="CLAUDE.md"
+@AGENTS.md
+
+## Claude-specific
+- Use plan mode before any change that touches more than one package.
+```
+
+אז איך יודעים מה באמת נטען? `/memory` בתוך ה-session מציג את כל הקבצים שנכנסו ופותח אותם לעריכה. תריצו את זה פעם אחת על המחשב של עובד חדש. לא פעם מגלים שם `~/.claude/CLAUDE.md` מפרויקט קודם שאף אחד לא זוכר.
+
+<figure><img src="/posts/claude-code-1-setup-and-memory/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+## 02 · להריץ /init, ואז למחוק חצי
+
+`/init` סורק את הריפו וכותב טיוטה. היא לא רעה, היא ארוכה. כל פעם שהרצתי אותו יצא משהו סביר ונפוח. Pocock צודק בעיקרון: כל שורה שם נכנסת ל-context בכל הודעה, כל יום. אבל לא צריך לוותר על `/init`, צריך לערוך אחריו.
+
+מה חותכים: מבנה התיקיות (קלוד רואה אותו לבד), רשימת התלויות (יש `package.json`), שלוש פסקאות על מה הפרויקט עושה. מה משאירים: הפקודות המדויקות ומה שאי אפשר לנחש. בסוף צריך לצאת משהו בסגנון:
+
+```markdown title="CLAUDE.md"
+# payments-api
+
+## Commands
+- Test one file: `pnpm vitest run path/to/file.test.ts`
+- Full check before commit: `pnpm lint && pnpm typecheck && pnpm test`
+- Local DB: `docker compose up -d db` (port 5433, not 5432)
+
+## Not obvious from the code
+- Money is integer agorot. Never floats, never `toFixed`.
+- Migrations: add a new file. Never edit a merged migration.
+- `src/legacy/` is frozen. Read it, don't change it.
+
+## When you are done
+- Run the full check. If it fails, fix the code, not the test.
+```
+
+שימו לב מה אין שם. אין "כתוב קוד נקי", אין "אתה מהנדס בכיר". מה שקלוד צריך זה הפקודה שאומרת לו אם הוא צדק. Boris Cherny מצוות Claude Code מעריך שאם נותנים לקלוד דרך לבדוק את עצמו, התוצאה משתפרת פי 2–3. השורה של ה-full check שווה יותר מכל פסקת סגנון בקובץ.
+
+## 03 · לסנן: מה נכנס ומה נשאר בחוץ
+
+הדוקס של אנטרופיק נותנים את המבחן הכי פשוט: CLAUDE.md הוא המקום למה שהייתם מסבירים שוב ושוב. ועוד שורה אחת שכדאי לתלות ליד המסך:
+
+> The more specific and concise your instructions, the more consistently Claude follows them.
+>
+> — Claude Code Docs, How Claude remembers your project
+
+בפועל, שורה נכנסת אם קלוד לא יכול להסיק אותה מהקוד (port 5433, אגורות), או אם היא מתקנת טעות שחוזרת. לא טעות שקרתה פעם.
+
+בחוץ: כללי סגנון שה-linter כבר אוכף, סודות, והוראות שרלוונטיות רק לחלק מהקבצים. את האחרונות שמים ב-`.claude/rules/`, והן נטענות רק כשקלוד נוגע בקבצים שמתאימים:
+
+```markdown title=".claude/rules/api.md"
+---
+paths:
+  - "src/api/**/*.ts"
+---
+- Every handler validates input with the zod schema next to it.
+- Errors go through `toProblemJson()`, never a raw throw.
+```
+
+Alex Jacobs כתב באוגוסט פוסט בשם "I am morally opposed to updating my Claude.md". הוא מצחיק, אבל הנקודה רצינית. הקובץ הופך לארכיון של עלבונות: כל שורה נכתבה ברגע של עצבים, אין לה תאריך תפוגה, והמודל משתפר כל ארבעה חודשים בזמן שהכללים קפואים על מה שהוא עשה רע באביב שעבר.
+
+> **הדעה שלי:** אני מסכים עם האבחנה של Jacobs ולא עם המסקנה. הפתרון הוא לא להפסיק לכתוב, אלא לכתוב כל שורה כמו קוד: עם reviewer, ועם נכונות למחוק אותה. כלל שאף אחד לא מוכן למחוק הוא כלל שאף אחד לא בדק.
+
+<figure><img src="/posts/claude-code-1-setup-and-memory/src6.jpg" alt="כל שורה נכתבה ביום רע ואף אחת לא נמחקה. הבעיה היא חוסר תאריך תפוגה, לא עודף כללים (credit: Alex Jacobs)" loading="lazy" /><figcaption>כל שורה נכתבה ביום רע ואף אחת לא נמחקה. הבעיה היא חוסר תאריך תפוגה, לא עודף כללים (credit: Alex Jacobs)</figcaption></figure>
+
+## 04 · auto memory: לתת לקלוד לכתוב, ולקרוא אחריו
+
+חוץ ממה שאתם כותבים, יש auto memory: הערות שקלוד כותב לעצמו כשאתם מתקנים אותו. הוא per-repo, משותף בין worktrees, ונטען לכל session עד 200 שורות או 25KB. מה שמעבר לזה פשוט לא נכנס.
+
+הטיפ של Boris, לסיים תיקון ב-"Update CLAUDE.md so you don't repeat this", עובד. קלוד באמת טוב בלנסח כללים לעצמו. מה שכן, אל תתנו לו לכתוב ישר ל-CLAUDE.md של הצוות בלי שאף אחד רואה. שיכתוב, ושזה יעבור ב-PR כמו כל שינוי אחר. ככה עוד בן אדם קורא את השורה לפני שהיא נהיית חוק.
+
+ופעם בחודש, ניקוי. זה הפרומפט שאנחנו מריצים, read-only, בלי לגעת בקבצים. מה שיוצא זו רשימה. מה שאתם עושים: מוחקים, מריצים את המשימה הבאה, ורואים אם משהו נשבר. זה ה-eval הכי זול שיש.
+
+<figure><img src="/posts/claude-code-1-setup-and-memory/v2-transcript-he.jpg" alt="קלוד מציע מה למחוק, אתם מוחקים ומריצים. מחיקה שלא שברה כלום היא ההוכחה שהשורה הייתה מיותרת (בעקבות Alex Jacobs)" loading="lazy" /><figcaption>קלוד מציע מה למחוק, אתם מוחקים ומריצים. מחיקה שלא שברה כלום היא ההוכחה שהשורה הייתה מיותרת (בעקבות Alex Jacobs)</figcaption></figure>
+
+## 05 · settings.json: מה מותר בלי לשאול
+
+פה עוברים מבקשות לאכיפה. הדוקס אומרים במפורש שקלוד מתייחס ל-CLAUDE.md כ-context, לא כקונפיגורציה שנאכפת. רשימת deny ב-settings.json, לעומת זאת, נבדקת לפני כל קריאה לכלי. ארבעה קבצים, לפי הדוקס:
+
+| קובץ | על מי זה חל | ב-git? |
+| --- | --- | --- |
+| `~/.claude/settings.json` | אתם, בכל פרויקט | לא |
+| `.claude/settings.json` | כל מי שעובד בפרויקט | כן, תעשו commit |
+| `.claude/settings.local.json` | אתם, בפרויקט הזה | לא |
+| `managed-settings.json` | כל הארגון, בלי אפשרות לדרוס | מופץ על ידי IT |
+
+תתחילו מ-deny, לא מ-allow. קודם כל מה שאסור לקרוא, אחר כך פקודות שאין להן undo:
+
+```json title=".claude/settings.json"
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ],
+    "ask": ["Bash(git push:*)"],
+    "allow": [
+      "Bash(pnpm test:*)",
+      "Bash(pnpm lint)",
+      "Bash(git diff:*)"
+    ]
+  }
+}
+```
+
+את allow מוסיפים אחרי שבוע, לפי מה שאישרתם ידנית עשר פעמים. `/permissions` מראה מה פעיל עכשיו ומאיזה קובץ זה הגיע.
+
+ויש לכם שורה ב-CLAUDE.md שמתחילה ב-NEVER? תעבירו אותה לפה. רק תזכרו ש-deny עובד על prefix, אז `git push origin +main` עדיין עובר. בשביל המקרים האלה יש hooks, ונגיע אליהם בחלק 2.
+
+<figure><img src="/posts/claude-code-1-setup-and-memory/v3-svg-he.jpg" alt="אותה שורה על force push: ב-CLAUDE.md היא בקשה שהמודל שוקל, ב-deny היא חסימה לפני ההרצה. הדוקס אומרים את זה במפורש (Claude Code Docs)" loading="lazy" /><figcaption>אותה שורה על force push: ב-CLAUDE.md היא בקשה שהמודל שוקל, ב-deny היא חסימה לפני ההרצה. הדוקס אומרים את זה במפורש (Claude Code Docs)</figcaption></figure>
+
+## 06 · פקודות וקיצורים שצריכים להיות באצבעות
+
+- `Shift+Tab` פעמיים: plan mode, read-only. כל שינוי שנוגע ביותר מקובץ אחד מתחיל פה.
+- `Ctrl+G`: פותח את התוכנית ב-editor שלכם. התוכנית היא טקסט, תערכו אותה לפני שהיא נהיית קוד.
+- `@src/auth/login.py` במקום "תסתכל על מודול ה-auth". הפניה מדויקת חוסכת חיפוש וטוקנים.
+- `cat error.log | claude` במקום להדביק stack trace לחלון.
+- `Esc` עוצר באמצע. עדיף לעצור בצעד השני מאשר לתקן בצעד העשרים.
+
+וחוץ מזה, פקודה משלכם. כל קובץ markdown ב-`.claude/commands/` הופך ל-slash command לכל הצוות. ה-review שכל אחד מנסח אחרת? קובץ אחד:
+
+```markdown title=".claude/commands/review.md"
+Review the diff against main (`git diff main...HEAD`).
+Check only: missing tests, money handled as floats, edits to merged migrations.
+Output a list: file:line, problem, suggested fix. No praise, no summary.
+```
+
+ואז `/review`, אותו דבר אצל כולם. מתי זה צריך להיות skill ולא command, גם זה בחלק 2.
+
+## מה לקחת
+
+- CLAUDE.md עובר code review. שורה בלי reviewer לא נכנסת.
+- כל NEVER עובר ל-deny ב-`.claude/settings.json`. בקשה נשארת בקשה.
+- פקודת הבדיקה המלאה היא השורה הכי חשובה בקובץ.
+- פעם בחודש מוחקים שורה ומריצים. אם שום דבר לא נשבר, היא לא הייתה צריכה להיות שם.

@@ -1,0 +1,148 @@
+---
+title: "OpenAI dots מקרוב: agent שלא הולך הביתה"
+description: "OpenAI dots מקרוב: agent שרץ 24/7 על מחשב ענן משלו ומחובר ל-4,000 אפליקציות. מה הוא עושה לבד, כמה זה עולה, ומה לא כדאי לתת לו."
+lang: he
+key: openai-dots-up-close
+term: "OpenAI dots"
+kind: deepdive
+pubDate: 2026-10-01
+tags: ["openai", "dots", "agents", "chatgpt", "background-agents"]
+hook: "number"
+cover: illus
+tldr: ["כתבו Custom Rules לפני שמחברים אפליקציות: טיוטה לבד, שליחה רק באישור.", "התחילו מ-triage לערוץ באגים. מתחת ל-7 סיכומים נכונים מ-10, הדקו.", "אל תחברו dot ל-production או ל-cloud console. קוד נשאר ב-Claude Code."]
+series: { slug: "the-assistants", name: "העוזרים של 2026, אחד-אחד", part: 1, total: 4 }
+hero: /posts/openai-dots-up-close/hero.jpg
+diagram: /posts/openai-dots-up-close/diagram.svg
+sources:
+  - { title: "Introducing dots", url: "https://openai.com/index/introducing-dots", date: "" }
+  - { title: "Biggest news from OpenAI Dev Day: Dots, GPT-6.1 Sol, new plans", url: "https://mashable.com/tech/openai-devday-2026-biggest-announcements", date: "" }
+  - { title: "Attention Required! | Cloudflare", url: "https://mixed-news.com/en/chatgpt-pro-500-tier-pro-200-lower-allowance", date: "" }
+  - { title: "OpenAI News", url: "https://openai.com/news", date: "" }
+  - { title: "OpenAI Dots: Always-On Agents in ChatGPT, Explained | DataCamp", url: "https://www.datacamp.com/blog/openai-dots", date: "" }
+  - { title: "OpenAI launches Dots AI agents amid safety questions", url: "https://www.nbcnews.com/tech/tech-news/openai-launches-dots-ai-agents-safety-questions-rcna600338", date: "" }
+opinion: "אנחנו לא קונים את ה-nearly anything, אנחנו קונים את ה-Custom Rules. בעינינו, מה שחשוב ב-2026 זה לתכנן את המערכת סביב המודל: מה הוא רואה, במה הוא נוגע, איך בודקים אותו ומתי מאפסים. dots מכניסים את כל ההחלטות האלה למסך הגדרות אחד ולחשבון אחד. זה יכול לעבוד, אבל רק אם מתייחסים ל-rules כמו ל-IAM policy ולא כמו להעדפות אישיות. לולאה שבודקת את עצמה שווה יותר מטיוטה טובה, ולכן השבוע אנחנו נותנים ל-dot רק משימות שאפשר לבדוק את התוצאה שלהן בחמש דקות. את הקוד משאירים ב-Claude Code, כי שם מי שבודק זה ה-tests, לא התחושה."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+4,000. זה מספר האפליקציות ש-dot יכול להתחבר אליהן מהיום הראשון, לפי ה-launch post של OpenAI מ-29 בספטמבר 2026. כל אחת מהן היא עוד מקום שבו agent יכול לקרוא, לכתוב ולשלוח. ובניגוד ל-thread רגיל ב-ChatGPT, ה-dot ממשיך לעבוד גם אחרי שסגרתם את החלון.
+
+סם אלטמן הציג את זה ב-DevDay, מול בערך 2,500 מפתחים על המזח של Fort Mason בסן פרנסיסקו. עברתי על ה-launch post, על ה-walk-through של DataCamp ועל הסיקור מהכנס. יצא מזה הפוסט הזה: מה זה, כמה זה עולה, איפה זה חזק, איפה זה נופל, ואיך זה עומד מול OpenClaw ומול Claude Code. ובסוף יש שלוש משימות שהייתי נותן ל-dot השבוע, ושתיים שלא.
+
+## מה זה dot, ומה הוא לא
+
+בגדול: dot הוא agent קבוע בתוך ChatGPT, והוא רץ על GPT-6 Astra, מודל הדגל של OpenAI. יש לו מחשב ענן משלו, דפדפן משלו, וגישה לאפליקציות שחיברתם דרך ה-plugins. מדברים איתו ב-ChatGPT, ב-Slack או ב-Teams, ואפשר גם לעלות איתו לשיחה קולית. הוא לומד מהפידבק, ומחזיק כמה פרויקטים במקביל בלי שתצטרכו לנהל לו threads נפרדים. ב-help docs של OpenAI, לפי DataCamp, ההבדל משיחה רגילה מתואר במשפט אחד: dot ממשיך לעבוד כשהשיחה נעצרת.
+
+> Dots can do nearly anything using their own cloud computer, their own browser, and the apps you’ve connected.
+>
+> — OpenAI, Introducing dots
+
+המילים שחשובות שם הן the apps you've connected. ה-nearly anything גדול בדיוק כמו ההרשאות שנתתם לו. לא יותר, וגם לא פחות.
+
+מה הוא לא:
+
+- **הוא לא API.** אתם לא בוחרים מודל, לא רואים את ה-harness ולא כותבים את ה-loop. DataCamp קוראים לזה managed alternative, וזה תיאור מדויק.
+- **הוא לא coding agent בתוך ה-repo שלכם.** OpenAI מספרים שאצלם dots הופכים עיצוב לאפליקציה עובדת. אבל הוא עובד על המחשב שלו, לא מול ה-tests שלכם.
+- **הוא עוד לא צוות.** היום מתחילים עם dot ראשי אחד. צוותים של dots זה חזון, ו-specialist dots לארגונים הם preview.
+
+## מה קורה כשמפעילים אחד
+
+רגע, הסתייגות קטנה: עוד לא קיבלנו גישה, אז מה שכאן מורכב מה-launch post, מ-DataCamp ומהדמו על הבמה. הזרימה בפועל:
+
+1. **Setup רק מה-desktop.** לא מהטלפון.
+2. **נותנים שם ל-dot הראשי.** אצל Holly Li מצוות המוצר של OpenAI הוא נקרא Dottie.
+3. **מחברים אפליקציות.** מהרגע הזה הוא יכול לחקור ולבנות זיכרונות ממה שיש שם, גם בלי הודעה חדשה מכם.
+4. **כותבים Custom Rules.** הן קובעות מה הוא עושה לבד ומה הוא מחזיר אליכם. מעליהן יש safety checks שאי אפשר לכבות.
+5. **עובדים איתו.** מ-ChatGPT, מ-Slack או מ-Teams. בכל רגע אפשר לפתוח את המחשב שלו ולראות מה הוא עושה.
+6. **אופציונלי: גישה ל-laptop.** אם תאשרו, הוא יתחבר גם למחשב שלכם ויעבוד לידכם.
+
+הדוגמה הכי טובה ב-launch post דווקא קטנה. ה-dot של אחד ה-early testers שם לב שהוא שכח להוציא חשבונית לעיתון, הכין אותה, ושלח רק אחרי אישור. תסתכלו על הסדר: שם לב, הכין, חיכה, שלח. זה הדפוס ששווה לשכפל.
+
+ככה הייתי כותב Custom Rules לשבוע הראשון. תעתיקו ותתאימו:
+
+```text title="custom-rules.txt"
+לבד, בלי לשאול:
+- לקרוא ערוצים ותיקיות שחוברו, לסכם, לחפש ברשת
+- להכין טיוטות (מייל, חשבונית, מסמך) ולשמור אותן כטיוטה
+
+רק אחרי אישור שלי:
+- כל שליחה החוצה: מייל, הודעה בערוץ, תגובה ללקוח
+- כל פעולה שעולה כסף או משנה רשומה (CRM, הנהלת חשבונות, Jira)
+
+אף פעם:
+- למחוק קבצים, הודעות או רשומות
+- להתחבר ל-laptop שלי בלי שביקשתי באותו יום
+- לפעול בקבוצות שיש בהן אנשים מחוץ לארגון
+
+כל יום ב-18:00: רשימה של מה עשית לבד היום, עם לינקים
+```
+
+<figure><img src="/posts/openai-dots-up-close/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/openai-dots-up-close/src1.jpg" alt="OpenAI משווקים חבר צוות, אבל מה שה-dot יכול לעשות נקבע לפי רשימת האפליקציות שחיברתם (credit: OpenAI)" loading="lazy" /><figcaption>OpenAI משווקים חבר צוות, אבל מה שה-dot יכול לעשות נקבע לפי רשימת האפליקציות שחיברתם (credit: OpenAI)</figcaption></figure>
+
+## המספרים
+
+- **הכרזה:** 29 בספטמבר 2026, ב-DevDay.
+- **מודל:** GPT-6 Astra. אין אפשרות לבחור אחר.
+- **אינטגרציות:** יותר מ-4,000 אפליקציות דרך ה-plugins, כולל Slack ו-Google Drive.
+- **מי מקבל:** Pro, Business Premium ו-Enterprise, ב-eligible markets. ה-dot הראשון כלול בלי תוספת ב-Pro וב-Business Premium.
+- **איפה לא:** בהשקה Pro לא זמין ב-EEA, בשווייץ ובבריטניה. ישראל לא ברשימת ההחרגות, אבל תבדקו בחשבון שלכם.
+- **Setup:** desktop בלבד.
+
+ובמקביל זז התמחור עצמו. לפי mixed-news, יחד עם ההשקה הופיע tier חדש של $500, וה-Pro של $200 קיבל מכסה נמוכה יותר.
+
+וכדאי לזכור את הרקע. DataCamp מתארים שבועות של מלחמת מחירים: GPT-6 Sol ו-Luna יצאו כסוסי עבודה זולים, ואנטרופיק הורידה 20% מהמחיר של אופוס 5.5 והשאירה את סונט 5.5 על $2 לקלט, $10 לפלט. ב-dots, OpenAI לא מוכרים tokens. הם מוכרים מנוי על המודל היקר שלהם, ומזיזים את השאלה מכמה עולה מיליון tokens לכמה עבודה זה סוגר לי בחודש. מבחינתם זה די חכם.
+
+> **הסתייגות:** את המאמר של mixed-news לא הצלחתי לפתוח, Cloudflare חסם, אז את ה-$500 וה-$200 אני לוקח מהכותרת בלבד. לפני שאתם משדרגים, תבדקו בעמוד התמחור של OpenAI מה המכסה בפועל, ובעיקר אם עבודת הרקע של ה-dot נספרת ממנה.
+
+<figure><img src="/posts/openai-dots-up-close/v2-strip-he.jpg" alt="4,000 אינטגרציות ועבודה בלי הודעה הן הכוח, וגם 4,000 מקומות לטעות כשאף אחד לא מסתכל (OpenAI, DataCamp)" loading="lazy" /><figcaption>4,000 אינטגרציות ועבודה בלי הודעה הן הכוח, וגם 4,000 מקומות לטעות כשאף אחד לא מסתכל (OpenAI, DataCamp)</figcaption></figure>
+
+## איפה זה חזק
+
+**יוזמה.** זה ההבדל האמיתי מכל chatbot. OpenAI מתארים שאצלם באג מופיע ב-Slack וה-dots כבר מתחילים לחקור, ושבזמן תכנון הם דואגים שכולם מעודכנים לקראת ה-deadline. אף אחד לא ביקש. זה בדיוק מה ש-DataCamp קוראים לו the work you never got around to automating.
+
+**רציפות.** אותו context ב-Slack, ב-Teams וב-ChatGPT. Holly Li סיפרה על הבמה שאנשים אצלם התחילו להתייחס ל-dots כמו לנציגים, ושהיום מכניסים אותם לקבוצות צ'אט מההתחלה.
+
+**אין תשתית.** אין שרת, אין API keys לסובב, אין מחשב שנרדם באמצע הלילה. מי שהריץ agent על laptop מכיר את הבוקר שבו מגלים שהוא נתקע בשתיים בלילה.
+
+**ארגונים.** ה-specialist dots שב-preview מקבלים identity משלהם ל-access management, חומרה מה-IT וחיבור עמוק ל-systems of record. זה החלק שה-CISO ירצה לראות לפני ה-dot האישי, כי ככה לפחות יודעים מי עשה מה.
+
+## איפה זה נופל
+
+**הדמו.** ב-keynote, Romain Huet ניסה להראות שליטה קולית, והמסך הראשי הציג Voice chat couldn't start. אחר כך ה-dot של Holly Li לא ענה לבקשה חיה, והיא צחקה ש-Dottie is having kind of a slow morning. ביום השקה סולחים. אבל agent שאמור לעבוד 24/7 נמדד בדיוק על הבקרים האיטיים.
+
+**זיכרון רקע הוא גם חשיפה.** ה-dot בונה זיכרונות מהאפליקציות שחיברתם בלי הודעה מכם. חיברתם Drive משותף? הוא קורא גם את מה ששכחתם שיש שם. ה-least privilege שלכם עובר דרך ה-plugins: מה שלא חיברתם, הוא לא רואה.
+
+**קופסה שחורה.** אין eval משלכם, אין logs במבנה שלכם, אין בחירת מודל. כלי הבדיקה היחיד הוא לפתוח את המחשב שלו ולהסתכל. נחמד מבחינת שקיפות, אבל זה לא מחזיק כשיש לכם עשרה dots.
+
+**אירופה בחוץ.** Pro לא נפתח ב-EEA, בשווייץ ובבריטניה. אף אחד לא אמר למה, אבל עם agent שקורא מיילים ובונה זיכרונות לבד, קשה לא לנחש שזו רגולציה.
+
+## dot מול OpenClaw ומול Claude Code
+
+| | dot | OpenClaw ודומיו | Claude Code |
+|---|---|---|---|
+| איפה הוא רץ | מחשב ענן של OpenAI | המכונה שלכם או VPS | ה-terminal שלכם, בתוך ה-repo |
+| מתי הוא עובד | 24/7, גם בלי הודעה | כל עוד המכונה דולקת | בסשן, או headless עם `claude -p` |
+| מודל | GPT-6 Astra, בלי בחירה | מה שתחברו | קלוד: סונט או אופוס |
+| מי מחזיק את המפתחות | OpenAI וה-plugins | אתם | אתם |
+| איך בודקים אותו | פותחים את המחשב שלו, Custom Rules | ה-logs שלכם | diff, tests, git |
+| חזק ב- | עבודה שאף אחד לא הגיע לאוטומט | שליטה מלאה ב-stack | קוד עם loop של בדיקה |
+
+בקיצור, שלוש תשובות שונות לשאלה איפה ה-agent גר. agents בסגנון OpenClaw ו-Instinct נותנים לכם את כל ה-stack, וגם את כל הכאב: אתם מחזיקים את המכונה, את המפתחות ואת ה-uptime. Claude Code חי בתוך ה-repo, ושם יש לו משהו ש-dot לא מקבל: tests, diff ו-git שבודקים אותו. dot הוא היחיד שעובד כשאתם לא בסביבה, על תשתית שלא שלכם.
+
+מה שכן, זה לא באמת או-או. נראה לי שבצוותי פיתוח Claude Code יישאר על הקוד, ו-dot ייקח את מה שמסביב: tickets, מיילים, status. ל-Gemini ול-Copilot נגיע בחלקים הבאים של הסדרה.
+
+<figure><img src="/posts/openai-dots-up-close/v3-svg-he.jpg" alt="Claude Code עובד בחלונות ו-dot עובד כל היממה, ולכן אצל dot ה-Custom Rules הן הבודק היחיד בין העצירות (OpenAI, DataCamp)" loading="lazy" /><figcaption>Claude Code עובד בחלונות ו-dot עובד כל היממה, ולכן אצל dot ה-Custom Rules הן הבודק היחיד בין העצירות (OpenAI, DataCamp)</figcaption></figure>
+
+## שלוש משימות ל-dot השבוע, ושתיים שלא
+
+**תנו לו:**
+
+1. **Triage לערוץ הבאגים ב-Slack.** זו הדוגמה ש-OpenAI עצמם פותחים איתה. תנו לו לקרוא, לשחזר בדפדפן שלו ולכתוב סיכום ב-thread, בלי לפתוח tickets לבד. אחרי 10 באגים תספרו כמה מהסיכומים נכונים. מתחת ל-7, תהדקו את ה-rules.
+2. **הכסף שנופל בין הכיסאות.** חשבוניות שלא יצאו, follow-ups שלא נשלחו. הוא מכין טיוטה, אתם מאשרים. בדיוק מקרה החשבונית מה-launch post.
+3. **status לפני deadline.** כל בוקר ב-08:30 הוא עובר על Jira או Linear ועל ה-Slack, ושולח לכם, רק לכם, מה תקוע ומי מחכה למי. אם שבוע שלם זה מדויק, תפתחו לו את הערוץ של הצוות.
+
+**אל תתנו לו:**
+
+1. **שום גישה ל-production או ל-cloud console.** ביולי 2025 ה-agent של Replit מחק DB של production אצל Jason Lemkin, באמצע code freeze ולמרות הוראה מפורשת. וזה היה agent בסשן, מול בן אדם שישב וצפה בו. dot עובד גם כשאתם ישנים.
+2. **שליחה החוצה בשמכם בלי אישור.** מיילים ללקוחות, הודעות בקבוצות עם אנשים מבחוץ. טיוטה כן, שליחה רק אחרי לחיצה שלכם. ה-safety checks של OpenAI לא מכירים את הלקוח הכי רגיש שלכם. ה-Custom Rules כן, אם כתבתם אותן.

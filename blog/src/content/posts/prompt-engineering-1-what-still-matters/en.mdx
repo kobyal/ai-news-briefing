@@ -1,15 +1,15 @@
 ---
-title: "Prompt engineering in late 2026: what still belongs in the prompt"
-description: "What still counts as prompt engineering in late 2026, what moved to context and the harness, and five things that still change results. Part 1 of 3."
+title: "Prompt engineering in 2026: what's still worth writing in the prompt"
+description: "Models understand plain language, and most 2023 tricks are dead. What moved into context and the harness, and what still belongs in the prompt."
 lang: en
 key: prompt-engineering-1-what-still-matters
 term: "prompt engineering"
 kind: explainer
-cover: illus
 pubDate: 2026-10-01
-tags: ["prompt-engineering", "context-engineering", "harness", "evals", "llm", "agents"]
-hook: "number"
-tldr: ["Before you touch a prompt, Anthropic says you need a definition of success and a test you can run.", "Format, context and retries belong in the harness and in code, not in wording.", "Keep these in the prompt: full intent, boundaries, an example, and a definition of done."]
+tags: ["prompt-engineering", "context-engineering", "agents", "claude-code", "openai"]
+hook: "scene"
+cover: type
+tldr: ["Write down when the task is done, not just what it's about", "Give the agent a check it runs on its own: tests, exit code, schema", "After two corrections in one chat, start a new one with a clean prompt"]
 series: { slug: "prompt-engineering", name: "Prompt engineering, minus the magic", part: 1, total: 3 }
 hero: /posts/prompt-engineering-1-what-still-matters/hero-en.jpg
 diagram: /posts/prompt-engineering-1-what-still-matters/diagram.svg
@@ -21,82 +21,126 @@ sources:
   - { title: "From prompt and pray to prompt engineering", url: "https://the.scapegoat.dev/from-prompt-and-pray-to-prompt-engineering", date: "2026-05-07" }
   - { title: "Prompt Engineering Is Not. Engineering, That Is", url: "https://the-infrastructure-mindset.ghost.io/prompt-engineering-is-not", date: "2026-04-01" }
   - { title: "Prompt Engineering Is Permanent", url: "https://yiblet.com/posts/prompt-engineering-is-permanent", date: "2026-05-03" }
-opinion: "We don't think prompt engineering is dead. We think it has shrunk to the part only you can write: intent, boundaries and a definition of done. Everything else, like format, context, retries and verification, belongs in code. Every time we moved something from the prompt into a deterministic rule, it got cheaper and more stable. A loop that checks itself is worth more than a better first draft. And if you see a job with “Prompt Engineer” in the title, check first whether there's an eval behind it."
+opinion: "We think the name prompt engineering survived because it's convenient, not because it describes a method. What really matters in 2026 is the system around the model: what it sees, what it can touch, how it's checked, and when it gets reset. What stays in the prompt is intent, boundaries and the definition of \"done\", and that takes the discipline of writing requirements, not a talent for phrasing. We prefer determinism wherever we can get it: any instruction that can become a schema, a test or a rule in code should leave the prompt. And a loop that checks itself is worth more than a brilliant first draft."
 madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
 ---
 
-Three. That's how many things Anthropic says you need before you start prompt engineering: a clear definition of success, a way to test it empirically, and a first draft of a prompt. Two of the three are text the model will never read.
+March 31, 2026. Michael Heap, who maintains trello-cli, opens a terminal and gives an agent one sentence: "Add support for showing card details". A few minutes later he has a command. It shows the title, the description and the labels. It doesn't show the due date, which is the thing he needs most. It doesn't show checklists at all. He's close to shutting the laptop.
 
-That's where things stand in late 2026, in one line. Most of the work has moved out of the prompt. What's left inside is smaller, and it matters more.
+Then he realizes the agent did exactly what he asked. He just never said which details. On the second try he writes five sentences: which flags, which fields, what to do when a value is missing, what happens when a checklist has more than 10 items. This time the command works right away. Heap says something that would have taken him an hour was done in minutes. The model didn't change. Only what the model knew changed.
 
-This is part 1 of 3. Here we cover what still counts as prompt engineering, what moved to context and the harness, and the five things that still move results. How a production system prompt is structured is part 2. How you know a change actually helped is part 3.
+That's prompt engineering at the end of 2026. Not magic words. Writing requirements.
 
-## The 2023 prediction that half came true
+## What died since 2023, and what stayed
 
-Nobody coined the term. It just stuck. It happened around GPT-3, in 2020–2021, when people found that the same model answered very differently depending on the wording. By 2023 it was mostly a bag of incantations: “think step by step”, a few examples, “you are a world-class expert in X”.
+First, what died. In 2023 prompt engineering was a bag of tricks: "think step by step", repeat your intent three times, promise the model a tip. The blogger yiblet wrote back then that it would be a profession for a few years. In May 2026 he came back to it in a post called Prompt Engineering Is Permanent and admitted he was only half right: "That notion of Prompt Engineering is largely gone." 2026 models understand plain language, and reasoning models think without being asked.
 
-In 2023 Yiblet wrote that this era would be “transient”, a few years and done. In May 2026 he revisited the post and said he was only half right. The “coax a chatbot into a better answer” version really has nearly disappeared. What remains, in his words, is making AI systems reliable “when they have context, tools, memory, permissions, and real consequences”.
+What stayed: once the model doesn't just answer but also acts, meaning it writes files, calls APIs, sends messages, the prompt has to describe the boundaries too. What to do, what not to do, when to ask, when to stop, what counts as success.
 
-Basically, the incantations died because models learned to do them on their own. Reasoning models think step by step without being asked. What didn't die is the need to explain what you actually want.
+What it isn't: a job title. The author of The Infrastructure Mindset blog, after four decades in infrastructure, went looking for the engineering discipline behind prompts and mostly found posts saying "be specific" and "iterate". About most of what's online, he's right. That doesn't mean there's nothing to learn here. It means most of what you need to learn sits outside the prompt.
 
+## What moved into context and the harness
 
-## What moved from the prompt to the harness
+Most of what we used to cram into the message moved to other layers. Pasting docs into the prompt became context engineering: what the agent sees, from where, and when. "Make sure it works" became the harness: a test suite the agent runs itself and an exit code it reads. "Think step by step" became a parameter on a reasoning model.
 
-Take a prompt from 2023 and go through it line by line. Half of those lines are now written in code.
+Anthropic's Claude Code guide says it plainly: most best practices come from one constraint. The context window fills up fast, and performance drops as it fills. One debugging session can burn tens of thousands of tokens. In practice, the text you type is a small part of what the model reads.
 
-**Format.** We used to write “return JSON only, no explanations” and hope for the best. Now OpenAI has Structured Outputs. Their docs say outright that `output` “often has more than one item”, and that it isn't safe to assume the text is at `output[0].content[0].text`. In day-to-day terms: format and parsing are the harness's job. Wording won't fix them.
-
-**Context.** In the Claude Code guide, Anthropic writes that almost every best practice follows from one constraint. The context window fills up fast, and performance drops as it fills. A single debugging session can burn tens of thousands of tokens. What goes into context, when to clear it and what to summarize is context engineering. You can't solve it with one more line in the prompt.
-
-**Verification.** The same guide says to give Claude something that returns pass or fail: tests, an exit code, a linter, a diff against a fixture. That loop lives in the harness.
+So what's left inside the prompt? Intent, boundaries, and the definition of "done". No harness will invent those for you.
 
 <figure><img src="/posts/prompt-engineering-1-what-still-matters/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
 
-<figure><img src="/posts/prompt-engineering-1-what-still-matters/v1-svg-en.jpg" alt="Of a typical 2023 prompt's six lines, three now live in code: format in Structured Outputs, context in window management, verification in a pass/fail loop. Two died because the model does them on its own. Only intent is still written in the text." loading="lazy" /><figcaption>Of a typical 2023 prompt's six lines, three now live in code: format in Structured Outputs, context in window management, verification in a pass/fail loop. Two died because the model does them on its own. Only intent is still written in the text.</figcaption></figure>
+<figure><img src="/posts/prompt-engineering-1-what-still-matters/v1-svg-en.jpg" alt="Three of the four layers are no longer written in the prompt. What's left in it is the one thing no harness will guess for you (Anthropic, Best practices for Claude Code)" loading="lazy" /><figcaption>Three of the four layers are no longer written in the prompt. What's left in it is the one thing no harness will guess for you (Anthropic, Best practices for Claude Code)</figcaption></figure>
 
-## What stays in the prompt
+## Five things that still change the result
 
-What does stay is the one thing no tool can guess for you: intent.
+Each one with a before and after. The prompts are in English because that's how most teams write to agents, but the principle doesn't depend on the language.
 
-In March 2026 Michael Heap wrote about trello-cli, a CLI tool he maintains. He asked an agent to “Add support for showing card details” and got a command that showed the title, description and labels. No due date, which is exactly the field he cares about most, and no checklists. So he rewrote the request. A `card:show` command with `--board` and `--list` flags, a list of fields to display, skip the header for an empty field, and “+ X more” when a checklist has more than 10 items. This time it worked, and a task that would have taken him an hour was done in a few minutes.
+**1. Write the end state, not the topic.** This is Heap's story, with his prompt almost word for word:
 
-His line: “Nothing about the model changed. The only thing that changed was the context.” I'd put it a little differently. What changed is that he stopped assuming the model knew what was in his head.
+```text title="01-done-state.txt"
+# before
+Add support for showing card details
 
-Yiblet adds the agent angle. When a chatbot misunderstands you, you get a bad answer. When an agent misunderstands, it can update a DB, message a customer, or confidently skip an important step. So the prompt also has to describe the boundaries: what not to do, when to ask, and when to stop.
+# after
+Add a card:show command that accepts --board and --list as flags.
+Output the card title, description, due date, any attached checklists and labels.
+If any of these values do not exist, skip the header for that section.
+If checklists have more than 10 items, add a "+ X more" entry.
+```
 
-<figure><img src="/posts/prompt-engineering-1-what-still-matters/v2-svg-en.jpg" alt="The gap between Heap's two requests isn't cleverer wording. It's four assumptions that moved from his head into the text. The due date and checklists were never beyond the model; they just weren't in the ask." loading="lazy" /><figcaption>The gap between Heap's two requests isn't cleverer wording. It's four assumptions that moved from his head into the text. The due date and checklists were never beyond the model; they just weren't in the ask.</figcaption></figure>
+**2. Give it a check it can run.** Anthropic put it best:
 
-## So is it engineering or not
+> Claude stops when the work looks done. Without a check it can run, “looks done” is the only signal available, and you become the verification loop: every mistake waits for you to notice it.
+> — Anthropic, Best practices for Claude Code
 
-In March, the-infrastructure-mindset published a piece called “Prompt Engineering Is Not”. The author has four decades of infrastructure behind him. He went looking for the discipline: formal methods, a testing framework, measurement. What he found, he says, was “creative writing advice with a technical veneer” and posts that say “be specific” and “iterate”.
+```text title="02-check.txt"
+# before
+Fix the date parsing bug. Make sure it works.
 
-For most of what's online, he's right. But go back to Anthropic's three prerequisites. Two of them are exactly what he was looking for: a definition of success and an empirical test. And the same page has another sentence most prompt guides skip:
+# after
+Fix the date parsing bug in src/parse.ts.
+Run `npm test -- parse` after every change.
+You're done when all tests pass, including one new test
+that reproduces the bug and failed before your fix.
+```
 
-> Not every success criteria or failing eval is best solved by prompt engineering. For example, you can sometimes improve latency and cost more easily by selecting a different model.
-> — Anthropic, Prompt engineering overview
+**3. Boundaries: what's off limits and when to stop.** yiblet wrote that when a chatbot misunderstands you, you get a bad answer, and when an agent misunderstands you, it might change a database. In July 2025 that's exactly what happened to Jason Lemkin with Replit's agent, which deleted a production database in the middle of a code freeze.
 
-In short, prompt engineering without an eval really is creative writing. With an eval, it's a change you can measure. scapegoat.dev put it best. When a model fails, there's a finite set of reasons: I worded it wrong, the model can't actually do this, bad luck, or something else is broken, like a tool or the vendor's harness. Each of them can be diagnosed.
+```text title="03-boundaries.txt"
+# before
+Clean up the old migration files.
 
-<figure><img src="/posts/prompt-engineering-1-what-still-matters/src1.jpg" alt="Anthropic's overview asks for a success definition and an empirical test before any prompt exists. That's exactly the discipline the critics went looking for and didn't find. (credit: Anthropic, Prompt engineering overview)" loading="lazy" /><figcaption>Anthropic's overview asks for a success definition and an empirical test before any prompt exists. That's exactly the discipline the critics went looking for and didn't find. (credit: Anthropic, Prompt engineering overview)</figcaption></figure>
+# after
+Clean up files older than 2025-01 in db/migrations/ only.
+Do not touch db/seeds/ and do not run any migration.
+If a file is referenced from code, list it and stop. Ask before deleting.
+```
 
-## What we saw in our own pipeline
+**4. A new chat instead of the fifth correction.** The the.scapegoat.dev blog describes this exactly: one more regenerate, one more "no, I meant this", and the context fills with noise that makes the next answer worse.
 
-At aibriefing.dev we run a graph of about 10 agents every day, in production since May 2026. Looking back at the incidents, almost none were fixed by changing the wording.
+```text title="04-fresh-session.txt"
+# before (5th message in the same chat)
+no, the other config, not that one, and keep the old flag
 
-Our wrapper around `claude -p` retries transient errors and repairs broken JSON. That small loop closed three production incidents. Everywhere we replaced an LLM call with a deterministic rule, the pipeline got cheaper and more stable. Translation and classification run on cheap models, and the heavy writing runs on Claude. Those are all system decisions, not prompt decisions.
+# after (new chat)
+Goal: add --dry-run to deploy.sh.
+Config: config/prod.yaml (not config/staging.yaml).
+The existing --force flag must keep working.
+```
 
-What did work inside the prompt? For Hebrew translation, the thing that moved quality most was pairs of bad sentence vs. good sentence in the system prompt. It beat every “write naturally” we tried before it.
+**5. Break it down when it doesn't hold.** Same blog: if the model can't do the task, split it into smaller problems. The first step is a plan, not code.
 
-> **My take:** Most of the time people burn on “improving the prompt” should have gone into an eval. I've rewritten prompts after incidents plenty of times, and the problem was almost always in what the model saw, not in what I told it.
+```text title="05-decompose.txt"
+# before
+Migrate auth to the new session library, update tests and docs.
 
-## Five things that still move results
+# after
+Step 1 only: read src/auth/ and write PLAN.md:
+which files change, in what order, what could break.
+Don't edit code yet. I'll review the plan first.
+```
 
-OK, so what do you do on Monday. These are the five things that, for us, still change results when they're written into the prompt:
+How do you know the new version is actually better and doesn't just look better? That's part 3.
 
-1. **Define “done”.** Per the Claude Code docs, the model stops when the work “looks” done. Write down what counts as done: which fields, which test has to pass, what length.
-2. **Write the whole intent, not just the task.** Heap's first version was one sentence. His second was five. Every assumption that stays in your head and doesn't make it into the text, the model will fill in on its own.
-3. **Boundaries and stopping points.** What's forbidden, when to ask before continuing, when to stop and report. In an agent, that's the difference between a bad answer and a changed DB.
-4. **One real example, preferably bad vs. good.** Describing a style works worse than a pair of sentences. How to build these, and when few-shot is worth the cost, is in part 2.
-5. **Tell it how to check itself.** “Run the tests before you finish” is one line that connects the prompt to the harness.
+## When it isn't a prompt problem at all
 
-Notice what's not on the list: any wording trick. No “you are a world-class expert”, no CAPS, no promised tip. And even with all five, if you have no way to measure whether any of them helped, you're still pulling a slot machine lever.
+Anthropic says this on the overview page: not every failing eval is fixed with a prompt, and sometimes latency and cost improve faster if you just switch models. Before touching the prompt at all, they ask for three things: a definition of success, a way to test it, and a first draft.
+
+the.scapegoat.dev lists four reasons a model fails: you phrased it badly, the model really can't do it, you got unlucky because the model is probabilistic, or something else broke, like a broken tool or a provider serving a quantized version. Only the first one is solved in the prompt. Rewriting the same instruction for the third time? Stop and check the other three.
+
+> **My take:** half the prompt engineering we see on teams is an attempt to solve in text something that should be a schema or a test. Prompts dozens of lines long begging "always return valid JSON", when what's missing is Structured Outputs and one line of validation. Every instruction that moves into code is an instruction the model can no longer forget.
+
+<figure><img src="/posts/prompt-engineering-1-what-still-matters/src1.jpg" alt="Anthropic puts a definition of success and a way to test it before the techniques, not after. Without those two there's nothing to improve against (credit: Anthropic docs)" loading="lazy" /><figcaption>Anthropic puts a definition of success and a way to test it before the techniques, not after. Without those two there's nothing to improve against (credit: Anthropic docs)</figcaption></figure>
+
+## What to try this week
+
+- Take the last prompt that failed on you and write one line under it: "Done means...". Nothing to write? You found the bug.
+- Give a model Heap's original request and ask it to come up with five questions before it writes any code. The answers to those questions are the prompt that was missing.
+- In Claude Code: set up a status line that shows how much context you've burned, as Anthropic recommends, and run `/clear` between tasks.
+- In OpenAI: if you're asking for JSON in plain text, switch to Structured Outputs. And stop reading `output[0].content[0].text`. OpenAI says explicitly that it isn't safe, because the output can contain tool calls and reasoning. Use `output_text`.
+
+And if your prompt doesn't hold up in a fresh chat, without all the history behind it, it isn't a prompt. It's a conversation.
+
+<figure><img src="/posts/prompt-engineering-1-what-still-matters/v3-transcript-en.jpg" alt="Heap's same request, and a model that asks before it writes: the answers to these five questions are exactly the prompt that was missing (Michael Heap)" loading="lazy" /><figcaption>Heap's same request, and a model that asks before it writes: the answers to these five questions are exactly the prompt that was missing (Michael Heap)</figcaption></figure>
+
+

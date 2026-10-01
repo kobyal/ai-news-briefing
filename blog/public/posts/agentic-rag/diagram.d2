@@ -1,19 +1,12 @@
 direction: right
-question: User question
-agent: LLM agent
-search: search_knowledge_base
-fetch: fetch_document_section
-list: list_documents
-check: Enough material?
-answer: Answer with citations
-guard: Grounding check
-question -> agent: ask
-agent -> search: query
-agent -> fetch: section id
-agent -> list: browse
-search -> check: chunks
-fetch -> check: full section
-list -> check: doc list
-check -> agent: no, search again
-check -> answer: yes
-answer -> guard: verify
+question -> router: classify
+router -> single_shot: simple
+router -> search: complex
+single_shot -> answer
+search -> grader: chunks
+grader -> rewrite: off-topic
+rewrite -> search: new query
+grader -> fetch_section: cut off
+fetch_section -> grader: full text
+grader -> answer: enough
+budget -> answer: MAX_STEPS forced

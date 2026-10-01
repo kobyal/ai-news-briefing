@@ -1,0 +1,146 @@
+---
+title: "Claude Code in practice, part 3: subagents, worktrees and a clean context"
+description: "When a subagent saves context and when it burns 15x the tokens, a git worktree per parallel session, plan mode, and a three-line handoff."
+lang: en
+key: claude-code-3-subagents-and-worktrees
+term: "subagents"
+kind: fieldnotes
+pubDate: 2026-10-01
+tags: ["claude-code", "subagents", "git-worktree", "plan-mode", "context-engineering"]
+hook: "scene"
+cover: type
+tldr: ["Use a subagent only when the input is noise and the output is a summary. Otherwise it costs up to 15x the tokens.", "Every session that edits code gets its own git worktree, branch, .env and port.", "Before /clear, write a three-line handoff: what works, what's open, what failed."]
+series: { slug: "claude-code-in-practice", name: "Claude Code in practice", part: 3, total: 5 }
+hero: /posts/claude-code-3-subagents-and-worktrees/hero-en.jpg
+diagram: /posts/claude-code-3-subagents-and-worktrees/diagram.svg
+sources:
+  - { title: "Create custom subagents - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/sub-agents", date: "" }
+  - { title: "Common workflows - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/common-workflows", date: "" }
+  - { title: "How we built our multi-agent research system", url: "https://www.anthropic.com/engineering/built-multi-agent-research-system", date: "" }
+  - { title: "Claude Code as a Daily Driver: Claude.md, Skills, Subagents, Plugins, and MCPs", url: "https://arps18.github.io/posts/claude-code-mastery", date: "2026-05-27" }
+  - { title: "I built ten custom subagents to tame a 500K-line Clojure codebase", url: "https://www.metabase.com/blog/ten-custom-subagents", date: "2026-04-29" }
+  - { title: "Show HN: Rayline routes Claude Code subagents to on-device and cheaper models", url: "https://rayline.ai", date: "2026-06-08" }
+  - { title: "Claude Code reverse-engineered itself. Two subagents refused. It called them shy", url: "https://www.skelpo.com/blog/claude-code-reverse-engineering", date: "2026-03-18" }
+opinion: "We see subagents as a way to keep context clean, not as a way of working. Most parallel work that pays off is two or three sessions in separate worktrees, not a tree of agents talking to each other. The subagent we recommend most is the one that checks, because a loop that checks itself is worth more than a better first draft. Wherever you can replace a subagent with a deterministic command, like a script that runs tests and returns only failures, do it. And agent orchestration is showing up in job ads before there's a single serious paper on it. Until that paper exists, we're waiting."
+madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
+---
+
+In March 2026, someone at Skelpo opened an empty folder, ran Claude Code in it and gave it one sentence: reconstruct as much of your own code as you can. Claude found two installs of itself, an npm package at version 2.1.56 and a 183MB binary. Then it did what it does best and split the work. Four subagents went out in parallel, seven in total. Two refused to take Claude apart. The main agent called them "shy" and carried on without them. At the end there were 12,093 lines of reconstructed code on disk.
+
+I'm not telling this for the laugh. It raises the same questions this part is about: what you split, who sees which context, and what comes back to the main session. In the previous part we settled what goes into a hook and what goes into a skill. Now it's parallel work: plan mode, subagents, git worktrees, and a three-line handoff that saves more than all the rest.
+
+## 01 · Plan mode before you split anything
+
+You can't split a task you don't understand. So start here: press Shift+Tab twice inside the session, or launch from the terminal:
+
+```bash title="terminal"
+claude --permission-mode plan
+```
+
+In this mode Claude reads files, searches and returns a plan. It doesn't write to disk. Ctrl+G opens the plan in your editor. It's just text, so edit it before it becomes code.
+
+My rule: use plan mode for any change that touches more than one file. Don't bother for a one-line fix. One more trick, from the May 2026 post Claude Code as a Daily Driver: open a second, clean session and ask it to critique the plan like a staff engineer. It doesn't have the first session's history, so it won't fall in love with the plan.
+
+In the plan you get back, check one thing: every task should be marked as dependent or independent. The independent ones are candidates for splitting. Everything else stays in one session, and that's fine.
+
+## 02 · Decide whether you need a subagent at all
+
+Before you define any agents, look at the numbers. In June 2025 Anthropic published how they built Research: a lead agent on Opus 4 that spins up subagents on Sonnet 4. On their internal eval it beat a single Opus 4 agent by 90.2%. Nice. But the same post says an agent burns about 4x the tokens of a normal chat, and a multi-agent system about 15x. They also say outright that most coding tasks have far fewer truly parallel pieces than research does.
+
+This is the sentence that explains why it works when it works:
+
+> "The essence of search is compression: distilling insights from a vast corpus."
+> — Anthropic, How we built our multi-agent research system
+
+In short, a subagent is worth the money when its input is noise and its output is a summary. Think of a grep across the whole repo, a failed build log, a test run, or mapping a module you won't come back to. The docs say almost the same thing: use one when a side task would flood the conversation with search results, logs or files you won't look at again.
+
+When not to: an edit that needs everything the main session already knows. The subagent starts from zero and rereads the same files, so you pay twice. It's never free either. It sends its own requests, and they count against the same usage limits as the main session. One more thing to remember: the built-in Explore and Plan agents skip CLAUDE.md. They don't know the rules you wrote in part one, so don't let them make decisions about code.
+
+<figure><img src="/posts/claude-code-3-subagents-and-worktrees/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/claude-code-3-subagents-and-worktrees/v1-chart-en.jpg" alt="15x the tokens bought a 90.2% gain in research. In code, where fewer things are truly parallel, the math doesn't work out as easily (Anthropic)" loading="lazy" /><figcaption>15x the tokens bought a 90.2% gain in research. In code, where fewer things are truly parallel, the math doesn't work out as easily (Anthropic)</figcaption></figure>
+
+## 03 · One subagent that checks, not ten that write
+
+In April 2026 Metabase published how they built ten subagents for a 500K-line Clojure codebase. Each one is a markdown file of 2,000 to 3,000 tokens, about 150 lines. They all share one structure: domain knowledge, where the code lives, how to investigate, pitfalls, how to verify. But their codebase has clear boundaries, like a 68-stage query processor and 18 SQL dialects. You'll start with one. The one that pays off most is the one that checks:
+
+```markdown title=".claude/agents/test-runner.md"
+---
+name: test-runner
+description: Runs the test suite after code changes and reports only failures. Use after every edit.
+tools: Bash, Read, Grep, Glob
+model: haiku
+---
+You run tests and report. You never edit files.
+
+1. Run: npm test 2>&1 | tail -n 200
+2. For each failure: file:line, the failing assertion, one-line probable cause.
+3. If everything passes, answer exactly: ALL GREEN (<n> tests).
+4. Never paste full stack traces. Max 15 lines in total.
+```
+
+Notice three things. First, tools has no Edit and no Write, so it can't "fix" a test to make it pass. Second, model: haiku, because running tests and summarizing failures doesn't need Opus. Third, a strict output format, because every line it returns lands in the main context. Replace npm test with the check command from part one.
+
+How to tell it's working: /agents shows it in the list. After an edit, Claude should hand off to it on its own based on the description. If it doesn't, write use the test-runner subagent. The description is short on purpose. All descriptions together load into every session, and above 15,000 tokens Claude Code warns you at startup. The details go in the body of the file, which loads only when the agent runs.
+
+> **My take:** The most useful subagent isn't the specialist. It's the checker. An agent writing code in parallel produces one more diff that someone has to read. An agent that runs tests and returns 15 lines saves you that reading.
+
+If haiku is still too expensive for you, there's already a Show HN called Rayline that routes subagents to cheaper or on-device models. I haven't tried it in production.
+
+<figure><img src="/posts/claude-code-3-subagents-and-worktrees/src3.jpg" alt="The lead agent gets only a summary from each subagent, and that is the whole point of splitting. If what comes back is too long, the benefit is gone (credit: Anthropic)" loading="lazy" /><figcaption>The lead agent gets only a summary from each subagent, and that is the whole point of splitting. If what comes back is too long, the benefit is gone (credit: Anthropic)</figcaption></figure>
+
+## 04 · A worktree for every session that edits code
+
+A subagent is a split inside one session. Sometimes you want two full sessions that each write code. They can't share a folder. Changes get overwritten, both git statuses get mixed together, and one session's test fails because of the other's half-edited file. git worktree solves this without another clone. You get the same .git, with a separate folder and branch per session.
+
+```bash title="parallel.sh"
+# from the main checkout
+git worktree add ../app-auth -b feature/auth
+git worktree add ../app-billing -b fix/billing-rounding
+
+# gitignored files do not come along
+cp .env ../app-auth/ && cp .env ../app-billing/
+echo "PORT=3001" >> ../app-auth/.env
+echo "PORT=3002" >> ../app-billing/.env
+
+# one terminal per worktree
+cd ../app-auth && claude
+cd ../app-billing && claude
+
+git worktree list
+
+# after the PR is merged
+git worktree remove ../app-auth
+git branch -d feature/auth
+```
+
+git worktree list shows one line per folder: path, commit and branch. There are three traps people fall into on day one. First, gitignored files don't come along: .env, node_modules, and CLAUDE.local.md from part one. CLAUDE.md and .claude/settings.json do come along, because they're in git. Second, two dev servers end up on the same port. That's why each worktree's .env gets its own PORT. The third trap is you. Three parallel sessions means three PRs to read, and I think three is the limit before your review becomes the bottleneck. Do the review in a fresh session from main, not in the one that wrote the code.
+
+<figure><img src="/posts/claude-code-3-subagents-and-worktrees/v3-svg-en.jpg" alt="A worktree separates files, port and .env, not history. Three sessions share one .git and none of them overwrites another (Claude Code docs, common workflows)" loading="lazy" /><figcaption>A worktree separates files, port and .env, not history. Three sessions share one .git and none of them overwrites another (Claude Code docs, common workflows)</figcaption></figure>
+
+## 05 · A fresh session per task, and a three-line handoff
+
+Start a new conversation for every task. A long conversation costs more with every message, and it also answers worse. Every turn resends the whole context, and every failed attempt still in there keeps pulling the model the same way. /compact summarizes, but it decides on its own what matters. I'd rather decide myself.
+
+Before /clear, make this the last request in the session:
+
+```text title="prompt"
+Write HANDOFF.md in three lines: what works, what is open, what failed and why. No other text.
+```
+
+The output looks like this:
+
+```markdown title="HANDOFF.md"
+Works: Google login passes end-to-end, 42 tests in auth/ are green.
+Open: refresh token doesn't renew after 60 minutes. Not started.
+Failed: middleware on the edge runtime breaks on crypto. Don't go back there.
+```
+
+Then run /clear, and in the new session type: @HANDOFF.md continue from line two. The third line matters most. Without it, the next session will try the same middleware, hit the same error, and burn half an hour of your time. In practice, keep one HANDOFF.md per worktree and add it to .gitignore. Save claude --continue for a task that was cut off halfway, not for the next task.
+
+## Takeaways
+
+- Use plan mode for any change that touches more than one file, and have a second, clean session critique the plan.
+- Use a subagent only when the input is noise and the output is a summary. Give it no Edit, run it on haiku, and set a strict output format.
+- A session that edits code gets its own worktree, its own .env and its own port.
+- Before /clear, write down what works, what's open and what failed. The last line is the one that saves the money.

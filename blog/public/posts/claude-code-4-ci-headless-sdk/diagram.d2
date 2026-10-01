@@ -1,0 +1,17 @@
+direction: right
+trigger: "@claude comment / cron"
+runner: "CI runner"
+cli: "claude -p --output-format json"
+envelope: "result envelope"
+gate: "jq assertions"
+tests: "test suite"
+pass: "PR ready for review"
+fail: "job fails"
+trigger -> runner: starts
+runner -> cli: max-turns, allowedTools
+cli -> envelope: exit 0
+envelope -> gate: subtype, num_turns, cost
+gate -> tests: all true
+gate -> fail: any false
+tests -> pass: green
+tests -> fail: red

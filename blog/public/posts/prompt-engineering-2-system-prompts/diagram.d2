@@ -1,17 +1,17 @@
 direction: right
-request: "Request (system + user)"
-prefix: "Prefix up to cache_control"
-check: "Prefix cached?"
-hit: "Cache read"
-miss: "Process full prompt"
-write: "Cache write"
-refresh: "TTL refreshed"
-response: "Response"
-request -> prefix: "stable blocks first"
-prefix -> check
-check -> hit: "yes"
-check -> miss: "no / prefix changed"
-miss -> write: "once response begins"
-hit -> refresh: "no extra cost"
-hit -> response: "~0.1x input price"
-write -> response: "1.25x input price"
+tools: Tools
+system: System prompt (static)
+bp: Cache breakpoint
+msgs: User message (time, user, trace)
+check: Prefix lookup
+hit: Cache read 0.1x
+miss: Cache write 1.25x
+model: Model
+tools -> system: prefix order
+system -> bp: cache_control
+bp -> check
+check -> hit: same bytes
+check -> miss: any byte changed
+hit -> model
+miss -> model
+msgs -> model: not cached

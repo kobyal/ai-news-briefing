@@ -1,12 +1,15 @@
 ---
-title: "Jev: a model that outputs decisions with probabilities, not text"
-description: "TypeSafe's Jev returns typed, calibrated decisions instead of text. What's inside, what it costs, and why people are testing it in 25 lines of Python."
+title: "Jev: when your agent needs a decision, not a paragraph"
+description: "TypeSafe's Jev returns a decision with a probability instead of text. What it actually does, what it costs, and how to build a decision layer this week."
 lang: en
 key: jev
 term: "Jev"
-cover: illus
-pubDate: 2026-09-30
-tags: ["jev", "typesafe", "classification", "calibration", "logprobs"]
+kind: explainer
+pubDate: 2026-10-01
+tags: ["jev", "typesafe", "decision-models", "agents", "calibration", "classification"]
+hook: "claim"
+cover: photo
+tldr: ["Count how many steps in your agent are a choice from a closed list", "Move them from a generative model to classification with a probability and an escalate threshold", "Label 200 examples and check calibration before you trust a 0.9"]
 hero: /posts/jev/hero-en.jpg
 diagram: /posts/jev/diagram.svg
 sources:
@@ -16,103 +19,132 @@ sources:
   - { title: "Ollaya – Ollama for open-source, Jev-style decision models", url: "https://ollaya.dev", date: "2026-09-25" }
   - { title: "OpenAI is well positioned to fast-follow Jev", url: "https://arcturus-labs.com/blog/2026/09/21/will-openai-eat-jevs-lunch", date: "2026-09-22" }
   - { title: "Show HN: Jev Plays Pokémon Red", url: "https://jev-pokemon.vercel.app", date: "2026-09-25" }
-opinion: "We don't buy \"zero hallucinations\". A model that picks the wrong answer at 0.95 confidence is a silent bug, and for us the silent bugs have been the worst ones, not the wrong answers. That said, the direction is right: we already run classification on cheap models and switch to a rule as soon as a rule is good enough, and Jev sits right in between. It has closed output, and a number you can put a threshold on and test. Before we pay for an API, we'll measure calibration on our own data with an open model's logprobs, and if that's good enough, we're done. And the fact that within a week there are already clones, benchmarks and arguments over the definition tells us this is real, even if TypeSafe's moat is less so."
-madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+  - { title: "Jev by TypeSafe: A Decision Model for AI Agents", url: "https://beam.ai/agentic-insights/jev-typesafe-ai-agents", date: "" }
+  - { title: "Jev Explained: Typesafe AI's Non-Autoregressive System-1 Model | MindStudio", url: "https://www.mindstudio.ai/blog/jev-system-one-model-launch", date: "" }
+  - { title: "What Is Jev AI? A Practical Guide to System One and Executable Decisions", url: "https://huggingface.co/blog/sora-2/what-is-jev-ai-a-practical-guide-to-system-one-and", date: "" }
+opinion: "To us, Jev is a good name for an old thing: classification over logits, and nobodywho proved it in 25 lines. But we judge a term by what it changes on Monday, and here something does change: decisions move out of generative prompts and into a closed answer space, as close to a rule as you can get. A calibrated probability is really a built-in check, and we'll always prefer a loop that checks itself over a better first draft. Six clones in one week and an open argument over the definition is a sign there's something real here. What we won't do is tie ourselves to a single vendor in early access: first we measure on our own data with an open model, and only then compare against Jev."
+madeWith: { model: "claude-opus-5-5", sourceCount: 9, reviewedBy: "Koby Almog" }
 ---
 
-## 16,150 decisions for $1.65
+Most of the steps your agent takes aren't writing. They're picking from a closed list. And you pay for them as if you'd asked for an essay.
 
-Christian Mathiesen from Frigade hooked Jev up to Pokémon Red and let it play until the Hall of Fame. The run took 37 hours and 40 minutes. It made 16,150 decisions on about 39.2 million input tokens, and the total cost came to roughly $1.65. Median time per decision was 0.4 seconds. Along the way the whole team wiped 16 times, and it took 15 attempts at the Elite Four.
+Look at a real trace. Which team gets the ticket. Which tool to call. Is the input safe. Should this go to a human. None of these needs a paragraph. Yet we send them to an LLM that writes token after token, parse whatever comes back, and act surprised when it invents a tool that doesn't exist.
 
-For comparison, TypeSafe's homepage shows one call to a regular LLM: 8.566 seconds and $0.01388. The same task on Jev: 0.114 seconds and $0.000081. Those are their numbers on their workflows, but the order of magnitude is clear.
+On September 15, 2026, TypeSafe AI released Jev, a model that returns only that: a decision with a probability. Pricing is $42 per billion input tokens, and output is free. In the demo on their homepage the same task takes 0.114 seconds and costs $0.000081, versus 8.566 seconds and $0.013880 on a regular LLM. And Vercel wrote that Jev took off on AI Gateway faster than any model that has ever been there.
 
-Jev shipped on September 15, 2026 from TypeSafe AI. The founder is Diogo Almeida, who worked at OpenAI on the methods that made models good at instruction following. That research eventually became ChatGPT. After two years in stealth he came back with one question: we've had superhuman chat models for years, so where's all the automation?
+## Jev is a function call that returns a probability, not a chatbot
 
-<figure><img src="/posts/jev/v1-strip-en.jpg" alt="The number that explains the story is cost per decision: about 10 cents per thousand. At that price, a decision stops looking like an API call you think twice about." loading="lazy" /><figcaption>The number that explains the story is cost per decision: about 10 cents per thousand. At that price, a decision stops looking like an API call you think twice about.</figcaption></figure>
+The person behind it is Diogo Almeida. At OpenAI he worked on the methods that got language models to follow instructions and hold a conversation, the research that led to ChatGPT. After two years in stealth he called what he built a "System One Model", after Kahneman's fast, intuitive thinking. The training method is called RLCD, Reinforcement Learning for Calibrated Decisions.
 
-## What it returns, and what it doesn't
+The contract is simple. You send state (an email, a log line, a ticket, JSON) and a list of typed questions. There are three kinds: a choice among options you defined, a score on a rubric, and yes/no. Every answer comes back with a calibrated probability. No explanation, no paragraph.
 
-Jev doesn't generate text. At all. You send it a state, as text or JSON, plus a list of questions, each with possible answers you define up front. For each question it returns a typed decision and a probability. TypeSafe calls this category a System One Model.
+What it isn't:
 
-An example from Ollaya: a customer writes "third time this year you charged me twice, refund me today or I'm leaving". Five questions, answered in 87ms on an RTX 4090: intent=refund at 0.91, is_urgent=yes at 0.92, churn_risk=yes at 0.99. No paragraph, no "I understand your frustration". Just values your code can act on.
+- It isn't a smaller LLM. It gave up text generation entirely.
+- It isn't JSON mode. With structured outputs the model still produces a string you parse, and it can put the name of a tool that doesn't exist inside perfectly valid JSON.
+- "Can't hallucinate" doesn't mean "always right." Beam put it best: Jev can pick the wrong option. It can't return something outside the list, something broken, or something that doesn't match the schema.
 
-What it isn't: it's not JSON mode. With structured outputs the model still writes a string token by token, and you parse, validate and hope. With Jev the answer space is closed in advance, so a type error can't happen. It's also not a small chat LLM. It won't write your emails.
+Almeida put it this way in the launch post:
 
-What about "Zero Hallucinations"? Technically true, since it can't invent a value you didn't define. But it can absolutely pick the wrong value with full confidence. That's not a hallucination, it's a mistake. In production, the name doesn't matter much.
+> While Jev gives up string generation, it’s optimized for structured outputs and _can’t_ hallucinate.
+>
+> — Diogo Almeida, founder of TypeSafe, Sept 15, 2026
+
+## Inside: one forward pass, then a split
+
+A regular LLM is autoregressive. It produces a token, feeds it back in, and produces another. Jev answers in a single forward pass.
+
+So what's actually happening in there? Arcturus Labs assume Jev is very close to a regular LLM. It runs one step, takes the probability distribution over every possible token, and keeps only the ones that stand for your options. nobodywho went a step further and on September 22 published "Jev in 25 Lines of Python": a local Qwen3-0.6B, an email asking for a password on a non-company sign-in page, three options. The result: Phishing 0.885, Spam 0.084, Legitimate 0.031. Their line: "There. That’s Jev."
+
+They're half right. The mechanism is old, and what TypeSafe is selling is two things the 25 lines don't have:
+
+- **Calibration.** A raw softmax tells you nothing about hit rate. According to Ollaya's comparison, even Ollama documents that the probabilities of the decision models they run aren't calibrated. RLCD is supposed to make sure a 0.9 is actually right 90% of the time.
+- **Parallelism.** Up to 256 questions in one request, and up to 255 options per question.
 
 <figure><img src="/posts/jev/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
 
-<figure><img src="/posts/jev/v2-svg-en.jpg" alt="The difference isn't the format, it's what the model is even able to return. On top, a string that can break halfway through. Below, a pick from a list you wrote. There's nothing to parse, so a type error can't happen." loading="lazy" /><figcaption>The difference isn't the format, it's what the model is even able to return. On top, a string that can break halfway through. Below, a pick from a list you wrote. There's nothing to parse, so a type error can't happen.</figcaption></figure>
+## The numbers, on their workflows
 
-## What's inside
+$42 per billion is $0.042 per million input tokens. TypeSafe claim that's 238x cheaper on input than Claude Fable 5.1, and that on their tasks Jev is 193.6x faster and 444.6x cheaper. Their numbers, on their workflows.
 
-TypeSafe describes three parts: a new architecture, a parallel sampler, and a training method they call RLCD, Reinforcement Learning for Calibrated Decisions. RLHF trains a model on what human raters prefer. RLCD trains it so the probability it reports matches reality. If it says 0.9, it should be right about 9 times out of 10.
+Do the math on your own load. 100,000 tickets a day at 800 tokens each is 80 million tokens. On Jev that's $3.36 a day.
 
-Arcturus Labs bets that under the hood it's fairly close to a regular LLM. Their argument: most of the first clones are LLM-based, and Latent Space counted six of them. The mechanism, as they describe it:
+The best public example isn't TypeSafe's at all. Christian Mathiesen from Frigade had Jev play Pokémon Red all the way to the Hall of Fame: 37 hours 40 minutes, 16,150 decisions, about 39.2 million input tokens, and roughly $1.65 in total. A median of 0.4 seconds per decision. That's about a cent per hundred decisions. Still, the whole team wiped 16 times, and it took 15 attempts at the Elite Four. The model isn't a genius. It's just cheap enough to be wrong a lot.
 
-- Run one forward pass over the state and the questions.
-- Take the next-token distribution.
-- Look only at the tokens that represent the options.
-- Normalize them into probabilities and map them to the type you defined.
+That said, MindStudio pointed out that every launch demo, Minecraft, a drone, driving, runs inside a simulator. We haven't seen anything on real hardware yet.
 
-That's why it's so fast: no generation, no loop over tokens.
+<figure><img src="/posts/jev/src6.jpg" alt="16,150 decisions and $1.65 to the Hall of Fame. Cheap enough to afford 16 full-team wipes (credit: Jev Plays Pokémon Red)" loading="lazy" /><figcaption>16,150 decisions and $1.65 to the Hall of Fame. Cheap enough to afford 16 full-team wipes (credit: Jev Plays Pokémon Red)</figcaption></figure>
 
-The part that actually matters to you is thresholds. Above 0.95 your code acts on its own; below that, the decision goes to review. That only works with calibration. Without it, the number is decoration.
+## Adding a decision layer without waiting for early access
 
-<figure><img src="/posts/jev/v3-svg-en.jpg" alt="The diagonal is the whole product: 0.9 is only worth something if it's right 9 times out of 10, and only then is a 0.95 threshold safe. The dashed curve illustrates an uncalibrated model. The 100-example test exposes exactly that gap." loading="lazy" /><figcaption>The diagonal is the whole product: 0.9 is only worth something if it's right 9 times out of 10, and only then is a 0.95 threshold safe. The dashed curve illustrates an uncalibrated model. The 100-example test exposes exactly that gap.</figcaption></figure>
+The pattern itself doesn't depend on Jev. Four steps:
 
-## Jev in 25 lines of Python
+1. Isolate the agent steps whose answer is closed in advance: routing, tool selection, safety gate, "hand off to a human?".
+2. Define the options in code, not inside the prompt.
+3. Set a threshold. Above it the code acts on its own, below it you escalate.
+4. Store the probability of every decision, so you can measure calibration later.
 
-On September 22, nobodywho published a post with a pointed title: Jev in 25 lines of Python. They took Qwen3-0.6B, a tiny open model, and ran it through llama.cpp. They asked whether an email was Legitimate, Spam or Phishing, and took the logits for the three letters. Result: Phishing at 0.885.
+Here's the nobodywho version, wrapped in a function with a threshold. It runs on a laptop with `uv run decide.py`:
 
-```python
-# pip install huggingface-hub llama-cpp-python numpy
+```python title="decide.py"
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["huggingface-hub", "llama-cpp-python", "numpy"]
+# ///
 import numpy as np
 from llama_cpp import Llama
 
-model = Llama.from_pretrained(repo_id="Qwen/Qwen3-0.6B-GGUF",
-    filename="Qwen3-0.6B-Q8_0.gguf", n_ctx=512, logits_all=True, verbose=False)
+model = Llama.from_pretrained(
+    repo_id="Qwen/Qwen3-0.6B-GGUF",
+    filename="Qwen3-0.6B-Q8_0.gguf",
+    n_ctx=512, logits_all=True, verbose=False,
+)
 
-labels, choices = ["A", "B", "C"], ["Legitimate", "Spam", "Phishing"]
-email = "Payroll asks for your password on a non-company sign-in page."
-options = "\n".join(f"{l}. {c}" for l, c in zip(labels, choices))
-prompt = (f"<|im_start|>system\nChoose one option.<|im_end|>\n"
-          f"<|im_start|>user\nEmail: {email}\n\n{options}<|im_end|>\n"
-          f"<|im_start|>assistant\n<think>\n\n</think>\n\n")
-model.eval(model.tokenize(prompt.encode(), add_bos=False, special=True))
+def decide(state, choices, threshold=0.8):
+    labels = [chr(ord("A") + i) for i in range(len(choices))]
+    options = "\n".join(f"{l}. {c}" for l, c in zip(labels, choices))
+    prompt = (
+        "<|im_start|>system\nChoose one option.<|im_end|>\n"
+        f"<|im_start|>user\n{state}\n\n{options}<|im_end|>\n"
+        "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    )
+    model.reset()
+    model.eval(model.tokenize(prompt.encode(), add_bos=False, special=True))
+    logits = model.scores[model.n_tokens - 1]
+    ids = [model.tokenize(l.encode(), add_bos=False)[0] for l in labels]
+    z = np.asarray([logits[i] for i in ids])
+    p = np.exp(z - np.logaddexp.reduce(z))
+    best = int(p.argmax())
+    action = "act" if p[best] >= threshold else "escalate"
+    return choices[best], round(float(p[best]), 3), action
 
-logits = model.scores[model.n_tokens - 1]
-ids = [model.tokenize(l.encode(), add_bos=False)[0] for l in labels]
-x = np.array([logits[i] for i in ids])
-p = np.exp(x - np.logaddexp.reduce(x))
-print(dict(zip(choices, p.round(3))))
+print(decide(
+    "Email: Payroll asks for your password on a non-company sign-in page.",
+    ["Legitimate", "Spam", "Phishing"],
+))
 ```
 
-They're half right. The mechanism is old. Arcturus points out that OpenAI has used LLMs as implicit classifiers for years; it just never packaged it as a product. What the 25 lines don't give you is calibration. When Qwen says 0.885, you have no idea whether that's really 88%. That's exactly what RLCD is for. To be fair, Arcturus also found that Jev's probabilities aren't always right.
+To be clear, the 0.8 here is a guess. On raw Qwen3-0.6B, a 0.885 doesn't mean it's right 88.5% of the time. That's why step 4 is the whole point.
 
-## The numbers, and who's already using it
+<figure><img src="/posts/jev/v2-svg-en.jpg" alt="The model gives a number, the code decides. Without a threshold measured on your data, a probability is just another line in the log (nobodywho)" loading="lazy" /><figcaption>The model gives a number, the code decides. Without a threshold measured on your data, a probability is just another line in the log (nobodywho)</figcaption></figure>
 
-Vercel wrote that Jev was adopted on AI Gateway faster than any other model in its history. Pricing is $42 per billion input tokens. TypeSafe's headline is 193.6x faster and 444.6x cheaper, but only on System One tasks and only on workflows they picked.
+## Where it breaks
 
-Meanwhile, Ollaya shipped something like Ollama for open models that make these kinds of decisions. Everything runs locally and speaks TypeSafe's API. They tested on 400 states and 2,000 questions:
+- **Calibration isn't perfect.** Arcturus Labs showed in a September 16 post that Jev's probabilities aren't always right. Even with Jev you'll have to check on your own data.
+- **Closed answer spaces only.** Need a reply to a customer, a summary, or code? That's still an LLM.
+- **Vendor dependency.** Early access at a single company is a risk. On September 25 Ollaya shipped, "Ollama for decision models": 15 families of open models and the same endpoints as TypeSafe (`/v1/systemone`). In their tests winnow:e4b scored 0.722 on typed decisions, versus 0.738 for hosted Jev, at 89ms on an RTX 4090.
+- **The moat.** Arcturus argue that OpenAI have been using their LLMs as implicit classifiers for years, and that TypeSafe's real moat is the training data. If OpenAI reproduce the training, they can build this capability into their own models and agents, and Jev won't be able to compete with that.
 
-| Model | Accuracy | Latency |
-| --- | --- | --- |
-| Jev (hosted API) | 0.738 | 236ms–276ms |
-| winnow:e4b | 0.722 | 89ms |
-| winnow:12b | 0.702 | 131ms |
-| laya:en | 0.361 | 10ms |
+> **My take:** I don't buy 238x as the number that should matter to you. For most teams the routing bill isn't the problem. The problem is the tool that got invented at 3 a.m., and what I take from Jev is the shape: an answer that's closed in advance, with a number you can put a threshold on.
 
-Note that Jev's latency includes the network, while the others were measured on a local RTX 4090. So this is an order-of-magnitude comparison, not a clean benchmark. Still, an open model hitting 0.722 against 0.738 a week after launch doesn't look good for the moat.
+<figure><img src="/posts/jev/v3-chart-en.jpg" alt="The most accurate model on the list is also one of the fastest, and it runs locally on your machine. That's the real pressure on TypeSafe (Ollaya)" loading="lazy" /><figcaption>The most accurate model on the list is also one of the fastest, and it runs locally on your machine. That's the real pressure on TypeSafe (Ollaya)</figcaption></figure>
 
-That's also Arcturus's thesis: if OpenAI manages to reproduce the training, it will copy Jev fast and fold the capability into its agents. In their view, TypeSafe's only moat is the data and the training process.
+## What to try this week
 
-<figure><img src="/posts/jev/v4-chart-en.jpg" alt="An open model running locally hits 0.722 against Jev's 0.738, one week after launch. Latency is left off because it isn't comparable (network vs a local RTX 4090), but a 0.016 accuracy gap is roughly the whole moat." loading="lazy" /><figcaption>An open model running locally hits 0.722 against Jev's 0.738, one week after launch. Latency is left off because it isn't comparable (network vs a local RTX 4090), but a 0.016 accuracy gap is roughly the whole moat.</figcaption></figure>
+- Open a production agent trace and count how many steps are a choice from a list. Beam claim it's most of them. Check whether that's true for you.
+- Pick one step, say ticket routing, and hand-label 200 examples.
+- Run `decide.py` or an Ollaya model on them. Measure accuracy, and split the probabilities into 0.1-wide buckets. In each bucket, the hit rate should be close to the probability. That's the ECE Ollaya publish for every model.
+- Set the threshold from the data: what share falls to escalate, and what the accuracy is above it.
+- Only then ask for Jev early access and run the same 200 examples.
 
-## When to use it, when not, and what to try this week
-
-Don't use it when you need text, when you need long reasoning, or when you can't close the answer space in advance. Do use it for classification, routing, triage and gating. Those are the pipeline steps where today you call an LLM, ask for "yes or no", and hope it doesn't add a sentence of explanation.
-
-What to try this week: take one classification step from your pipeline and 100 labeled examples from real data. Run the 25-line version on them, then check how often the model was right across all the answers that came back at around 0.9. If it's about 90%, you don't need Jev. If it's 60%, that's exactly what TypeSafe is selling.
-
-The idea costs 25 lines. The calibration is the product.
+If 0.9 isn't right 90% of the time for you, you don't have a decision model. You have a pretty softmax.

@@ -1,0 +1,105 @@
+---
+title: "Claude Code in practice, part 5: which model, which mode, what it costs"
+description: "Sonnet, Opus or Haiku per task, effort and fast mode, four permission modes, AGENTS.md vs CLAUDE.md, and reading /usage. A command and a number for each."
+lang: en
+key: claude-code-5-models-switches-cost
+term: "choosing a model"
+kind: faq
+pubDate: 2026-10-01
+tags: ["claude-code", "model-selection", "cost", "permissions", "agents-md"]
+hook: "number"
+cover: illus
+tldr: ["Default to Sonnet in settings.json. Switch to Opus via /model only when Sonnet gets stuck.", "plan for a fuzzy task, acceptEdits for execution, bypass only inside a container.", "Check /usage at the end of every day for a week. Over $30 a day, see how much of it is Opus."]
+series: { slug: "claude-code-in-practice", name: "Claude Code in practice", part: 5, total: 5 }
+hero: /posts/claude-code-5-models-switches-cost/hero-en.jpg
+diagram: /posts/claude-code-5-models-switches-cost/diagram.svg
+sources:
+  - { title: "CLI reference - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/cli-reference", date: "" }
+  - { title: "Settings files and precedence - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/settings", date: "" }
+  - { title: "Manage costs effectively - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/costs", date: "" }
+  - { title: "Models overview", url: "https://docs.anthropic.com/en/docs/about-claude/models/overview", date: "" }
+  - { title: "AGENTS.md", url: "https://agents.md", date: "" }
+  - { title: "Choosing a Model on the Pareto Frontier with Jev", url: "https://philippdubach.com/posts/jev-model-router-for-pi", date: "2026-09-22" }
+  - { title: "How to choose the right model for AI agents (and not overpay)", url: "https://www.kore.ai/blog/how-to-choose-the-right-model-for-ai-agents", date: "" }
+opinion: "We're not fans of a router that switches models on every prompt. The model is chosen per task, and whoever planned the task makes that call, not a classifier. Wherever there's a clear rule, we prefer deterministic code over a cheap model, and in our own pipeline every LLM call we turned into a fixed rule came out cheaper and more stable. What actually saves money isn't the model but the check after it: Sonnet with tests running in a loop beats Opus without them."
+madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
+---
+
+## How much should this cost me per day?
+
+$13. That's the average per active workday according to Anthropic's costs page, on enterprise deployments. That works out to $150–250 per developer per month, and 90% of users stay under $30 a day. If you're well above that, it's almost always one of these: Opus on every task, one conversation that has been running since the morning, or several sessions in parallel.
+
+At the other extreme, Kore.ai tells of a company that got a $500 million bill for one month, May 2026, after opening a frontier model to every employee with no cap. You won't get there. But the cause is the same: one model for everything. Measure before you decide what's expensive.
+
+## Which model should be the default, and when do you drop to Haiku?
+
+Prices per million tokens: Haiku 4.5 is $1 input and $5 output, Sonnet 5.5 is $2/$10, Opus 5.5 is $4/$20, and Fable 5.1 is $10/$50. Anthropic recommends starting with Opus. I start with Sonnet: half the price, faster, and the same 1M context. Opus comes in when the task spans many files, or when Sonnet gets stuck twice on the same thing. Haiku is for mechanical work: a commit message, a rename, a log summary, a subagent that scans a directory. Just remember it has a 200K context and a February 2025 cutoff. Keep Fable for when Opus at high effort still fails.
+
+Philipp Dubach built a router in pi that picks a model per task. Of the first 151 logged decisions, 90 came back `unclear`, and most of those were just "continue". Here's what he wrote after a week in production:
+
+> A confident “clarify” on the brief stops the router from switching, because a different model does not make an ill-defined task well-defined.
+>
+> — Philipp Dubach, Choosing a Model on the Pareto Frontier with Jev
+
+<figure><img src="/posts/claude-code-5-models-switches-cost/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/claude-code-5-models-switches-cost/src4.jpg" alt="Sonnet 5.5 costs half as much as Opus with the same 1M context, so it's the default and Opus is the escalation (credit: Anthropic, Models overview)" loading="lazy" /><figcaption>Sonnet 5.5 costs half as much as Opus with the same 1M context, so it's the default and Opus is the escalation (credit: Anthropic, Models overview)</figcaption></figure>
+
+## How do you switch models mid-session, and how do you set a default?
+
+Inside a session, `/model` opens a menu. From the command line: `claude --model sonnet`, or a full ID like `claude-opus-5-5` if you want a pinned version and not an alias that moves with every release. A permanent default goes in `model` in `~/.claude/settings.json` (just you) or in `.claude/settings.json` (the whole team, via git):
+
+```json title=".claude/settings.json"
+{
+  "model": "sonnet",
+  "permissions": {
+    "defaultMode": "acceptEdits"
+  }
+}
+```
+
+Three more worth knowing. `opusplan` runs Opus in plan mode and Sonnet for execution. `--advisor opus` lets Sonnet consult Opus server-side without swapping the main model. And a subagent that only scans files gets `model: haiku` in its frontmatter.
+
+## What are effort and fast mode, and when should you touch them?
+
+Effort is how many tokens the model gets to think before it answers. Anthropic's defaults: Opus 5.5 on `medium`, Sonnet 5.5 and Fable on `high`, and Haiku 4.5 has no effort setting at all. You change it in the `/model` menu. Raise effort when the answer is fast and wrong, not when it's slow. And before jumping up a model tier, try one step up in effort. Sometimes that's enough.
+
+Fast mode (`/fast`) is the same model, faster output, higher price per token. Worth it when you're staring at the screen waiting for an answer. Wasted on a long background run nobody is watching.
+
+<figure><img src="/posts/claude-code-5-models-switches-cost/v2-transcript-en.jpg" alt="A ten-second question before a task saves a whole model tier, and most teams never ask it" loading="lazy" /><figcaption>A ten-second question before a task saves a whole model tier, and most teams never ask it</figcaption></figure>
+
+## Which of the four permission modes should you work in?
+
+- `default`: asks before every edit and every command.
+- `acceptEdits`: edits files without asking, still asks on commands.
+- `plan`: reads, plans, touches nothing.
+- `bypassPermissions`: asks nothing.
+
+`Shift+Tab` cycles between them. bypass only joins the cycle if you launched with `--allow-dangerously-skip-permissions`, and that's on purpose. My setup: plan for a task I'm not sure about, `acceptEdits` once I've approved a plan and I'm on a clean branch, and bypass only inside a container with no credentials. The Replit agent that deleted a production DB in July 2025 is exactly the scenario that long flag is trying to prevent. To set a fixed starting mode: `--permission-mode` on the command line, or `defaultMode` in settings as in the file above.
+
+<figure><img src="/posts/claude-code-5-models-switches-cost/v3-svg-en.jpg" alt="The needle should sit on acceptEdits on a clean branch. bypass is a container mode, not a laptop mode (Claude Code CLI reference)" loading="lazy" /><figcaption>The needle should sit on acceptEdits on a clean branch. bypass is a container mode, not a laptop mode (Claude Code CLI reference)</figcaption></figure>
+
+## The team also uses Cursor and Codex. CLAUDE.md, AGENTS.md or .cursorrules?
+
+AGENTS.md is the open format, and according to its site it's already in more than 60,000 open-source projects. Codex and Cursor read it. Claude Code looks for `CLAUDE.md`. `.cursorrules` is Cursor's old format; today they use `.cursor/rules`. So write it once in AGENTS.md, and CLAUDE.md becomes an `@AGENTS.md` line plus whatever is Claude-specific. That way you don't end up with three files that slowly stop agreeing with each other. What goes into the file itself we covered in part 1; this is only about where to put it.
+
+## The session is getting muddled. /compact or /clear?
+
+`/compact` summarizes the conversation and keeps only the summary in context. You can steer it: `/compact keep the schema decisions`. `/clear` throws everything away and starts a new session, and since version 2.1.211 it also resets the cost counter in `/usage`. Rule of thumb: same task and a heavy context, `/compact`. New task, `/clear`. From the terminal: `claude -c` (`--continue`) returns to the last conversation in the directory, and `claude -r` (`--resume`) lets you pick from a list.
+
+> **My take:** I almost never use `/compact`. The automatic summary loses exactly the detail you'll need ten minutes later. Three lines of handoff from part 3 followed by `/clear` come out cheaper and more precise.
+
+## On a subscription, /usage shows $40. Do I pay that?
+
+No. If you're looking for `/cost` from older versions, the numbers now live in the Session block of `/usage`, and they're computed locally: tokens times list price. On Pro, Max or Team you pay a flat fee, and what limits you is the usage quota on that same screen, not the dollars. On the API it is your money, roughly. The estimate doesn't know about a contract discount unless an admin set `modelPricing` in managed settings, and before 2.1.239 it also left out the 1.1x data-residency multiplier. The real bill is on the Usage page in the Console.
+
+## So what do you change on Monday?
+
+1. `"model": "sonnet"` in settings.json, and Opus via `/model` when Sonnet gets stuck.
+2. Every subagent that scans or summarizes gets `model: haiku`.
+3. plan before a fuzzy task, `acceptEdits` for execution, bypass only in a container.
+4. One AGENTS.md, and a CLAUDE.md that imports it.
+5. `/clear` between tasks, not between days.
+6. A week of `/usage` at the end of every day, and in scripts `--output-format json` with `total_cost_usd` written to a log. Over $30 a day on the API? First check how much of it is Opus.
+
+And a task that repeats every day and has a clear rule doesn't need any model. It needs a script.

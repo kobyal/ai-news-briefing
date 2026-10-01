@@ -1,15 +1,15 @@
 ---
-title: "System prompts ב-production: סדר, תגים, דוגמאות וכמה זה עולה"
-description: "חלק 2 בסדרה: איך בונים system prompt שמחזיק ב-production. ארבעה בלוקים, XML מול markdown, few-shot, אורך, ו-prompt caching."
+title: "System prompts ב-production: ארבעה בלוקים, סדר אחד, ו-cache שחוסך 90%"
+description: "איך בונים system prompt שעובד ב-production: role, rules, examples, output contract, XML מול markdown, few-shot, אורך, ו-prompt caching עם מחירים אמיתיים."
 lang: he
 key: prompt-engineering-2-system-prompts
 term: "system prompts"
 kind: fieldnotes
-cover: illus
 pubDate: 2026-10-01
-tags: ["prompt-engineering", "system-prompts", "prompt-caching", "claude", "llm-ops"]
-hook: "scene"
-tldr: ["תריצו כל prompt פעם בלי system prompt ושמרו את הפלט כ-baseline.", "תאריך וקלט יומי הולכים ל-user message, אחרת ה-cache נשבר בכל ריצה.", "כלל שאפשר לבדוק בקוד נאכף בקוד. ב-prompt מספיקה תזכורת בשורה."]
+tags: ["system-prompts", "prompt-engineering", "prompt-caching", "anthropic", "llm"]
+hook: "claim"
+cover: photo
+tldr: ["בנו system prompt בארבעה בלוקים: role, rules, examples, output contract", "timestamp ושם משתמש הולכים להודעת המשתמש, לא לראש ה-system", "בדקו cache_read_input_tokens בקריאה השנייה. אם הוא 0, הפרפיקס זז"]
 series: { slug: "prompt-engineering", name: "Prompt engineering, בלי הקסם", part: 2, total: 3 }
 hero: /posts/prompt-engineering-2-system-prompts/hero.jpg
 diagram: /posts/prompt-engineering-2-system-prompts/diagram.svg
@@ -17,125 +17,149 @@ sources:
   - { title: "Prompting best practices", url: "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts", date: "" }
   - { title: "Prompt caching", url: "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching", date: "" }
   - { title: "Claude: System Prompts", url: "https://platform.claude.com/docs/en/release-notes/system-prompts", date: "2026-08-16" }
+  - { title: "Arena AI Model ELO History", url: "https://mayerwin.github.io/AI-Arena-History", date: "2026-05-14" }
   - { title: "Anthropic injects reasoning_effort=25 into Claude.ai consumer system prompts", url: "https://imgur.com/AOAs7Aq", date: "2026-04-10" }
-opinion: "אנחנו לא רואים ב-system prompt טקסט, אנחנו רואים בו חלק מה-system: הוא קובע מה המודל רואה ומה נחשב פלט תקין, והקוד שמסביב בודק אם זה קרה. כל פעם שתיקנו באג בעוד שורה ב-prompt, שילמנו על זה אחר כך. כל פעם שהעברנו כלל ל-validator או לקוד, ה-pipeline נהיה זול ויציב יותר. דוגמאות BAD/GOOD הן המקום היחיד שבו אנחנו מוכנים שה-prompt יתארך בלי הרבה ויכוח. ו-prompt caching הוא לא טריק חיסכון, הוא תוצאה של סדר: מי שמפריד בין יציב למשתנה מקבל אותו כמעט בחינם."
-madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+opinion: "בשבילנו system prompt הוא לא טקסט שמשכנע את המודל, הוא חלק מתכנון המערכת: מה המודל רואה, באיזה סדר, ומה הוא מחזיר. כל מה שאפשר לבדוק בקוד, אורך, פורמט, schema, אנחנו בודקים בקוד אחרי התשובה, ולא מוסיפים עוד שורה ל-prompt. output contract שאי אפשר לאמת אוטומטית הוא בקשה, לא חוזה. ו-prompt של אלפי מילים שאף אחד לא יודע למה כל שורה בו נמצאת שם הוא חוב טכני, בדיוק כמו קוד שאף אחד לא מעז למחוק."
+madeWith: { model: "claude-opus-5-5", sourceCount: 5, reviewedBy: "Koby Almog" }
 ---
 
-ב-10 באפריל 2026 מישהו העלה ל-imgur צילום מסך עם טענה שאנטרופיק מזריקה `reasoning_effort=25` ל-system prompt של Claude.ai. 206 צפיות, לא בדיוק סערה, ולא בדקתי אם זה נכון. אבל זה מזכיר משהו שהרבה צוותים מפספסים: מה שאתם מקבלים ב-claude.ai הוא לא המודל לבד. זה המודל ועוד system prompt שאנטרופיק כותבת ומעדכנת. בדף ה-release notes שלהם, בגרסה מ-16 באוגוסט 2026, זה כתוב במפורש:
+ה-system prompt הוא לא המקום שבו מסבירים למודל מי הוא. זה הקוד הכי יקר שיש לכם ב-production, והוא נשלח מחדש בכל קריאה.
 
-> "These system prompt updates do not apply to the Claude API."
-> — אנטרופיק, Release notes: System prompts
+תעשו חשבון. system prompt של 8,000 טוקנים, 10,000 קריאות ביום, סונט ב-$3 למיליון טוקני קלט. יוצא $240 ביום רק על ההוראות, לפני שמשתמש אחד כתב מילה. עם prompt caching אותו prompt בדיוק עולה בערך $24, כי קריאה מה-cache עולה עשירית מהמחיר. ההבדל לא בניסוח. ההבדל הוא איפה שמתם את השורה עם ה-timestamp.
 
-בקיצור, ב-API אף אחד לא כתב בשבילכם system prompt. את ה-role של `system` הכניסה OpenAI ל-chat API במרץ 2023, ומאז כולם עובדים עם אותה תבנית. בחלק הקודם ראינו שפורמט, context ו-retry עוברים ל-harness. הפעם נעבור על מה שכן נשאר בתוך ה-system prompt, באיזה סדר, וכמה זה עולה. שישה צעדים, כולם מה-pipeline שלנו.
+בחלק הקודם ראינו שרוב הטריקים של 2023 מתו, ושהרבה עבר ל-context ול-harness. מה שכן נשאר בתוך ה-prompt יושב ברובו ב-system prompt. אז הנה איך אני בונה אחד, בשישה צעדים, ומה רואים בכל צעד.
 
-## 01 · להריץ את אותה שאלה פעמיים
+## 01 · תריצו את המשימה בלי system prompt
 
-לפני שכותבים מילה, תבדקו מה המודל עושה בלי ההוראות שלכם. ניסיתי את זה עם `claude -p`, ויש כאן מלכודת קטנה. `claude -p` בלי דגלים לא רץ בלי system prompt. הוא רץ עם ה-system prompt של Claude Code עצמו. `--system-prompt` מחליף אותו, `--append-system-prompt` מוסיף עליו. אם ה-agent שלכם לא כותב קוד, ההבדל הזה חשוב, כי אתם יורשים התנהגות של כלי קוד בלי לדעת.
+קודם כל baseline. משימה קצרה ומשעממת: לקחת שגיאה מ-production ולהחזיר שורה אחת ל-Slack של ה-on-call. ככה זה נראה כששולחים רק את הבקשה.
 
-```bash title="ab_system.sh"
-Q='סכם בשורה אחת למהנדסים: אנטרופיק הוסיפה TTL של שעה ל-prompt caching.'
-claude -p "$Q" > default.txt
-claude -p --system-prompt "$(cat prompts/editor_system.md)" "$Q" > ours.txt
-diff default.txt ours.txt
-```
+תראו מה חוזר: פסקת פתיחה, כותרות, כמה השערות, ולפעמים גם הצעה לתיקון. התשובה לא שגויה. היא פשוט לא שורה אחת, ואי אפשר להכניס אותה ל-pipeline בלי regex שמנקה אחריה.
 
-מה תראו: בריצה הראשונה המודל מחליט לבד על אורך, טון ופורמט. בשנייה, עם הקובץ שנבנה בצעד הבא, יוצא אובייקט עם שני שדות שאפשר להעביר ל-`json.loads`. בשורה התחתונה, זה כל מה ש-system prompt עושה: מחליף את הדיפולטים של המודל בדיפולטים שלכם. תשמרו את `default.txt`. זה ה-baseline שלכם.
+רגע, הסתייגות. `claude -p` הוא לא מודל נקי, יש מתחתיו כבר system prompt של Claude Code. בשביל baseline אמיתי תריצו מול ה-API, אותה בקשה פעמיים:
 
-<figure><img src="/posts/prompt-engineering-2-system-prompts/src3.jpg" alt="תדעו מול מה אתם משווים. claude.ai רץ עם system prompt שאנטרופיק כותבת ומעדכנת, וה-API לא מקבל אותו. לכן ה-baseline שלכם הוא המודל בלי ההוראות שלכם, לא מה שראיתם בצ'אט. (קרדיט: Anthropic, Release notes: System prompts)" loading="lazy" /><figcaption>תדעו מול מה אתם משווים. claude.ai רץ עם system prompt שאנטרופיק כותבת ומעדכנת, וה-API לא מקבל אותו. לכן ה-baseline שלכם הוא המודל בלי ההוראות שלכם, לא מה שראיתם בצ'אט. (קרדיט: Anthropic, Release notes: System prompts)</figcaption></figure>
-
-## 02 · ארבעה בלוקים, תמיד באותו סדר
-
-אצלנו כל system prompt בנוי מאותם ארבעה חלקים: role, rules, examples, output contract. ה-role הוא שתיים-שלוש שורות, לא "אתה מומחה עולמי". מי אתה, למי אתה כותב, מה נחשב הצלחה. ה-rules הם גבולות: מה אסור, מה חובה, מה עושים כשחסר מידע. ה-examples הם זוגות. ה-output contract הוא הסכמה, בדיוק כמו שהקוד יבדוק אותה.
-
-```markdown title="prompts/editor_system.md"
-<role>
-עורך חדשות AI. כותב למהנדסים ישראלים.
-הצלחה = כותרת שמהנדס היה שולח לקבוצה של הצוות.
-</role>
-<rules>
-- רק מה שכתוב בקלט. חסר מידע? שדה ריק, לא ניחוש.
-- בלי סופרלטיבים, בלי emoji.
-</rules>
-<examples>
-<bad>אנטרופיק משיקה יכולת פורצת דרך לחיסכון בעלויות</bad>
-<good>אנטרופיק: cache של שעה במקום 5 דקות</good>
-</examples>
-<output_contract>
-JSON בלבד: {"headline": "עד 12 מילים", "why_it_matters": "עד 25 מילים"}
-</output_contract>
-```
-
-הסדר לא אסתטי. מה שיציב למעלה, מה שמשתנה למטה. ה-role וה-rules כמעט לא זזים בין ריצות. ה-contract זז כשמשנים schema. והקלט של היום לא נכנס לשם בכלל, הוא הולך ל-user message. ל-merger שלנו נכנסים כל בוקר כמה עשרות stories מעשרה agents, וה-system prompt שלו לא מכיר אף אחד מהם. הוא מכיר רק את הכללים. תזכרו את זה לצעד 06, שם זה הופך לכסף.
-
-<figure><img src="/posts/prompt-engineering-2-system-prompts/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
-
-<figure><img src="/posts/prompt-engineering-2-system-prompts/v2-svg-he.jpg" alt="הסדר הוא לא עניין של סגנון. ארבעת הבלוקים היציבים יושבים ב-prefix שנקרא מה-cache בעשירית מהמחיר, וכל מה שמשתנה, כולל התאריך, יורד אל מתחת ל-breakpoint." loading="lazy" /><figcaption>הסדר הוא לא עניין של סגנון. ארבעת הבלוקים היציבים יושבים ב-prefix שנקרא מה-cache בעשירית מהמחיר, וכל מה שמשתנה, כולל התאריך, יורד אל מתחת ל-breakpoint.</figcaption></figure>
-
-## 03 · XML לגבולות, markdown בתוך הבלוק
-
-הוויכוח הזה נמשך שנתיים, ובגדול הוא מיותר. אנטרופיק ממליצה על XML tags במדריך ה-prompting שלה, והסיבה פרקטית: תג סגור אומר למודל בדיוק איפה דבר אחד נגמר ואיפה השני מתחיל. markdown נוח להוראות שבן אדם עורך. אצלנו הכלל פשוט. תג לכל גבול: בין בלוקים, ובעיקר סביב כל מה שבא מבחוץ. בתוך בלוק, markdown רגיל.
-
-רגע, למה זה משנה בפועל? כי טקסט מבחוץ מכיל הוראות. כתבה שמצטטת prompt, README עם "ignore previous instructions", או Jina שמחזיר `![Image](url)` באמצע הטקסט. בתוך `<article>` המודל מבין שזה חומר גלם. בלי התג, זה נראה כמו עוד שורה ב-rules.
-
-
-## 04 · few-shot: זוג אחד רע, זוג אחד טוב
-
-zero-shot עובד מצוין כשהמשימה ברורה והפורמט סטנדרטי. סיווג ל-vendor, למשל, אצלנו בכלל לא צריך מודל. יש `classify_vendor` עם כללים. few-shot נכנס כשהמשימה היא "תכתוב כמו X" וקשה להגדיר את X במילים.
-
-המקרה הכי ברור אצלנו הוא התרגום לעברית. ניסינו לתאר במילים "עברית טבעית, לא מתורגמת". לא עזר. מה שעזר זה זוגות BAD/GOOD בתוך ה-system prompt של התרגום: משפט שנשמע כמו מכונה, ולידו איך מהנדס היה אומר אותו. זה המנוף הכי חזק שמצאנו, יותר מכל הנחיה.
-
-> **הדעה שלי:** זוג BAD/GOOD אחד שווה יותר מפסקה של הגדרות סגנון. המודל לא מבין "טבעי", הוא מבין דוגמה. אני כבר לא כותב הנחיית סגנון בלי זוג לצידה.
-
-מה שכן, דוגמאות הן גם סיכון. המודל מעתיק אותן, כולל אורך, מבנה ולפעמים מילים ספציפיות. שתיים-שלוש דוגמאות ששונות זו מזו עדיפות על חמש שנראות אותו דבר. ואם כל הדוגמאות שלכם על אנטרופיק, תקבלו כותרות שמזכירות את אנטרופיק גם כשהכתבה על גוגל.
-
-## 05 · כמה ארוך זה יותר מדי
-
-אין מספר tokens קסום. ה-system prompt של ה-agent שכותב את הבלוג הזה ארוך, וזה בסדר, כי כל סעיף בו נולד מפוסט שיצא רע. השאלה היא לא כמה מילים, אלא שלוש שאלות על כל כלל:
-
-1. אפשר לבדוק את זה בקוד? "JSON בלבד", "עד 160 תווים", "בלי emoji". את כל אלה validator תופס בחינם. אז הקוד אוכף, וה-prompt רק מזכיר בשורה.
-2. הוא סותר כלל אחר? שני כללים שמושכים לכיוונים הפוכים, והמודל בוחר ביניהם כמעט באקראי.
-3. מה קורה אם מוחקים אותו? אם אין לכם דרך לענות, אין לכם eval. על זה בחלק 3.
-
-בגדול, prompt מתנפח כשכל באג נפתר בעוד שורה. אצלנו כל מקום שבו החלפנו הוראה למודל בכלל בקוד יצא זול ואמין יותר. ה-wrapper של `claude -p` מתקן JSON שבור, ולכן ה-output contract ב-prompt קצר והאכיפה יושבת בקוד.
-
-## 06 · prompt caching: הסדר הוא הכסף
-
-עכשיו לחשבון. prompt caching של אנטרופיק שומר prefix של ה-prompt עד breakpoint שמסמנים עם `cache_control`. ברירת מחדל 5 דקות, אפשרות לשעה, וכל פגיעה ב-cache מרעננת אותו בלי עלות. בטבלת התמחור כתיבה ל-cache של 5 דקות היא פי 1.25 ממחיר קלט רגיל, וקריאה ממנו היא בערך עשירית.
-
-ופה הסדר מצעד 02 מחזיר את עצמו. ה-cache עובד על prefix מדויק. שינוי של תו אחד למעלה, וכל מה שמתחתיו נכתב מחדש. הטעות הכי נפוצה שראיתי: תאריך היום בשורה הראשונה של ה-system prompt. נשמע הגיוני, שובר את ה-cache בכל ריצה. התאריך הולך ל-user message.
-
-עוד פרט מהדוקס ששווה להכיר: ה-TTL נמדד מתחילת הבקשה, לא מסוף התשובה. אם תשובה לוקחת 4 דקות לזרום, נשארת לכם בערך דקה להתחיל את הבקשה הבאה לפני שה-cache של 5 דקות פג. ב-pipeline שכותב תשובות ארוכות, ככה מפספסים cache בלי לשים לב. אם יש לכם agents שרצים אחד אחרי השני על אותו system prompt, תשקלו TTL של שעה.
-
-```python title="cached_system.py"
+```python title="compare.py"
 import anthropic
 
 client = anthropic.Anthropic()
-SYSTEM = open("prompts/editor_system.md", encoding="utf-8").read()
+TASK = open("trace.txt").read() + "\n\nWhat is the problem?"
+SYSTEM = open("system.md").read()
 
-def run(user_text: str):
-    resp = client.messages.create(
+for label, extra in [("bare", {}), ("system", {"system": SYSTEM})]:
+    r = client.messages.create(
         model="claude-sonnet-5-5",
-        max_tokens=1024,
-        system=[{
-            "type": "text",
-            "text": SYSTEM,
-            "cache_control": {"type": "ephemeral", "ttl": "1h"},
-        }],
-        messages=[{"role": "user", "content": user_text}],
+        max_tokens=400,
+        messages=[{"role": "user", "content": TASK}],
+        **extra,
     )
-    u = resp.usage
-    print("write:", u.cache_creation_input_tokens, "read:", u.cache_read_input_tokens)
-    return resp
+    print(f"--- {label}: {r.usage.output_tokens} output tokens")
+    print(r.content[0].text)
 ```
 
-תריצו פעמיים ותסתכלו על `read` בקריאה השנייה. אם הוא אפס, משהו ב-prefix זז. ויש מינימום אורך ל-prefix שנכנס ל-cache, תלוי מודל, וה-skeleton מצעד 02 קצר ממנו. כלומר זה משתלם כשה-system prompt ארוך באמת, בדרך כלל בגלל הדוגמאות. אצלנו הכתיבה הכבדה רצה על subscription, אז החשבון הזה פחות כואב לנו. מי שמשלם API לפי token, זה ההבדל בין מספר שאף אחד לא מסתכל עליו לבין שורה בחשבון החודשי.
+תסתכלו על `output_tokens` בשתי הריצות, לא רק על הטקסט. זה המספר שתשלמו עליו.
 
-<figure><img src="/posts/prompt-engineering-2-system-prompts/v3-svg-he.jpg" alt="ארבע דקות של streaming אוכלות ארבע מתוך חמש דקות ה-TTL, כי השעון התחיל לרוץ עם הבקשה. pipeline שכותב תשובות ארוכות מפספס את ה-cache בשקט, ושם TTL של שעה מחזיר את עצמו." loading="lazy" /><figcaption>ארבע דקות של streaming אוכלות ארבע מתוך חמש דקות ה-TTL, כי השעון התחיל לרוץ עם הבקשה. pipeline שכותב תשובות ארוכות מפספס את ה-cache בשקט, ושם TTL של שעה מחזיר את עצמו.</figcaption></figure>
+<figure><img src="/posts/prompt-engineering-2-system-prompts/v1-transcript-he.jpg" alt="ביקשנו תשובה ל-Slack וקיבלנו הרצאה. בלי output contract המודל לא טועה, הוא מנחש מה רציתם" loading="lazy" /><figcaption>ביקשנו תשובה ל-Slack וקיבלנו הרצאה. בלי output contract המודל לא טועה, הוא מנחש מה רציתם</figcaption></figure>
+
+## 02 · ארבעה בלוקים, תמיד באותו סדר
+
+ה-system prompt שאני כותב היום הוא כמעט תמיד ארבעה בלוקים:
+
+- **role**: שורה-שתיים. לא "אתה מומחה עולמי", אלא מי קורא את התשובה ובאיזה מצב.
+- **rules**: כל כלל עם הסיבה שלו. זה טיפ מפורש במדריך של אנטרופיק: מודל שיודע למה, מכליל נכון גם למקרים שלא כתבתם.
+- **examples**: רק אם צריך, על זה בצעד 04.
+- **output contract**: מה חוזר, באיזה פורמט, ומה עושים כשאין תשובה.
+
+```markdown title="system.md"
+<role>
+You help the platform on-call team. Readers are engineers on Slack,
+on a phone, often at 3am.
+</role>
+
+<rules>
+- One line, max 25 words. They read it on a phone.
+- If the cause is not clear from the trace, say "unclear from trace"
+  and name what is missing. A wrong guess costs us an hour.
+- No code. Fixes happen in a PR, not in Slack.
+</rules>
+
+<examples>
+<example>
+<input>ConnectionRefusedError: [Errno 111] ... redis:6379</input>
+<output>Redis unreachable from the pod. Check the Service and NetworkPolicy.</output>
+</example>
+</examples>
+
+<output_contract>
+Plain text, one line, no markdown, no preamble.
+</output_contract>
+```
+
+חוץ מזה, שני כללים שאני לא מוותר עליהם. ה-output contract הולך אחרון, כי זה מה שאני רוצה שיהיה הכי קרוב להודעת המשתמש. ומה שמשתנה בין קריאות, כמו שעה, שם משתמש או מזהה session, לא נכנס ל-system prompt בכלל. למה? צעד 06.
+
+<figure><img src="/posts/prompt-engineering-2-system-prompts/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+## 03 · XML לגבולות, markdown להוראות
+
+אנטרופיק ממליצים על XML tags כבר כמה דורות, וזה נשאר גם במדריך ה-best practices העדכני, שמכסה היום הכל מ-Haiku 4.5 ועד Fable 5.1. בפועל, בתוך ההוראות עצמן ההבדל לא דרמטי. הוא דרמטי בגבולות: איפה נגמר המסמך ומתחילה השאלה, איפה נגמרת הדוגמה ומתחיל הקלט האמיתי. כותרת markdown לא סוגרת כלום. `</document>` כן.
+
+שווה לראות איך אחרים עושים את זה. בריפו `system-prompts-and-models-of-ai-tools` ב-GitHub יש prompts שדלפו מ-Cursor, Devin, v0 של Vercel ועוד הרבה. כמעט כולם מערבבים: tags לבלוקים הגדולים (איך לדבר עם המשתמש, מתי לקרוא לכלים), ובפנים רשימות markdown רגילות. v0 מגדיר גם פורמט פלט משלו, כי ה-UI שלו צריך לרנדר את התשובה. זה בדיוק output contract, רק בגודל של מוצר.
+
+בקיצור: tags סביב דאטה ודוגמאות, markdown להוראות. ואל תתאמצו על שמות. `<document>` ו-`<example>` מספיקים, המודל לא צריך tag עם שם מתוחכם כדי להבין מה בתוכו.
+
+## 04 · few-shot רק כשהפורמט חשוב
+
+zero-shot זה ברירת המחדל שלי ב-2026. המודלים המובילים מבינים הוראה כתובה טוב, ודוגמאות עולות טוקנים וגם מושכות את המודל להעתיק אותן. דוגמה אחת היא הכי מסוכנת: המודל לומד ממנה את מבנה המשפט, את האורך, ולפעמים מילה ספציפית שלא קשורה למקרה בכלל.
+
+מתי כן? כשהפורמט קשיח, כשקשה לתאר טון במילים, ובמקרי קצה. אנטרופיק מדברים על 3–5 דוגמאות, מגוונות, כל אחת עטופה ב-`<example>`. אני מוסיף כלל משלי: לפחות דוגמה אחת של המסלול "לא יודע". דוגמה של `unclear from trace, missing pod logs` שווה יותר משלוש דוגמאות של תשובה מושלמת, כי ברירת המחדל של מודל היא לענות משהו.
+
+## 05 · כמה ארוך זה יותר מדי
+
+אנטרופיק מפרסמים את ה-system prompt של Claude.ai לכל מודל, בעמוד release notes מסודר, מאופוס 4.7 ועד סונט 5.5. תקראו אחד. הוא ארוך, כתוב בגוף שלישי ("Claude does…"), כולל את התאריך הנוכחי והנחיות כמו לשים קוד ב-markdown. ובעמוד עצמו הם כותבים:
+
+> These system prompt updates do not apply to the Claude API.
+> — אנטרופיק, עמוד ה-release notes של System prompts
+
+כלומר, Claude.ai זה מודל + prompt + פרמטרים שאתם לא רואים. ב-10 באפריל 2026 הסתובב צילום מסך שמראה ש-Claude.ai מזריק `reasoning_effort=25` ל-system prompt של משתמשי ה-consumer. גם AI-Arena-History כותבים במפורש ש-Arena בודק מול ה-API, ושה-UI הצרכני מוסיף system prompts ופילטרים. אז "בצ'אט זה ענה לי יותר טוב" זה לא baseline.
+
+לגבי האורך שלכם, המבחן שלי הוא לא מספר מילים. כל שורה צריכה להיות קשורה לכשל שראיתם בפלט אמיתי. שורה שאף אחד בצוות לא יודע למה היא שם תסתור בסוף שורה אחרת, ואז המודל בוחר לבד. תמדדו עם `client.messages.count_tokens(...)` לפני כל merge, ותכתבו את המספר ב-PR.
+
+> **הדעה שלי:** אני לא קונה prompt של אלפי מילים שגדל מתיקון לתיקון. ראיתי צוותים שמוסיפים IMPORTANT בפעם השלישית לאותו כלל, במקום לבדוק בקוד שהפלט עומד בו. אם אפשר לאמת את זה עם schema או regex, זה לא שייך ל-prompt.
+
+<figure><img src="/posts/prompt-engineering-2-system-prompts/src6.jpg" alt="ב-Claude.ai יש פרמטרים שה-API לא מקבל, אז תשובה מהצ'אט היא לא baseline ל-prompt שלכם (credit: imgur, 10.4.2026)" loading="lazy" /><figcaption>ב-Claude.ai יש פרמטרים שה-API לא מקבל, אז תשובה מהצ'אט היא לא baseline ל-prompt שלכם (credit: imgur, 10.4.2026)</figcaption></figure>
+
+## 06 · סדר בשביל ה-cache
+
+טוב, עכשיו הכסף. prompt caching של אנטרופיק עובד על prefix: הבקשה נבנית בסדר tools, אחר כך system, אחר כך messages, וה-cache תופס את כל מה שעד ה-breakpoint. בייט אחד ששונה לפני ה-breakpoint, וזה miss.
+
+המספרים, ביחס למחיר הקלט הרגיל: כתיבה ל-cache ל-5 דקות פי 1.25, כתיבה לשעה פי 2, קריאה מה-cache פי 0.1. בסונט ב-$3 למיליון: $3.75 לכתיבה, $0.30 לקריאה. ה-TTL הדיפולטיבי הוא 5 דקות, מתחדש בחינם בכל שימוש, ונמדד מתחילת הבקשה, לא מסוף התשובה. תשובה שמוזרמת 4 דקות משאירה לכם בערך דקה לקריאה הבאה.
+
+בגדול: מה שקבוע למעלה, מה שזז למטה. וזה המקום שבו timestamp בשורה הראשונה של ה-system שורף את כל החשבון.
+
+```python title="cached_call.py"
+r = client.messages.create(
+    model="claude-sonnet-5-5",
+    max_tokens=400,
+    system=[{
+        "type": "text",
+        "text": SYSTEM,  # static only: no time, no user name
+        "cache_control": {"type": "ephemeral"},
+    }],
+    messages=[{
+        "role": "user",
+        "content": f"Now: {now}\nUser: {user}\n\n{trace}",
+    }],
+)
+print(r.usage.cache_creation_input_tokens, r.usage.cache_read_input_tokens)
+```
+
+מה שתראו: בקריאה הראשונה `cache_creation_input_tokens` גבוה, בשנייה `cache_read_input_tokens` גבוה ו-creation אפס. אם בשנייה הקריאה מה-cache היא 0, משהו בפרפיקס זז. יש גם אורך מינימלי ל-cache, בסביבות אלף טוקנים ומעלה, תלוי במודל, אז תבדקו בטבלה. prompt קצר מזה פשוט לא נשמר, וזה בסדר, הוא גם לא עולה הרבה. ל-batch עם הפסקות של יותר מ-5 דקות בין קריאות תוסיפו `"ttl": "1h"`. הכתיבה עולה כפול, אבל מהקריאה השלישית אתם כבר ברווח.
+
+איך יודעים אם השינוי ב-prompt באמת שיפר משהו, ולא רק נראה טוב בשלוש דוגמאות? זה חלק 3.
+
+<figure><img src="/posts/prompt-engineering-2-system-prompts/v3-svg-he.jpg" alt="אותו prompt, אותם טוקנים. פי 10 במחיר תלוי רק באיפה ה-timestamp יושב (מחירים: Anthropic prompt caching)" loading="lazy" /><figcaption>אותו prompt, אותם טוקנים. פי 10 במחיר תלוי רק באיפה ה-timestamp יושב (מחירים: Anthropic prompt caching)</figcaption></figure>
 
 ## מה לקחת
 
-- לפני שכותבים system prompt, להריץ בלי ולשמור את הפלט כ-baseline.
-- role, rules, examples, contract, בסדר הזה. כל מה שמשתנה, כולל התאריך, ב-user message.
-- כל טקסט שבא מבחוץ נכנס בתוך תג. ההוראות שלכם ב-markdown.
-- כלל שאפשר לבדוק בקוד, נבדק בקוד. ה-prompt רק מזכיר אותו.
+- תריצו baseline בלי system prompt לפני שאתם כותבים שורה אחת, ותשמרו את הפלט.
+- ארבעה בלוקים בסדר קבוע. כל כלל עם סיבה, כל שורה עם כשל שהיא מתקנת.
+- כל מה שמשתנה בין קריאות עובר להודעת המשתמש, לא ל-system.
+- תבדקו `cache_read_input_tokens` בקריאה השנייה. אפס שם זה $216 ביום על הרצפה.

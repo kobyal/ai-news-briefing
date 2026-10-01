@@ -1,97 +1,163 @@
 ---
-title: "Agentic RAG: כשהמודל מחזיק את מנוע החיפוש"
-description: "מה משתנה כשהמודל מפעיל את ה-retrieval בעצמו, בלולאה: שלושה tools, עשרה nodes של גדרות, ומה באייר למדו ב-production."
+title: "Agentic RAG בפועל: שישה צעדים מחיפוש אחד ללולאה עם תקרה"
+description: "איך הופכים RAG שמחפש פעם אחת ל-agent שמחפש, בודק ומחפש שוב. eval, שלושה tools, grader, MAX_STEPS ו-router, עם קוד להדבקה."
 lang: he
 key: agentic-rag
 term: "agentic rag"
+kind: fieldnotes
+pubDate: 2026-10-01
+tags: ["rag", "agents", "retrieval", "evals", "tool-use"]
+hook: "number"
 cover: illus
-pubDate: 2026-09-30
-tags: ["rag", "agents", "retrieval", "context-engineering", "harness-engineering"]
+tldr: ["תריצו 30 שאלות קשות ותבדקו אם ה-gold doc נמצא ב-top-k", "תוסיפו grader נפרד שמחזיר JSON לפני שהמודל עונה", "תגבילו את הלולאה ל-MAX_STEPS=6 עם תשובה כפויה בצעד האחרון"]
 hero: /posts/agentic-rag/hero.jpg
 diagram: /posts/agentic-rag/diagram.svg
 sources:
-  - { title: "Show HN: 11-Node Agentic RAG with MCP and PII Shield Under 512MB RAM", url: "https://agentic-rag-financial-parser.onrender.com", date: "2026-08-03" }
   - { title: "Bayer's PRINCE: a production agentic RAG system", url: "https://martinfowler.com/articles/reliable-llm-bayer.html", date: "2026-06-16" }
   - { title: "How to Build an Agentic RAG with RubyLLM and Rails", url: "https://www.panasiti.me/blog/how-to-build-agentic-rag-with-rubyllm-and-rails", date: "2026-06-10" }
+  - { title: "Save Your Time with These Agentic RAG Patterns", url: "https://medium.com/@ZikoZero011/rag-is-easy-until-the-questions-stop-being-easy-a76186e11394", date: "2026-09-27" }
   - { title: "Agentic RAG Explained in 3 Levels of Difficulty", url: "https://machinelearningmastery.com/agentic-rag-explained-in-3-levels-of-difficulty", date: "2026-05-04" }
-opinion: "אנחנו חושבים ש-agentic RAG הוא מהמונחים הבודדים שבאמת משנים מה עושים ביום שני: מעבירים את ה-retrieval מלפני המודל אל תוך הלולאה. אבל הערך לא בלולאה עצמה, הוא במה שבודק אותה: hallucination guard, ציטוטים, תקרה על מספר הסיבובים. אצלנו לולאה שבודקת את עצמה תמיד שווה יותר מטיוטה ראשונה טובה יותר. ואנחנו לא קונים גרף של עשרה nodes כשסיווג אחד ו-rule אחד היו עושים את העבודה. תתחילו מ-single-shot, תמדדו איפה החיפוש הראשון מפספס, ורק שם תנו למודל לחפש שוב."
-madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+  - { title: "ai-agents-for-beginners | 18 Lessons to Get Started Building AI Agents", url: "https://microsoft.github.io/ai-agents-for-beginners/05-agentic-rag", date: "" }
+  - { title: "What is Agentic RAG? | IBM", url: "https://www.ibm.com/think/topics/agentic-rag", date: "" }
+  - { title: "Traditional RAG vs. Agentic RAG—Why AI Agents Need Dynamic Knowledge to Get Smarter | NVIDIA Technical Blog", url: "https://developer.nvidia.com/blog/traditional-rag-vs-agentic-rag-why-ai-agents-need-dynamic-knowledge-to-get-smarter", date: "" }
+opinion: "אנחנו לא חושבים ש-agentic RAG הוא שיטה חדשה. זה tool-use על החיפוש שכבר היה לכם, ומבחינתנו זה בסדר גמור, כי כשיש לדבר שם, לצוות קל יותר לדבר עליו. המבחן שלנו הוא אם זה משנה משהו בעבודה שלכם מחר בבוקר, וכאן התשובה כן, אבל דרך ה-grader וה-router ולא דרך הלולאה עצמה. אנחנו שמים כלל דטרמיניסטי בכל מקום שאפשר, ומשאירים שיקול דעת של מודל רק לשאלות שבאמת צריכות אותו. ולולאה שבודקת את מה שהיא שלפה שווה לנו יותר ממודל חזק יותר שמנסח תשובה יפה מ-chunks לא נכונים."
+madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
 ---
 
-יש בחור באיטליה שמריץ אפליקציית RAG ליועצי פנסיה ומס. שואלים אותה על INPS, על קרנות פנסיה של בעלי מקצוע, על חוקים ותקנות. היא עונה מתוך מסמכים שהועלו לבסיס ידע.
+אחד. זה מספר החיפושים ש-RAG קלאסי עושה, והחיפוש הזה רץ לפני שהמודל הספיק לחשוב על השאלה. Panasiti מריץ אפליקציית RAG ליועצי פנסיה ומס באיטליה: INPS, קרנות פנסיה, חקיקה. ב-11 ביוני 2026 הוא תיאר בדיוק את הקיר הזה:
 
-במשך הרבה זמן זה היה ה-RAG הקלאסי: לוקחים את השאלה, מחפשים ב-DB, דוחפים את התוצאות ל-system prompt וקוראים למודל פעם אחת. עובד. עד שהחיפוש הראשון מפספס. ואז התשובה גרועה, והמודל לא יכול לעשות עם זה כלום. ה-retrieval קרה לפני שהוא בכלל הספיק לחשוב על השאלה.
+> If the first search misses, the answer is bad and there is nothing the model can do about it.
+>
+> — Panasiti, How to Build an Agentic RAG with RubyLLM and Rails
 
-אז הוא בנה את זה מחדש כ-agent, ב-Ruby נקי, וכתב על זה ביוני. וזה בגדול כל הסיפור של agentic RAG.
+אז הוא בנה את ה-pipeline מחדש כ-agent. שלושה tools, לולאה, והמודל מחליט לבד מתי יש לו מספיק חומר. Rails 8.1, Ruby 3.3, Postgres עם pgvector. בלי LangChain.
 
-## המודל מחזיק את מנוע החיפוש
+בגדול, זה כל הסיפור של agentic RAG. אף אחד לא המציא את המונח, הוא פשוט נדבק. IBM פרסמה עליו explainer בפברואר 2025, NVIDIA ביולי, ומיקרוסופט הפכה אותו לשיעור 5 מתוך 18 בקורס ai-agents-for-beginners. ההגדרה הכי פשוטה: לא דוחפים את תוצאות החיפוש ל-prompt. נותנים למודל את החיפוש כ-tool, והוא קורא לו בלולאה, בודק מה חזר ומחפש שוב אם צריך. זה לא framework ולא מוצר. זו לולאת tool-use שהיעד שלה הוא ה-knowledge base שלכם.
 
-ההגדרה בשורה אחת: במקום שהקוד שלכם יחפש ואז ימסור למודל, המודל מפעיל את החיפוש בעצמו. הוא מחליט מה לחפש, קורא מה חזר, מחפש שוב במילים אחרות, עוקב אחרי הפניות בין מסמכים, ורק אז כותב תשובה.
+הנה הצעדים, בסדר שבו אני הייתי עושה אותם.
 
-RAG עצמו הגיע מ-paper של Facebook AI Research ב-2020. ה-agentic שהודבק לו לא הגיע מ-paper אחד. אף אחד לא המציא את זה, זה פשוט נדבק ברגע שכולם התחילו לתת למודלים tools. היום כבר יש לזה עמוד הסבר אצל IBM.
+## 01 · לפני הקוד: 30 שאלות שה-RAG שלכם נופל עליהן
 
-מה זה לא: זה לא "RAG עם LangChain". הגרסה האיטלקית רצה על Rails ו-RubyLLM, בלי LangChain ובלי Python בצד. זה גם לא חייב להיות multi-agent. agent אחד, כמה tools, לולאה. זהו.
+כל סיבוב בלולאה הוא עוד קריאת LLM. אז קודם תוכיחו שיש בעיה שהלולאה פותרת. תוציאו מה-logs שאלות אמיתיות, 30 מספיקות להתחלה, ותתייגו כל אחת לפי סוג הכשל. המקורות מתארים שלושה:
 
-ב-Machine Learning Mastery נתנו דוגמה שמסבירה למה צריך את זה: "תשווה את המכירות של Q3 2025 ל-Q1 2026 ותסכם את גורמי הסיכון מה-SEC filing האחרון". RAG רגיל עושה embedding לכל הבליל הזה ומחזיר chunks שדומים לממוצע של שלוש שאלות שונות. כלומר, לאף אחת מהן. agent מפרק את זה לשלושה חיפושים, שולח כל אחד למקור הנכון ובודק מה חזר.
+- **פער ניסוח.** הדוגמה מ-Medium: משתמש שואל "How do I make the graph remember what happened previously?", והתיעוד מדבר על checkpointers, persistence ו-threads. אין אף מילה משותפת.
+- **שאלה כפולה.** הדוגמה של MachineLearningMastery: "Compare our Q3 2025 sales with Q1 2026 performance and summarize the key risk factors from our latest SEC filing". חיפוש אחד על כל המשפט מחזיר סלט של chunks שלא עונה על אף חלק.
+- **הפניות בין מסמכים.** חוק שמפנה לסעיף בחוק אחר. בדיוק מה ש-Panasiti פוגש בתחום הפנסיה.
 
-<figure><img src="/posts/agentic-rag/v1-svg-he.jpg" alt="שאלה עם שלושה חלקים הופכת אצל RAG רגיל ל-embedding אחד שנוחת באמצע, רחוק מכל אחת מהתשובות. ה-agent מפרק את השאלה לפני שהוא מחפש, וזה כל ההבדל." loading="lazy" /><figcaption>שאלה עם שלושה חלקים הופכת אצל RAG רגיל ל-embedding אחד שנוחת באמצע, רחוק מכל אחת מהתשובות. ה-agent מפרק את השאלה לפני שהוא מחפש, וזה כל ההבדל.</figcaption></figure>
+לכל שאלה תסמנו איזה מסמך מכיל את התשובה:
 
-## שלושה tools ולולאה
+```jsonl title="evals/rag_hard.jsonl"
+{"q": "How do I make the graph remember what happened previously?", "gold_doc": "persistence.md", "type": "vocab_gap"}
+{"q": "Compare Q3 2025 sales with Q1 2026 and list risk factors from the latest filing", "gold_doc": ["sales_q3_2025.pdf", "sales_q1_2026.pdf", "10k_2026.pdf"], "type": "multi_part"}
+```
 
-מה שיפה בפוסט של panasiti זה כמה מעט השתנה. אותו pgvector דרך ה-gem של neighbor, אותו pg_search עם מילון איטלקי, אותם chunks. מה שזז: החיפוש כבר לא רץ לפני המודל. המודל מקבל שלושה tools:
+עכשיו תריצו את ה-RAG הקיים ותבדקו דבר אחד: האם ה-gold_doc נמצא ב-top-k. אם הוא שם ב-28 מתוך 30, הבעיה שלכם ב-prompt או במודל, לא בחיפוש, ו-agent לא יעזור. אם הוא חסר בשליש מהמקרים, יש לכם בשביל מה לבנות.
 
-- `search_knowledge_base`: החיפוש שהיה קודם, רק שעכשיו המודל לוחץ על הכפתור
-- `fetch_document_section`: לשלוף סעיף ממסמך כשה-chunk קטוע
-- `list_documents`: לראות מה בכלל יש בבסיס הידע
+## 02 · שלושה tools, וה-description הוא חצי מהעבודה
 
-המודל קורא להם כמה פעמים שהוא צריך. כשיש לו מספיק חומר, הוא כותב תשובה עם ציטוטים. הכל רץ ב-background job, והצעדים של ה-agent זורמים לדפדפן ב-Turbo Streams. המשתמש רואה בזמן אמת מה הוא מחפש.
+Panasiti נתן למודל שלושה tools: `search_knowledge_base`, `fetch_document_section` ו-`list_documents`. החיפוש עצמו hybrid: וקטורי דרך pgvector וה-gem `neighbor`, ו-full-text דרך `pg_search` עם מילון איטלקי. כל זה כבר היה לו ב-single-shot. הוא לא החליף את ה-retrieval, רק נתן למודל להפעיל אותו בעצמו.
 
-ב-MLM מפרקים את זה לשלושה כוחות: query decomposition, multi-hop chaining, self-correction. בשפה של standup: לפרק את השאלה, ללכת אחרי קצה חוט, ולהודות כשפספסת ולחפש שוב.
+ה-tool השני הוא החשוב. `fetch_document_section` נותן למודל לראות chunk חתוך או הפניה לסעיף אחר, ואז לקרוא את כל הסעיף. בלי זה, agentic RAG הוא בסך הכל single-shot שמנסה כמה פעמים.
+
+ועוד דבר: המודל בוחר tool לפי ה-description, לא לפי השם. תכתבו בו שלושה דברים: מה חוזר (כמה chunks, איזה שדות), מתי להשתמש, ומתי לא. "Returns up to 8 chunks with doc_id and section" שווה יותר מכל פסקה על powerful semantic search.
 
 <figure><img src="/posts/agentic-rag/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
 
-<figure><img src="/posts/agentic-rag/src3.jpg" alt="השינוי אצל panasiti קטן ממה שחושבים: אותו pgvector, אותם chunks, רק שהחיפוש עבר מהקוד לידיים של המודל (credit: panasiti.me)" loading="lazy" /><figcaption>השינוי אצל panasiti קטן ממה שחושבים: אותו pgvector, אותם chunks, רק שהחיפוש עבר מהקוד לידיים של המודל (credit: panasiti.me)</figcaption></figure>
+<figure><img src="/posts/agentic-rag/src2.jpg" alt="שלושה tools ו-Postgres אחד, בלי LangChain ובלי Python sidecar: agentic RAG הוא pattern, לא framework (credit: Panasiti)" loading="lazy" /><figcaption>שלושה tools ו-Postgres אחד, בלי LangChain ובלי Python sidecar: agentic RAG הוא pattern, לא framework (credit: Panasiti)</figcaption></figure>
 
-## עשרה nodes, ורובם גדרות
+## 03 · הלולאה, עם תקרה קשיחה
 
-באוגוסט עלה ל-HN פרויקט בשם "11-Node Agentic RAG with MCP and PII Shield Under 512MB RAM". בדף עצמו כתוב 10-Node LangGraph. לא נריב על node.
+זה מה ש-Panasiti כתב ב-Ruby, בגרסת Python עם ה-SDK של אנטרופיק. מדביקים ומחברים ל-`run_tool` שלכם, פונקציה שמקבלת שם tool ו-input ומחזירה string:
 
-המערכת עונה על שאלות על החוקה ההודית, תקציבי מדינה וחוקי מס. תסתכלו מה כל node עושה:
+```python title="agentic_rag.py"
+import os
+import anthropic
 
-- Classifier מסווג כוונה: שאלת RAG, ברכה, פוגעני, מעורפל, מחוץ לתחום
-- CrossQuestioner שואל שאלת הבהרה על שאלה מעורפלת, מקסימום שני סבבים
-- Retriever שולף מ-Pinecone, ו-reranker של Cohere מסנן 10 chunks מתוך 100+ מועמדים
-- Hallucination Guard בודק אחרי הכתיבה שהתשובה מבוססת על מה שנשלף, ומתחת ל-40% ביטחון דוחה אותה
-- Fallback עם circuit breaker: שלושה כשלונות API והמעגל נפתח, בלי קריסה ובלי תקיעה
+client = anthropic.Anthropic()
+MODEL = os.environ.get("RAG_MODEL", "claude-sonnet-4-5")
+MAX_STEPS = 6
 
-ויש גם web search דרך Tavily שרץ רק אחרי אישור אנושי, ו-cache ב-Redis לשעה.
+SYSTEM = (
+    "Answer only from the knowledge base. Search before answering. "
+    "If results are off-topic, rewrite the query and search again. "
+    "Cite doc_id and section for every claim. If nothing fits, say so."
+)
 
-רגע, איפה פה ה-agentic? ב-retriever, ב-tool calling לשערי מניות, בהחלטה ללכת ל-web. כל השאר זה גדרות: סיווג, בדיקה, retry, cache ובלם. וזה בדיוק מה שהופך את זה למשהו שאפשר להשאיר לרוץ לבד.
+def schema(*fields):
+    return {"type": "object", "properties": {f: {"type": "string"} for f in fields}, "required": list(fields)}
 
-<figure><img src="/posts/agentic-rag/v3-svg-he.jpg" alt="המודל מחליט בשלושה מקומות בלבד. כל השאר זה סיווג, ספים, תקרות ובלמים, וזה מה שמאפשר להשאיר את המערכת לרוץ לבד בלי שמישהו יעמוד מעליה." loading="lazy" /><figcaption>המודל מחליט בשלושה מקומות בלבד. כל השאר זה סיווג, ספים, תקרות ובלמים, וזה מה שמאפשר להשאיר את המערכת לרוץ לבד בלי שמישהו יעמוד מעליה.</figcaption></figure>
+TOOLS = [
+    {"name": "search_knowledge_base", "input_schema": schema("query"),
+     "description": "Hybrid search (vector + full-text). Returns up to 8 chunks with doc_id, section, text. Use short keyword queries."},
+    {"name": "fetch_document_section", "input_schema": schema("doc_id", "section"),
+     "description": "Full text of one section. Use when a chunk is cut off or refers to another section."},
+    {"name": "list_documents", "input_schema": schema(),
+     "description": "Titles and doc_ids of everything in the knowledge base. Use to check a source exists."},
+]
 
-## באייר קראו לזה אחרת
+def answer(question, run_tool, log=print):
+    messages = [{"role": "user", "content": question}]
+    for step in range(1, MAX_STEPS + 1):
+        last = step == MAX_STEPS
+        resp = client.messages.create(
+            model=MODEL, max_tokens=2000, system=SYSTEM, tools=TOOLS,
+            tool_choice={"type": "none" if last else "auto"},
+            messages=messages,
+        )
+        if resp.stop_reason != "tool_use":
+            log(f"step={step} done forced={last}")
+            return "".join(b.text for b in resp.content if b.type == "text")
+        messages.append({"role": "assistant", "content": resp.content})
+        results = []
+        for block in resp.content:
+            if block.type == "tool_use":
+                out = run_tool(block.name, block.input)[:6000]
+                log(f"step={step} tool={block.name} input={block.input} chars={len(out)}")
+                results.append({"type": "tool_result", "tool_use_id": block.id, "content": out})
+        if step == MAX_STEPS - 1:
+            results.append({"type": "text", "text": "Step budget is over. Answer now with what you have and say what is missing."})
+        messages.append({"role": "user", "content": results})
+```
 
-אצל Martin Fowler פורסם הסיפור של PRINCE, מערכת agentic RAG של באייר למחקר פרה-קליני. הבעיה שם: חוקרים שצריכים לשאול שאלות מסובכות על כמויות ענק של דאטה פנימי, וחיפוש מילות מפתח עם לוגיקה בוליאנית שלא מחזיק מעמד.
+שני דברים בקוד הזה הם לא קישוט. קודם כל `MAX_STEPS`. בלי תקרה, שאלה שאין לה תשובה ב-knowledge base תגרום למודל לנסות עוד ועוד ניסוחים. שישה צעדים זו ברירת המחדל שלי, ותכווננו לפי ה-eval מצעד 01. חוץ מזה, הצעד האחרון רץ עם `tool_choice` מסוג `none` ועם הוראה מפורשת לענות ולהגיד מה חסר. ככה גם כשנגמר התקציב, המשתמש מקבל תשובה ולא timeout.
 
-הקטע המעניין הוא לא הארכיטקטורה. זו ההודאה שכשתכננו את המערכת, לא היו להם שמות למה שהם עושים. היום הם מתארים את זה כ-context engineering ו-harness engineering.
+ותזכרו את החשבון. כל צעד שולח שוב את כל השיחה, כולל ה-chunks של כל הצעדים הקודמים. צעד 5 משלם שוב על כל מה שנשלף בצעדים 1 עד 4. אז `cache_control` על ה-system וה-tools, וחיתוך של כל tool_result, כמו ה-`[:6000]` למעלה.
 
-context engineering קבע מה כל מודל מקבל, מה הוא לא מקבל, ואיך context עובר בין השלבים: research, reflection, writing. harness engineering זה כל הפיגומים מסביב: orchestration, גבולות ל-tools, שמירת state, retries, fallbacks, validation, reflection loops, observability ובדיקה אנושית.
+<figure><img src="/posts/agentic-rag/v2-svg-he.jpg" alt="לולאה בלי יציאה שנייה היא חשבונית פתוחה: MAX_STEPS הוא חלק מהעיצוב, לא מקרה קצה (הלולאה של Panasiti, עם תקרה)" loading="lazy" /><figcaption>לולאה בלי יציאה שנייה היא חשבונית פתוחה: MAX_STEPS הוא חלק מהעיצוב, לא מקרה קצה (הלולאה של Panasiti, עם תקרה)</figcaption></figure>
 
-תקראו את הרשימה הזאת שוב. זו אותה רשימה של ה-Show HN, רק בגרסה של חברת תרופות עם paper ב-Frontiers in AI.
+## 04 · Evaluate לפני Generate
 
+בלולאה מצעד 03 המודל אמור לשפוט לבד אם מה שחזר רלוונטי. לפעמים הוא עושה את זה, ולפעמים פשוט עונה ממה שיש. Senevirathna ניסח את התיקון הכי טוב ב-Medium: במקום Question → Retrieve → Generate, עושים Question → Retrieve → Evaluate → Decide. ואם ה-evaluate נכשל, יש ארבע אפשרויות: לשכתב את ה-query, לחפש שוב, לפנות למקור אחר, או לעצור ולשאול בן אדם.
 
-## מתי להשאיר את ה-RAG הישן
+בפועל אני מוציא את ה-evaluate מהלולאה הראשית לקריאה נפרדת, עם מודל זול ותשובה ב-JSON. ככה אפשר לבדוק אותו לבד, לראות מתי הוא טועה, ולהחליף אותו בלי לגעת בשאר. זה ה-prompt שאנחנו מריצים, עם שאלת ה-checkpointers מצעד 01. התוצאה נכנסת ללולאה: רק chunks שסומנו relevant נשארים ב-context, ואם `enough` הוא false, ה-query המוצע הולך לחיפוש הבא.
 
-גם ב-MLM מודים: RAG רגיל עובד טוב לשאלות פשוטות וברורות. והמחיר של הלולאה אמיתי:
+> **הדעה שלי:** ה-grader הוא הצעד היחיד כאן שבאמת שווה את הכסף. מודל שמחפש שלוש פעמים ולא בודק מה מצא, פשוט מייצר טעות יקרה יותר. תבנו את ה-evaluate קודם, ואת הלולאה אחר כך.
 
-- כל סיבוב זה עוד קריאה למודל, עוד tokens, עוד latency
-- מספר הצעדים משתנה משאלה לשאלה, אז גם החשבון וגם זמן התגובה
-- eval נהיה קשה יותר, כי אותה שאלה יכולה לעבור מסלול אחר בכל ריצה
-- בלי תקרה על מספר הסיבובים, agent שלא מוצא ימשיך לחפש הרבה אחרי שהיה צריך לוותר
+<figure><img src="/posts/agentic-rag/v3-transcript-he.jpg" alt="grader זול שמחזיר JSON מסנן את מה שלא שייך לפני שהוא מגיע לתשובה: Retrieve → Evaluate → Decide (Senevirathna, Medium)" loading="lazy" /><figcaption>grader זול שמחזיר JSON מסנן את מה שלא שייך לפני שהוא מגיע לתשובה: Retrieve → Evaluate → Decide (Senevirathna, Medium)</figcaption></figure>
 
-אם רוב השאלות אצלכם הן "איפה הטופס", אין לכם בעיה של agent. יש לכם בעיה של FAQ.
+## 05 · תראו את הצעדים, למשתמש ולעצמכם
 
-ואצלנו? ב-pipeline היומי של aibriefing יש בערך 10 agents, וכל מקום שהחלפנו בו קריאה למודל ב-rule נהיה זול ואמין יותר. הלולאה הכי שימושית שיש לנו בכלל לא חכמה: ה-wrapper של `claude -p` עושה retry לכשלונות רגעיים ומתקן JSON שבור. משעמם וטוב, וזה סגר שלוש תקלות production. והבאגים הכי גרועים שלנו לא היו תשובות שגויות, אלא כשלונות שקטים. agent שמחפש שש פעמים ומחזיר תשובה בטוחה בעצמה על בסיס כלום, זה בדיוק כשלון כזה.
+Panasiti מזרים ל-browser לא רק את התשובה אלא גם את צעדי ה-agent, דרך Turbo Streams, ואת כל הריצה הוא מריץ ב-background job מחוץ ל-request. המשתמש רואה מה המודל מחפש ואיזה סעיף הוא קורא, ולא בוהה ב-spinner.
 
-ה-agent מחליט מה לחפש. אתם מחליטים מתי הוא מפסיק, ומי בודק אותו.
+אצל Bayer זה עוד יותר מפורש. PRINCE, מערכת agentic RAG למחקר פרה-קליני שהצוות תיאר באתר של מרטין פאולר בסוף ספטמבר 2026, נבנתה עם רשימה ארוכה של דברים סביב המודל: orchestration, גבולות ל-tools, שמירת state, retries, fallbacks, validation, reflection loops, observability ו-human review. הם כותבים שאז עוד לא קראו לזה harness engineering, אבל זה בדיוק מה שזה היה.
+
+תרשמו שורה לכל tool call, משהו כזה:
+
+`step=2 tool=search_knowledge_base query="checkpointer thread_id" chunks=8 kept=3`
+
+ושלושה מספרים לדשבורד: ממוצע צעדים לשאלה, אחוז השאלות שהגיעו ל-`MAX_STEPS`, ואחוז ה-chunks שה-grader זרק. אם יותר מ-10% מהשאלות מגיעות לתקרה, הבעיה כמעט אף פעם לא בתקרה. היא ב-descriptions או בחיפוש עצמו.
+
+## 06 · Router: לא כל שאלה מקבלת agent
+
+רגע, נעצור. ב-eval מצעד 01 רוב השאלות כנראה עברו ב-single-shot בלי בעיה. "What is LangGraph's StateGraph?" לא צריכה לולאה. היא צריכה חיפוש אחד וזהו.
+
+אז שמים router בכניסה. לא מודל, כלל: שאלה קצרה, בלי compare, בלי שני תאריכים, בלי הפניה לסעיף, הולכת ל-single-shot. כל השאר הולך ל-agent. אם הכלל לא מחזיק, classifier זול. Bayer הלכו רחוק יותר וחילקו את העבודה ל-steps עם context נפרד לכל אחד: research, reflection, writing. כל שלב מקבל רק את מה שהוא צריך, ולא את כל ההיסטוריה.
+
+תריצו את 30 השאלות על שני המסלולים ותשוו שלושה דברים: דיוק, latency ועלות לשאלה. agentic RAG צריך לנצח בדיוק על השאלות הקשות, ולא להפסיד על הקלות.
+
+## מה לקחת
+
+- מתחילים מ-eval של שאלות שנופלות, לא מ-framework. אם ה-gold doc כבר ב-top-k, agent לא יעזור.
+- `fetch_document_section` שווה יותר מעוד ניסיון חיפוש. תנו למודל לקרוא את המסמך, לא רק chunks.
+- grader נפרד ב-JSON לפני התשובה. ככה יודעים מה נכנס ל-context ולמה.
+- לולאה בלי `MAX_STEPS` היא לא agent. היא חשבונית פתוחה.

@@ -1,15 +1,15 @@
 ---
-title: "Claude Design up close: a great canvas, and why we wrote code anyway"
-description: "Anthropic's Claude Design up close: what it makes, who it's for, where it falls short, and why our blog redesign went straight to code."
+title: "Claude Design up close: the tool that reads your repo and draws you a deck"
+description: "Anthropic's Claude Design: what it builds, how it learns your design system from code, what it costs, where it fails, and when Open Design or Figma win."
 lang: en
 key: claude-design-up-close
 term: "Claude Design"
 kind: deepdive
 pubDate: 2026-10-01
-tags: ["claude-design", "anthropic", "design-tools", "prototyping", "claude-code"]
-hook: "claim"
-cover: photo
-tldr: ["Decks, one-pagers and PM wireframes: use Claude Design. Product UI: go straight to code", "Before onboarding, decide where your design's source of truth lives: the canvas or the repo", "Want a canvas without leaving your own agent? Look at Open Design"]
+tags: ["claude-design", "anthropic", "design-tools", "figma", "prototyping"]
+hook: "scene"
+cover: type
+tldr: ["Clean up one tokens file in the repo before onboarding, not after", "Start with a deck or a one-pager, not your product's main screen", "Hand a wireframe to Claude Code on a separate branch and count the review fixes"]
 series: { slug: "the-new-tools", name: "The new tools, up close", part: 4, total: 4 }
 hero: /posts/claude-design-up-close/hero-en.jpg
 diagram: /posts/claude-design-up-close/diagram.svg
@@ -19,98 +19,113 @@ sources:
   - { title: "Claude Design", url: "https://www.anthropic.com/news/claude-design-anthropic-labs", date: "2026-04-17" }
   - { title: "Thoughts and feelings around Claude Design", url: "https://samhenri.gold/blog/20260418-claude-design", date: "2026-04-18" }
   - { title: "Figma's woes compound with Claude Design", url: "https://martinalderson.com/posts/figmas-woes-compound-with-claude-design", date: "2026-04-20" }
+  - { title: "Show HN: SeasonMap – when to travel where? visualized with climate data", url: "https://seasonmap.app", date: "2026-09-16" }
   - { title: "The open-source Claude Design alternative has 77k GitHub stars and 1M+ installs", url: "https://okaneland.com/studio/tom-huang", date: "2026-07-18" }
-  - { title: "Claude Design: What It Is & Why It Matters (2026)", url: "https://www.eigent.ai/blog/claude-design", date: "" }
-opinion: "We judge a tool by what it changes on Monday. Claude Design changes a lot for people who open Figma or PowerPoint today, and very little for people whose UI already lives in a repo. For us, every place where the same thing lived in two copies eventually turned into a bug, and a design that lives in both a canvas and CSS is exactly that. That said, Anthropic got one thing right: the real work isn't the drawing, it's the design system and whatever checks it. We check every UI change with a screenshot, and that only works when the design is code."
-madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
+  - { title: "Show HN: an AI app that settles small couple arguments", url: "https://thepiece.app/en", date: "2026-06-04" }
+  - { title: "Claude (AI) - Wikipedia", url: "https://en.wikipedia.org/wiki/Claude_(AI)", date: "" }
+opinion: "We're not excited about the canvas, we're excited about the onboarding. The moment the tool reads the codebase and builds a design system from it is the deterministic part, and that's what makes the output consistent, far more than model quality. To us the right question isn't how pretty the first version is, but what checks it: a handoff to Claude Code with review and tests is worth more than another slider. We judge a tool by what it changes on Monday morning, and here the answer is clear: a tool that forces you to keep the source of truth in code is good for the team even if you stop using it after a month."
+madeWith: { model: "claude-opus-5-5", sourceCount: 9, reviewedBy: "Koby Almog" }
 ---
 
-Claude Design is a good product. That's exactly why most developers don't need it.
+On April 18, 2026, a day after Anthropic launched Claude Design, designer Sam Henri Gold opened one file on his blog: Figma's own design system. Not a client's. Figma's. 946 color variables, grouped in folders like `bg/desktopBackgrounded`, each with eight modes: Light and Dark, plus variants for FigJam, DevMode and Slides. He wrote the post a few hours after trying Claude Design for the first time, and his argument is short. Models trained on code, not on Figma's primitives. So the design source of truth moves back to code, and the tool that can read code wins.
 
-That sounds backwards, so here's the reasoning. Anthropic launched it on April 17, 2026 as an Anthropic Labs product, in research preview for Pro, Max, Team and Enterprise subscribers. At launch it ran on Opus 4.7, which Anthropic called its most capable vision model. Eleven days later it already had an open-source alternative. Today it sits in the claude.com menu under "Claude apps built for", next to Science and Security, not next to Claude Code. So Anthropic is selling it to a different audience too.
-
-This week we sat with it for the redesign of this blog. After a few rounds we closed the tab and went back to writing code. Not because it didn't work. It worked, just for someone who isn't us. This is the last part of the series, and unlike Codex in part one, the question here isn't which agent writes better code. It's whether you need a step before the code at all.
+This is the fourth and final part of the series. After Codex, Grok Bot and ChatGPT, this time it's a tool Anthropic doesn't even sell to developers. That's exactly why you should know it: the first thing it does is ask for access to your repo.
 
 ## What it is, and what it isn't
 
-Claude Design is a visual workspace. You describe what you need, Claude builds a first version, and you refine it four ways: chat, inline comments on an element, direct edits, and sliders Claude builds itself for the specific project. What comes out: interactive prototypes, wireframes, decks, one-pagers, landing pages, campaign visuals. Also prototypes with voice, video, shaders and 3D. The genuinely interesting part is onboarding: Claude reads your codebase and design files, builds a design system from them, and every project after that already uses your colors, typography and components. You can keep more than one system.
+Claude Design is an Anthropic Labs product, the company's experiments unit. Roughly: a canvas where you describe what you need, Claude builds a first version, and you refine it together. According to the official announcement, the outputs are designs, prototypes, slide decks and one-pagers. At launch it ran on Opus 4.7, which Anthropic called its strongest vision model, and it's still labeled a research preview.
 
-Now what it isn't. It isn't artifacts. An artifact in chat is a side panel to the conversation, born with it and forgotten with it. In Design, the project is the point and the chat is just the tool. It isn't Claude Code either: it doesn't work on your repo. When you need an implementation, it hands off to Claude Code. And it isn't the ChatGPT canvas from part three, which is basically a document editor with a model on the side.
+Now what it isn't, because that's where most of the confusion is:
 
-<figure><img src="/posts/claude-design-up-close/v1-screenshot-en.jpg" alt="Anthropic sells it next to Science and Security, not next to Claude Code. The core audience isn't the developer (claude.com)" loading="lazy" /><figcaption>Anthropic sells it next to Science and Security, not next to Claude Code. The core audience isn't the developer (claude.com)</figcaption></figure>
+- **It's not an artifact.** Artifacts in claude.ai chat are a single piece of HTML or React inside a conversation. Claude Design is a workspace: projects, a persistent design system, comments on the canvas, export.
+- **It's not Claude Code.** It reads the codebase during onboarding, but it doesn't write to the repo. When a wireframe is ready, you hand it to Claude Code, and Claude Code implements it.
+- **It's not Figma.** There's no vector file with components and variants. The output is code-based, so a prototype can include voice, video, shaders, 3D and built-in AI. A Figma file can't run that.
+- **It's not Cowork.** Cowork is a general agent for non-programmers' tasks. Design is one tool, for visual work.
 
-## Sitting with it: what actually happens
+<figure><img src="/posts/claude-design-up-close/v1-screenshot-en.jpg" alt="Anthropic sells this to product managers, founders and marketers, not designers, and the page is built accordingly (claude.com)" loading="lazy" /><figcaption>Anthropic sells this to product managers, founders and marketers, not designers, and the page is built accordingly (claude.com)</figcaption></figure>
 
-Onboarding is where you find out whether this is for you. For us it read the blog repo, Astro with hand-written CSS, and pulled a design system out of it: the paper and ink colors, Frank Ruhl Libre for headings, Heebo for body text. Without being asked. Nice.
+## First session: what happens when you open it
 
-From there it feels like working with a very fast designer. We asked for a Hebrew post page, RTL, with a big headline and a pull quote, and the first version arrived within minutes. You point at an element, write "less air here", and it fixes just that element. When something is a matter of degree, it builds a slider instead of guessing, and you drag until it looks right.
+Per the launch, the flow goes like this. First, onboarding: Claude reads the codebase and design files and builds a design system for the team. Colors, typography, components. From then on every new project uses them automatically, and you can keep more than one system, say one for product and one for marketing.
 
-At the end there are four exits: PDF, a shareable URL, PPTX, or sending it to Canva, where it stays editable. And for a real product, a handoff to Claude Code.
+Then the prompt. Anthropic described the working phase like this:
 
-Hold on, this is where we got stuck. What crosses the handoff is the design, not the commit. Someone still has to get it into the CSS file that already exists, and decide what happens the next time someone changes that file and not the canvas.
+> Describe what you need and Claude builds a first version. From there, you refine through conversation, inline comments, direct edits, or custom sliders (made by Claude) until it's right.
+> — Anthropic, launch announcement, April 17, 2026
+
+The sliders are the nicest part. Claude builds custom controls for each design: density, heading size, how much color. Instead of typing "make it a bit airier" five times, you move a slider. Just ask for them, and say exactly which ones.
+
+In practice, the first prompt decides how many rounds you'll go through. Write a brief the way you'd write one for a freelance designer, not a single line:
+
+```markdown title="brief.md"
+What: product one-pager, one portrait A4 page
+For: CTO at a 200-developer company, will read it for 40 seconds
+Must: the 3 numbers from the attached table, the logo, one CTA
+No: stock photos, more than two accent colors from the design system
+Variations: 3 genuinely different directions, not 3 shades of one direction
+Controls: a density slider, a slider for the main headline size
+```
+
+Finally, export. A deck goes out as PPTX or to Canva. A prototype is shared as is, interactive, with no code review and no PR. And a feature wireframe goes to Claude Code for implementation.
 
 <figure><img src="/posts/claude-design-up-close/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
 
-## The numbers, such as they are
+## The numbers: who gets it, what it costs
 
-- **April 17, 2026**: launch, research preview, gradual rollout the same day.
-- **4 plans**: Pro, Max, Team, Enterprise. No separate price in the launch post, it's part of the subscription. Usage limits? We couldn't find an official number, so don't plan around one.
-- **4 export formats**: PDF, URL, PPTX, Canva.
-- **11 days**: until a team from Shanghai shipped Open Design, an open-source alternative (Apache-2.0), local-first, that runs through the coding agent you already pay for. The first version: about 18,700 lines, one person, two days plus a day of debugging, and a subscription of roughly $200. By July it had 77,000 stars and over a million installs.
-- **946**: color variables in Figma's own design system file, according to Sam Henri Gold, each with 8 modes. That's the scale of what Claude Design is trying to make unnecessary.
+- **Launch:** April 17, 2026, gradual roll-out over the same day.
+- **Access:** Pro, Max, Team and Enterprise subscribers. Not on the free plan.
+- **Price:** No separate price, it's part of the subscription. Pro is the entry point ($20/month at list price). The launch announcement gives no specific usage limits, so check the pricing page before planning a 30-person workshop.
+- **Model:** Opus 4.7 at launch. Since then Opus 5.5 (September 22) and Sonnet 5.5 (September 28) shipped, and the original announcement doesn't say what runs there today.
+
+For comparison, the other side's numbers. Open Design, the open-source alternative a Shanghai team released on April 28, 11 days after launch. A first version of about 18,700 lines, two days of the CEO's time plus 24 hours of debugging, and a bill of roughly $200 for a coding agent subscription. Since then: 77,000 stars and over a million installs. A 10-to-1 ratio, the reverse of the usual GitHub funnel.
 
 ## Where it's strong
 
-> "Designers can turn static mockups into easily-shareable interactive prototypes to gather feedback and user-test, without code review or PRs."
-> — Anthropic, Claude Design launch post
+Two days after launch, Martin Alderson wrote the sentence that explains most of this market: models don't design like a talented designer, but not everything needs a talented designer. The board meeting deck, the quarterly report, the client proposal, the conference landing page. Work no designer is excited about that burns hours on back-and-forth. That's where Claude Design is strongest, and Anthropic orders its own use-case list that way: prototypes, wireframes for PMs, decks for founders and sales, marketing materials.
 
-Without code review or PRs. That's the core feature. For a PM, a founder or a marketing team, that's a lot: something clickable by tomorrow morning, without waiting for a sprint.
+Second, the design system built from code. If your tokens already live in the repo, every deck comes out in the product's colors and fonts without anyone remembering hex codes. That's exactly the consistency design teams spend days on in Figma.
 
-It's strong at everything around the product. Martin Alderson put it best: LLMs don't design like a talented designer, but not everything needs a talented designer. A client deck, a one-pager, an event landing page, a quarterly report. Things that eat hours of back-and-forth and that no designer gets excited about. With a design system built from the repo, the output stays consistent with the product, and that's exactly what AI design has been missing until now.
+And there's exploration. Anthropic opens the announcement by saying even experienced designers ration exploration, because there's no time for a dozen directions. Here a dozen directions is one prompt.
 
-And it's strong at exploration. The launch post says it plainly: designers don't have time to prototype a dozen directions, so they settle for a few. Here a dozen directions is cheap. That said, a human still picks between them.
+> **Caveat:** I looked for a public project that documents "we built this in Claude Design" end to end and didn't find one I trust. Show HN pages like SeasonMap and Piece look exactly like what the tool produces, an app mockup, three steps, a pricing table, but none of them claims it's the tool. So the examples here are Anthropic's and from people who wrote about it, not from customers.
 
-## Where it falls short
+## Where it falls down
 
-It all comes down to one question: where does the design's source of truth live. Sam Henri Gold, who tried the product the day after launch, wrote that his team spends a fair amount of time copying changes made in code back into Figma, and that it's "not fun". Claude Design beats Figma here because it can read code. But if your UI changes in the repo every day, every change there is one more thing to sync to the canvas. And if you don't sync, the canvas just goes stale, and a month later nobody trusts it.
+First, the ceiling. Alderson himself writes that it's nowhere near a talented designer, and adds currently. For your product's core flow, the screen people see 50 times a day, you still need a designer.
 
-Second, it's a tool for a human. We found no way to run it from a pipeline, and for us half the design isn't drawn by hand, it's generated every morning by an agent.
+The design system won't be better than your code. If the repo has four shades of blue hardcoded in four CSS files, it will learn four shades. Onboarding doesn't clean up a mess, it copies it.
 
-Third, it's still a preview. Limits aren't documented, and we have no idea what happens to pricing when it leaves preview.
+Then, the way back. Gold writes that at his job they waste a lot of time porting design changes made directly in code back into Figma, and that it's no fun. If your org lives in Figma, everything Claude Design produces creates exactly that work.
 
-> **My take:** I don't think this kills Figma tomorrow. But Sam Henri Gold is right about one thing: Figma's closed format kept it out of the training data, and Claude Design was born on the right side of that line. What interests me isn't who wins, it's how long teams will agree to maintain two sources of truth.
+There's vendor lock-in. The tool needs an Anthropic subscription, runs on its models and sits in its cloud. For onboarding it needs access to the codebase. In an org with a strict policy on code leaving the building, that's a conversation with security before the first project, not after.
 
-<figure><img src="/posts/claude-design-up-close/src4.jpg" alt="The day after launch, Sam Henri Gold was already betting that the design source of truth moves back to code, and our experience agrees (credit: Sam Henri Gold)" loading="lazy" /><figcaption>The day after launch, Sam Henri Gold was already betting that the design source of truth moves back to code, and our experience agrees (credit: Sam Henri Gold)</figcaption></figure>
+And a research preview is a research preview. Features move, and it's not a tool you build a whole team's process on without a plan B.
 
-## Claude Design vs. going straight to Claude Code
+<figure><img src="/posts/claude-design-up-close/src4.jpg" alt="A day after launch Gold was already arguing the real pain is the double work between code and Figma, and that's where this tool comes in (credit: samhenri.gold)" loading="lazy" /><figcaption>A day after launch Gold was already arguing the real pain is the double work between code and Figma, and that's where this tool comes in (credit: samhenri.gold)</figcaption></figure>
 
-| | Claude Design | Open Design | Claude Code directly |
-|---|---|---|---|
-| For whom | PMs, founders, marketing, designers | Anyone who wants a canvas on their own agent | Developers whose UI lives in the repo |
-| Source of truth | The canvas, then handoff | Local files | The repo |
-| Output | Prototype, PDF, URL, PPTX, Canva | Prototypes and designs as files | A commit |
-| Cost | Included in Pro and up | Free, you pay for the agent | Included in the subscription |
+## Versus Figma and Open Design
 
-So why did we close the tab. Basically, three reasons.
+**Figma** is still the source of truth in most orgs, with mature collaboration and components entire teams maintain. The problem is what Gold described: a closed, barely documented format that models have hardly seen. Any automation there goes through plugins.
 
-One: the blog is Astro, and its paper+ink design lives in one CSS file. Anything we got from the canvas would have had to go into that file anyway, so better to have Claude Code work on it directly and see the diff.
+**Open Design** is the opposite in deployment: Apache-2.0, runs on your machine, and routes through the coding agent you already pay for. If you have Claude Code or Codex and it matters that code doesn't leave your machine, it's the natural choice. What you give up: the polish of a managed product and the direct link to Claude Code.
 
-Two: the blog-agent in local-cycle generates a cover, SVG figures and a video for every post each morning, following a style guide. That style guide has to be text an agent reads on every run, not a design system living in a tool the agent can't see.
+In between there's Vercel's v0, which generates React directly and sits closer to the frontend developer's world.
 
-Three: we check every UI change with a screenshot before it ships. That works when the design is code you can build and capture. With a second copy, it becomes a project.
+<figure><img src="/posts/claude-design-up-close/v3-svg-en.jpg" alt="Claude Design didn't move into Figma's quadrant, it opened a new one on the code side, and 11 days later Open Design was already sitting in the local quadrant (Anthropic, samhenri.gold, Okane Land)" loading="lazy" /><figcaption>Claude Design didn't move into Figma's quadrant, it opened a new one on the code side, and 11 days later Open Design was already sitting in the local quadrant (Anthropic, samhenri.gold, Okane Land)</figcaption></figure>
 
-To be fair: the canvas version suggested a few good ideas, and we took them by hand. That's the right way for developers to use it. A mirror, not a source.
+## Who should pick it this quarter
 
-<figure><img src="/posts/claude-design-up-close/v3-svg-en.jpg" alt="On a blog the agent rebuilds every morning, any path through a canvas adds a second source of truth, and that's what decided it for us (our redesign, September 2026)" loading="lazy" /><figcaption>On a blog the agent rebuilds every morning, any path through a canvas adds a second source of truth, and that's what decided it for us (our redesign, September 2026)</figcaption></figure>
+- **PMs, founders, developers who need a deck or a landing page:** Yes. That's the audience Anthropic aimed at, and that's where the tool actually works.
+- **A design team deep inside Figma:** Only for exploration. Not for files someone has to maintain later.
+- **An org without an Anthropic subscription or with limits on code in the cloud:** Open Design, through the agent you already have.
 
-## Who needs it this quarter
+What to do this week:
 
-A PM who wants to show a flow before opening a ticket: yes. The wireframe comes out fast, and the handoff to Claude Code skips the step where the developer guesses what was meant.
+1. Before onboarding, clean up one tokens file in the repo: colors, fonts, spacing. That's what the tool will learn.
+2. Pick one real artifact, the next deck, not a product screen. Time it against the previous deck.
+3. Export to PPTX and open it in PowerPoint or Keynote. Count what breaks.
+4. One wireframe to Claude Code on a separate branch. Count how many fixes the review needed.
 
-Founders and AEs building decks: yes, without thinking twice. PPTX and Canva are exactly where that work continues.
+If after three rounds of comments it's still not something you'd send, stop. The tool is burning the time it's supposed to save.
 
-Designers on a team whose design system already lives in code: yes, for exploration. A dozen directions a day, then pick one and hand it over.
-
-Developers whose UI lives in the repo and changes daily: no. Work with Claude Code directly against the dev server. And anyone who needs design generated inside a pipeline: no, this isn't the tool. If you want the canvas experience without vendor lock-in, look at Open Design, which runs locally on the agent you already have.
-
-In short: if your UI already lives in a repo, the best canvas you have is the dev server. Claude Design is built for everyone who doesn't have one.
+And if your next deck still opens in Figma a month from now, that's not the tool failing. It's a sign your source of truth isn't in code yet.

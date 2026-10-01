@@ -1,0 +1,105 @@
+---
+title: "Claude Code בפרקטיקה, חלק 5: איזה מודל, איזה מצב, כמה זה עולה"
+description: "סונט, אופוס או Haiku לכל משימה, effort ו-fast mode, ארבעה מצבי הרשאות, AGENTS.md מול CLAUDE.md ואיך לקרוא את /usage. פקודה ומספר לכל שאלה."
+lang: he
+key: claude-code-5-models-switches-cost
+term: "choosing a model"
+kind: faq
+pubDate: 2026-10-01
+tags: ["claude-code", "model-selection", "cost", "permissions", "agents-md"]
+hook: "number"
+cover: illus
+tldr: ["ברירת מחדל סונט ב-settings.json. אופוס דרך /model רק כשסונט נתקע.", "plan למשימה עמומה, acceptEdits לביצוע, bypass רק בתוך container.", "שבוע של /usage בסוף כל יום. מעל $30 ליום, תבדקו כמה מזה אופוס."]
+series: { slug: "claude-code-in-practice", name: "Claude Code בפרקטיקה", part: 5, total: 5 }
+hero: /posts/claude-code-5-models-switches-cost/hero.jpg
+diagram: /posts/claude-code-5-models-switches-cost/diagram.svg
+sources:
+  - { title: "CLI reference - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/cli-reference", date: "" }
+  - { title: "Settings files and precedence - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/settings", date: "" }
+  - { title: "Manage costs effectively - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/costs", date: "" }
+  - { title: "Models overview", url: "https://docs.anthropic.com/en/docs/about-claude/models/overview", date: "" }
+  - { title: "AGENTS.md", url: "https://agents.md", date: "" }
+  - { title: "Choosing a Model on the Pareto Frontier with Jev", url: "https://philippdubach.com/posts/jev-model-router-for-pi", date: "2026-09-22" }
+  - { title: "How to choose the right model for AI agents (and not overpay)", url: "https://www.kore.ai/blog/how-to-choose-the-right-model-for-ai-agents", date: "" }
+opinion: "אנחנו לא מתלהבים מ-router שמחליף מודל על כל prompt. על המודל מחליטים ברמת המשימה, ומי שמחליט זה מי שתכנן אותה, לא classifier. בכל מקום שיש כלל ברור אנחנו מעדיפים קוד דטרמיניסטי על מודל זול, ואצלנו בפייפליין כל קריאה ל-LLM שהפכנו לכלל קבוע יצאה זולה ויציבה יותר. ומה שבאמת חוסך כסף זה לא המודל אלא הבדיקה אחריו: סונט עם טסטים שרצים בלולאה שווה יותר מאופוס בלי."
+madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
+---
+
+## כמה זה אמור לעלות לי ביום?
+
+$13. זה הממוצע ליום עבודה פעיל לפי דף העלויות של אנטרופיק, על פריסות enterprise. בחודש זה יוצא $150–250 למפתח, ו-90% מהמשתמשים נשארים מתחת ל-$30 ליום. אם אתם הרבה מעל, זה כמעט תמיד אחד מאלה: אופוס על כל משימה, שיחה אחת שנמשכת מהבוקר, או כמה סשנים במקביל.
+
+בקצה השני, Kore.ai מספרים על חברה שקיבלה חשבון של $500 מיליון על חודש אחד, מאי 2026, אחרי שפתחה מודל מוביל לכל העובדים בלי תקרה. אתם לא תגיעו לשם. אבל הסיבה זהה: מודל אחד לכל דבר. בקיצור, תמדדו לפני שאתם מחליטים מה יקר.
+
+## איזה מודל להשאיר כברירת מחדל, ומתי לרדת ל-Haiku?
+
+המחירים, למיליון טוקנים: Haiku 4.5 עולה $1 לקלט ו-$5 לפלט, סונט 5.5 עולה $2/$10, אופוס 5.5 עולה $4/$20 ו-Fable 5.1 עולה $10/$50. אנטרופיק ממליצים להתחיל מאופוס. אני מתחיל מסונט: חצי מחיר, מהיר יותר, ואותו 1M context. אופוס נכנס כשהמשימה חוצה הרבה קבצים, או כשסונט נתקע פעמיים על אותו דבר. Haiku לעבודה מכנית: commit message, שינוי שם, סיכום לוג, subagent שסורק תיקייה. רק תזכרו שיש לו 200K context ו-cutoff של פברואר 2025. את Fable שומרים למקרה שאופוס ב-effort גבוה עדיין נופל.
+
+פיליפ דובאך בנה router שבוחר מודל לכל משימה ב-pi. מתוך 151 ההחלטות הראשונות שנרשמו, 90 חזרו `unclear`, ורובן היו סתם "continue". מה שהוא כתב אחרי שבוע בפרודקשן:
+
+> A confident “clarify” on the brief stops the router from switching, because a different model does not make an ill-defined task well-defined.
+>
+> — Philipp Dubach, Choosing a Model on the Pareto Frontier with Jev
+
+<figure><img src="/posts/claude-code-5-models-switches-cost/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/claude-code-5-models-switches-cost/src4.jpg" alt="סונט 5.5 עולה חצי מאופוס ונותן אותו 1M context, אז הוא ברירת המחדל ואופוס הוא הסלמה (credit: Anthropic, Models overview)" loading="lazy" /><figcaption>סונט 5.5 עולה חצי מאופוס ונותן אותו 1M context, אז הוא ברירת המחדל ואופוס הוא הסלמה (credit: Anthropic, Models overview)</figcaption></figure>
+
+## איך מחליפים מודל באמצע, ואיך קובעים ברירת מחדל?
+
+בתוך הסשן, `/model` פותח תפריט. מהשורה: `claude --model sonnet`, או ID מלא כמו `claude-opus-5-5` אם אתם רוצים גרסה קבועה ולא alias שזז עם כל שחרור. ברירת מחדל קבועה נכנסת ל-`model` ב-`~/.claude/settings.json` (רק לכם) או ב-`.claude/settings.json` (לכל הצוות, דרך git):
+
+```json title=".claude/settings.json"
+{
+  "model": "sonnet",
+  "permissions": {
+    "defaultMode": "acceptEdits"
+  }
+}
+```
+
+ועוד שלושה שכדאי להכיר. `opusplan` מריץ אופוס ב-plan mode וסונט בביצוע. `--advisor opus` נותן לסונט להתייעץ עם אופוס בצד השרת, בלי להחליף את המודל הראשי. ול-subagent שרק סורק קבצים שמים `model: haiku` ב-frontmatter.
+
+## מה זה effort ו-fast mode, ומתי לגעת בהם?
+
+בגדול, effort זה כמה טוקנים המודל מקבל לחשוב לפני שהוא עונה. ברירות המחדל לפי אנטרופיק: אופוס 5.5 על `medium`, סונט 5.5 ו-Fable על `high`, ול-Haiku 4.5 אין effort בכלל. מזיזים אותו בתפריט של `/model`. מעלים effort כשהתשובה מהירה ולא נכונה, לא כשהיא איטית. ולפני שקופצים מדרגת מודל, תנסו מדרגת effort אחת למעלה. לפעמים זה מספיק.
+
+fast mode (`/fast`) זה אותו מודל, פלט מהיר יותר, מחיר גבוה יותר לטוקן. שווה כשאתם בוהים במסך ומחכים לתשובה. חבל עליו בריצה ארוכה ברקע שאף אחד לא מסתכל עליה.
+
+<figure><img src="/posts/claude-code-5-models-switches-cost/v2-transcript-he.jpg" alt="שאלה של עשר שניות לפני משימה חוסכת מדרגת מודל שלמה, ורוב הצוותים בכלל לא שואלים אותה" loading="lazy" /><figcaption>שאלה של עשר שניות לפני משימה חוסכת מדרגת מודל שלמה, ורוב הצוותים בכלל לא שואלים אותה</figcaption></figure>
+
+## ארבעה מצבי הרשאות. באיזה לעבוד?
+
+- `default`: שואל לפני כל עריכה וכל פקודה.
+- `acceptEdits`: עורך קבצים בלי לשאול, על פקודות עדיין שואל.
+- `plan`: קורא, מתכנן, לא נוגע בכלום.
+- `bypassPermissions`: לא שואל כלום.
+
+`Shift+Tab` מסובב ביניהם. bypass נכנס לסבב רק אם הפעלתם עם `--allow-dangerously-skip-permissions`, וזה בכוונה. אצלי: plan למשימה שאני לא סגור עליה, `acceptEdits` אחרי שאישרתי תוכנית ואני על ענף נקי, ו-bypass רק בתוך container בלי credentials. ה-agent של Replit שמחק DB של production ביולי 2025 זה בדיוק התרחיש שהדגל הארוך הזה מנסה למנוע. מצב פתיחה קבוע: `--permission-mode` בשורה, או `defaultMode` ב-settings כמו בקובץ למעלה.
+
+<figure><img src="/posts/claude-code-5-models-switches-cost/v3-svg-he.jpg" alt="המחט צריכה לשבת על acceptEdits בענף נקי. bypass הוא מצב ל-container, לא ללפטופ (Claude Code CLI reference)" loading="lazy" /><figcaption>המחט צריכה לשבת על acceptEdits בענף נקי. bypass הוא מצב ל-container, לא ללפטופ (Claude Code CLI reference)</figcaption></figure>
+
+## יש בצוות גם Cursor ו-Codex. CLAUDE.md, AGENTS.md או .cursorrules?
+
+AGENTS.md הוא הפורמט הפתוח, ולפי האתר שלו הוא כבר נמצא ביותר מ-60 אלף פרויקטי open-source. Codex ו-Cursor קוראים אותו. קלוד קוד מחפש `CLAUDE.md`. `.cursorrules` זה הפורמט הישן של Cursor, היום הם ב-`.cursor/rules`. אז כותבים פעם אחת ב-AGENTS.md, ו-CLAUDE.md נהיה שורת `@AGENTS.md` ועוד מה שספציפי לקלוד. ככה לא נגמרים עם שלושה קבצים שלאט לאט כבר לא מסכימים ביניהם. מה נכנס לקובץ עצמו כבר כיסינו בחלק 1, פה זה רק איפה לשים אותו.
+
+## הסשן מתברבר. /compact או /clear?
+
+`/compact` מסכם את השיחה ומשאיר רק את הסיכום ב-context. אפשר לכוון אותו: `/compact תשמור את ההחלטות על ה-schema`. `/clear` זורק הכל ומתחיל סשן חדש, ומגרסה 2.1.211 הוא גם מאפס את מונה העלות ב-`/usage`. כלל אצבע: אותה משימה ו-context כבד, `/compact`. משימה חדשה, `/clear`. ומהטרמינל: `claude -c` (`--continue`) חוזר לשיחה האחרונה בתיקייה, ו-`claude -r` (`--resume`) נותן לבחור מרשימה.
+
+> **הדעה שלי:** אני כמעט לא משתמש ב-`/compact`. הסיכום האוטומטי מאבד בדיוק את הפרט שתצטרכו עוד עשר דקות. שלוש שורות handoff מחלק 3 ואז `/clear` יוצאות זולות ומדויקות יותר.
+
+## במנוי, /usage מראה $40. אני משלם את זה?
+
+לא. מי שמחפש את `/cost` מגרסאות ישנות, המספרים יושבים היום בבלוק Session של `/usage`, והם מחושבים מקומית: טוקנים כפול מחיר מחירון. ב-Pro, Max או Team אתם משלמים סכום קבוע, ומה שמגביל אתכם זו מכסת השימוש באותו מסך, לא הדולרים. ב-API זה כן הכסף שלכם, בקירוב. ההערכה לא יודעת על הנחה חוזית אלא אם האדמין הגדיר `modelPricing` ב-managed settings, ועד 2.1.239 היא גם לא כללה את תוספת ה-1.1 של data residency. החשבון האמיתי נמצא בדף Usage ב-Console.
+
+## טוב, מה משנים ביום שני?
+
+1. `"model": "sonnet"` ב-settings.json, ואופוס דרך `/model` כשסונט נתקע.
+2. כל subagent שסורק או מסכם מקבל `model: haiku`.
+3. plan לפני משימה עמומה, `acceptEdits` לביצוע, bypass רק ב-container.
+4. AGENTS.md אחד, ו-CLAUDE.md שמייבא אותו.
+5. `/clear` בין משימות, לא בין ימים.
+6. שבוע של `/usage` בסוף כל יום, ובסקריפטים `--output-format json` עם `total_cost_usd` ללוג. מעל $30 ליום ב-API? קודם כל תבדקו כמה מזה אופוס.
+
+ומשימה שחוזרת כל יום ויש לה כלל ברור לא צריכה אף מודל. היא צריכה סקריפט.

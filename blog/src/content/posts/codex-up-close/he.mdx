@@ -1,15 +1,15 @@
 ---
-title: "Codex מקרוב: ChatGPT עם טרמינל, ומה זה אומר מול Claude Code"
-description: "Codex של OpenAI בסוף 2026: CLI, agents בענן, טלפון ו-Spark. כמה זה עולה, איפה הוא חזק, איפה הוא נופל, ואיך הוא נראה ליד Claude Code ביום רגיל."
+title: "Codex מקרוב: מה OpenAI באמת מתקינה לכם במחשב"
+description: "OpenAI Codex בסוף 2026: CLI, ענן, IDE ומובייל. מה הוא עושה טוב, כמה הוא עולה, ואיך הוא מול Claude Code ביום-יום."
 lang: he
 key: codex-up-close
 term: "Codex"
 kind: deepdive
 pubDate: 2026-10-01
-tags: ["codex", "openai", "coding-agents", "claude-code", "developer-tools"]
-hook: "claim"
-cover: photo
-tldr: ["יש לכם ChatGPT Business? תדליקו Codex PR review על repo אחד לשבועיים", "עובדים עם Spark? תכתבו ב-AGENTS.md להריץ טסטים, הוא לא מריץ לבד", "AGENTS.md אחד ו-symlink ל-CLAUDE.md, וההחלפה בין הכלים לא עולה כלום"]
+tags: ["codex", "openai", "coding-agents", "claude-code", "cli"]
+hook: "scene"
+cover: type
+tldr: ["הפעילו @codex review על repo אחד לשבועיים וספרו באגים אמיתיים מול רעש", "השאירו sandbox_mode = workspace-write ורשת כבויה ב-config.toml", "אותו טסט נופל ב-codex exec וב-claude -p: מדדו זמן, diff והתערבויות"]
 series: { slug: "the-new-tools", name: "הכלים החדשים, מקרוב", part: 1, total: 4 }
 hero: /posts/codex-up-close/hero.jpg
 diagram: /posts/codex-up-close/diagram.svg
@@ -23,99 +23,113 @@ sources:
   - { title: "Codex is now in the ChatGPT mobile app", url: "https://openai.com/index/work-with-codex-from-anywhere", date: "2026-05-14" }
   - { title: "Codex Micro", url: "https://openai.com/supply/co-lab/work-louder", date: "2026-07-15" }
   - { title: "OpenAI Codex (AI agent) - Wikipedia", url: "https://en.wikipedia.org/wiki/OpenAI_Codex_(AI_agent)", date: "" }
-opinion: "אנחנו לא בוחרים כלי לפי benchmark. אנחנו בוחרים לפי מה שהוא משנה בעבודה ביום שני. ב-Codex הדבר שמשנה הוא לא המודל. הוא ה-PR review האוטומטי והמשימות בענן שממשיכות לרוץ בלעדיכם, כלומר המערכת שסביב המודל. Spark שלא מריץ טסטים כברירת מחדל הוא בדיוק ההפך ממה שלמדנו: לולאה שבודקת את עצמה שווה יותר מטיוטה מהירה. אנחנו נשארים עם קלוד דרך מנוי לכתיבה הכבדה, כי ה-pipeline שלנו בנוי סביבו, וה-silent failures עלו לנו יותר מכל הבדל בין מודלים. אבל אם יש לכם ChatGPT Business ואתם לא מדליקים את Codex review, השארתם בודק חינמי בחוץ."
+opinion: "אנחנו לא מתרשמים מ\"שיא חדש ב-SWE-Bench Pro\" כשהספק מודד את עצמו. מה שכן משכנע אותנו ב-Codex זה ה-sandbox שדולק כברירת מחדל וה-`@codex review` על PR. שניהם לולאת בדיקה ולא עוד generation, ושם תמיד הערך. הבחירה בין Codex ל-Claude Code היא פחות שאלה של מודל ויותר שאלה של מערכת: מה ה-agent רואה, במה מותר לו לגעת, ומי בודק אותו לפני merge. אנחנו מריצים Claude Code בייצור ולא מתכננים לעבור, אבל את ה-review של Codex היינו מפעילים על repo אחד כבר מחר בבוקר. תמדדו את שניהם על הבאגים שלכם, תספרו כמה פעמים התערבתם, ותחליטו לפי זה."
 madeWith: { model: "claude-opus-5-5", sourceCount: 9, reviewedBy: "Koby Almog" }
 ---
 
-הטענה שלי: Codex כבר לא כלי לכתיבת קוד. הוא ChatGPT שקיבל טרמינל, עכבר משלו ו-1.7GB של runtime על הדיסק שלכם.
+ב-1 בספטמבר 2026 סיימון וויליסון עשה מה שכולנו עושים פעם בחצי שנה. הוא פתח את OmniDiskSweeper כדי לראות מה אוכל לו את הדיסק. בתוך `~/.cache/` הוא מצא תיקייה בשם `codex-primary-runtime`, ‏1.7GB. בפנים היו Python מלא, Node.js מלא, git, Poppler ועותק שלם של LibreOffice. כל זה הותקן בשקט יחד עם אפליקציית הדסקטופ של Codex, שבינתיים שינתה את השם שלה פשוט ל-ChatGPT.
 
-זה לא דימוי. ב-1 בספטמבר 2026 סיימון ווילסון חיטט ב-`~/.cache` שלו ומצא תיקייה בשם `codex-primary-runtime`. בפנים: Python מלא, Node.js מלא, git, Poppler, ועותק שלם של LibreOffice. ובאותה תקופה אפליקציית הדסקטופ של Codex עברה rebrand, ועכשיו היא פשוט נקראת ChatGPT.
+התיקייה הזאת מראה יפה איפה Codex עומד היום. ה-CLI יצא באפריל 2025 ככלי קטן לטרמינל. שנה וחצי אחרי, OpenAI מתקינה אצלכם runtime שלם, כדי שה-agent יוכל לפתוח spreadsheet, לקרוא PDF ולהריץ טסטים בלי לשאול מה מותקן לכם. ובמספרים: יותר מ-3 מיליון מפתחים בשבוע באפריל, ויותר מ-4 מיליון במאי. זה כבר לא ניסוי.
 
-ותסתכלו על המספרים. ב-16 באפריל OpenAI דיברו על יותר מ-3 מיליון מפתחים בשבוע. ב-14 במאי כבר על יותר מ-4 מיליון אנשים בשבוע. שימו לב למילה. תוך חודש מפתחים הפכו לאנשים. אז מי שמשווה את Codex ל-Claude Code רק לפי SWE-Bench מפספס מה OpenAI בונים פה. אני ניסיתי להסתכל על זה כמו על מוצר, ולא כמו על מודל.
+בחלק הראשון של הסדרה נבדוק מה באמת יש שם, כמה זה עולה, ואיך זה מול Claude Code ביום-יום.
 
-## ארבעה משטחים, חשבון ChatGPT אחד
+## מה זה Codex בסוף 2026, ומה הוא לא
 
-בגדול, Codex בסוף 2026 הוא agent אחד שרץ בכמה מקומות, וכולם מחוברים דרך חשבון ה-ChatGPT שלכם. יש CLI בקוד פתוח (Apache 2.0, יצא באפריל 2025) ותוסף ל-IDE. יש agent בענן עם סביבה לכל repo, שממשיך לעבוד גם כשסגרתם את הלפטופ. יש אפליקציית דסקטופ ל-Mac ול-Windows, ומ-14 במאי הוא גם בתוך אפליקציית ה-ChatGPT בטלפון. מתחת לכל זה רץ GPT-5.3-Codex. הוא יצא ב-5 בפברואר, ולפי OpenAI הוא מהיר ב-25% מהדור הקודם. לצידו יש את Spark למשימות בזמן אמת.
+בגדול, Codex הוא agent אחד עם חמש כניסות, וכולן מחוברות לחשבון ה-ChatGPT שלכם. יש CLI בקוד פתוח (Apache 2.0, ב-`github.com/openai/codex`) ותוסף ל-IDE (VS Code והמשפחה שלו). יש אפליקציית דסקטופ ל-Mac ול-Windows. יש Codex בענן דרך `chatgpt.com/codex`, עם סביבה קבועה לכל repo. ומאז 14 במאי יש גם אפליקציה במובייל. שיחה שפתחתם בטרמינל זמינה בטלפון, ו-agent שרץ בענן ממשיך לעבוד גם אחרי שסגרתם את הלפטופ.
 
-מה הוא לא:
-- הוא לא ה-Codex של 2021, הגרסה של GPT-3 שישבה מאחורי Copilot. אותו שם, מוצר אחר לגמרי.
-- הוא לא מודל אחד. Codex זה ה-harness, והמודל מתחלף מתחתיו.
-- והוא כבר לא רק קוד. מאז העדכון של 16 באפריל יש computer use ברקע על ה-Mac, עם סמן משלו וכמה agents במקביל. יש יצירת תמונות עם gpt-image-1.5, ויותר מ-90 plugins חדשים: JIRA דרך Atlassian Rovo, CircleCI, GitLab Issues, Neon, Render ועוד. במרץ יצא גם Codex Security, agent נפרד לאבטחת אפליקציות.
+מה הוא לא: הוא לא המודל Codex מ-2021 שהריץ את Copilot הראשון. זה אותו שם ומוצר אחר לגמרי, כי OpenAI פשוט ממחזרת שמות. הוא גם לא IDE כמו Cursor. והוא לא מוצר API שמשלמים עליו לפי טוקן, לפחות לא כברירת מחדל. Codex כלול במנוי ChatGPT, ו-API key הוא אופציה ולא הדרך הראשית.
 
-## מה קורה כשמפעילים אותו
+## ידיים על המקלדת: מה רואים כשמתקינים
 
-ב-CLI זה ירגיש מוכר למי שעבד עם קלוד. מריצים `npm i -g @openai/codex`, נכנסים ל-repo, מקלידים `codex` ומתחברים עם חשבון ChatGPT. ההוראות הקבועות שלו יושבות ב-`AGENTS.md` בתוך ה-repo, כמו ש-Claude Code קורא `CLAUDE.md`. לריצה בלי אדם יש `codex exec`. זה המקביל ל-`claude -p` שאנחנו מריצים לאורך כל ה-pipeline.
+ההתקנה של ה-CLI לוקחת דקה:
 
-את ה-sandbox כדאי לסגור כבר ביום הראשון. ברירת המחדל סבירה, אבל אני מעדיף שזה יהיה כתוב בקובץ ולא בזיכרון של מישהו:
+```bash title="install.sh"
+npm i -g @openai/codex        # or: brew install --cask codex
+codex                         # TUI, sign in with ChatGPT
+codex exec "run the tests and fix what fails"   # headless, for CI
+codex resume                  # back to a previous session
+```
+
+בהרצה הראשונה הוא שואל אם לסמוך על התיקייה, ומראה באיזה מצב הרשאות הוא רץ. משם עובדים עם slash commands. `/init` כותב `AGENTS.md`, קובץ ההוראות של הפרויקט. `/model` בוחר מודל ורמת reasoning. `/review` עובר על ה-diff הנוכחי כמו reviewer. `/approvals` קובע מתי הוא עוצר לשאול, ו-`/status` מראה כמה נשאר לכם מהמכסה.
+
+את רוב ההחלטות החשובות שמים בקובץ אחד:
 
 ```toml title="~/.codex/config.toml"
 model = "gpt-5.3-codex"
-model_reasoning_effort = "high"
+model_reasoning_effort = "medium"
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
 [sandbox_workspace_write]
 network_access = false
+
+[mcp_servers.github]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
 ```
 
-בפועל, ככה הוא כותב רק בתוך ה-workspace, בלי רשת, ושואל לפני כל צעד מחוץ לזה. את `network_access` תפתחו רק כשאתם יודעים בדיוק למה.
+השורה שהכי שווה להבין היא `sandbox_mode`. ב-`workspace-write` הוא כותב רק בתוך ה-repo, ובלי רשת. זה sandbox ברמת מערכת ההפעלה ולא בקשה מנומסת ב-prompt. תשאירו את זה ככה, ותפתחו רשת רק למשימה שבאמת צריכה אותה.
 
-בענן זה מרגיש אחרת. בוחרים repo וסביבה, זורקים כמה משימות במקביל, וכל אחת חוזרת עם diff או PR. והטלפון בכלל לא מקבל את הקוד. יש relay מאובטח, והקבצים, ה-credentials וההרשאות נשארים על המכונה שמריצה את Codex. לטלפון מגיעים רק screenshots, פלט טרמינל, diffs, תוצאות טסטים ובקשות אישור. מאשרים פקודה בתור לקפה. זה הסיפור ש-OpenAI מוכרים, ובשבילו המוצר בנוי.
+בענן הזרימה אחרת. מחברים repo, מגדירים סביבה (setup script ומשתני סביבה), ושולחים משימה מהדפדפן או מהטלפון. ב-GitHub אפשר לכתוב `@codex review` בתגובה על PR ולקבל review אוטומטי. ככה רוב הצוותים מתחילים, ובצדק.
 
 <figure><img src="/posts/codex-up-close/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
 
-<figure><img src="/posts/codex-up-close/v1-screenshot-he.jpg" alt="ה-docs ממקמים את Codex תחת ChatGPT ולא תחת ה-API. קונים אותו כמוצר במנוי, לא כמודל לפי tokens (developers.openai.com)" loading="lazy" /><figcaption>ה-docs ממקמים את Codex תחת ChatGPT ולא תחת ה-API. קונים אותו כמוצר במנוי, לא כמודל לפי tokens (developers.openai.com)</figcaption></figure>
+<figure><img src="/posts/codex-up-close/v1-screenshot-he.jpg" alt="התיעוד של Codex יושב תחת ChatGPT ולא תחת ה-API. זה מוצר של המנוי, לא של ה-token (developers.openai.com)" loading="lazy" /><figcaption>התיעוד של Codex יושב תחת ChatGPT ולא תחת ה-API. זה מוצר של המנוי, לא של ה-token (developers.openai.com)</figcaption></figure>
 
-## המספרים: מחיר, limits ומקלדת ב-$230
+## המספרים: כמה זה עולה ואיפה נגמרת המכסה
 
-- **מחיר:** Codex כלול במנוי ChatGPT. Plus עולה $20 לחודש, Pro עולה $200, ו-Business או Enterprise מתומחרים לפי מושב. אין חיוב נפרד על Codex.
-- **Limits:** נספרים בחלונות של 5 שעות ובתקרה שבועית, וגם משימות ענן יורדות מאותו תקציב. לא מצאתי טבלה רשמית של מספר ההודעות שנשארת יציבה, הם מזיזים אותה. מי שעובד עליו כל היום עם Plus ירגיש את הקיר.
-- **Spark:** research preview למשתמשי Pro בלבד. מעל 1000 tokens בשנייה על חומרה של Cerebras, context של 128k, טקסט בלבד. יש לו limits נפרדים שלא נספרים מהמכסה הרגילה. וכשיש עומס, מחכים בתור.
-- **שימוש:** 3 מיליון בשבוע ב-16 באפריל, 4 מיליון בשבוע ב-14 במאי.
-- **חומרה:** כן, יש. ביולי יצאה Codex Micro, מקלדת של 13 מקשים ב-$230. לכל agent יש נורת RGB שמראה אם הוא חושב, רץ, מחכה או סיים, ויש חוגה שמכוונת את רמת ה-reasoning. היא נגמרה במלאי. אני לא שופט.
+Codex כלול במנוי ChatGPT. Plus עולה $20 לחודש ו-Pro עולה $200, ולארגונים יש Business ו-Enterprise. אין מחיר נפרד ל-Codex, ו-OpenAI גם לא מפרסמת מספר הודעות קבוע. המכסה תלויה בגודל המשימה ומתאפסת בחלונות זמן. משימת ענן שורפת ממנה יותר מעריכה קטנה מקומית. בפועל, `/status` הוא המקור היחיד שאפשר לסמוך עליו.
 
-<figure><img src="/posts/codex-up-close/src5.jpg" alt="מעל 1000 tokens בשנייה על Cerebras, אבל רק ב-Pro, עם 128k context ובלי טסטים אוטומטיים (credit: OpenAI)" loading="lazy" /><figcaption>מעל 1000 tokens בשנייה על Cerebras, אבל רק ב-Pro, עם 128k context ובלי טסטים אוטומטיים (credit: OpenAI)</figcaption></figure>
+המודלים:
 
-## איפה הוא חזק
+- **GPT-5.3-Codex** (5 בפברואר 2026): לפי OpenAI הוא מהיר ב-25% מ-5.2-Codex. הוא קבע שיא ב-SWE-Bench Pro וב-Terminal-Bench 2.0, עם פחות טוקנים לכל משימה. אלה המספרים שלהם, על ה-benchmarks שהם בחרו.
+- **GPT-5.3-Codex-Spark** (12 בפברואר): מודל קטן שרץ על חומרה של Cerebras. הוא מוציא יותר מ-1,000 טוקנים לשנייה, עם context של 128k, טקסט בלבד. הוא זמין כ-research preview למנויי Pro, עם מכסה נפרדת שלא נספרת מהרגילה.
 
-החוזקה הראשונה היא עבודה ארוכה ברקע. סביבת ענן לכל repo, כמה agents במקביל, הם ממשיכים כשהלפטופ סגור, ואתם מתערבים רק כשצריך. לפי OpenAI, GPT-5.3-Codex בנה משחקים לבד לאורך מיליוני tokens, עם prompts גנריים כמו "fix the bug". אלה המספרים שלהם על ה-workflows שלהם, אבל הכיוון ברור.
+ויש עוד שני מספרים, פחות רציניים. 1.7GB בדיסק בשביל אפליקציית הדסקטופ. ו-$230 בשביל Codex Micro, מקלדת שהשיקו עם Work Louder ביולי. יש לה כפתור סיבובי לרמת ה-reasoning ונורות RGB שמראות איזה agent חושב ואיזה מחכה לכם. היא אזלה מהמלאי. כן.
 
-החוזקה השנייה היא code review אוטומטי על PRs, ופה יש עדויות מצד שלישי. בדואולינגו הריצו בנצ'מרק פנימי של code review על Python בצד שרת, ולדבריהם Codex היה "the only one to catch tricky backward compatibility issues". וב-Wonderful התל אביבית, ה-Chief Architect דניאל סיקורסקי אמר ש-Codex CLI "completely replaced every other agentic harness" בעבודת הארכיטקטורה שלהם. אלה ציטוטים מדף שיווק, ברור. מה שכן, זה דף שחברה ישראלית שמה עליו את השם שלה.
+## איפה הוא באמת חזק
 
-ועוד יתרון שקל לפספס. אם הארגון שלכם כבר משלם על ChatGPT Business, Codex עולה לכם אפס שקלים נוספים. זה כל ה-procurement.
+קודם כל, עבודה ארוכה בלי השגחה. OpenAI הראו את GPT-5.3-Codex בונה משחקים מאפס לאורך מיליוני טוקנים, עם prompts גנריים כמו "fix the bug". בעבודה אמיתית זה אומר שאפשר לשלוח לו refactor של שעה בענן ולחזור לתוצאה.
+
+חוץ מזה, code review. פה העדויות הכי ספציפיות. ב-Duolingo אומרים שרק הוא תפס בעיות backward compatibility ב-benchmark הפנימי שלהם ל-code review ב-Python. ב-Ramp אומרים שה-reviews שלו תופסים באגים שהצוות היה מפספס. וב-Wonderful הישראלית הלכו הכי רחוק:
+
+> "At Wonderful, Codex CLI has completely replaced every other agentic harness for our core technology and architecture work requiring deep reasoning and understanding." — Daniel Sikorskiy, Chief Architect, Wonderful (openai.com/codex)
+
+ובמקביל יש את כל מה שמסביב. ה-sandbox דולק כברירת מחדל, ואת הקוד של ה-CLI אפשר לקרוא. פקודות מאשרים מהטלפון דרך relay שלא חושף את המחשב לאינטרנט. מאז 16 באפריל נוספו גם computer use ברקע, דפדפן מובנה שאפשר לכתוב הערות ישירות על הדף שלו, ויותר מ-90 plugins חדשים (Atlassian Rovo, CircleCI, CodeRabbit, GitLab Issues, Neon, Render ועוד).
+
+<figure><img src="/posts/codex-up-close/src4.jpg" alt="מאפריל Codex כבר לא רק כותב קוד: computer use, דפדפן מובנה ו-90+ plugins באותו חלון (credit: OpenAI)" loading="lazy" /><figcaption>מאפריל Codex כבר לא רק כותב קוד: computer use, דפדפן מובנה ו-90+ plugins באותו חלון (credit: OpenAI)</figcaption></figure>
 
 ## איפה הוא נופל
 
-מה שהכי מטריד אותי זה מה ש-OpenAI כתבו בעצמם על Spark:
+קודם כל, השמות. Codex הוא מודל, CLI, אפליקציה (שעכשיו נקראת ChatGPT), סוכן ענן, מוצר אבטחה (Codex Security, מרץ 2026) ומקלדת. נסו להסביר לצוות ה-security מה בדיוק אישרתם.
 
-> "Because it's tuned for speed, Codex-Spark keeps its default working style lightweight: it makes minimal, targeted edits and doesn't automatically run tests unless you ask it to."
-> (OpenAI, השקת GPT-5.3-Codex-Spark, 12 בפברואר 2026)
+המכסה אטומה. בלי מספר מפורסם קשה לתכנן עבודה של צוות. מי שמריץ כמה agents במקביל יגלה את הגבול באמצע היום ולא בתיעוד.
 
-1000 tokens בשנייה בלי טסטים זו פשוט דרך מהירה יותר לייצר באגים. אם אתם עוברים ל-Spark, תכתבו ב-`AGENTS.md` שמריצים טסטים אחרי כל שינוי, ואל תסמכו על ברירת המחדל.
+הפיצ'רים החדשים מכוונים מאוד ל-Mac. OpenAI מתארים את ה-computer use ברקע כעבודה "on your Mac", חיבור ל-devbox ב-SSH עדיין ב-alpha, ו-Spark זמין רק ב-Pro. ולפי OpenAI עצמם, Spark עושה עריכות מינימליות ולא מריץ טסטים אם לא ביקשתם. כלומר הוא מהיר, אבל לבדוק זה שוב עליכם.
 
-ושאר הנקודות:
-- **פיזור.** CLI, IDE, ענן, אפליקציה שנקראת עכשיו ChatGPT, טלפון, ואפילו מקלדת. ה-docs מפוצלים בין developers.openai.com ל-learn.chatgpt.com, ואחרי חודש עדיין תחפשו איפה יושבת הגדרה מסוימת.
-- **משקל.** 1.7GB של runtime, כולל LibreOffice, רק כדי שהוא יוכל לפתוח לכם קובץ xlsx. זה נוח, אבל זה כבר לא כלי CLI רזה.
-- **Computer use מכוון ל-Mac.** בהשקה דיברו רק על Mac. מי שעובד על Linux או בתוך WSL יקבל רק חלק מהחוויה.
-- **90 plugins זה 90 הרשאות.** בארגון מפוקח כל plugin עובר סקירת אבטחה, ומי שעובד בבנק או בתעשייה הביטחונית יודע כמה זמן זה לוקח.
+והאפליקציה מתקינה runtime של 1.7GB בלי לשאול. אצל מפתח בודד זה ניטפוק. במחשב ארגוני מנוהל זה Python ו-Node נוספים שה-IT לא יודע עליהם.
 
-## Codex מול Claude Code, ביום רגיל
+> **הסתייגות:** את כל ה-benchmarks בפוסט הזה OpenAI פרסמה על המודלים של עצמה. אני לא קונה "שיא חדש" בלי להריץ על ה-repo שלי, ואני ממליץ גם לכם לא לקנות. העדויות של הלקוחות מעניינות יותר, אבל גם הן מופיעות בדף שיווק.
 
-רגע, ב-CLI ביום-יום הם ממש קרובים. שניהם agent בטרמינל עם קובץ הוראות ב-repo. לשניהם יש sandbox והרשאות, ולשניהם יש מצב headless לסקריפטים. גם המחיר דומה: $20 בכניסה אצל שניהם ו-$200 בטופ, ואצל אנטרופיק יש גם מדרגה של $100 באמצע.
+## Codex מול Claude Code, ביום-יום
 
-ההבדל הוא בהימור. OpenAI מהמרים על רוחב: ענן, טלפון, computer use, plugins, ו-agent אחד שמחובר לחשבון ChatGPT שכבר יש לכם. אנטרופיק מהמרים על עומק בטרמינל: hooks, subagents, MCP, ולולאה הדוקה של לקרוא, לערוך, להריץ ולתקן. Codex רוצה שתפקחו עליו מרחוק. קלוד רוצה שתישארו לידו.
+על הנייר הם כמעט אותו דבר. שניהם agent בטרמינל, ושניהם קוראים קובץ הוראות לפרויקט ומדברים MCP. לשניהם יש מצב headless (`codex exec` מול `claude -p`), ושניהם מתחילים ב-$20 לחודש. ההבדלים צצים אחרי שבוע של עבודה.
 
-טיפ פרקטי לצוות שעוד לא החליט: תחזיקו `AGENTS.md` אחד כמקור אמת, ותריצו `ln -s AGENTS.md CLAUDE.md`. ככה המעבר בין הכלים לא עולה לכם כלום, ואף אחד לא מתחזק שני קבצי הוראות שמתרחקים אחד מהשני עם הזמן. אצלנו copy-paste בין agents כבר הפיל לנו production, אז שתי גרסאות של אותן הוראות לא מלהיבות אותי.
+אז איפה בדיוק? Codex חזק בכל מה שקורה כשאתם לא ליד המחשב: ענן, מובייל ו-sandbox שלא צריך להגדיר. גם לאנטרופיק יש Claude Code בדפדפן. אבל ב-Codex הענן, המובייל וה-review ב-GitHub הם מוצר אחד שרץ מאותו חשבון. Claude Code חזק בשליטה על הלולאה עצמה. יש לו hooks שרצים לפני ואחרי כל כלי, subagents, והרשאות מפורטות ב-`settings.json`. רוצים שכל עריכה תעבור linter לפני שה-agent ממשיך? ב-Claude Code זה hook אחד. ב-Codex זה עדיין יותר הוראה ב-`AGENTS.md` מאשר אכיפה.
 
-> **הדעה שלי:** ה-pipeline שלנו רץ על קלוד דרך מנוי, ואני לא ממהר להחליף. אבל את ה-PR review של Codex הייתי מדליק מחר על repo אחד. זו בדיוק לולאה שבודקת עבודה, ובדיקה שווה לי יותר מטיוטה ראשונה טובה יותר.
+טיפ קטן למי שמריץ את שניהם על אותו repo. Codex קורא `AGENTS.md` ו-Claude Code קורא `CLAUDE.md`. תחזיקו קובץ אחד ותריצו `ln -s AGENTS.md CLAUDE.md`, אחרת תוך שבועיים יהיו לכם שתי גרסאות שונות של ההוראות.
 
-<figure><img src="/posts/codex-up-close/v3-svg-he.jpg" alt="אותו $20 בכניסה, הימור הפוך: Codex מתפזר לשישה משטחים ול-4M משתמשים בשבוע, קלוד מעמיק בלולאה אחת בטרמינל (OpenAI, מאי 2026)" loading="lazy" /><figcaption>אותו $20 בכניסה, הימור הפוך: Codex מתפזר לשישה משטחים ול-4M משתמשים בשבוע, קלוד מעמיק בלולאה אחת בטרמינל (OpenAI, מאי 2026)</figcaption></figure>
+<figure><img src="/posts/codex-up-close/v3-svg-he.jpg" alt="Codex מנצח בכל מה שקורה כשאתם לא ליד המחשב, ו-Claude Code מנצח בשליטה על מה שה-agent עושה כשאתם כן (OpenAI, התיעוד של אנטרופיק)" loading="lazy" /><figcaption>Codex מנצח בכל מה שקורה כשאתם לא ליד המחשב, ו-Claude Code מנצח בשליטה על מה שה-agent עושה כשאתם כן (OpenAI, התיעוד של אנטרופיק)</figcaption></figure>
 
-## מי צריך לבחור בו ברבעון הזה
+## מי צריך לבחור בו הרבעון
 
-- **יש לכם ChatGPT Business:** תדליקו Codex review על repo אחד לשבועיים. תספרו כמה מההערות היו באגים אמיתיים וכמה היו רעש. זה כל הניסוי.
-- **סטארט-אפ קטן שחצי מהזמן במילואים או בדרכים:** כאן המובייל וה-agents בענן באמת שווים משהו. כשאתם 4 מפתחים, לאשר פקודה מהטלפון במקום לחכות שמישהו יחזור למחשב זה לא גימיק.
-- **ארגון מפוקח, כמו בנקים, ביטחוני או בריאות:** סביבות ענן אומרות שהקוד יושב אצל OpenAI. תתחילו עם CLI מקומי, `sandbox_mode = "workspace-write"` ורשת סגורה, ובלי plugins עד שאבטחת מידע חותמת.
-- **אתם כבר עמוק ב-Claude Code עם hooks ו-subagents:** אין לכם סיבה לעבור. כן יש סיבה לתת לשניהם את אותו באג פעם בשבוע ולראות מי מוצא אותו.
+אם יש לצוות שלכם כבר מנוי ChatGPT, לנסות את Codex לא עולה לכם כלום. אין סיבה לא להפעיל `@codex review` על repo אחד כבר השבוע. אם רוב העבודה שלכם היא משימות ארוכות שאפשר לשלוח ולשכוח, או שאתם רוצים לאשר פקודות מהטלפון, כרגע הוא המוצר המלוטש יותר. ואם בניתם workflow על hooks ו-subagents ב-Claude Code, אין פה סיבה לעבור. תריצו את שניהם במקביל ותראו.
 
-בשורה התחתונה, אל תבחרו לפי benchmark. תבחרו לפי המקום שבו אתם רוצים לבדוק את העבודה של ה-agent. ומי שלא בודק בכלל יפסיד עם שניהם, בכל מהירות.
+מה לעשות השבוע:
+
+1. תריצו `npm i -g @openai/codex` ואז `codex` על repo אמיתי, ב-branch נפרד.
+2. קחו טסט אחד שנופל, ותריצו את אותו prompt ב-`codex exec` וב-`claude -p`. תמדדו זמן, גודל diff, וכמה פעמים הייתם צריכים להתערב.
+3. תפעילו `@codex review` על repo אחד לשבועיים, ותספרו כמה הערות היו באגים אמיתיים וכמה היו רעש.
+4. תפתחו את `~/.codex/config.toml` ותוודאו ש-`network_access = false` נשאר ברירת המחדל.
+
+בסוף מנצח הכלי שהטסטים שלכם תופסים אצלו פחות טעויות. ה-benchmark פחות חשוב.

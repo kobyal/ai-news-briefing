@@ -1,0 +1,164 @@
+---
+title: "Claude Code בפרקטיקה, חלק 2: hooks, MCP ו-skills, מה הולך לאן"
+description: "CLAUDE.md אומר מה חייב, skill איך, MCP מה אפשר, hook אוכף. PreToolUse שחוסם commit ל-main, formatter אוטומטי, שרת MCP ו-SKILL.md ראשון."
+lang: he
+key: claude-code-2-hooks-mcp-skills
+term: "hooks and MCP"
+kind: explainer
+pubDate: 2026-10-01
+tags: ["claude-code", "hooks", "mcp", "skills", "agents"]
+hook: "number"
+cover: illus
+tldr: ["חוק שאסור לפספס אף פעם עובר ל-hook, לא ל-CLAUDE.md.", "PreToolUse עם exit 2 חוסם פעולה ומחזיר לקלוד את הסיבה.", "נוהל ארוך מ-CLAUDE.md עובר ל-SKILL.md ונטען רק כשצריך."]
+series: { slug: "claude-code-in-practice", name: "Claude Code בפרקטיקה", part: 2, total: 5 }
+hero: /posts/claude-code-2-hooks-mcp-skills/hero.jpg
+diagram: /posts/claude-code-2-hooks-mcp-skills/diagram.svg
+sources:
+  - { title: "Hooks reference - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/hooks", date: "" }
+  - { title: "Connect Claude Code to tools via MCP - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/mcp", date: "" }
+  - { title: "Extend Claude with skills - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/skills", date: "" }
+  - { title: "AI Coding Agents: Rules, Commands, Skills, MCP and Hooks Explained : AntonioCortes.com", url: "https://antoniocortes.com/en/2026/02/01/ai-coding-agents-conceptos-clave", date: "" }
+  - { title: "AI agent hooks: the interface for governing AI agents — Speakeasy", url: "https://www.speakeasy.com/resources/ai-agent-hooks", date: "" }
+  - { title: "What Are Hooks in AI Coding? | Corridor", url: "https://corridor.dev/learn/hooks", date: "" }
+opinion: "אנחנו מסתכלים על זה ככה: CLAUDE.md הוא בקשה, hook הוא חוזה. כל מקום שאפשר להחליף בו שיקול דעת של מודל בכלל דטרמיניסטי, כדאי להחליף, ואצלנו כל החלפה כזאת יצאה זולה ואמינה יותר. hooks הם גם הצורה הכי פשוטה של verification: בדיקה שרצה על הפלט בלי לשאול את המודל אם הוא רוצה להיבדק. MCP ו-skills שימושיים, אבל הם מרחיבים את מה שהמודל יכול לעשות, לא את מה שאפשר לסמוך עליו. ב-2026 הכישרון הוא לתכנן את המערכת סביב המודל, ו-hooks הם החלק במערכת שאתם כותבים, לא הוא."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+1 מתוך 4. זה המספר שכדאי לזכור מהחלק הזה. ל-Claude Code יש ארבעה מנגנונים שמכוונים אותו: CLAUDE.md, skills, MCP ו-hooks. שלושה מהם עובדים רק אם המודל מחליט להשתמש בהם. הרביעי רץ גם כשהמודל שכח.
+
+ב-6 במאי 2026 Speakeasy ספרו ארבעה agents שכבר חושפים hooks: קלוד קוד היה הראשון, אחריו Cursor, Codex ו-VS Code Copilot, כולם עם צורה כמעט זהה. כשארבעה ספקים מתכנסים לאותו API, זה כבר לא פיצ'ר של מוצר אחד. זה מנגנון שצריך להכיר.
+
+בחלק הקודם העברנו כל NEVER מ-CLAUDE.md ל-deny ב-settings.json. עכשיו ממשיכים משם: מה עושים עם חוק ש-deny לא יודע לבטא, איך מחברים כלי חיצוני, ומה עושים כשפסקה ב-CLAUDE.md גדלה לנוהל שלם.
+
+## כלל, נוהל, יכולת, אכיפה
+
+אנטוניו קורטס פירק את המושגים האלה בפוסט מפברואר 2026. אני מקצר לשורה אחת: rules אומרים מה חייב, skills אומרים איך, MCP אומר מה אפשר, hooks אוכפים.
+
+| מנגנון | איפה הוא יושב | מי מחליט שהוא קורה | עלות ב-context |
+| --- | --- | --- | --- |
+| CLAUDE.md | שורש הריפו | נטען תמיד, המודל מחליט אם להישמע | כל שורה, בכל הודעה |
+| skill | `.claude/skills/<name>/SKILL.md` | המודל, או אתם עם `/name` | רק ה-description, עד שמשתמשים |
+| MCP | `.mcp.json` או `claude mcp add` | המודל, כשהוא בוחר לקרוא לכלי | הגדרות הכלים |
+| hook | `hooks` ב-settings.json | אף אחד. רץ על האירוע | אפס, אלא אם הוא מחזיר פלט |
+
+העמודה שחשובה פה היא השלישית. CLAUDE.md נטען תמיד, אבל להישמע לו זו עדיין החלטה של המודל. skill ו-MCP קורים רק אם המודל בוחר בהם. hook לא שואל אף אחד.
+
+> "Ask an agent to call a security tool through MCP, and it will... probably do it. Most of the time. When it remembers."
+>
+> — Corridor, What Are Hooks in AI Coding
+
+כן. "בדרך כלל" מספיק לסגנון קוד. זה לא מספיק ל-push ל-main וגם לא לסריקת secrets.
+
+ו-hook הוא לא עוד מקום לכתוב בו הוראות. לפי התיעוד של אנטרופיק handler יכול להיות פקודת shell, HTTP endpoint, כלי MCP, prompt קצר למודל או subagent. ברגע ששמים שם מודל, ההסתברות חוזרת. אני מתחיל תמיד מ-command.
+
+<figure><img src="/posts/claude-code-2-hooks-mcp-skills/v1-svg-he.jpg" alt="שלושה מנגנונים תלויים בזה שהמודל יבחר נכון. hook לא שואל אותו בכלל (תיעוד ה-hooks של אנטרופיק, Corridor)" loading="lazy" /><figcaption>שלושה מנגנונים תלויים בזה שהמודל יבחר נכון. hook לא שואל אותו בכלל (תיעוד ה-hooks של אנטרופיק, Corridor)</figcaption></figure>
+
+## PreToolUse: חוסמים commit ל-main
+
+deny הוא בינארי: פקודה מותרת או אסורה. "אסור commit, אבל רק על main" זה תנאי, ובשביל תנאים יש PreToolUse.
+
+בגדול זה עובד ככה. hooks רצים בשלוש תדירויות: פעם בסשן (SessionStart, SessionEnd), פעם בתור (UserPromptSubmit, Stop), ועל כל tool call (PreToolUse, PostToolUse). לפני כל tool call קלוד קוד מריץ את ה-hooks שה-matcher שלהם תואם לשם הכלי, ושולח להם JSON ב-stdin עם `tool_name` ו-`tool_input`. exit 0, ממשיכים. exit 2, הפעולה נחסמת ומה שכתבתם ל-stderr חוזר לקלוד כהסבר. הוא קורא את זה, ובדרך כלל פותח branch לבד.
+
+```bash title=".claude/hooks/block-main-commit.sh"
+#!/usr/bin/env bash
+# PreToolUse, matcher: Bash
+input=$(cat)
+cmd=$(echo "$input" | jq -r '.tool_input.command // ""')
+
+if echo "$cmd" | grep -qE 'git (commit|push)'; then
+  branch=$(git -C "$CLAUDE_PROJECT_DIR" branch --show-current)
+  if [ "$branch" = "main" ]; then
+    echo "Blocked: no direct commit/push on main. Create a feature branch first." >&2
+    exit 2
+  fi
+fi
+exit 0
+```
+
+אחרי `chmod +x`, תבדקו אותו מה-shell לפני שאתם סומכים עליו:
+
+```bash title="terminal"
+echo '{"tool_input":{"command":"git commit -m x"}}' | CLAUDE_PROJECT_DIR=$PWD .claude/hooks/block-main-commit.sh; echo $?
+```
+
+על main אתם אמורים לראות 2. על כל branch אחר, 0.
+
+<figure><img src="/posts/claude-code-2-hooks-mcp-skills/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/claude-code-2-hooks-mcp-skills/src6.jpg" alt="Claude Code, Cursor, Codex ו-Copilot חושפים כמעט אותו מנגנון, אז hook שתכתבו עכשיו לא ייזרק כשתחליפו כלי (credit: Speakeasy)" loading="lazy" /><figcaption>Claude Code, Cursor, Codex ו-Copilot חושפים כמעט אותו מנגנון, אז hook שתכתבו עכשיו לא ייזרק כשתחליפו כלי (credit: Speakeasy)</figcaption></figure>
+
+## PostToolUse: formatter אחרי כל עריכה
+
+פה הכיוון הפוך. לא חוסמים לפני, מתקנים אחרי. matcher על `Edit|Write`, הנתיב של הקובץ יושב ב-`tool_input.file_path`, ומריצים עליו prettier. בפייתון תחליפו ל-`ruff format`, ב-Go ל-`gofmt`. ככה נראה הקובץ עם שני ה-hooks:
+
+```json title=".claude/settings.json"
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/block-main-commit.sh" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "jq -r '.tool_input.file_path' | xargs -I {} npx prettier --write --ignore-unknown {}" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+עם `--ignore-unknown`, prettier פשוט שותק על קבצים שהוא לא מכיר. אחרי השמירה תריצו `/hooks` בתוך הסשן ותוודאו ששניהם רשומים.
+
+רגע, למה לא פשוט לכתוב ב-CLAUDE.md "תריץ prettier אחרי כל שינוי"? כי אז זה עוד צעד שהמודל צריך לזכור, עוד tool call ועוד tokens. ה-hook עושה את זה בלי לשאול ובלי לשרוף כלום.
+
+> **הדעה שלי:** hooks הם ההשקעה הכי זולה ב-Claude Code. עשר שורות bash מחליפות פסקה ב-CLAUDE.md שהמודל ממילא מפספס פעם בכמה ימים. הייתי מתחיל מה-formatter, כי אין בו שום סיכון.
+
+## MCP: כשאתם מעתיקים לצ'אט מכלי אחר
+
+לתיעוד של אנטרופיק יש כלל אצבע טוב: תחברו שרת MCP כשאתם תופסים את עצמכם מדביקים לצ'אט נתונים מכלי אחר, issue tracker או dashboard של monitoring. HTTP הוא ה-transport המומלץ לשרתים מרוחקים.
+
+```bash title="terminal"
+claude mcp add --transport http --scope project notion https://mcp.notion.com/mcp
+claude mcp list
+```
+
+`--scope project` כותב את ההגדרה ל-`.mcp.json` בשורש הריפו. הקובץ עובר commit, וכל הצוות מקבל אותו שרת. את ההתחברות עצמה עושים עם `/mcp` בתוך הסשן.
+
+ופה hooks ו-MCP נפגשים. כלי MCP מופיעים לקלוד בשם בפורמט `mcp__<server>__<tool>`, אז PreToolUse עם matcher של `mcp__notion__.*` יכול לרשום כל קריאה ללוג או לחסום את הכלים שכותבים. Corridor ממליצים בדיוק על זה: hook לפני כל קריאת MCP, שאוכף אילו שרתים מותרים. בקיצור, MCP נותן יכולת, וה-hook מחליט מה מותר לעשות איתה.
+
+## skill: כשפסקה ב-CLAUDE.md הפכה לנוהל
+
+התיעוד אומר את זה ישר: skill מתאים כשאתם מדביקים שוב ושוב את אותה רשימת צעדים, או כשקטע ב-CLAUDE.md הפך מעובדה לנוהל. וההבדל הוא בעלות. CLAUDE.md נטען בכל הודעה, הגוף של skill נטען רק כשמשתמשים בו, אז נוהל ארוך כמעט לא עולה כלום עד שצריך אותו.
+
+```markdown title=".claude/skills/db-migration/SKILL.md"
+---
+name: db-migration
+description: Use when creating or changing a database migration. Naming, rollback, and the check before opening a PR.
+---
+
+1. שם הקובץ: `YYYYMMDDHHMM_<what>.sql` בתיקייה `migrations/`.
+2. כל migration מגיע עם down. אין down? עוצרים ושואלים.
+3. מריצים `make db-migrate && make db-rollback && make db-migrate` על ה-DB המקומי.
+4. ב-PR: שורה אחת על lock של טבלאות, אם הטבלה מעל מיליון שורות.
+```
+
+ה-description הוא החלק היחיד שקלוד רואה כל הזמן, אז הוא צריך להגיד מתי, לא מה. "Use when creating a migration" עובד הרבה יותר טוב מ-"Database helper". קלוד מפעיל אותו לבד, או שאתם מפעילים ישירות עם `/db-migration`. skills של Claude Code בנויים על הסטנדרט הפתוח Agent Skills, אז אותו קובץ עובד גם בכלים אחרים. ויש כבר כמה מובנים, כמו `/code-review` ו-`/debug`, שכדאי לפתוח ולקרוא לפני שכותבים את שלכם.
+
+<figure><img src="/posts/claude-code-2-hooks-mcp-skills/src5.jpg" alt="חמש קטגוריות אצל קורטס, ארבע בפועל ב-Claude Code: שם skill הוא כבר גם ה-slash command (credit: AntonioCortes.com)" loading="lazy" /><figcaption>חמש קטגוריות אצל קורטס, ארבע בפועל ב-Claude Code: שם skill הוא כבר גם ה-slash command (credit: AntonioCortes.com)</figcaption></figure>
+
+## מה לעשות השבוע
+
+- תעברו על CLAUDE.md ותסמנו כל שורה: עובדה, נוהל או חוק. עובדה נשארת, נוהל עובר ל-skill, חוק שאסור לפספס עובר ל-hook או ל-deny.
+- תוסיפו PostToolUse עם ה-formatter של הפרויקט. הכי בטוח להתחיל ממנו.
+- PreToolUse אחד, לחוק שהכי כואב לכם: commit ל-main, עריכה של `.env`, migration בלי down.
+- כל hook נבדק מה-shell עם pipe לפני שהוא נכנס ל-settings.json. exit 2 כשצריך לחסום, 0 כשלא.
+- שרת MCP אחד, לכלי שאתם הכי הרבה מעתיקים ממנו, עם `--scope project`.
+
+ובמקרים שלא ברור לאן משהו הולך, שאלה אחת: מה קורה אם קלוד שוכח את זה פעם אחת? אם התשובה היא "כלום", זה CLAUDE.md. אם התשובה היא incident, זה hook.

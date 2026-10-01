@@ -1,0 +1,185 @@
+---
+title: "Claude Code in Practice, Part 1: Short CLAUDE.md, Strict Permissions"
+description: "The three CLAUDE.md files, auto memory, settings.json permissions, and the commands worth memorizing. Step by step, for a real team."
+lang: en
+key: claude-code-1-setup-and-memory
+term: "CLAUDE.md"
+kind: fieldnotes
+pubDate: 2026-10-01
+tags: ["claude-code", "claude-md", "agents-md", "permissions", "developer-tools"]
+hook: "claim"
+cover: photo
+tldr: ["Run /init, then delete every line Claude could infer from the code.", "Every NEVER rule moves to deny in .claude/settings.json.", "Put the full check command at the top of CLAUDE.md, and send the file through code review."]
+series: { slug: "claude-code-in-practice", name: "Claude Code in practice", part: 1, total: 5 }
+hero: /posts/claude-code-1-setup-and-memory/hero-en.jpg
+diagram: /posts/claude-code-1-setup-and-memory/diagram.svg
+sources:
+  - { title: "How Claude remembers your project - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/memory", date: "" }
+  - { title: "Settings files and precedence - Claude Code Docs", url: "https://docs.anthropic.com/en/docs/claude-code/settings", date: "" }
+  - { title: "Best practices for Claude Code - Claude Code Docs", url: "https://www.anthropic.com/engineering/claude-code-best-practices", date: "" }
+  - { title: "Claude Code now reads AGENTS.md if there is no Claude.md", url: "https://code.claude.com/docs/en/changelog", date: "2026-09-18" }
+  - { title: "Claude Code as a Daily Driver: Claude.md, Skills, Subagents, Plugins, and MCPs", url: "https://arps18.github.io/posts/claude-code-mastery", date: "2026-05-27" }
+  - { title: "I am morally opposed to updating my Claude.md", url: "https://alex-jacobs.com/posts/claudemd", date: "2026-08-20" }
+  - { title: "Compress Your Claude.md: Cut 60-70% of System Prompt Bloat in Claude Code", url: "https://techloom.it/blog/compress-claude-md.html", date: "2026-02-24" }
+  - { title: "`bun init` automatically creates a Claude.md file by default", url: "https://bun.com/docs/runtime/templating/init", date: "2026-07-28" }
+  - { title: "AGENTS.md, SKILL.md, DESIGN.md: How AI Instructions Split into Three Layers | AWS Builder Center", url: "https://builder.aws.com/content/3Fn9XceqvLb9capjSjqtClrA4Ea/agentsmd-skillmd-designmd-how-ai-instructions-split-into-three-layers", date: "" }
+opinion: "We look at CLAUDE.md the way we look at any new term: a name isn't a method, and the file is only worth something if it changes what Claude does on Monday. A NEVER line with no deny behind it is a hope, not a policy. Everywhere we replaced an instruction with a deterministic rule, whether a permission, a linter, or a test, it came out cheaper and more reliable than any clever phrasing. The one line we insist on is the check command, because a loop that verifies itself is worth more than a good first draft. Everything else: shorten it, put it through review, and delete without sentiment."
+madeWith: { model: "claude-opus-5-5", sourceCount: 9, reviewedBy: "Koby Almog" }
+---
+
+The best CLAUDE.md on your team is probably the shortest one. Not the one /init generated, and not the one everyone added a line to after a bad day.
+
+That sounds backwards, but Anthropic sets a ceiling too. Claude Code's auto memory loads into each session only up to 200 lines or 25KB, whichever comes first. Matt Pocock put out a video titled simply "Never Run claude /init". And in February 2026 someone at techloom compressed their CLAUDE.md by 60–70%, then ran a benchmark and found the file helps less than the community assumes.
+
+Meanwhile, the file is becoming a default. `bun init` creates a CLAUDE.md automatically when it detects the Claude CLI, and per the September changelog, Claude Code reads AGENTS.md if there's no CLAUDE.md. So you'll have one of these files either way. The only question is whether it works for you or against you.
+
+This is part 1 of a series: setting up for a real team. Files, memory, permissions, commands. Hooks, skills, and MCP wait for part 2.
+
+## 01 · Map the three levels before writing a line
+
+Claude Code loads CLAUDE.md from three levels, and each one belongs to someone different:
+
+- `./CLAUDE.md` at the repo root. The team's. Goes into git and gets reviewed like any other file.
+- `~/.claude/CLAUDE.md`. Yours, across every project on the machine. Personal habits go here: commit message style, which language to answer in.
+- `CLAUDE.local.md` at the project root. Yours, this project only. Add it to `.gitignore`.
+
+Above that sits an organization (managed) layer that IT distributes and you can't override. And a CLAUDE.md in a subdirectory loads when Claude works on files there, which pays off nicely in a monorepo.
+
+If the repo already uses AGENTS.md (the standard from OpenAI, Google, Cursor and others, donated to the Linux Foundation in December 2025), don't duplicate it. An import is enough:
+
+```markdown title="CLAUDE.md"
+@AGENTS.md
+
+## Claude-specific
+- Use plan mode before any change that touches more than one package.
+```
+
+So how do you know what actually loaded? `/memory` inside the session lists every file that came in and opens them for editing. Run it once on a new hire's machine. Often you'll find a `~/.claude/CLAUDE.md` from some old project nobody remembers.
+
+<figure><img src="/posts/claude-code-1-setup-and-memory/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## 02 · Run /init, then delete half
+
+`/init` scans the repo and writes a draft. It's not bad, it's long. Every time I've run it I got something reasonable and bloated. Pocock is right in principle: every line there goes into context on every message, every day. But you don't need to give up `/init`, you need to edit after it.
+
+What to cut: the directory layout (Claude sees it on its own), the dependency list (there's a `package.json`), three paragraphs about what the project does. What to keep: the exact commands and whatever can't be guessed. You should end up with something like:
+
+```markdown title="CLAUDE.md"
+# payments-api
+
+## Commands
+- Test one file: `pnpm vitest run path/to/file.test.ts`
+- Full check before commit: `pnpm lint && pnpm typecheck && pnpm test`
+- Local DB: `docker compose up -d db` (port 5433, not 5432)
+
+## Not obvious from the code
+- Money is integer agorot. Never floats, never `toFixed`.
+- Migrations: add a new file. Never edit a merged migration.
+- `src/legacy/` is frozen. Read it, don't change it.
+
+## When you are done
+- Run the full check. If it fails, fix the code, not the test.
+```
+
+Notice what's missing. No "write clean code", no "you are a senior engineer". What Claude needs is the command that tells it whether it got it right. Boris Cherny from the Claude Code team estimates that giving Claude a way to check itself improves results 2–3x. The full check line is worth more than every style paragraph in the file.
+
+## 03 · Filter: what goes in, what stays out
+
+Anthropic's docs give the simplest test: CLAUDE.md is for the things you'd otherwise explain over and over. And one more line worth pinning next to your screen:
+
+> The more specific and concise your instructions, the more consistently Claude follows them.
+>
+> — Claude Code Docs, How Claude remembers your project
+
+In practice, a line goes in if Claude can't infer it from the code (port 5433, agorot), or if it fixes a mistake that keeps recurring. Not one that happened once.
+
+Stays out: style rules the linter already enforces, secrets, and instructions that only apply to some of the files. Those last ones go in `.claude/rules/`, and they load only when Claude touches matching files:
+
+```markdown title=".claude/rules/api.md"
+---
+paths:
+  - "src/api/**/*.ts"
+---
+- Every handler validates input with the zod schema next to it.
+- Errors go through `toProblemJson()`, never a raw throw.
+```
+
+Alex Jacobs wrote a post in August called "I am morally opposed to updating my Claude.md". It's funny, but the point is serious. The file turns into an archive of grievances: every line written in a moment of frustration, with no expiry date, while the model improves every four months and the rules stay frozen on what it did wrong last spring.
+
+> **My take:** I agree with Jacobs's diagnosis, not his conclusion. The fix isn't to stop writing, it's to write every line like code: with a reviewer, and a willingness to delete it. A rule nobody is willing to delete is a rule nobody has tested.
+
+<figure><img src="/posts/claude-code-1-setup-and-memory/src6.jpg" alt="Every line was written on a bad day and none were ever deleted. The problem is no expiry date, not too many rules (credit: Alex Jacobs)" loading="lazy" /><figcaption>Every line was written on a bad day and none were ever deleted. The problem is no expiry date, not too many rules (credit: Alex Jacobs)</figcaption></figure>
+
+## 04 · Auto memory: let Claude write, then read after it
+
+Beyond what you write, there's auto memory: notes Claude writes to itself when you correct it. It's per-repo, shared across worktrees, and loads into each session up to 200 lines or 25KB. Anything past that simply doesn't get in.
+
+Boris's tip, ending a correction with "Update CLAUDE.md so you don't repeat this", works. Claude really is good at phrasing rules for itself. That said, don't let it write straight into the team's CLAUDE.md without anyone seeing. Let it write, and have it go through a PR like any other change. That way another human reads the line before it becomes law.
+
+And once a month, a cleanup. This is the prompt we run, read-only, without touching files. What comes out is a list. What you do: delete, run the next task, and see whether anything breaks. It's the cheapest eval there is.
+
+<figure><img src="/posts/claude-code-1-setup-and-memory/v2-transcript-en.jpg" alt="Claude suggests what to delete, you delete and run. A deletion that broke nothing proves the line was unnecessary (after Alex Jacobs)" loading="lazy" /><figcaption>Claude suggests what to delete, you delete and run. A deletion that broke nothing proves the line was unnecessary (after Alex Jacobs)</figcaption></figure>
+
+## 05 · settings.json: what's allowed without asking
+
+This is where we move from requests to enforcement. The docs say explicitly that Claude treats CLAUDE.md as context, not enforced configuration. A deny list in settings.json, on the other hand, is checked before every tool call. Four files, per the docs:
+
+| File | Applies to | In git? |
+| --- | --- | --- |
+| `~/.claude/settings.json` | You, in every project | No |
+| `.claude/settings.json` | Everyone working on the project | Yes, commit it |
+| `.claude/settings.local.json` | You, in this project | No |
+| `managed-settings.json` | The whole org, no override | Distributed by IT |
+
+Start with deny, not allow. First what must not be read, then commands with no undo:
+
+```json title=".claude/settings.json"
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ],
+    "ask": ["Bash(git push:*)"],
+    "allow": [
+      "Bash(pnpm test:*)",
+      "Bash(pnpm lint)",
+      "Bash(git diff:*)"
+    ]
+  }
+}
+```
+
+Add allow entries after a week, based on what you approved by hand ten times. `/permissions` shows what's active right now and which file it came from.
+
+Got a line in CLAUDE.md that starts with NEVER? Move it here. Just remember deny matches on prefix, so `git push origin +main` still gets through. That's what hooks are for, and we'll get to them in part 2.
+
+<figure><img src="/posts/claude-code-1-setup-and-memory/v3-svg-en.jpg" alt="The same force-push line: in CLAUDE.md it's a request the model weighs, in deny it's a block before execution. The docs say so explicitly (Claude Code Docs)" loading="lazy" /><figcaption>The same force-push line: in CLAUDE.md it's a request the model weighs, in deny it's a block before execution. The docs say so explicitly (Claude Code Docs)</figcaption></figure>
+
+## 06 · Commands and shortcuts to keep at your fingertips
+
+- `Shift+Tab` twice: plan mode, read-only. Any change touching more than one file starts here.
+- `Ctrl+G`: opens the plan in your editor. The plan is text, edit it before it becomes code.
+- `@src/auth/login.py` instead of "look at the auth module". A precise reference saves searching and tokens.
+- `cat error.log | claude` instead of pasting a stack trace into the window.
+- `Esc` stops mid-run. Better to stop at step two than fix things at step twenty.
+
+And beyond those, a command of your own. Every markdown file in `.claude/commands/` becomes a slash command for the whole team. The review everyone phrases differently? One file:
+
+```markdown title=".claude/commands/review.md"
+Review the diff against main (`git diff main...HEAD`).
+Check only: missing tests, money handled as floats, edits to merged migrations.
+Output a list: file:line, problem, suggested fix. No praise, no summary.
+```
+
+Then `/review`, the same for everyone. When this should be a skill rather than a command is also part 2.
+
+## Takeaways
+
+- CLAUDE.md goes through code review. A line without a reviewer doesn't get in.
+- Every NEVER moves to deny in `.claude/settings.json`. A request stays a request.
+- The full check command is the most important line in the file.
+- Once a month, delete a line and run. If nothing breaks, it didn't need to be there.

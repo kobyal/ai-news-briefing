@@ -1,0 +1,147 @@
+---
+title: "Perplexity Comet up close: a great research assistant, and an agent you're better off not running"
+description: "Perplexity Comet up close: it reads and compares pages very well, and its agent works inside your session. Pricing, risks, and five research prompts."
+lang: en
+key: perplexity-comet-up-close
+term: "Perplexity Comet"
+kind: deepdive
+pubDate: 2026-10-01
+tags: ["perplexity", "comet", "agentic-browser", "prompt-injection", "research"]
+hook: "claim"
+cover: photo
+tldr: ["Install Comet in a separate profile. Don't import passwords, and keep work accounts out of it.", "In a research prompt, specify the source, the format, and \"write 'not found'\" instead of guessing.", "Code that calls Sonar Chat Completions? Move to the Agent API. Support ended on Sept 27."]
+series: { slug: "the-assistants", name: "The 2026 assistants, one by one", part: 4, total: 4 }
+hero: /posts/perplexity-comet-up-close/hero-en.jpg
+diagram: /posts/perplexity-comet-up-close/diagram.svg
+sources:
+  - { title: "https://www.perplexity.ai/comet", url: "https://www.perplexity.ai/comet", date: "" }
+  - { title: "Perplexity | AI for the Curious", url: "https://www.perplexity.ai/hub", date: "" }
+  - { title: "Overview - Perplexity", url: "https://docs.perplexity.ai", date: "" }
+  - { title: "What is Perplexity Comet and why is it on my website?", url: "https://www.humansecurity.com/ai-agent/perplexity-comet", date: "" }
+  - { title: "Perplexity AI Agents: Setup Guide for Automation", url: "https://stealaitools.com/perplexity-ai-agents", date: "" }
+  - { title: "Comet — 2025 AI Agent Index", url: "https://aiagentindex.mit.edu/2025/comet", date: "" }
+opinion: "We're not excited about an agent that clicks buttons inside the user's session. In 2026 the real skill is designing what the model sees and what it can touch, and Comet leaves that question to you, with no document explaining the boundaries. Assistant mode, on the other hand, is a great use: it returns sources, and with a source you can verify, and for us verification is always worth more than a good first draft. For repeated research we prefer the Search API, because it's deterministic, cheap, and holds no passwords. Buy the office chair yourself."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+Comet is a great research tool that also happens to know how to click buttons. Perplexity's landing page leads with «Buy a high quality, comfortable yet cheap office chair», and that is the part you should least let it do.
+
+I know that's the opposite of what you'd expect from an "agentic browser", so here's the reasoning. Comet launched in July 2025, at first only for Max subscribers at $200 a month. Since October 2025 it's a free download for everyone, and today it runs on Mac, Windows, iOS and Android. As early as August 20, 2025, The Register reported on researchers who showed that its assistant reads instructions hidden inside page content and executes them with your logged-in session. Both things are true of the same product. It reads and compares pages better than any other browser, and it does that from the browser where you're logged into your bank.
+
+This is the fourth and final part of the series. In part one we looked at dots, an agent that lives on its own cloud computer. Comet is the opposite. It lives on your machine.
+
+## What it is, and what it isn't
+
+In short, it's Chromium, with Perplexity as the default search engine and an AI side panel that sees the open page and your other tabs. It has two modes, and Perplexity explains the difference in one sentence:
+
+> "While the Assistant focuses on understanding and explaining, the Agent focuses on doing and executing" — Perplexity, Comet Resource Hub
+
+The Assistant reads, summarizes, compares across tabs and cites sources. The Agent scrolls, clicks, fills in forms and completes purchases. This whole post is built on that distinction.
+
+What it isn't:
+
+- **Not a sandbox.** There's no virtual machine on the side. The agent works with your cookies, logins and extensions.
+- **Not ChatGPT agent**, which runs in a clean remote browser at OpenAI.
+- **Not dots**, which keeps working when your laptop is closed. Comet works while the browser is open.
+- **Not the API.** Perplexity's Agent API, formerly Sonar Chat Completions, is a separate product for developers. We'll get to it at the end.
+
+## Hands-on: what happens when you use it
+
+Installation is standard. On first run it offers to import from Chrome, and that's already the first decision that matters. After that it looks like any Chromium, with an Assistant button that opens a side panel.
+
+You ask about the open page and get an answer that cites both the page and sources from the web. Open four pricing-page tabs, ask what the difference is, and it reads all of them. This is the part that really works. After a week, it's hard to go back to plain Chrome for this alone.
+
+Switch to Agent and you watch it work: the page moves, fields fill in, and there's a «Pause Comet Assistant» button to stop it midway. On a site you know, it's slower than you. On a site you don't know, it's faster.
+
+From the site's side it looks different. HUMAN Security, which sells bot detection, writes that Comet's traffic shows higher-density interactions and fewer idle periods than a human user, and yet it looks indistinguishable from a standard Chromium browser to most detection systems. Bottom line: if you run a website, some of your users are no longer clicking for themselves.
+
+<figure><img src="/posts/perplexity-comet-up-close/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/perplexity-comet-up-close/v1-screenshot-en.jpg" alt="Perplexity sells Comet through shopping and email, but the strongest example on the page is comparing coverage across news outlets (perplexity.ai/comet)" loading="lazy" /><figcaption>Perplexity sells Comet through shopping and email, but the strongest example on the page is comparing coverage across news outlets (perplexity.ai/comet)</figcaption></figure>
+
+## The numbers: $0, $20, $200
+
+- **Comet itself:** free to download.
+- **Pro:** $20 a month, higher limits on research.
+- **Max:** $200 a month. The MIT AI Agent Index sums it up as access to agentic mode and higher rate limits.
+- **Enterprise:** there's Comet for Enterprise Pro, for organizations.
+
+Two more details from the same index are worth remembering before you bring this into a company. Under AI safety/trust framework it says None found. Under Model specifications it says unsure. On the plus side, there's SOC2, GDPR and PCI. So there's standards compliance, but no document that explains how the agent decides what it's allowed to do.
+
+And for developers: if you have code that calls Sonar Chat Completions, the old endpoint was supported until September 27, 2026. That was four days ago. Check your logs.
+
+<figure><img src="/posts/perplexity-comet-up-close/src6.jpg" alt="Comet has SOC2 and GDPR, but the index found no documented safety framework for the agent itself (credit: MIT AI Agent Index 2025)" loading="lazy" /><figcaption>Comet has SOC2 and GDPR, but the index found no documented safety framework for the agent itself (credit: MIT AI Agent Index 2025)</figcaption></figure>
+
+## Where it's strong: five research tasks, with exact prompts
+
+My rule: define the source, define the format, and ask it to say when it has no answer. Without that third part, it fills in the gaps.
+
+1. **Comparing pricing pages across tabs.** Open 3–5 pricing pages and ask: «Build a table from all open tabs: price per month, limits, SLA, data region. Next to each number, write which tab it came from. If something isn't on the page, write 'not on page'.» The tab column is what lets you check it in ten seconds.
+
+2. **One event, several outlets.** This is Perplexity's own example, and it's genuinely good: «Find 4 articles about [event] from different outlets. What does each one emphasize, what does each one leave out, and where don't the numbers line up between them.»
+
+3. **Changelog between two versions.** «What changed in [SDK] between version X and version Y? Only from the official changelog and release notes. Breaking changes first, with a link for every line.»
+
+4. **Vendor due diligence.** «For [vendor]: find the status page, the last 3 incidents with date and duration, and whether they have SOC2 or ISO 27001 and from what source. If you didn't find it, write 'not found', don't guess.»
+
+5. **A long HN or Reddit thread.** «Summarize the discussion: the 3 strongest arguments for, 3 against, and which commenters say they ran this in production. A short quote for each.»
+
+None of these need Agent mode. They're all Assistant, and they all work on the free tier or Pro. And note task 5: a Reddit comment is exactly where the well-known demo against Comet worked.
+
+## Where it breaks: your session is the sandbox
+
+Why is this a problem at all? A normal browser keeps sites separated. A page on reddit.com can't read your Gmail; that's the same-origin policy. In Comet, the agent reads both, and if one page tells it what to do in the other, the separation doesn't help. HUMAN says it directly: the agent acts with the user's privileges, which is effectively bypassing SOP/CORS assumptions.
+
+The demo The Register reported on in August 2025 was Brave's: instructions hidden in a Reddit comment, the user asks for a summary of the page, and the assistant goes on to the user's logged-in accounts and pulls details from them. Perplexity patched it partially. According to HUMAN, follow-up testing suggested residual risk.
+
+So what do you actually do:
+
+- **A separate profile.** Comet as a research browser, not your main browser. On first run, don't import passwords from Chrome.
+- **Don't log in with it** to work Gmail, the AWS console, your bank, or GitHub with admin permissions.
+- **Agent only on public sites.** For purchases, forms and bookings, you click the last button.
+- **If you run a website:** assume some of your traffic is an agent with a real session. Account deletion, email changes and payments need re-confirmation.
+
+> **My take:** I looked for a case where Agent mode is worth both the $200 and the open session, and didn't find one that ChatGPT agent doesn't do with less risk. The office chair will arrive even if you click "Buy" yourself.
+
+## Comet vs. ChatGPT agent vs. dots
+
+The difference that matters here isn't the model. It's where the agent sits relative to your stuff.
+
+| | Comet | ChatGPT agent | OpenAI dots |
+|---|---|---|---|
+| Where it runs | In your browser | A remote browser at OpenAI | Its own cloud computer |
+| Whose session | Yours, cookies included | Clean, you log in manually when needed | Connectors you approved |
+| When it works | While the browser is open | Until the task is done | 24/7 |
+| Price | Free, full agent on Max at $200 | On paid plans; at launch in July 2025: 40 agent messages a month on Plus | See part 1 |
+| Best for | Reading and comparing across tabs | A one-off task across a few sites | Recurring routines, triage |
+
+If the task is reading and understanding, Comet wins easily, because it already sees what you see. If the task is doing something on a site, ChatGPT agent does it in a browser that holds none of your passwords. And dots belongs to work that repeats every morning, not to the search you need right now.
+
+<figure><img src="/posts/perplexity-comet-up-close/v3-svg-en.jpg" alt="Same prompt injection, three blast radii: only in Comet does it sit in the same ring as your saved passwords (HUMAN Security, The Register)" loading="lazy" /><figcaption>Same prompt injection, three blast radii: only in Comet does it sit in the same ring as your saved passwords (HUMAN Security, The Register)</figcaption></figure>
+
+## Who should pick it this quarter
+
+OK, the bottom line:
+
+- **Engineers, PMs and product people** who do a lot of comparisons and due diligence: yes. Free or Pro, as a second browser, in a clean profile.
+- **Anyone considering Max just for the Agent:** no. That $200 is better spent on something that runs outside your browser.
+- **Company IT:** before approving, add one line to the policy: Comet doesn't go into the profile with corporate SSO.
+- **Developers building research tools:** not the browser. The API. The Search API returns ranked results with no LLM in the middle, which is what you want in a pipeline:
+
+```python title="research.py"
+from perplexity import Perplexity
+
+client = Perplexity()  # reads PERPLEXITY_API_KEY from env
+
+search = client.search.create(
+    query=[
+        "Comet browser prompt injection",
+        "Perplexity Agent API Sonar migration",
+    ]
+)
+
+for result in search.results:
+    print(f"{result.title}: {result.url}")
+```
+
+This code can't see your cookies. That's its whole advantage, and it's enough.

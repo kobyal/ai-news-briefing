@@ -1,0 +1,14 @@
+direction: right
+claude: Claude picks a tool
+pre: PreToolUse hook
+tool: Tool runs
+post: PostToolUse hook
+result: Result back to Claude
+block: Blocked, stderr to Claude
+claude -> pre: tool_name + tool_input
+pre -> tool: exit 0
+pre -> block: exit 2
+block -> claude: reason
+tool -> post: file_path
+post -> result: formatted
+result -> claude

@@ -1,12 +1,15 @@
 ---
-title: "Jev: מודל שלא מייצר טקסט, רק החלטות עם הסתברות"
-description: "TypeSafe שחררו את Jev, מודל שמחזיר החלטות מוקלדות עם calibration במקום טקסט. מה יש בפנים, כמה זה עולה, ולמה בוחנים אותו ב-25 שורות פייתון."
+title: "Jev: כשה-agent צריך החלטה ולא פסקה"
+description: "Jev של TypeSafe מחזיר החלטה עם הסתברות במקום טקסט. מה הוא עושה בפועל, כמה הוא עולה, ואיך בונים decision layer כבר השבוע."
 lang: he
 key: jev
 term: "Jev"
-cover: illus
-pubDate: 2026-09-30
-tags: ["jev", "typesafe", "classification", "calibration", "logprobs"]
+kind: explainer
+pubDate: 2026-10-01
+tags: ["jev", "typesafe", "decision-models", "agents", "calibration", "classification"]
+hook: "claim"
+cover: photo
+tldr: ["תספרו כמה צעדים ב-agent שלכם הם בחירה מתוך רשימה סגורה", "תעבירו אותם ממודל גנרטיבי לסיווג עם הסתברות וסף escalate", "תתייגו 200 דוגמאות ותבדקו כיול לפני שאתם סומכים על 0.9"]
 hero: /posts/jev/hero.jpg
 diagram: /posts/jev/diagram.svg
 sources:
@@ -16,103 +19,132 @@ sources:
   - { title: "Ollaya – Ollama for open-source, Jev-style decision models", url: "https://ollaya.dev", date: "2026-09-25" }
   - { title: "OpenAI is well positioned to fast-follow Jev", url: "https://arcturus-labs.com/blog/2026/09/21/will-openai-eat-jevs-lunch", date: "2026-09-22" }
   - { title: "Show HN: Jev Plays Pokémon Red", url: "https://jev-pokemon.vercel.app", date: "2026-09-25" }
-opinion: "אנחנו לא קונים את \"אפס הזיות\". מודל שבוחר תשובה שגויה בביטחון של 0.95 הוא באג שקט, ואצלנו הבאגים השקטים היו הגרועים ביותר, לא התשובות השגויות. מה שכן, הכיוון נכון: אנחנו כבר מריצים סיווג על מודלים זולים ועוברים לכלל ברגע שכלל מספיק, ו-Jev יושב בדיוק באמצע. יש לו פלט סגור, ומספר שאפשר לשים עליו threshold ולבדוק אותו. לפני שנשלם על API, נמדוד calibration על הדאטה שלנו עם logprobs של מודל פתוח, ואם זה מספיק, סיימנו. וזה שתוך שבוע כבר יש שיבוטים, benchmarks וויכוחים על ההגדרה אומר לנו שזה אמיתי, גם אם ה-moat של TypeSafe פחות."
-madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+  - { title: "Jev by TypeSafe: A Decision Model for AI Agents", url: "https://beam.ai/agentic-insights/jev-typesafe-ai-agents", date: "" }
+  - { title: "Jev Explained: Typesafe AI's Non-Autoregressive System-1 Model | MindStudio", url: "https://www.mindstudio.ai/blog/jev-system-one-model-launch", date: "" }
+  - { title: "What Is Jev AI? A Practical Guide to System One and Executable Decisions", url: "https://huggingface.co/blog/sora-2/what-is-jev-ai-a-practical-guide-to-system-one-and", date: "" }
+opinion: "בעינינו Jev הוא שם טוב לדבר ישן: סיווג על logits, ו-nobodywho הוכיחו את זה ב-25 שורות. אבל אנחנו שופטים מונח לפי מה שהוא משנה ביום שני, וכאן משהו כן משתנה: מוציאים החלטות מ-prompts גנרטיביים ומכניסים אותן למרחב תשובות סגור, הכי קרוב ל-rule שאפשר. הסתברות מכוילת היא בעצם בדיקה שבנויה פנימה, ותמיד נעדיף לולאה שבודקת את עצמה מאשר טיוטה ראשונה טובה יותר. שישה clones בשבוע אחד וויכוח פתוח על ההגדרה זה סימן שיש פה משהו אמיתי. מה שלא נעשה זה להיכבל לספק אחד ב-early access: קודם מודדים על הדאטה שלנו עם מודל פתוח, ורק אחר כך משווים ל-Jev."
+madeWith: { model: "claude-opus-5-5", sourceCount: 9, reviewedBy: "Koby Almog" }
 ---
 
-## 16,150 החלטות ב-$1.65
+רוב הצעדים של ה-agent שלכם הם לא כתיבה. הם בחירה מתוך רשימה סגורה. ואתם משלמים עליהם כאילו ביקשתם חיבור.
 
-כריסטיאן מתיסן מ-Frigade חיבר את Jev לפוקימון Red ונתן לו לשחק עד ה-Hall of Fame. זה לקח 37 שעות ו-40 דקות. היו 16,150 החלטות ובערך 39.2 מיליון tokens של קלט, והעלות הכוללת יצאה בערך $1.65. זמן חציוני להחלטה: 0.4 שניות. בדרך היו גם 16 פעמים שכל הקבוצה נפלה, ו-15 ניסיונות מול ה-Elite Four.
+תסתכלו על trace אמיתי. לאיזה צוות הולך ה-ticket. איזה tool לקרוא. האם הקלט בטוח. האם להעביר לבן אדם. אף אחד מאלה לא צריך פסקה. ובכל זאת אנחנו שולחים אותם ל-LLM שכותב token אחרי token, מפרסרים את מה שחזר, ומתפלאים שהוא המציא tool שלא קיים.
 
-לצורך השוואה, TypeSafe עצמם מראים על ה-homepage קריאה אחת ל-LLM רגיל: 8.566 שניות ו-$0.01388. אותה משימה ב-Jev: 0.114 שניות ו-$0.000081. אלה המספרים שלהם, על ה-workflows שלהם, אבל הסדר גודל ברור.
+ב-15 בספטמבר 2026 TypeSafe AI הוציאו את Jev, מודל שמחזיר רק את זה: החלטה עם הסתברות. המחיר הוא $42 למיליארד tokens קלט, והפלט בחינם. בדמו בדף הבית שלהם אותה משימה לוקחת 0.114 שניות ועולה $0.000081, מול 8.566 שניות ו-$0.013880 ב-LLM רגיל. ו-Vercel כתבו ש-Jev תפס ב-AI Gateway מהר יותר מכל מודל אחר שהיה שם אי פעם.
 
-Jev יצא ב-15 בספטמבר 2026 מ-TypeSafe AI. המייסד הוא Diogo Almeida, שעבד ב-OpenAI על השיטות שהפכו מודלים לטובים ב-instruction following. זה המחקר שבסוף הפך ל-ChatGPT. אחרי שנתיים ב-stealth הוא חזר עם שאלה אחת: מודלים סופר-אנושיים בצ'אט כבר שנים, אז איפה כל האוטומציה?
+## Jev הוא function call שמחזיר הסתברות, לא צ'אטבוט
 
-<figure><img src="/posts/jev/v1-strip-he.jpg" alt="המספר שמסביר את הסיפור הוא העלות להחלטה: בערך 10 סנט לאלף החלטות. במחיר כזה, החלטה כבר לא נראית כמו קריאת API שחושבים עליה פעמיים." loading="lazy" /><figcaption>המספר שמסביר את הסיפור הוא העלות להחלטה: בערך 10 סנט לאלף החלטות. במחיר כזה, החלטה כבר לא נראית כמו קריאת API שחושבים עליה פעמיים.</figcaption></figure>
+מי שעומד מאחוריו הוא Diogo Almeida. ב-OpenAI הוא עבד על השיטות שגרמו למודלי שפה למלא הוראות ולנהל שיחה, המחקר שהוביל ל-ChatGPT. אחרי שנתיים ב-stealth הוא קרא למה שבנה "System One Model", על שם החשיבה המהירה והאינטואיטיבית של כהנמן. שיטת האימון נקראת RLCD, Reinforcement Learning for Calibrated Decisions.
 
-## מה הוא מחזיר, ומה הוא לא
+בגדול, החוזה פשוט. אתם שולחים state (מייל, שורת log, ticket, JSON) ורשימת שאלות מוקלדות. יש שלושה סוגים: בחירה מתוך אפשרויות שהגדרתם, ציון על rubric, וכן/לא. כל תשובה חוזרת עם הסתברות מכוילת. אין הסבר ואין פסקה.
 
-בגדול, Jev לא מייצר טקסט. בכלל. אתם שולחים לו state, טקסט או JSON, ורשימת שאלות עם תשובות אפשריות שהגדרתם מראש. לכל שאלה הוא מחזיר החלטה מוקלדת ואיתה הסתברות. TypeSafe קוראים לקטגוריה הזאת System One Model.
+מה זה לא:
 
-דוגמה מ-Ollaya: לקוח כותב "שלישית השנה חייבתם אותי פעמיים, תחזירו את הכסף היום או שאני עוזב". חמש שאלות, תשובה אחרי 87ms על RTX 4090: intent=refund עם 0.91, is_urgent=yes עם 0.92, churn_risk=yes עם 0.99. אין שם פסקה ואין "I understand your frustration". יש ערכים שהקוד שלכם יכול לעשות איתם משהו.
+- זה לא LLM קטן יותר. הוא ויתר על יצירת טקסט לגמרי.
+- זה לא JSON mode. ב-structured outputs המודל עדיין מייצר מחרוזת שאתם מפרסרים, והוא יכול לשים בתוך JSON תקין לגמרי שם של tool שלא קיים.
+- "לא יכול להזות" לא אומר "תמיד צודק". ב-Beam ניסחו את זה הכי טוב: Jev יכול לבחור את האפשרות הלא נכונה. הוא לא יכול להחזיר משהו מחוץ לרשימה, משהו שבור או משהו שלא עומד ב-schema.
 
-מה זה לא: זה לא JSON mode. ב-structured outputs המודל עדיין כותב מחרוזת token אחרי token, ואתם עושים parse ו-validate ומקווים לטוב. ב-Jev מרחב התשובות סגור מראש, ולכן type error פשוט לא יכול לקרות. זה גם לא LLM קטן לצ'אט. מייל הוא לא יכתוב לכם.
+Almeida כתב את זה ככה בפוסט ההשקה:
 
-רגע, ומה עם "Zero Hallucinations"? טכנית זה נכון, כי הוא לא יכול להמציא ערך שלא הגדרתם. אבל הוא בהחלט יכול לבחור את הערך הלא נכון בביטחון מלא. זו לא הזיה, זו טעות. ובפרודקשן לא ממש משנה לכם איך קוראים לזה.
+> While Jev gives up string generation, it’s optimized for structured outputs and _can’t_ hallucinate.
+>
+> — Diogo Almeida, מייסד TypeSafe, 15.9.2026
+
+## מה קורה בפנים: צעד אחד, ואז חלוקה
+
+LLM רגיל הוא autoregressive. הוא מייצר token, מזין אותו בחזרה ומייצר עוד אחד. Jev עונה ב-forward pass אחד.
+
+רגע, אז מה קורה שם בפועל? ב-Arcturus Labs מניחים ש-Jev קרוב מאוד ל-LLM רגיל. הוא מריץ צעד אחד, לוקח את התפלגות ההסתברויות על כל ה-tokens האפשריים, ומשאיר רק את אלה שמייצגים את האפשרויות שלכם. ב-nobodywho הלכו עוד צעד ופרסמו ב-22 בספטמבר את "Jev in 25 Lines of Python": Qwen3-0.6B מקומי, מייל שמבקש סיסמה בדף התחברות שלא של החברה, שלוש אפשרויות. יצא Phishing 0.885, Spam 0.084, Legitimate 0.031. והשורה שלהם: "There. That’s Jev."
+
+הם צודקים בחצי. המנגנון ישן, ומה ש-TypeSafe מוכרים זה שני דברים שאין ב-25 השורות:
+
+- **כיול.** softmax גולמי לא אומר כלום על אחוז הפגיעה. לפי ההשוואה של Ollaya, אפילו Ollama מתעדים שההסתברויות של מודלי ההחלטה שהם מריצים לא מכוילות. RLCD אמור לדאוג ש-0.9 באמת יהיה נכון ב-90% מהמקרים.
+- **מקביליות.** עד 256 שאלות בבקשה אחת, ועד 255 אפשרויות לשאלה.
 
 <figure><img src="/posts/jev/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
 
-<figure><img src="/posts/jev/v2-svg-he.jpg" alt="ההבדל הוא לא בפורמט, הוא במה שהמודל בכלל מסוגל להחזיר. למעלה מחרוזת שאפשר לשבור באמצע, ולמטה בחירה מתוך רשימה שאתם כתבתם. אין מה לפרסר, ולכן type error לא יכול לקרות." loading="lazy" /><figcaption>ההבדל הוא לא בפורמט, הוא במה שהמודל בכלל מסוגל להחזיר. למעלה מחרוזת שאפשר לשבור באמצע, ולמטה בחירה מתוך רשימה שאתם כתבתם. אין מה לפרסר, ולכן type error לא יכול לקרות.</figcaption></figure>
+## המספרים, על ה-workflows שלהם
 
-## מה קורה בפנים
+$42 למיליארד זה $0.042 למיליון tokens קלט. TypeSafe טוענים שזה מחיר קלט נמוך פי 238 מ-Claude Fable 5.1, ושעל המשימות שלהם Jev מהיר פי 193.6 וזול פי 444.6. המספרים שלהם, על ה-workflows שלהם.
 
-TypeSafe מדברים על שלושה חלקים: ארכיטקטורה חדשה, sampler מקבילי ושיטת אימון שהם קוראים לה RLCD, כלומר Reinforcement Learning for Calibrated Decisions. ב-RLHF מאמנים את המודל על מה ששופטים אנושיים מעדיפים. ב-RLCD מאמנים אותו כך שההסתברות שהוא נותן תתאים למציאות. אם הוא אומר 0.9, הוא אמור לצדוק בערך 9 פעמים מתוך 10.
+תעשו את החשבון על עצמכם. 100 אלף tickets ביום, 800 tokens כל אחד, זה 80 מיליון tokens. ב-Jev זה $3.36 ליום.
 
-ב-Arcturus Labs מהמרים שמתחת למכסה זה די קרוב ל-LLM רגיל. הטיעון שלהם: רוב השיבוטים הראשונים שיצאו מבוססים על LLM, ו-Latent Space ספרו שישה כאלה. המנגנון, כמו שהם מתארים אותו:
+הדוגמה הכי טובה בציבור היא בכלל לא של TypeSafe. Christian Mathiesen מ-Frigade נתן ל-Jev לשחק Pokémon Red עד ה-Hall of Fame: 37 שעות ו-40 דקות, 16,150 החלטות, בערך 39.2 מיליון tokens קלט, וכ-$1.65 בסך הכול. חציון של 0.4 שניות להחלטה. זה בערך סנט לכל מאה החלטות. ועדיין, כל הצוות נפל 16 פעמים, והיו 15 ניסיונות מול ה-Elite Four. המודל לא גאון. הוא פשוט זול מספיק כדי לטעות הרבה.
 
-- מריצים forward pass אחד על ה-state והשאלות.
-- לוקחים את ההתפלגות של ה-token הבא.
-- מסתכלים רק על ה-tokens שמייצגים את האופציות.
-- מנרמלים אותם להסתברויות וממפים אותם לטיפוס שהגדרתם.
+מה שכן, ב-MindStudio שמו לב שכל הדמואים של ההשקה, Minecraft, רחפן, נהיגה, רצים בתוך סימולטור. על חומרה אמיתית עוד לא ראינו כלום.
 
-בגלל זה הוא כל כך מהיר: אין generation ואין לולאה על tokens.
+<figure><img src="/posts/jev/src6.jpg" alt="16,150 החלטות ו-$1.65 עד ה-Hall of Fame. זול מספיק כדי להרשות לעצמו 16 נפילות של כל הצוות (credit: Jev Plays Pokémon Red)" loading="lazy" /><figcaption>16,150 החלטות ו-$1.65 עד ה-Hall of Fame. זול מספיק כדי להרשות לעצמו 16 נפילות של כל הצוות (credit: Jev Plays Pokémon Red)</figcaption></figure>
 
-מה שבאמת מעניין אתכם זה ה-thresholds. מעל 0.95 הקוד פועל לבד, ומתחת לזה ההחלטה הולכת ל-review. בשביל זה צריך calibration. בלעדיו המספר הוא סתם קישוט.
+## איך מכניסים decision layer בלי לחכות ל-early access
 
-<figure><img src="/posts/jev/v3-svg-he.jpg" alt="האלכסון הוא כל המוצר: 0.9 שווה משהו רק אם הוא צודק 9 פעמים מתוך 10, ורק אז הסף של 0.95 בטוח. העקומה המקווקוות היא המחשה של מודל לא מכויל, וזה בדיוק מה שמבחן 100 הדוגמאות חושף." loading="lazy" /><figcaption>האלכסון הוא כל המוצר: 0.9 שווה משהו רק אם הוא צודק 9 פעמים מתוך 10, ורק אז הסף של 0.95 בטוח. העקומה המקווקוות היא המחשה של מודל לא מכויל, וזה בדיוק מה שמבחן 100 הדוגמאות חושף.</figcaption></figure>
+הדפוס עצמו לא תלוי ב-Jev. ארבעה צעדים:
 
-## Jev ב-25 שורות פייתון
+1. תבודדו ב-agent את הצעדים שהתשובה שלהם סגורה מראש: routing, בחירת tool, safety gate, "להעביר לבן אדם?".
+2. תגדירו את האפשרויות בקוד, לא בתוך ה-prompt.
+3. תקבעו סף. מעליו הקוד פועל לבד, מתחתיו escalate.
+4. תשמרו את ההסתברות של כל החלטה, כדי שתוכלו למדוד כיול אחר כך.
 
-ב-nobodywho פרסמו ב-22 בספטמבר פוסט עם כותרת די עוקצנית: Jev ב-25 שורות פייתון. הם לקחו את Qwen3-0.6B, מודל פתוח קטנטן, והריצו אותו דרך llama.cpp. שאלו אם מייל הוא Legitimate, Spam או Phishing, ולקחו את ה-logits של שלוש האותיות. יצא Phishing עם 0.885.
+הנה הגרסה של nobodywho, עטופה בפונקציה עם סף. רצה על לפטופ עם `uv run decide.py`:
 
-```python
-# pip install huggingface-hub llama-cpp-python numpy
+```python title="decide.py"
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["huggingface-hub", "llama-cpp-python", "numpy"]
+# ///
 import numpy as np
 from llama_cpp import Llama
 
-model = Llama.from_pretrained(repo_id="Qwen/Qwen3-0.6B-GGUF",
-    filename="Qwen3-0.6B-Q8_0.gguf", n_ctx=512, logits_all=True, verbose=False)
+model = Llama.from_pretrained(
+    repo_id="Qwen/Qwen3-0.6B-GGUF",
+    filename="Qwen3-0.6B-Q8_0.gguf",
+    n_ctx=512, logits_all=True, verbose=False,
+)
 
-labels, choices = ["A", "B", "C"], ["Legitimate", "Spam", "Phishing"]
-email = "Payroll asks for your password on a non-company sign-in page."
-options = "\n".join(f"{l}. {c}" for l, c in zip(labels, choices))
-prompt = (f"<|im_start|>system\nChoose one option.<|im_end|>\n"
-          f"<|im_start|>user\nEmail: {email}\n\n{options}<|im_end|>\n"
-          f"<|im_start|>assistant\n<think>\n\n</think>\n\n")
-model.eval(model.tokenize(prompt.encode(), add_bos=False, special=True))
+def decide(state, choices, threshold=0.8):
+    labels = [chr(ord("A") + i) for i in range(len(choices))]
+    options = "\n".join(f"{l}. {c}" for l, c in zip(labels, choices))
+    prompt = (
+        "<|im_start|>system\nChoose one option.<|im_end|>\n"
+        f"<|im_start|>user\n{state}\n\n{options}<|im_end|>\n"
+        "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    )
+    model.reset()
+    model.eval(model.tokenize(prompt.encode(), add_bos=False, special=True))
+    logits = model.scores[model.n_tokens - 1]
+    ids = [model.tokenize(l.encode(), add_bos=False)[0] for l in labels]
+    z = np.asarray([logits[i] for i in ids])
+    p = np.exp(z - np.logaddexp.reduce(z))
+    best = int(p.argmax())
+    action = "act" if p[best] >= threshold else "escalate"
+    return choices[best], round(float(p[best]), 3), action
 
-logits = model.scores[model.n_tokens - 1]
-ids = [model.tokenize(l.encode(), add_bos=False)[0] for l in labels]
-x = np.array([logits[i] for i in ids])
-p = np.exp(x - np.logaddexp.reduce(x))
-print(dict(zip(choices, p.round(3))))
+print(decide(
+    "Email: Payroll asks for your password on a non-company sign-in page.",
+    ["Legitimate", "Spam", "Phishing"],
+))
 ```
 
-הם צודקים בחצי. המנגנון ישן. Arcturus מזכירים ש-OpenAI משתמשת ב-LLMs בתור classifiers מובלעים כבר שנים, היא פשוט לא ארזה את זה כמוצר. מה שה-25 שורות לא נותנות לכם זה calibration. כש-Qwen אומר 0.885, אין לכם מושג אם זה באמת 88%. בשביל זה בדיוק RLCD קיים. ובהוגנות, גם ב-Arcturus מצאו שההסתברויות של Jev לא תמיד נכונות.
+טוב, ה-0.8 פה הוא ניחוש. על Qwen3-0.6B גולמי, 0.885 לא אומר שהוא צודק ב-88.5% מהמקרים. בגלל זה צעד 4 הוא העיקר.
 
-## המספרים, ומי כבר רץ עם זה
+<figure><img src="/posts/jev/v2-svg-he.jpg" alt="המודל נותן מספר, הקוד מחליט. בלי סף שנמדד על הדאטה שלכם, הסתברות היא סתם עוד שורה ב-log (nobodywho)" loading="lazy" /><figcaption>המודל נותן מספר, הקוד מחליט. בלי סף שנמדד על הדאטה שלכם, הסתברות היא סתם עוד שורה ב-log (nobodywho)</figcaption></figure>
 
-ב-Vercel כתבו ש-Jev אומץ ב-AI Gateway מהר יותר מכל מודל אחר בהיסטוריה שלו. המחיר הוא $42 למיליארד tokens של קלט. הכותרת של TypeSafe היא פי 193.6 יותר מהר ופי 444.6 יותר זול, אבל רק על משימות System One ורק ב-workflows שהם בחרו.
+## איפה זה נופל
 
-במקביל, Ollaya הוציאו משהו בסגנון Ollama למודלים פתוחים שעושים החלטות כאלה. הכל רץ מקומית ומדבר עם ה-API של TypeSafe. הם בדקו על 400 states ו-2,000 שאלות:
+- **הכיול לא מושלם.** ב-Arcturus Labs הראו בפוסט מ-16 בספטמבר שההסתברויות של Jev לא תמיד נכונות. גם עם Jev תצטרכו לבדוק על הדאטה שלכם.
+- **רק מרחב תשובות סגור.** צריך תשובה ללקוח, תקציר או קוד? זה עדיין LLM.
+- **תלות בספק.** early access אצל חברה אחת זה סיכון. ב-25 בספטמבר יצא Ollaya, "Ollama למודלי החלטה": 15 משפחות של מודלים פתוחים ואותם endpoints כמו של TypeSafe (`/v1/systemone`). winnow:e4b קיבל אצלם 0.722 בהחלטות מוקלדות, מול 0.738 של Jev המתארח, ב-89ms על RTX 4090.
+- **החפיר.** ב-Arcturus טוענים ש-OpenAI משתמשים כבר שנים ב-LLM שלהם כמסווגים מרומזים, ושהחפיר האמיתי של TypeSafe הוא דאטה האימון. אם OpenAI ישחזרו את האימון, הם יכולים להכניס את היכולת הזו לתוך המודלים וה-agents שלהם, ו-Jev לא יוכל להתחרות בזה.
 
-| מודל | דיוק | latency |
-| --- | --- | --- |
-| Jev (API מתארח) | 0.738 | 236ms–276ms |
-| winnow:e4b | 0.722 | 89ms |
-| winnow:12b | 0.702 | 131ms |
-| laya:en | 0.361 | 10ms |
+> **הדעה שלי:** אני לא קונה את ה-238x כמספר שאמור לעניין אתכם. אצל רוב הצוותים החשבונית על routing היא לא הבעיה. הבעיה היא ה-tool שהומצא בשלוש בלילה, ומה שאני לוקח מ-Jev זה הצורה: תשובה שסגורה מראש, עם מספר שאפשר לשים עליו סף.
 
-שימו לב שה-latency של Jev כולל רשת, והשאר נמדדו על RTX 4090 מקומי. בקיצור, זו השוואה של סדרי גודל ולא benchmark נקי. מה שכן, מודל פתוח שמגיע ל-0.722 מול 0.738 שבוע אחרי ההשקה לא נראה טוב בשביל ה-moat.
+<figure><img src="/posts/jev/v3-chart-he.jpg" alt="המודל הכי מדויק ברשימה הוא גם מהמהירים, והוא רץ אצלכם מקומית. זה הלחץ האמיתי על TypeSafe (Ollaya)" loading="lazy" /><figcaption>המודל הכי מדויק ברשימה הוא גם מהמהירים, והוא רץ אצלכם מקומית. זה הלחץ האמיתי על TypeSafe (Ollaya)</figcaption></figure>
 
-זו גם בדיוק התזה של Arcturus: אם OpenAI תצליח לשחזר את האימון, היא תעתיק את Jev מהר ותכניס את היכולת לתוך ה-agents שלה. לדעתם ה-moat היחיד של TypeSafe הוא הדאטה ותהליך האימון.
+## מה לנסות השבוע
 
-<figure><img src="/posts/jev/v4-chart-he.jpg" alt="מודל פתוח שרץ מקומית מגיע ל-0.722 מול 0.738 של Jev, שבוע אחרי ההשקה. ה-latency לא בגרף כי הוא לא בר-השוואה (רשת מול RTX 4090 מקומי), אבל פער של 0.016 בדיוק הוא בערך כל ה-moat." loading="lazy" /><figcaption>מודל פתוח שרץ מקומית מגיע ל-0.722 מול 0.738 של Jev, שבוע אחרי ההשקה. ה-latency לא בגרף כי הוא לא בר-השוואה (רשת מול RTX 4090 מקומי), אבל פער של 0.016 בדיוק הוא בערך כל ה-moat.</figcaption></figure>
+- תפתחו trace של agent ב-production ותספרו כמה צעדים הם בחירה מתוך רשימה. ב-Beam טוענים שזה רוב הצעדים. תבדקו אם זה נכון אצלכם.
+- תבחרו צעד אחד, נגיד routing של tickets, ותתייגו ידנית 200 דוגמאות.
+- תריצו עליהן את `decide.py` או מודל מ-Ollaya. תמדדו accuracy, ותחלקו את ההסתברויות לדליים של 0.1. בכל דלי, אחוז הפגיעה צריך להיות קרוב להסתברות. זה ה-ECE ש-Ollaya מפרסמים לכל מודל.
+- תקבעו את הסף מהדאטה: כמה אחוז נופל ל-escalate, ומה הדיוק מעליו.
+- רק אז תבקשו early access ל-Jev ותריצו את אותן 200 דוגמאות.
 
-## מתי כן, מתי לא, ומה לנסות השבוע
-
-אל תשתמשו בזה כשצריך טקסט, כשצריך reasoning ארוך, או כשאי אפשר לסגור מראש את מרחב התשובות. כן תשתמשו בזה לסיווג, routing, triage ו-gating. אלה הצעדים ב-pipeline שבהם היום אתם קוראים ל-LLM, מבקשים ממנו "yes או no" ומקווים שהוא לא יוסיף משפט הסבר.
-
-מה לנסות השבוע: קחו צעד סיווג אחד מה-pipeline שלכם, ו-100 דוגמאות מתויגות מהדאטה האמיתי. תריצו עליהן את גרסת ה-25 שורות, ואז תבדקו כמה פעמים המודל צדק מכל התשובות שקיבלו בערך 0.9. אם יוצא בערך 90%, אתם לא צריכים את Jev. אם יוצא 60%, זה בדיוק מה ש-TypeSafe מוכרים.
-
-הרעיון עולה 25 שורות. ה-calibration הוא המוצר.
+אם 0.9 אצלכם לא נכון ב-90% מהמקרים, אין לכם decision model. יש לכם softmax יפה.

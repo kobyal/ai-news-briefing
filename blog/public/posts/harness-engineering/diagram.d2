@@ -1,16 +1,18 @@
 direction: right
-task: Task
-context: Context (AGENTS.md + rules)
-model: Model
-tools: Tools in sandbox
-checks: Checks (lint, tests, hooks)
-done: Done
-rules: New rule
-task -> context: loaded
-context -> model: prompt
-model -> tools: calls
-tools -> checks: output
-checks -> done: pass
-checks -> model: fail + error
-checks -> rules: new mistake
-rules -> context: next session
+agent: Agent opens PR
+ci: CI custom linters
+review: Human review
+rule: Repeated mistake becomes rule
+map: AGENTS.md map (~100 lines)
+docs: docs/ system of record
+gc: Background cleanup agent
+agent -> ci: run checks
+ci -> agent: fail + FIX text
+ci -> review: pass
+review -> rule: same comment twice
+rule -> ci: encode as check
+rule -> docs: write principle
+map -> docs: points to
+map -> agent: read at start
+gc -> docs: scan deviations
+gc -> agent: small refactor PRs

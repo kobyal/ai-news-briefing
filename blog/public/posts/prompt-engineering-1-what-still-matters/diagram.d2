@@ -1,13 +1,18 @@
 direction: right
-intent: Intent + boundaries
+intent: Intent and done-state
 prompt: Prompt
-context: Context (files, tools)
-model: Model
-check: Check (schema, tests)
+context: Context (files, docs, history)
+harness: Harness (tools, permissions)
+agent: Agent
+check: Check (tests, exit code, schema)
 done: Done
-intent -> prompt: written by you
-context -> model: assembled by harness
-prompt -> model: instructions
-model -> check: output
-check -> model: fail, error fed back
+reset: New session
+intent -> prompt: written down
+prompt -> agent
+context -> agent: loaded
+harness -> agent: allowed actions
+agent -> check: runs
+check -> agent: fail, iterate
 check -> done: pass
+agent -> reset: context full or stuck
+reset -> prompt: clean restart

@@ -1,139 +1,125 @@
 ---
-title: "Grok Bot up close: a teammate with its own computer and all your passwords"
-description: "SpaceXAI's Grok Bot up close: what it does on its own, what it really costs, and why the shared cloud computer is the decision to understand."
+title: "Grok Bot up close: a cloud computer that holds your passwords"
+description: "SpaceXAI's Grok Bot: what it does on its own, what it costs when sources disagree, where it breaks, and the open-source alternative."
 lang: en
 key: grok-bot-up-close
 term: "Grok bot"
 kind: deepdive
 pubDate: 2026-10-01
-tags: ["grok", "xai", "agents", "computer-use", "cursor"]
-hook: "number"
-cover: illus
-tldr: ["Start with one read-only bot that writes a morning briefing and stops before sending anything", "Don't connect a financial system: all the bots share one computer and one set of credentials", "Check the pricing page on the day you buy, because sources disagree anywhere from $20 to $300"]
+tags: ["grok-bot", "xai", "computer-use", "ai-agents", "cursor"]
+hook: "claim"
+cover: photo
+tldr: ["Give the bot dedicated Google and Slack accounts, because every bot on your account shares the same cookies", "Test a skill on public pages before you turn it into a scheduled routine", "Count how many of 10 tasks finish without you touching them. Below 7, drop it"]
 series: { slug: "the-new-tools", name: "The new tools, up close", part: 2, total: 4 }
 hero: /posts/grok-bot-up-close/hero-en.jpg
 diagram: /posts/grok-bot-up-close/diagram.svg
 sources:
-  - { title: "SpaceXAI — Creators of Grok, the AI Chatbot", url: "https://x.ai", date: "" }
   - { title: "Grok API Documentation", url: "https://docs.x.ai/docs/overview", date: "" }
   - { title: "SpaceXAI — Creators of Grok, the AI Chatbot", url: "https://x.ai/news", date: "" }
   - { title: "Grok Bot", url: "https://x.ai/bot", date: "2026-08-11" }
   - { title: "Grok Bot by SpaceXAI", url: "https://x.ai/news/introducing-grok-bot", date: "2026-08-11" }
   - { title: "Errand – open-source Grok Bot and Muse alternative, built in a week", url: "https://runta.com/blog/building-errand-in-one-week", date: "2026-09-22" }
+  - { title: "Category Name Needed for OpenClaw, Hermes, Grok Bot", url: "https://claude.ai/share/35ec8519-06eb-4303-bf01-083bd2d4f8ac", date: "2026-09-02" }
   - { title: "I Run Grok Bot with BotOps", url: "https://granda.org/en/2026/09/06/how-i-run-grok-bot", date: "2026-09-06" }
   - { title: "What is Grok Bot? SpaceXAI's Computer-Use AI Agent Explained", url: "https://4geeks.com/en/blog/ai-tools/what-is-grok-bot", date: "" }
   - { title: "A Guide to Grok Bot: How xAI's Always-On AI Teammates Work | Composio", url: "https://composio.dev/content/guide-to-frok-bot", date: "" }
   - { title: "🎙️ How I AI: Grok Bot + Grok 4.6—what’s great (and what’s still hype) & Lessons from spending $20,000 on Devin in one month", url: "https://www.lennysnewsletter.com/p/how-i-ai-grok-bot-grok-46whats-great", date: "" }
-  - { title: "Grok Bot Guide: Always-On AI Agents, Routines, and Limits", url: "https://www.ai.joaoqueiros.com/blog/grok-bot-always-on-ai-agent-teams-routines-skills-security", date: "" }
-opinion: "We don't buy the word \"teammate\". A bot with a computer, memory and routines is a cron job and a headless browser with an LLM in the middle. The new name doesn't change what you do on Monday: you still decide what it sees, what it touches and how you check it. With Grok Bot, the first of those decisions has already been made for you, and the answer is everything. In our pipeline, every place where we replaced a model call with a deterministic rule got cheaper and more reliable. Grok Bot goes the other way, with a model clicking buttons where an API would be. That only pays off on sites that truly have no API. It also needs a verification loop before the work lands, like a ticket, a diff or a human who approves."
+  - { title: "Grok Bot Tutorial: Skills, Routines, and Approvals | DataCamp", url: "https://www.datacamp.com/tutorial/grok-bot-tutorial", date: "" }
+opinion: "We don't see Grok Bot as a model leap. It's a product that understood the real work is the system around the model: what it sees, what it touches, and when it stops to ask for approval. That's exactly where its weakness is, too. One computer holding every cookie for every bot is a permission boundary at the account level, and we'd want it at the bot level. That said, skills with a built-in check step and approval points are the right direction, because a loop that verifies itself is worth more than a good first draft. We'd give it repetitive work in tools without an API, on dedicated accounts, and nothing that needs your primary password."
 madeWith: { model: "claude-opus-5-5", sourceCount: 11, reviewedBy: "Koby Almog" }
 ---
 
-One computer. That's the most important number in the Grok Bot docs. It matters more than the $20 a month and more than the $300 for SuperGrok Heavy. Every bot in your account works on the same Linux machine in the cloud, and you can put up to six of them in one thread. They share the same files, the same browser sessions and the same CLI credentials.
+Grok Bot isn't a model product. It's a computer product, and Grok is the least interesting part of it.
 
-SpaceXAI, formerly xAI, launched Grok Bot in beta on August 11, 2026. In the seven weeks since, it has shipped an X integration (August 29), an Enterprise version (September 3), a post about a bot that found more than $100,000 in procurement savings (September 4) and Team Bots (September 28). That's a fast pace. The cost is that half the guides online are already out of date. We'll get to that.
+SpaceXAI (formerly xAI) launched it in beta on August 11, 2026. On paper it's another agent. In practice you're buying a Linux machine in the cloud that stays on when you close your laptop. It holds your sessions for Gmail, Zendesk and Slack, and several named "bots" work on it in parallel. The model behind it (Grok 4.6, per the plans page) will be swapped for the next version. The machine, the permissions and the routines stay.
 
-In the previous part we looked at Codex, a tool that lives next to the code. Grok Bot goes in a different direction. It doesn't touch the repo. It touches Zendesk, Gmail and the CRM.
+Want proof? Six weeks after launch, a developer at Runta built an open-source alternative called Errand in one week. His app is about 4,000 lines of TypeScript. He says so himself: he didn't build the hard parts, because the runtime already existed. So the value sits in the infrastructure that runs the bot, not in the model that answers. And the entry price? Depends who you ask. The x.ai page says $20 a month. People who read the docs in launch week wrote $200 to $300. We'll get to that.
 
-## A bot with its own computer, not a chat with buttons
+## What it is, and what it isn't
 
-Grok Bot is an agent with a name, a role and memory, running on a VM in SpaceXAI's cloud. It has a browser, a filesystem and a terminal. You sign in to your tools once from inside its computer, and from then on it works alone. It fills out forms, answers email, updates the CRM, and comes back to you when it needs approval. You can give it routines on a schedule, or show it a workflow once. It saves that and runs it on its own next time.
+There are four concepts, and they're worth knowing before you start. A **Bot** is an agent with a name, a role, its own conversation and persistent context. The **Cloud computer** is one machine per account, with a browser, files and a terminal, and every bot shares it. A **Skill** is a set of instructions for a task: how to do it, how to check it, when to ask for approval. A **Routine** tells the bot when to run a task, on a schedule or after an event. That's how SpaceXAI's docs define them, and DataCamp work in the same order: test the skill first, schedule it after.
 
-Here's a detail almost nobody mentions: you download it from Cursor, not from xAI. The installer sits on downloads.cursor.com, you log in with Sign In with Cursor, and billing shows up in the Cursor dashboard.
+What it isn't:
 
-Here's what it isn't:
+- It's not the Grok chat app, and it's not Grok Build, the coding CLI. It's a separate product.
+- You don't download it from xAI. The installer lives on `downloads.cursor.com`, signup goes through `cursor.com/bot/onboarding`, and the docs say it outright: "Grok Bot uses Cursor authentication and account data settings". Billing shows up in the Cursor dashboard too.
+- It's not "a teammate that learns on its own." Memory holds stable preferences and the role. DataCamp recommend putting anything that changes week to week in a file the bot reads, rather than trusting its memory.
 
-- **It's not Grok on X.** The chat inside X and the @grok that replies to you in threads are a different product. On August 29 SpaceXAI announced a "tighter integration with X" for the Bot, without saying what that means. When someone says "Grok bot" to you, ask which one they mean.
-- **It's not an API.** The Bot has no endpoint. Developers get Grok 4.7 in the API: $2 input and $6 output per million tokens, with a 500k context.
-- **It's not fully autonomous.** It stops for approvals, and some sites block it or throw CAPTCHAs at it.
+## Hands on: what happens when you give it a task
 
-## What happens when you give it work
+You install the desktop or iPhone app, create a Bot and message it like a colleague. The example on the product page is exactly that: "Sign in to Zendesk so I can work the support queue". A window into its computer stays open on the side, showing a Working state. When it gets stuck on a form, you can step in and take control.
 
-A disclosure first: we didn't run this ourselves. 4Geeks downloaded all 14 pages of the docs (1,889 lines), and even they wrote that they couldn't test the product itself. What follows comes from the docs and from three people who did work with it.
+Two things here we didn't see with Codex in the previous part. First, Teach a task: you do a workflow once, the bot watches and saves it as a routine that runs on its own. Second, you can put 2 to 6 bots in the same thread, and they hand work to each other without you approving every step.
 
-The flow is simple. You create a bot, give it a name and a role, and message it like you would a teammate. The example on the product page is "Sign in to Zendesk so I can work the support queue". You sign in to the account inside its computer, and it takes over the queue. Want to see what it's doing? You open its screen and watch, or you take control.
+What does it look like for real users? On September 6, Matthew Granda published BotOps, his method for running a fleet of bots. He talks to exactly one bot, a Chief of Staff. Under it sit bots that each own a domain (home, work, writing, Notion), and under those, one-off temps that browse a site or spin up a Cursor cloud agent. The source of truth is Notion, not the chat. And the default is silence: no findings, no ping. He put the skill in a public repo, `github.com/granda/botops`.
 
-Composio ran four bots with separate roles that handed work to each other in a shared thread. A group can hold two to six bots, and they pass ownership of a task without you copying context by hand.
-
-Matthew Granda wrote on September 6 about how he runs a whole fleet. He reached the same conclusion everyone who runs several agents reaches: chat doesn't scale. He talks to only one bot, a Chief of Staff. Under it are bots that each own an area (home, work, writing, Notion), and under those are one-off temps that get deleted when they're done. Notion is the source of record. His best rule: no findings, no ping.
-
-This hierarchy doesn't ship with the product. He built it on top, because without it he was living in the sidebar.
+Claire Vo tested it on Lenny's How I AI on August 24. What sold her was connectors for multiple accounts. She has four email addresses and seven Slack workspaces, and all of them connect to one bot. She says Codex and Claude aren't there yet.
 
 <figure><img src="/posts/grok-bot-up-close/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
 
-<figure><img src="/posts/grok-bot-up-close/src4.jpg" alt="The product page promises a teammate that works 24/7. In practice it stops at every approval and every CAPTCHA, which is actually a good thing (credit: SpaceXAI)" loading="lazy" /><figcaption>The product page promises a teammate that works 24/7. In practice it stops at every approval and every CAPTCHA, which is actually a good thing (credit: SpaceXAI)</figcaption></figure>
+<figure><img src="/posts/grok-bot-up-close/src4.jpg" alt="The interface looks like iMessage on purpose: they're selling you a coworker, not a pipeline to maintain (credit: x.ai/bot)" loading="lazy" /><figcaption>The interface looks like iMessage on purpose: they're selling you a coworker, not a pipeline to maintain (credit: x.ai/bot)</figcaption></figure>
 
-## The numbers, and the sources disagree
+## The numbers, and why they don't add up
 
-The product page today shows three plans. $20 a month through Cursor Pro, with your own computer, routines and weekly usage included. $30 for SuperGrok, with Bot access and Grok 4.6. And $40 per user per month for Cursor Teams Standard.
+The sources flat out contradict each other here, so here's all of them:
 
-But 4Geeks, who checked on August 12 and again on August 20, wrote that it isn't sold separately. They said it only comes with Cursor Ultra at $200, SuperGrok Heavy at $300 and Cursor Premium Teams at $120 per user. Composio (August 20) also mentions only Heavy, Ultra and team plans. Yet the launch post itself, on August 11, lists SuperGrok and Cursor Pro too.
+- **Launch post (Aug 11):** beta for SuperGrok, SuperGrok Plus and Heavy subscribers, for Cursor Pro, Pro+ and Ultra, and for Cursor Teams Standard and Premium. Desktop and iOS.
+- **4geeks (checked Aug 11–12, re-verified Aug 20):** not sold separately. Only bundled with Cursor Ultra at $200 a month, SuperGrok Heavy at $300, or Cursor Premium Teams at $120 per seat.
+- **Composio (Aug 20):** early access for Heavy, Ultra and eligible team plans. macOS, Windows and iPhone. No Linux, Android or iPad.
+- **The product page today:** Pro at $20 a month, SuperGrok at $30, Standard Teams at $40 per seat.
+- **Docs from September 2 (per 4geeks):** macOS, Windows and Linux, iPhone on iOS 18+, Android 9+. Still no iPad.
 
-Our read: the launch started on the expensive plans and dropped to $20 within a few weeks. That's a read, not a fact. Before you commit, check the pricing page on the day you buy.
+The likely explanation: they started with the expensive plans and opened up the cheaper ones within a few weeks. What every source agrees on: the bot has its own usage quota, separate from your Grok or Cursor plan. Whatever you hand the bot doesn't come out of your regular quota. An Enterprise version shipped on September 3, with two weeks free for Grok and Cursor Enterprise customers. Team Bots arrived on September 28.
 
-One thing is clear: Bot usage is counted separately from your Grok or Cursor quota. A task you hand to the Bot doesn't eat into your Cursor usage.
+And if you think in tokens: through the API, Grok 4.7 costs $2 input and $6 output per million tokens, with a 500k context. But that's not the bot's price. The bot is a subscription with "Weekly Grok Bot usage included", not per-token billing. So you have no number to compare a nightly routine against.
 
-The sources are just as confused about platforms:
+<figure><img src="/posts/grok-bot-up-close/v2-chart-en.jpg" alt="A 15x gap in entry price between August and September. Check the plans page before you commit (x.ai/bot, 4geeks)" loading="lazy" /><figcaption>A 15x gap in entry price between August and September. Check the plans page before you commit (x.ai/bot, 4geeks)</figcaption></figure>
 
-| Source | Date | Desktop | Mobile |
-|---|---|---|---|
-| Launch post | Aug 11, 2026 | Not specified | iOS |
-| Composio | Aug 20, 2026 | macOS, Windows | iPhone only |
-| The docs (via 4Geeks) | Sep 2, 2026 | macOS, Windows, Linux | iOS 18+, Android 9+ |
+## Where it's strong
 
-No source lists iPad support. As for the model, the SuperGrok plan lists Grok 4.6, and Grok 4.7 came out on September 21. The pages don't say clearly which one runs your bot today.
-
-<figure><img src="/posts/grok-bot-up-close/v2-chart-en.jpg" alt="Either the entry price dropped from $200 to $20 within weeks, or the sources just contradict each other. Either way, check on the day you buy (x.ai/bot, 4Geeks)" loading="lazy" /><figcaption>Either the entry price dropped from $200 to $20 within weeks, or the sources just contradict each other. Either way, check on the day you buy (x.ai/bot, 4Geeks)</figcaption></figure>
-
-## Where it's actually strong
-
-The clearest strength is sites with no API and no MCP. Every company has some 2014 vendor portal nobody will ever write a connector for. A bot that logs in with a username and password and clicks buttons solves exactly that. Roman from the product team put it best in the launch post:
+It finishes the work inside the tool itself, and that's really the whole story. Roman from the product team put it well in the launch post:
 
 > There is a huge difference between 90% done and 100% done. Most AI gets you almost there. Grok Bot can finish the swing, because the work lands where a human would put it, in the actual tool.
->
-> — Roman, Product, SpaceXAI
 
-What he doesn't say there: SpaceXAI itself recommends a connector when one exists, because it's more reliable. Computer use is the fallback, not the main path.
+Most agents you know hand you back text, and you paste it into the CRM. Here the bot goes into the CRM itself, including systems with no clean API and no MCP. Their internal examples: a sales bot that updates the CRM from a call transcript and drafts a follow-up. An ops bot that assigns seats to new hires and processes invoices that land in Gmail. And an engineering bot that reproduced a UI bug, opened a ticket and handed it to a debugging bot.
 
-Second, it handles several accounts on one bot. Claire Vo said on How I AI that she has four email addresses and seven Slack workspaces, all connected to a single bot. In her view, Codex and Claude can't do that yet.
+On September 4 they said they gave the bot access to vendor spend, contracts and usage data, and it found more than $100,000 in direct savings. Those are their numbers, on their contracts. Nice, but you can't verify it from the outside.
 
-Third, setup is fast. You don't build a workflow up front, you just send a message. At SpaceXAI it looks like this: a sales bot that updates the CRM from call transcripts, an ops bot that processes invoices from Gmail, and an engineering bot that reproduces a UI bug, opens a ticket and hands it to a debugging bot. Those are their numbers, on their workflows.
+One more upside: simplicity. Claire describes a fast setup and built-in plugins that work from minute one. You don't have to build a workflow before you start.
 
-## Where it falls down: everyone on one machine
+## Where it falls down
 
-Back to the number from the top. One computer per user, shared by every bot. The bot that writes your posts sees the same open Gmail session the invoice bot works in, and the same CLI credentials. João Queirós summed it up in one line: "Convenience is the product advantage; permission design is the operating responsibility."
+Back to the shared computer. Per the FAQ, the computer belongs to the account, not the bot. Every bot sees the cookies, the saved logins and the files. Signed into Gmail for the invoice bot? Now the bot that browses random websites holds that session too. And deleting a bot doesn't guarantee its files or logins get deleted. Signing out and cleaning up is manual.
 
-Now think about prompt injection. A bot that reads your inbox also reads email from strangers. If one of those emails convinces it to do something, there's no wall between it and every other account you connected.
+Computer use breaks where it always breaks: sites that block automation, CAPTCHAs, human verification. Even SpaceXAI recommend using a connector when one exists.
 
-> **My take:** We wouldn't give any bot in this account write access to a financial system as long as they all share a machine. It's not a bug. It's a product decision that makes setup fast. But its blast radius is the whole account.
+And there's nothing to tune. No model choice, no persona design, no harness to swap. Claire likes her OpenClaw agents precisely because they're chaotic and need upkeep, and she says Grok Bot didn't give her much to tinker with. If you run agents like a system, you'll feel that fast.
 
-Our daily pipeline has run about ten agents since May 2026. The worst bugs we've had weren't wrong answers. They were silent failures, like an agent that reported success and shipped an empty briefing. A bot that "only comes back when it needs approval" sounds great, until it doesn't come back because it's stuck. Before you hand it real work, ask first: how will I know it failed?
+> **Caveat:** A lot of what's written about Grok Bot is the vendor's description, not something anyone has seen firsthand. 4geeks wrote explicitly that they couldn't test it because there's no open trial, and we're leaning on docs and user posts here too. And we don't buy "Bots get smarter over time" until someone shows us a measurement, not a quote.
 
-A few more:
+## The alternatives: Errand and OpenClaw
 
-- **The Cursor dependency.** Auth, billing and data settings all go through Cursor. That's one more vendor in the chain.
-- **Too simple.** You can't pick a model or shape a personality. Claire said her OpenClaw is chaotic and needs maintenance, and that's why she likes it. Grok Bot gives her nothing to tinker with.
-- **"24/7" is marketing.** In practice it works 24/7 until the next approval or the next CAPTCHA.
-- **The $100,000 in procurement.** Nice. It's a vendor post, on vendor data.
+If what bothers you is the shared computer and the vendor lock-in, there are two clear alternatives.
 
-## Versus Errand and OpenClaw
+The first is Runta's Errand, open-source since September 22. Each teammate gets an isolated runtime: a shell, browser and filesystem that persist between tasks, created with one API call in a few seconds. The agent loop runs on Pi Agent, a small framework you can swap out. The live desktop window, VNC through noVNC, took him 72 lines. Short version: same experience, but the stack is yours and you decide what each bot sees.
 
-On September 22 Runta published Errand, an open-source alternative to Grok Bot. One person built the first version in a week. It's a desktop app of about 4,000 lines of TypeScript on top of their runtime. Every teammate gets its own isolated machine, with a shell, a browser and a filesystem that persists between tasks. The agent loop is Pi Agent by default, and you can swap it. The live screen is VNC, in 72 lines.
+The second is OpenClaw, at the other extreme: it runs 24/7 on your own VPS, talks to you over Telegram, Slack or WhatsApp, and you pick the model. Full freedom, and all the maintenance is on you.
 
-The real difference isn't price. It's isolation. In Errand every teammate has its own machine. In Grok Bot they all share one. In return, Grok Bot gives you a working bot in minutes, a phone app and connectors that already work, with no infrastructure to maintain.
+The real difference isn't the model, it's the boundary. In Grok Bot the permission boundary is the account. In Errand it's the bot.
 
-OpenClaw sits at the other end: flexible, chaotic, high-maintenance. Then there's what we covered in the previous part, Codex and Claude Code, which are agents for code, not operations. If your task is a PR, you're in the wrong tool.
+<figure><img src="/posts/grok-bot-up-close/v3-svg-en.jpg" alt="In Grok Bot the permission boundary is the account; in Errand it's the bot. That's the difference that matters, not the model (Grok Bot FAQ, Runta)" loading="lazy" /><figcaption>In Grok Bot the permission boundary is the account; in Errand it's the bot. That's the difference that matters, not the model (Grok Bot FAQ, Runta)</figcaption></figure>
 
-<figure><img src="/posts/grok-bot-up-close/v3-svg-en.jpg" alt="Same idea, opposite decision: Grok Bot trades isolation for fast setup, while Errand costs a week of dev and gives every teammate its own machine (SpaceXAI, Runta)" loading="lazy" /><figcaption>Same idea, opposite decision: Grok Bot trades isolation for fast setup, while Errand costs a week of dev and gives every teammate its own machine (SpaceXAI, Runta)</figcaption></figure>
+## Who should pick it this quarter
 
-## Who should pick this up this quarter
+If you already pay for Cursor or SuperGrok, and you have repetitive work in tools without an API (support, procurement, CRM entry), try it now. The quota is separate, so it doesn't eat into your regular work. If you're a team that needs to control what each agent sees, or you need an audit trail on permissions, look at Errand or wait for Team Bots to mature.
 
-If you're already on Cursor Teams or SuperGrok, yes, try it. The experiment is cheap, and usage doesn't come out of your existing quota. Start the way João recommends: one bot, read-only, with output you can check. A good first job is a morning briefing from your calendar and email that stops before it sends anything. Run it manually twice, save it as a skill, and only then put it on a schedule.
+What to do this week:
 
-If you're in ops, sales or support, with lots of SaaS and no APIs, this was built for you.
+1. Give the bot its own accounts: dedicated Google and Slack, not yours. Every session you sign into is open to every bot on the account.
+2. Start with a skill that only touches public pages, like DataCamp did with their Scout. Only after it passes a check, turn it into a routine.
+3. Where there's a connector or MCP, use it instead of computer use.
+4. Copy Granda: one bot that talks to you, tickets instead of chat, silence by default.
+5. Count. Out of 10 tasks a week, how many reached 100% without you touching them? If fewer than 7, you're not delegating work. You're reviewing someone else's.
+6. Deleted a bot? Sign out of every session on the computer and delete its files.
 
-If you're at a regulated company like a bank, an insurer or a health provider, get ready for a talk with security. One VM in a foreign cloud holding sessions for every system, through a Cursor account, is not a short conversation. We haven't yet seen an Israeli team say publicly that it passed a review like that. If you have, we want to hear about it.
-
-And if you want something to write code for you, go back to the previous part.
-
-Let the first bot only read. As long as there's one computer, its permissions are everyone's permissions.
+And remember: the most careful bot in the fleet runs on the same computer as the most reckless one.

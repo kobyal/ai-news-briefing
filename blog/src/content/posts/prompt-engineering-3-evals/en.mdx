@@ -1,123 +1,134 @@
 ---
-title: "Prompt evals: three mornings of empty briefings, and the fix that didn't go in the prompt"
-description: "Part 3: how to know a prompt change helped. Golden sets, LLM-as-judge, pairwise and regression, told through a bug that emptied our pipeline for 3 days."
+title: "Prompt evals: how Rechat's Lucy stalled, and how to know a prompt change helped"
+description: "Part 3: golden sets, LLM-as-judge, pairwise comparison and regression on real traffic. The Lucy case, plus a promptfoo config to paste."
 lang: en
 key: prompt-engineering-3-evals
 term: "prompt evals"
 kind: warstory
-cover: illus
 pubDate: 2026-10-01
-tags: ["prompt-engineering", "evals", "llm-as-judge", "regression-testing", "production"]
-hook: "claim"
-tldr: ["Add an assert for empty output and required fields before any judge.", "A parser that returns {} on failure is a bug. Make it raise and trigger a retry.", "A prompt change passes pairwise and a diff on yesterday's inputs before deploy."]
+tags: ["prompt-engineering", "evals", "llm-as-judge", "promptfoo", "regression-testing"]
+hook: "number"
+cover: illus
+tldr: ["Every user complaint becomes a test case before anyone touches the prompt", "Code assertions first, LLM-as-judge only for what code can't check", "Run the old prompt against the new one on the same set, with --repeat 3"]
 series: { slug: "prompt-engineering", name: "Prompt engineering, minus the magic", part: 3, total: 3 }
 hero: /posts/prompt-engineering-3-evals/hero-en.jpg
 diagram: /posts/prompt-engineering-3-evals/diagram.svg
 sources:
   - { title: "Intro | Promptfoo", url: "https://www.promptfoo.dev/docs/intro", date: "" }
-  - { title: "Define success criteria and build evaluations", url: "https://docs.anthropic.com/en/docs/test-and-evaluate/develop-tests", date: "" }
   - { title: "Get started with Braintrust - Braintrust", url: "https://www.braintrust.dev/docs", date: "" }
-  - { title: "Evaluate AI agents systematically with Agent-EvalKit | Artificial Intelligence", url: "https://aws.amazon.com/blogs/machine-learning/evaluate-ai-agents-systematically-with-agent-evalkit", date: "" }
-  - { title: "The six generations of AI agents and how to eval them - Blog - Braintrust", url: "https://www.braintrust.dev/blog/six-generations-ai-agents", date: "" }
+  - { title: "Your AI Product Needs Evals", url: "https://hamel.dev/blog/posts/evals", date: "" }
+  - { title: "Evaluating AI Agents at the Run, Trace, and Thread Level", url: "https://www.langchain.com/resources/agent-evals", date: "" }
   - { title: "Demystifying evals for AI agents \\ Anthropic", url: "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents", date: "" }
-opinion: "We believe verification is worth more than a better first draft, and this incident proved it to us at the cost of three mornings. The fix that worked was deterministic: a parser that raises, a retry, and a floor on the count. Everywhere we replaced model judgment with no model at all, the pipeline got cheaper and more reliable, and that includes QA. LLM-as-judge and pairwise are worth the cost only after the boring layer already catches the silent failures, because for us those were the worst bugs, not wrong answers. And a prompt change without a golden set and without a diff on real traffic is, as far as we're concerned, a guess with a commit message."
-madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+opinion: "We don't believe in a prompt improvement nobody measured. A fix tested only on the case that caused it is a bet on every other case. We put code before the model: whatever a regex or a schema can check never reaches the judge, because there it's cheaper and more stable. A loop that checks itself is worth more than a brilliant prompt, and we'd take a mediocre prompt with 40 test cases over a beautiful one with none. Evals aren't a new discipline. They're software tests with a model in the middle, and that's why they work."
+madeWith: { model: "claude-opus-5-5", sourceCount: 5, reviewedBy: "Koby Almog" }
 ---
 
-The most important eval we added this year doesn't check whether the prompt is good. It checks that the output isn't empty. Sounds dumb, I know. But on August 5, 6 and 7, 2026, the aibriefing.dev pipeline published three mornings in a row without the content of two agents, and every check was green. Our judge didn't complain. It had nothing to score.
+89% of organizations have observability on their agents. 52% run offline evals on a test set. Only 37% run evals on real traffic. The numbers come from LangChain's State of Agent Engineering survey, published in June 2026. Put in standup terms: almost everyone can see what the model is doing, and fewer than half can say whether today's prompt is better than yesterday's.
 
-In part one we said, following Anthropic, that before you touch a prompt you need a definition of success and a test you can run. In part two we said that a rule you can check in code gets enforced in code. This time, the story that shows why, and then the order I test a prompt change in today.
+In the previous part we built a system prompt in four blocks. This time we look at what happens after you change one line of it. The best-documented case I know on the subject is Lucy.
 
-## 06:07, a normal run
+## Lucy ran on prompts, and it worked
 
-The pipeline has run every morning since May 2026. Cron starts it at 06:07, and it usually finishes between 06:40 and 06:55. Inside are about 10 agents: each pulls a different source, calls `claude -p` through one wrapper in `shared/anthropic_cc.py`, and returns JSON. After them, a merger combines everything into about 11 stories a day and publishes, and then a QA evaluator runs over what was published and flags P0s.
+Rechat is a SaaS for real estate agents: contracts, property search, meetings, marketing materials. Lucy is their assistant, a chat interface that replaces all the clicks and forms. Hamel Husain, who led CodeSearchNet at GitHub (one of the precursors of Copilot), worked with them and published the case on March 29, 2024, in the post Your AI Product Needs Evals.
 
-Every JSON that comes back from the model goes through `parse_json` in `shared/json_repair.py`. It was written after an incident on May 31 to repair broken JSON: a trailing comma, quotes, output cut off mid-way. And when it couldn't repair something, it returned `{}`. At the time that seemed reasonable.
+At first everything moved fast. Prompt engineering alone delivered improvement after improvement. New feature? Another paragraph in the prompt, a few questions in the chat, looks good, deploy. Every team that built an assistant two years ago knows this rhythm.
 
-## The morning the JSON started with a sentence
+## When the curve went flat
 
-`claude -p` started opening its answer with a short paragraph before the `{`. A remark about audit rules and about the task being safe, and only then the JSON. In the rss and editorial agents this happened on almost every run.
+As Lucy gained more capabilities, performance stalled. Hamel describes three symptoms, and I think most of you will recognize at least two:
 
-We didn't touch our prompt. What changed were rules sitting in the `claude -p` session, which the model read before the task and decided it had to respond to. As far as the model is concerned, that's a prompt change. The prompt is everything the model sees, not just what you wrote in the file.
+- Every fix for one problem created a new one. Whack-a-mole, in his words.
+- There was no way to know how the system did across all tasks at once, other than vibe checks.
+- The prompts grew into long blobs trying to cover every edge case.
 
-`parse_json` got a string that didn't start with `{`, tried to repair it, failed, and returned `{}`. And `{}` is valid JSON. The agent wrote a file, exited 0, and the merger carried on with what it had.
+From the outside this doesn't look like an incident. No outage, no 500s in the logs, no alert. Just a different complaint every week, and every week someone fixes it. That's the most dangerous kind of regression, because it has no timestamp.
 
 <figure><img src="/posts/prompt-engineering-3-evals/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
 
-<figure><img src="/posts/prompt-engineering-3-evals/v1-svg-en.jpg" alt="The model returned valid JSON, just with a sentence in front of it. Our parser looked for it at the first character, failed, and returned `{}`. From there the whole chain looked green: the bug was in our default, not in the model." loading="lazy" /><figcaption>The model returned valid JSON, just with a sentence in front of it. Our parser looked for it at the first character, failed, and returned `{}`. From there the whole chain looked green: the bug was in our default, not in the model.</figcaption></figure>
-
-## From the outside, everything looked green
-
-The site went up on time. The summary email showed every step as successful. The QA evaluator ran, scored the stories that did get published, and found them fine. Because they were fine. There were just fewer of them, and two whole sources were missing.
-
-In their post on Agent-EvalKit, AWS wrote that an answer can look great even when the tools returned nothing. Ours was even simpler: the judge checks the quality of what's there. It doesn't ask what was supposed to be there.
-
-Three days before we noticed.
-
-<figure><img src="/posts/prompt-engineering-3-evals/v2-strip-en.jpg" alt="Three mornings, two whole sources missing, and not one alert. The judge scored what was published and found it fine, because it has no way to ask what was supposed to be there." loading="lazy" /><figcaption>Three mornings, two whole sources missing, and not one alert. The judge scored what was published and found it fine, because it has no way to ask what was supposed to be there.</figcaption></figure>
+<figure><img src="/posts/prompt-engineering-3-evals/v1-svg-en.jpg" alt="Four versions, four fixes, the same 4 out of 5. Without a fixed set you only see the cell you fixed (Hamel Husain on Lucy)" loading="lazy" /><figcaption>Four versions, four fixes, the same 4 out of 5. Without a fixed set you only see the cell you fixed (Hamel Husain on Lucy)</figcaption></figure>
 
 ## The first fix: one more line in the prompt
 
-The first reflex was to fix it with words. We added to the prompt that the answer "MUST begin with '\{'", plus a line that starts with "Do not preface it with commentary" and goes on to audit rules. That line still sits in the system prompt that wrote this post. We also tried `--bare` to clear the session context, and that broke subscription auth.
+This is the intuitive fix, and it's the wrong one. Lucy showed the user an internal ID from the DB? Add "never display IDs". Property search returns junk on a vague question? Add an example. Each line like that gets tested on the case that caused it, and only on that case.
 
-The line helped. Not always. And how did we know it helped? We ran it a few times by hand and looked. That's exactly the trial-and-error promptfoo is built against. Anthropic put it best:
+Wait, why is that a problem? Because a prompt has no scope. A line you wrote for property search also changes how the model phrases a contract summary. Without a fixed set that runs on every change, you see exactly one cell in the table: the one you looked at. Everything else shifts quietly.
 
-> "Without them, it's easy to get stuck in reactive loops—catching issues only in production, where fixing one failure creates others."
-> — Anthropic Engineering, Demystifying evals for AI agents
+## The real cause: nothing to run
 
-That's how it felt. Every fix in words moved the problem, it didn't close it.
+Hamel opens the post with a sentence I come back to in every conversation on this:
 
-> **My take:** I don't buy a prompt as the fix for a parsing bug. A prompt lowers a probability, it's not a contract. If the failure looks like exit 0, it will come back, and you'll find out from a reader.
+> I've found that unsuccessful products almost always share a common root cause: a failure to create robust evaluation systems.
+>
+> — Hamel Husain, Your AI Product Needs Evals
 
-<figure><img src="/posts/prompt-engineering-3-evals/src1.jpg" alt="promptfoo is built against exactly what we did that week: run it by hand a few times and eyeball it. 'The line helped, not always' isn't a result, it's a mood. (credit: Promptfoo)" loading="lazy" /><figcaption>promptfoo is built against exactly what we did that week: run it by hand a few times and eyeball it. 'The line helped, not always' isn't a result, it's a mood. (credit: Promptfoo)</figcaption></figure>
+The prompt's wording wasn't the problem. Measurement was missing. Every decision about the prompt rested on five questions someone typed that morning. And that's exactly the situation LangChain's survey describes two years later: teams see traces, but they don't judge them.
 
-## The real cause was in our code
+<figure><img src="/posts/prompt-engineering-3-evals/v2-strip-en.jpg" alt="Rechat isn't an outlier: almost everyone sees traces, and only about a third judge what happens in production (LangChain, State of Agent Engineering)" loading="lazy" /><figcaption>Rechat isn't an outlier: almost everyone sees traces, and only about a third judge what happens in production (LangChain, State of Agent Engineering)</figcaption></figure>
 
-So what exactly was the bug? Not the model. The model returned valid JSON, with a sentence in front of it. The bug was ours, in two places: the parser didn't look for the JSON inside the text, and failure looked like success. `{}` as a default is a silent failure waiting to happen.
+## What Rechat built, in three levels
 
-The fix went into `shared/json_repair.py` and `shared/anthropic_cc.py`, so it covered every agent at once. Roughly, here's the idea in a short version:
+Roughly, three layers, from cheap to expensive.
 
-```python title="parse_guard.py"
-import json
+**Level 1, unit tests.** Assertions in code, no model. No UUID in the response. Search never runs with an empty query. The number of properties in the answer matches what the tool returned. They run on every change, and results are kept over time so you see a trend, not just pass/fail. Some of the test cases they generated with an LLM, per feature.
 
-class EmptyModelOutput(Exception):
-    pass
+**Level 2, traces and LLM-as-judge.** Log every conversation, read them yourself, and write a judge for the things code can't check. Hamel insists on one point: measure how often the judge agrees with a human, and don't trust it before that.
 
-def parse_model_json(raw: str, required=()) -> dict:
-    decoder = json.JSONDecoder()
-    for i, ch in enumerate(raw):
-        if ch != "{":
-            continue
-        try:
-            obj, _ = decoder.raw_decode(raw, i)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(obj, dict) and obj:
-            missing = [k for k in required if not obj.get(k)]
-            if missing:
-                raise EmptyModelOutput(f"empty keys: {missing}")
-            return obj
-    raise EmptyModelOutput(f"no JSON object: {raw[:120]!r}")
+**Level 3, A/B.** Only once the first two levels are stable do you test on real users.
+
+> **My take:** I don't trust a judge that hasn't been checked against at least 50 human-graded answers. An uncalibrated judge tends to like long, polite answers, which is the opposite of what a real estate agent needs in the middle of the day.
+
+The grader was also written by a person, and it can be wrong. In January 2026 Anthropic described how Opus 4.5 "failed" a τ2-bench task because it found a loophole in the airline's policy and gave the customer a better solution than the eval expected. When the eval says fail, read the transcript before you touch the prompt.
+
+<figure><img src="/posts/prompt-engineering-3-evals/src4.jpg" alt="The order is the point: cheap assertions first, the judge next, A/B last. Start with A/B and you're measuring noise (credit: hamel.dev)" loading="lazy" /><figcaption>The order is the point: cheap assertions first, the judge next, A/B last. Start with A/B and you're measuring noise (credit: hamel.dev)</figcaption></figure>
+
+## What to check this week
+
+Okay, enough story. This is the minimum to avoid becoming Lucy, using promptfoo (open source, runs locally, has a GitHub Action for CI):
+
+1. **A golden set of 30–50 cases.** From the logs, not from your head. Every user complaint goes into the set before you fix it.
+2. **Code first.** Whatever a regex or a JSON schema can check doesn't go to the judge. Cheap, deterministic, doesn't argue.
+3. **A judge with a narrow rubric.** One sentence that checks one thing. Not "is the answer good".
+4. **Pairwise comparison.** The current prompt against the candidate, on the same inputs. A 7 versus a 7.5 doesn't say much. "Which of the two is better" does.
+5. **Regression on real traffic.** Once a week, pull 20 traces from production (Braintrust, LangSmith, or just a log) and add whatever looks odd to the set.
+
+```yaml title="promptfooconfig.yaml"
+description: prompt regression, current vs candidate
+prompts:
+  - file://prompts/current.txt
+  - file://prompts/candidate.txt
+providers:
+  - id: anthropic:messages:claude-sonnet-5-5   # replace with the model ID you run in production
+    config:
+      temperature: 0
+defaultTest:
+  options:
+    provider: anthropic:messages:claude-opus-5-5   # the judge: a stronger model than the one under test
+  assert:
+    - type: not-regex
+      value: '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    - type: javascript
+      value: 'output.length < 1500'
+    - type: llm-rubric
+      value: Does not mention a property, price or address that did not appear in the context
+    - type: select-best
+      value: Which answer moves the agent to the next task in fewer messages
+tests: file://golden.csv
 ```
 
-Two things. It finds the first object that actually parses, even if there's a paragraph before it. And if there isn't one, or it's empty, it raises. The agent fails loudly, the wrapper retries, and the email says red.
+Both prompt files use `{{question}}`, and the CSV holds a single column with that name:
 
-## Since then: asserts before scores
+```csv title="golden.csv"
+question
+Find me a 4-room apartment in Ramat Gan under 3 million
+Schedule a meeting with yesterday's buyer
+How much commission do I get on the Bialik Street deal
+```
 
-QA got per-agent floors: a minimum item count, required fields not empty. That's an eval too. Boring, deterministic, runs in milliseconds, and it would have caught this on the first morning.
+```bash title="run.sh"
+npx promptfoo@latest eval -c promptfooconfig.yaml --repeat 3 --no-cache -o results.json
+npx promptfoo@latest view
+```
 
-OK, but what about a real prompt change, one that's supposed to improve content? Here's the order I work in, cheapest to most expensive:
+The `--repeat 3` isn't decoration. The same input doesn't return the same answer, and a test that passes 2 out of 3 times is flaky, not green. `select-best` is the pairwise comparison: the judge sees both versions side by side and picks one. If the candidate doesn't win or at least tie in most cases, it doesn't ship.
 
-- **Asserts in code.** Schema, required fields, counts. In promptfoo it's YAML with `is-json`, and it runs in CI.
-- **Golden set.** Real days from the archive, with what counts as good output. Put the bad days in there too. August 5–7 are exactly the cases that belong there.
-- **LLM-as-judge.** Braintrust splits an eval into three parts: data, task, scores. The judge is one scorer, not the truth. Anthropic say Opus 4.5 "failed" τ2-bench because it found a loophole in the policy and gave the user a better solution. Graders are wrong in both directions, so calibrate the judge against human labels.
-- **Pairwise.** Same input, old prompt vs. new, the judge picks the better one. That's easier for it than an absolute score. Run it twice in reversed order, or you're measuring position bias.
-- **Regression on real traffic.** Run the new prompt in shadow on yesterday's inputs and diff: how many items, how many empty fields, length. Braintrust built their product around this side, production traces.
-
-In practice, what would have caught August? An assert on count, and a diff on real traffic. Neither uses a model at all. The judge, the most expensive layer, would have missed it.
-
-An eval that can't fail on `{}` isn't an eval. It's a dashboard.
-
-<figure><img src="/posts/prompt-engineering-3-evals/v4-svg-en.jpg" alt="Same bad input, five layers. What would have caught August is an assert on count and a diff on real traffic, neither using a model. Build up from the cheap layers; don't start with the judge." loading="lazy" /><figcaption>Same bad input, five layers. What would have caught August is an assert on count and a diff on real traffic, neither using a model. Build up from the cheap layers; don't start with the judge.</figcaption></figure>
-
-
+And if you only have time for one item, do the first. Lucy didn't stall because the prompt was bad. It stalled because every fix was tested on one case, and a complaint that never became a test comes back in the next version.

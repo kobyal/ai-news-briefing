@@ -1,93 +1,103 @@
 ---
-title: "Harness engineering: everything that isn't the model"
-description: "OpenAI shipped a million lines of code without writing one by hand. What a harness is, why every agent mistake should become a check, and when not to build one."
+title: "Harness engineering: what broke when OpenAI let Codex write a million lines"
+description: "OpenAI built a product with zero hand-written code. The code drifted, the first fix failed, and harness engineering came out of it. What to check in yours."
 lang: en
 key: harness-engineering
 term: "harness engineering"
-cover: illus
-pubDate: 2026-09-30
-tags: ["harness-engineering", "agents", "coding-agents", "evals", "llm-ops"]
+kind: warstory
+pubDate: 2026-10-01
+tags: ["harness-engineering", "agents", "codex", "openai", "ci", "ai-coding"]
+hook: "scene"
+cover: type
+tldr: ["Every repeated agent mistake becomes a linter, not another line in the prompt.", "Keep AGENTS.md around 100 lines, pointing to a docs/ folder. Not a giant manual.", "Every linter error message should tell the agent how to fix it."]
 hero: /posts/harness-engineering/hero-en.jpg
 diagram: /posts/harness-engineering/diagram.svg
 sources:
   - { title: "Harness engineering: Leveraging Codex in an agent-first world", url: "https://openai.com/index/harness-engineering", date: "2026-06-05" }
-  - { title: "Harness engineering for self-improvement", url: "https://lilianweng.github.io/posts/2026-07-04-harness", date: "2026-08-04" }
-  - { title: "Learn Harness Engineering", url: "https://walkinglabs.github.io/learn-harness-engineering/en", date: "2026-05-18" }
   - { title: "Harness Engineering", url: "https://Habitat-Thinking.github.io/ai-literacy-superpowers/plugins/ai-literacy-superpowers/explanation/harness-engineering", date: "2026-08-27" }
-  - { title: "Building agents without harness engineering", url: "https://rajitkhanna.com/agents", date: "2026-06-11" }
   - { title: "Agent Harness Engineering", url: "https://addyosmani.com/blog/agent-harness-engineering", date: "2026-07-12" }
-opinion: "We buy it, with one caveat: harness engineering is mostly old engineering, test harnesses, CI, and permissions, back with a model inside the loop. The name helps a team talk about it, but a name isn't a method. What makes it real is that it changes what you do on Monday: instead of hunting for a better model, you write another check. For us, every place we replaced an LLM call with a deterministic rule came out cheaper and more reliable, and a loop that checks its own output is worth more than a better first draft. What convinces us this isn't hype: people in the field are still arguing about who coined it and what exactly belongs in it."
-madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+  - { title: "Harness Engineering for AI Coding Agents: Constraints That Ship Reliable Code | Augment Code", url: "https://www.augmentcode.com/guides/harness-engineering-ai-coding-agents", date: "" }
+  - { title: "What Is Harness Engineering for AI Agents? | Milvus\n - Milvus Blog", url: "https://milvus.io/blog/harness-engineering-ai-agents.md", date: "" }
+opinion: "We buy the term, because it passes the Monday test: it tells you to move rules out of the prompt and into CI, and that's a change you actually make. To us this is old-school software engineering with a model in the loop. Linters, layer boundaries and garbage collection weren't born in 2026, and that's fine. What the OpenAI story proves is a principle we keep coming back to: anywhere a deterministic rule replaces the model's judgment gets cheaper and more reliable, and a loop that checks itself is worth more than a good first draft. What worries us is that Harness Engineer is already showing up as a job title, before there's any serious research on it. What reassures us is that practitioners are still arguing openly about the definition and about who coined the name, and in our experience terms like that usually stick."
+madeWith: { model: "claude-opus-5-5", sourceCount: 5, reviewedBy: "Koby Almog" }
 ---
 
-## A million lines, none by hand
+## 01 · Late August 2025: an empty repo and three engineers
 
-In late August 2025, a team at OpenAI opened an empty repo and set one rule: no human writes a line of code. Not logic, not tests, not CI, not docs. Codex writes all of it.
+Late August 2025. An internal team at OpenAI pushes the first commit to an empty repo. Codex CLI with GPT-5 writes the scaffold: folder structure, CI, formatting rules, package manager, framework. Codex even wrote AGENTS.md, the file that tells the agent how to work in the repo. The team had one rule: no human writes a line of code. Not in the app, not in the tests, not in CI, not in the docs.
 
-Five months later the repo has about a million lines of code and 1,500 merged PRs. The team started with three engineers and now has seven. They average 3.5 PRs per engineer per day, and that number went up as the team grew. They estimate the work took a tenth of the time it would have taken by hand. Even the first AGENTS.md, the file that tells agents how to work in the repo, was written by Codex.
+Five months later the repo holds about a million lines and around 1,500 merged PRs. The team grew from three engineers to seven. Throughput was 3.5 PRs per engineer per day, and it went up as the team grew, not down. They estimate it took a tenth of the time it would have taken by hand. Ryan Lopopolo published this in February 2026, and everyone has been talking about harness engineering since.
 
-These are their numbers about their own product, so take them with a grain of salt. The number isn't the point of the post, though. This sentence is: the team's job is no longer to write code. It is to design the environment, define intent, and build feedback loops that let agents work reliably. They call that harness engineering.
+But this isn't a clean success story. The part worth learning from is what broke along the way.
 
-<figure><img src="/posts/harness-engineering/v1-strip-en.jpg" alt="These are OpenAI's numbers about OpenAI's product. The interesting part is that output per engineer rose as the team grew: what scaled was the environment, not the hands." loading="lazy" /><figcaption>These are OpenAI's numbers about OpenAI's product. The interesting part is that output per engineer rose as the team grew: what scaled was the environment, not the hands.</figcaption></figure>
+<figure><img src="/posts/harness-engineering/src1.jpg" alt="Zero hand-written lines doesn't mean zero work. The work just moved from writing code to building the environment (credit: OpenAI)" loading="lazy" /><figcaption>Zero hand-written lines doesn't mean zero work. The work just moved from writing code to building the environment (credit: OpenAI)</figcaption></figure>
 
-## Who coined it? Depends who you ask
+## 02 · A few months in: Codex copies itself
 
-Addy Osmani writes that Viv Trivedy coined the term, and that Trivedy's post "Anatomy of an Agent Harness" is the cleanest definition out there. The Habitat Thinking docs credit Birgitta Böckeler of ThoughtWorks, for her piece on martinfowler.com. Dex Horthy and HumanLayer were tracking the same pattern even earlier.
+Codex learns from the repo it works in. If a pattern exists in the repo, it will replicate it, good ones and bad ones alike. In a repo where agents wrote every line, there's no old, carefully written code holding the style together. Every shortcut that gets in once becomes a template the next agent copies, and then the one after that.
 
-So nobody invented it alone. It showed up in several places at once and stuck. That's a good sign, not a bad one.
-
-Trivedy's line does most of the work: Agent = Model + Harness. If you're not the model, you're the harness.
+Birgitta Böckeler of ThoughtWorks wrote on martinfowler.com about the same thing at other teams. Unconstrained coding assistants forget conventions, repeat the same mistakes, and slowly wear down the consistency of the codebase. This isn't an OpenAI-specific bug. It's what happens anywhere you let an agent write a lot of code.
 
 <figure><img src="/posts/harness-engineering/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
 
-## What's in a harness, and what isn't
+## 03 · From the outside, everything is green
 
-A harness is all the code, config, and runtime logic that isn't the model itself. The system prompt, the tools, how context is managed, hooks, the sandbox, subagents, checks, and what happens when something fails halfway through. A raw model is not an agent. It becomes one when someone gives it state, tool execution, feedback, and constraints that can actually be enforced.
+This is the annoying part. The code compiles, the tests pass, and the PR chart looks great. No alert fires when the architecture slowly falls apart. Habitat Thinking, who document Böckeler's idea, put it in two sentences: "The code continues to compile and pass tests. The degradation is quiet."
 
-Lilian Weng contrasts this with 2023. Back then an agent was "LLM + memory + tools + planning." A harness adds workflow, evals, permissions, and state that persists across runs. That's not prompt templates anymore. It's runtime design.
+The outside numbers tell the same story. The DORA report found that more AI adoption goes with higher software delivery throughput, and also with more instability. Apiiro counted more than 10,000 new security findings per month in AI-written code by June 2025, 10x the December 2024 level. Speed goes up, quality erodes, and the dashboard only shows the speed.
 
-What it isn't:
+> **Caveat:** These are OpenAI's numbers on their own internal product, with access to their best model and no paying customer. The "tenth of the time" is their own estimate, with no control group. I take the mechanisms from the post. I wouldn't put the ratios in a slide for management.
 
-- It's not prompt engineering with a new name. The prompt is one component out of ten.
-- It's not a framework. You can build a harness on any SDK, or on no SDK at all.
-- It doesn't make the model smarter. The walkinglabs course says it plainly: the harness doesn't improve the model, it builds a closed working system around it.
+<figure><img src="/posts/harness-engineering/v2-strip-en.jpg" alt="Every number here is excellent, and none of them measures code drift. That's why you can't see it from the outside (OpenAI)" loading="lazy" /><figcaption>Every number here is excellent, and none of them measures code drift. That's why you can't see it from the outside (OpenAI)</figcaption></figure>
 
-<figure><img src="/posts/harness-engineering/v2-svg-en.jpg" alt="The prompt is one box out of ten. Tools, hooks, checks, and state across runs are what turn a raw model into an agent, and none of them makes the model itself any smarter." loading="lazy" /><figcaption>The prompt is one box out of ten. Tools, hooks, checks, and state across runs are what turn a raw model into an agent, and none of them makes the model itself any smarter.</figcaption></figure>
+## 04 · The first fix: cleanup Fridays
 
-## Osmani's rule: every mistake, once
+The team's first response was entirely human. Every Friday, 20% of the week, they manually cleaned up what they called AI slop. It didn't hold. At 3.5 PRs per engineer per day, one cleanup day a week is a bucket under a burst pipe.
 
-The mechanism is simple. Osmani puts it like this: every time the agent makes a mistake, you spend the time to engineer a fix so it never makes that mistake again. Ever.
+The second fix was to write more instructions. One big AGENTS.md with all the rules. That failed too, and they described exactly why: the file eats the context, when everything is marked important nothing is, and it goes stale faster than anyone updates it.
 
-In practice it looks like this. The agent imported from a directory it shouldn't touch? Add a lint rule, not another line in the prompt. It declared "done" with red tests? Add a hook that won't let a task close without green CI. It forgot a convention? That goes into AGENTS.md, and the next agent reads it at the start of every session.
+Wait, why would that ever work? Augment put it well: telling an agent "follow our coding standards" is probabilistic compliance. Wiring in a linter that blocks the PR is deterministic enforcement. OpenAI's first two fixes stayed on the probabilistic side.
 
-The harness tightens with every screwup. Wait, isn't this just the old test harness? Almost. Böckeler noticed that AI-written code doesn't break loudly. It compiles, passes tests, and slowly erodes the codebase. Conventions get forgotten, mistakes repeat. The degradation is quiet. So the harness has to check architecture, naming, and security too, not just whether a function returns the right value.
+## 05 · The real cause: what the agent can't see doesn't exist
 
-HumanLayer go further and say most agent failures are a configuration skill issue, not a model issue. Osmani closes the loop: a decent model with a great harness beats a great model with a bad harness.
+The problem wasn't the model. The knowledge of how the code should look lived in places the agent can't read, like engineers' heads or Slack threads. And the checks in the repo caught functional breakage, not architectural drift. If the agent can't see something or feel it in its loop, then as far as it's concerned, it doesn't exist.
 
-<figure><img src="/posts/harness-engineering/v3-svg-en.jpg" alt="Every screwup becomes a step you never walk back down: a lint rule, a hook, a line in AGENTS.md. ‘Another line in the prompt’ gets struck out, because a prompt can be forgotten and a check can't." loading="lazy" /><figcaption>Every screwup becomes a step you never walk back down: a lint rule, a hook, a line in AGENTS.md. ‘Another line in the prompt’ gets struck out, because a prompt can be forgotten and a check can't.</figcaption></figure>
+So they moved the rules into the repo. AGENTS.md shrank to about 100 lines that act as a map to a docs/ folder, and docs/ became the source of truth. Custom linters, written by Codex itself, enforce the boundaries between layers, and their error messages include a fix instruction. The agent reads the error and fixes it on its own. On top of that, background Codex tasks scan the repo against a list of principles stored in the repo and open small refactor PRs. Garbage collection instead of Fridays.
 
-## Our pipeline: the harness is most of the code
+They described the shift in the job like this:
 
-The aibriefing.dev pipeline has run every morning since May 2026. About 10 agents, a merger step that combines them, and a QA evaluator that runs after publish and flags P0s. When I look at the repo, the part that actually talks to the model is small. Everything else is harness.
+> what changes when a software engineering team's primary job is no longer to write code, but to design environments, specify intent, and build feedback loops that allow Codex agents to do reliable work.
+> — OpenAI, Harness engineering: leveraging Codex in an agent-first world
 
-One example: our `claude -p` wrapper retries transient errors and repairs broken JSON. A small, boring loop. It closed three production incidents. None of them was "the model gave the wrong answer." They were a timeout, JSON with a prose preamble, and an empty response reported as success.
+The rule behind it is credited to Mitchell Hashimoto (HashiCorp, Terraform), who wrote in February 2026 that every agent mistake gets a permanent fix in the environment, so the same mistake doesn't come back. Addy Osmani credits the name to Viv Trivedy. The fact that people are still arguing about who coined the name is a good sign, not a bad one.
 
-That's what surprised me most. Our worst bugs were silent failures, not wrong answers. The agent doesn't fail loudly. It returns `{}` and says success. Without a check that runs afterward, you find out from your users.
+<figure><img src="/posts/harness-engineering/v3-svg-en.jpg" alt="The first two fixes stayed on the probabilistic side. Only when the rule moved into CI did the agent start fixing itself (OpenAI, Augment)" loading="lazy" /><figcaption>The first two fixes stayed on the probabilistic side. Only when the rule moved into CI did the agent start fixing itself (OpenAI, Augment)</figcaption></figure>
 
-One more thing, boring and good: we used to copy logic between agents, and a fix that landed in one copy didn't land in the other. Today it lives in `shared/`, with one wrapper for everyone. That's harness too.
+## 06 · What to check in your repo this week
 
-## When not to build your own
+You don't need a million lines to hit the same wall. An agent opening PRs for a few weeks is enough. Here's what to check:
 
-Rajit Khanna built a media-generation agent at prismvideos on the Vercel SDK. It worked well. A few days later a competitor, Higgsfield, launched an agent with cross-session memory, skills, automations, and a filesystem. All of it on Hermes, an open agent from Nous Research with more than 185k GitHub stars.
+- `wc -l AGENTS.md CLAUDE.md`. If it's over 150 lines, split it into files under docs/ and keep only a map in the main file.
+- Go through your last 20 review comments on agent PRs. Any comment that shows up twice is a check you haven't written yet.
+- Every linter or CI error message needs a FIX line and a WHY line pointing to a doc. The agent reads the message, so instructions inside it work better than a line in the prompt.
+- Run a weekly scheduled job that asks the agent to find deviations from docs/principles.md and open up to three small PRs. No more, or you've just moved Friday into review.
 
-What did they do? Deleted their agent. They stood up an EC2 box with a Hono server, one Hermes container per customer, and feed it only what's unique to them: the system prompt, tools over MCP, skills, and connectors to Meta Ads and Google Drive.
+This is the simplest boundary linter there is. It blocks direct DB access outside the allowed layer and tells the agent what to do instead:
 
-This doesn't contradict everything above. It sharpens it. There's the generic harness: session management, compaction, memory, a browser. You're probably better off taking that off the shelf. And there's your domain harness: the checks that know what valid output means for you, the permissions, the rules born from your own screwups. Nobody will build that for you.
+```python title="check_boundaries.py"
+import pathlib, re, sys
 
-<figure><img src="/posts/harness-engineering/src5.jpg" alt="prismvideos deleted an agent that worked and put Hermes underneath. What stayed theirs is only the domain harness: prompt, tools, and connectors (credit: Rajit Khanna)" loading="lazy" /><figcaption>prismvideos deleted an agent that worked and put Hermes underneath. What stayed theirs is only the domain harness: prompt, tools, and connectors (credit: Rajit Khanna)</figcaption></figure>
+IMPORT_DB = re.compile(r'^\s*(from|import)\s+app\.db\b', re.M)
+ALLOWED = ('app/repo/', 'app/db/')
 
-## What to try this week
+bad = [p for p in pathlib.Path('app').rglob('*.py')
+       if not str(p).startswith(ALLOWED) and IMPORT_DB.search(p.read_text())]
 
-If you don't have an AGENTS.md, start one. Then go through your agent's last five mistakes and ask of each: can this become an automated check? Lint, schema, hook, test. Only what can't become a check goes into the prompt.
+for p in bad:
+    print(f'{p}: direct import of app.db outside the repo layer.\n'
+          '  FIX: add a function in app/repo/ and call it from here.\n'
+          '  WHY: docs/architecture.md#data-access')
+sys.exit(1 if bad else 0)
+```
 
-And if nothing runs after your agent says "done," start there. The agent will always say it's done.
+Wire it into pre-commit and CI, and see how many PRs it catches in the first week. The interesting part of this file isn't the regex. It's the three lines that tell the agent what to do after it gets blocked.

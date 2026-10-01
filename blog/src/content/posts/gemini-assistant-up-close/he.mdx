@@ -1,0 +1,157 @@
+---
+title: "Gemini מקרוב: זול, מהיר, ומשתנה כל שלושה שבועות"
+description: "Gemini בסוף 2026: CLI, Live, Workspace ומחירי Flash. איפה הוא עוקף את ChatGPT וקלוד, איפה הוא נופל, ומתי צוות ישראלי צריך לבחור בו."
+lang: he
+key: gemini-assistant-up-close
+term: "Gemini"
+kind: deepdive
+pubDate: 2026-10-01
+tags: ["gemini", "google", "ai-assistants", "gemini-cli", "llm-pricing", "api-security"]
+hook: "number"
+cover: illus
+tldr: ["מחזיקים Maps key ב-GCP? תגבילו אותו ל-API ספציפי לפני שמישהו מפעיל Gemini.", "בנפח גבוה: 3.8 Flash ב-$0.75/$3.75, עם model ID מקובע ו-eval של 100 מקרים.", "על Workspace? רוב התוכניות כבר כוללות Gemini. תפעילו פיילוט ל-10 אנשים."]
+series: { slug: "the-assistants", name: "העוזרים של 2026, אחד-אחד", part: 2, total: 4 }
+hero: /posts/gemini-assistant-up-close/hero.jpg
+diagram: /posts/gemini-assistant-up-close/diagram.svg
+sources:
+  - { title: "Gemini", url: "https://blog.google/products/gemini", date: "" }
+  - { title: "Gemini 4 Argon", url: "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon", date: "2026-09-30" }
+  - { title: "Gemini 3.8 Flash and 3.8 Flash Cyber", url: "https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber", date: "2026-09-02" }
+  - { title: "Gemini 3 Deep Think", url: "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-deep-think", date: "2026-02-12" }
+  - { title: "Gemini 3.5 Flash", url: "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-5", date: "2026-05-19" }
+  - { title: "Google API keys weren't secrets, but then Gemini changed the rules", url: "https://trufflesecurity.com/blog/google-api-keys-werent-secrets-but-then-gemini-changed-the-rules", date: "2026-02-25" }
+  - { title: "Gemini 3.7 Flash", url: "https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-3-7-flash", date: "2026-08-13" }
+  - { title: "Gemini 3.6 Flash, 3.5 Flash-Lite, and 3.5 Flash Cyber", url: "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-6-flash-3-5-flash-lite-3-5-flash-cyber", date: "2026-07-21" }
+  - { title: "Apple reveals new AI architecture built around Google Gemini models", url: "https://www.macrumors.com/2026/06/08/apple-reveals-new-ai-architecture", date: "2026-06-08" }
+  - { title: "How Google’s Gemini AI model got its name", url: "https://blog.google/innovation-and-ai/products/google-gemini-ai-name-meaning", date: "" }
+opinion: "אנחנו לא בוחרים מודל לפי טבלת benchmarks, ובטח לא לפי זו של הספק. מה שמושך אותנו ב-Gemini זה ה-$0.75 של Flash: בכל משימה צרה שהפלט שלה נבדק אוטומטית, מודל זול ומהיר מנצח מודל חכם ויקר. אבל ספק שמחליף גרסה כל שלושה שבועות מכריח אותנו לעשות את מה שאנחנו ממילא מאמינים בו: eval קבוע, גרסה מקובעת, ובדיקה לפני כל שדרוג. סיפור מפתחות ה-API מזכיר שהמערכת סביב המודל, מה הוא רואה ומי יכול לקרוא לו, חשובה יותר מהמודל עצמו. ולכתיבת קוד בתוך repo אנחנו עדיין עם קלוד; Gemini אצלנו סורק זול, לא מי שמחליט."
+madeWith: { model: "claude-opus-5-5", sourceCount: 10, reviewedBy: "Koby Almog" }
+---
+
+$0.75 למיליון tokens של קלט, $3.75 לפלט. זה המחיר של Gemini 3.8 Flash, שגוגל השיקה ב-2 בספטמבר 2026. ובאותו פוסט היא כתבה שזו גרסת ה-Flash השלישית בשישה שבועות: 3.6 ב-21 ביולי, 3.7 ב-13 באוגוסט, 3.8 ב-2 בספטמבר. ב-30 בספטמבר כבר הגיע Gemini 4 Argon, ב-$2 לקלט ו-$10 לפלט, אבל רק לקבוצה סגורה של מגיני סייבר.
+
+המחיר והקצב, זה בגדול כל הסיפור של Gemini ב-2026. הוא זול והוא מהיר: לפי גוגל, 3.5 Flash מוציא tokens פי 4 יותר מהר משאר המודלים המובילים. ובמקביל הוא מטרה שזזה כל שלושה שבועות. בחלק הקודם של הסדרה ראינו את dots של OpenAI, agent אחד שרץ לבד על מחשב בענן. Gemini זה משהו אחר. פחות agent אחד גדול, יותר שכבה שגוגל מורחת על כל מה שכבר יש לכם בטלפון ובארגון.
+
+## ארבעה מוצרים עם שם אחד
+
+Gemini זה לא מוצר. זה מותג שמכסה לפחות ארבעה דברים:
+
+- **המודלים** דרך ה-API, ב-Google AI Studio וב-Vertex: Flash, Flash-Lite, Pro, Deep Think, ועכשיו Argon.
+- **האפליקציה** לצרכנים, עם Gemini Live (שיחה קולית בזמן אמת, כולל מצלמה ושיתוף מסך), Deep Research, ו-Deep Think למנויי Ultra.
+- **השכבה ב-Workspace**: פאנל צד ב-Gmail, Docs, Sheets ו-Drive, שקורא את המסמכים שלכם בלי שתעתיקו כלום.
+- **כלי פיתוח**: Gemini CLI בטרמינל, ו-Antigravity, שגוגל קוראת לה פלטפורמת פיתוח agent-first.
+
+ויש חמישי, שקט: ב-8 ביוני 2026 אפל הציגה ארכיטקטורת AI חדשה שבנויה סביב מודלי Gemini. כלומר חלק מהמשתמשים שלכם ידברו עם Gemini בלי לדעת.
+
+את השם המציא ג'ף דין. Gemini זה תאומים בלטינית, והתאומים הם צוות Brain וצוות DeepMind שאוחדו באפריל 2023. גוגל הזכירה אותו לראשונה ב-I/O של אותה שנה.
+
+ומה הוא לא: הוא לא agent אחד שמפעילים כמו dots. הוא לא חשבונית אחת, כי מנוי האפליקציה, רישיון Workspace וחיוב ה-API הם שלושה מסלולים נפרדים. והוא בטח לא יעד יציב. מי שקיבע model ID ביולי כבר שתי גרסאות מאחור.
+
+## יום עם זה ביד: CLI, Live ו-Workspace
+
+נתחיל מהטרמינל, כי שם רוב הקוראים פה יפגשו אותו. Gemini CLI יצא ביוני 2025 כקוד פתוח (Apache 2.0), ובהשקה נתן עם חשבון גוגל אישי 60 בקשות בדקה ו-1,000 ביום בחינם. תבדקו את המכסה העדכנית לפני שאתם בונים עליה, היא זזה.
+
+```bash title="gemini-setup.sh"
+npm install -g @google/gemini-cli
+cd your-repo
+# קובץ context שה-CLI קורא בכל הפעלה
+cat > GEMINI.md <<'EOF'
+- Python 3.12, pytest. Never touch infra/ or .github/.
+- Propose a diff, don't apply it.
+EOF
+# הרצה לא-אינטראקטיבית עם מודל מקובע (את השם המדויק תיקחו מ-/model)
+gemini -m "$GEMINI_MODEL" -p "find dead code in src/ and list it as file:line"
+```
+
+מה שרואים בפועל: הוא קורא את GEMINI.md, סורק את ה-repo ומחזיר רשימה. מהר. ממש מהר. אותה משימה ב-Claude Code לוקחת אצלי יותר זמן, אבל מחזירה פחות false positives. בקיצור, Flash מצוין בסריקה רחבה ופחות בהחלטות עדינות.
+
+ב-Gemini Live גוגל באמת מקדימה את כולם. מכוונים את המצלמה על error שמוקרן במסך בחדר הישיבות, ומדברים איתו. ה-latency נמוך מספיק כדי שזו תהיה שיחה ולא תור. בעברית הוא מבין, אבל בניסיון שלי זה פחות חלק מאנגלית.
+
+ב-Workspace הערך הוא שאין העתק-הדבק. "תסכם לי את השרשור עם הספק מהשבוע ותכין טיוטת תשובה", בתוך Gmail, עם גישה לקבצים ב-Drive. מתחילת 2025 גוגל צירפה את Gemini לתוכניות Workspace עצמן במקום add-on נפרד, אז הרבה ארגונים בארץ כבר משלמים עליו בלי לשים לב.
+
+פיצ'רי ה-agent לצרכנים, כמו לתת ל-Gemini להתקשר לעסק ולברר מחיר או זמינות, נפתחים קודם בארצות הברית ובאנגלית. אל תבנו תהליך על פיצ'ר כזה לפני שבדקתם שהוא פתוח לחשבון ולשפה שלכם.
+
+<figure><img src="/posts/gemini-assistant-up-close/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/gemini-assistant-up-close/src1.jpg" alt="גוגל מציגה את Gemini כאפליקציה אחת, אבל מאחוריה שלושה מסלולי חיוב שונים: מנוי, Workspace ו-API (credit: Google)" loading="lazy" /><figcaption>גוגל מציגה את Gemini כאפליקציה אחת, אבל מאחוריה שלושה מסלולי חיוב שונים: מנוי, Workspace ו-API (credit: Google)</figcaption></figure>
+
+## המספרים: שלוש גרסאות Flash בשישה שבועות
+
+כל המחירים מהפוסטים של גוגל, וכולם מסומנים introductory. כלומר הם עוד יעלו.
+
+| מודל | הושק | קלט / פלט למיליון tokens | מה עוד כדאי לדעת |
+|---|---|---|---|
+| 3.6 Flash | 21.7.2026 | $1.50 / $7.50 | 17% פחות output tokens מ-3.5 Flash |
+| 3.5 Flash-Lite | 21.7.2026 | לא פורסם בפוסט | 350 tokens לשנייה |
+| 3.7 Flash | 13.8.2026 | $0.75 / $3.75 | DeepSWE: 65.3% מול 49.0% ב-3.6 |
+| 3.8 Flash | 2.9.2026 | $0.75 / $3.75 | HLE-Verified: 54.9% |
+| 4 Argon | 30.9.2026 | $2 / $10, cache ב-95% הנחה | רק בתוכנית Fairwind |
+
+בצד הצרכני יש שני מנויים: Google AI Pro ו-Ultra. במחירון האמריקאי של 2025 זה היה $19.99 ו-$249.99 לחודש. Deep Think, מצב ההיגיון הכבד, זמין באפליקציה רק ל-Ultra, וב-API רק בגישה מוקדמת.
+
+רגע, למה הקצב הוא מספר ולא רק כותרת? כי ב-3.6 גוגל עצמה מדווחת על 17% פחות output tokens. כלומר גם אורך התשובות וגם המבנה שלהן זזים בין גרסאות. parser שעבד על 3.5 יכול להישבר על 3.6 בלי שמישהו שינה שורת קוד.
+
+<figure><img src="/posts/gemini-assistant-up-close/v2-svg-he.jpg" alt="63 יום בלי Flash חדש, ואז שלוש גרסאות במרווחים של 20–23 יום: מי שמקבע גרסה צריך eval שרץ על כל השקה (Google)" loading="lazy" /><figcaption>63 יום בלי Flash חדש, ואז שלוש גרסאות במרווחים של 20–23 יום: מי שמקבע גרסה צריך eval שרץ על כל השקה (Google)</figcaption></figure>
+
+## איפה הוא חזק
+
+קודם כל, נפח. נגיד שיש לכם מיליון מסמכים לסווג, 2,000 tokens קלט ו-300 פלט לכל אחד. ב-3.8 Flash זה $1,500 על הקלט ו-$1,125 על הפלט, $2,625 בסך הכל. אותה עבודה ב-3.6 Flash מלפני חודשיים: $5,250. ב-Argon, כשייפתח: $7,000. ובמהירות של Flash-Lite, 350 tokens לשנייה, זה ההבדל בין batch של לילה ל-batch של שעה.
+
+חוץ מזה, Workspace. אם הארגון חי ב-Gmail וב-Drive, כל מתחרה צריך connector, הרשאות ו-OAuth כדי לראות את המסמכים. Gemini פשוט כבר שם.
+
+שלישי זה קול ומולטימודליות. Live עם מצלמה הוא הכי קרוב לעוזר שמדברים איתו כמו עם בן אדם, וההפצה עצומה: אנדרואיד, Search, ועכשיו גם אפל.
+
+ולבעיות קשות באמת יש את Deep Think. הנתונים מ-12 בפברואר: 48.4% ב-Humanity's Last Exam בלי כלים, 84.6% ב-ARC-AGI-2 באימות של ARC Prize Foundation, ו-Elo של 3455 ב-Codeforces. יפה. אבל זה מצב ל-Ultra, לא משהו שתריצו בפרודקשן מחר.
+
+## איפה הוא נופל
+
+הקצב. שלוש גרסאות בשישה שבועות זה נהדר בפוסט השקה ומעייף בפרודקשן. ובכיוון ההפוך: ב-19 במאי גוגל הבטיחה את 3.5 Pro ל"חודש הבא", וב-21 ביולי הוא עוד היה בבדיקות עם שותפים. אז תתקצבו גם הפתעות לטובה וגם עיכובים.
+
+המפתחות. ב-25 בפברואר 2026 Truffle Security סרקו מיליוני אתרים ומצאו כמעט 3,000 מפתחות Google API, שנפרסו במקור ל-Maps ול-Firebase, שעובדים גם מול Gemini. כולל מפתחות ישנים של גוגל עצמה.
+
+> "When you enable the Gemini API (Generative Language API) on a Google Cloud project, existing API keys in that project (including the ones sitting in public JavaScript on your website) can silently gain access to sensitive Gemini endpoints. No warning. No confirmation dialog. No email notification."
+> — Truffle Security, פברואר 2026
+
+בפועל, מפתח Maps שהטמעתם ב-HTML לפני שלוש שנים, בדיוק כמו שגוגל הורתה, הופך ל-credential של Gemini ברגע שמישהו בצוות מפעיל את ה-API באותו פרויקט לטובת פרוטוטייפ. מי שגורד אותו יכול לקרוא קבצים שהעליתם ולחייב אתכם על ה-LLM. תריצו את זה היום:
+
+```bash title="audit-keys.sh"
+PROJECT=your-gcp-project
+# האם Gemini API פתוח בפרויקט?
+gcloud services list --enabled --project=$PROJECT | grep generativelanguage
+# אילו מפתחות יש, ולאיזה API כל אחד מוגבל
+gcloud services api-keys list --project=$PROJECT \
+  --format="table(uid,displayName,restrictions.apiTargets)"
+# מפתח של Maps? להגביל אותו ל-Maps בלבד
+gcloud services api-keys update KEY_UID --project=$PROJECT \
+  --api-target=service=maps-backend.googleapis.com
+```
+
+מפתח בלי apiTargets ובפרויקט שבו generativelanguage פתוח, זה הממצא. אם יש לכם כזה בקוד צד-לקוח, תגבילו אותו או תעבירו את Gemini לפרויקט נפרד.
+
+והפיזור. ארבעה מוצרים, שלושה מסלולי חיוב, ושמות שמשתנים מהר יותר מה-changelog. Argon, הדבר הכי חזק שיש להם, סגור כרגע לתוכנית Fairwind. חבל.
+
+> **הסתייגות:** את מספרי ה-benchmark פה, DeepSWE ו-HLE-Verified, לקחתי מהפוסטים של גוגל עצמה ולא הרצתי אותם. על ה-workloads שלכם התוצאה יכולה לצאת אחרת לגמרי. ה-eval שלכם שווה יותר מכל טבלה בפוסט הזה.
+
+## מול ChatGPT וקלוד
+
+ChatGPT הוא עדיין ברירת המחדל לצרכן, ועם dots OpenAI הולכת ל-agent שעובד לבד ברקע. קלוד, בעיני, הכי חזק בכתיבת קוד בתוך repo ובהתנהגות צפויה בין גרסאות. Gemini לא מנסה לנצח אותם במגרש שלהם. הוא מנצח במחיר לנפח, ב-Workspace ובקול.
+
+טוב, אז מה זה אומר בפועל? שהשאלה "איזה עוזר לקנות" היא השאלה הלא נכונה. צוות טיפוסי בארץ יגיע לשניים: אחד שחי במסמכים ובמייל, ואחד שחי ב-repo. ומעליהם API זול למשימות צרות שנבדקות אוטומטית.
+
+<figure><img src="/posts/gemini-assistant-up-close/v3-svg-he.jpg" alt="Gemini מנצח איפה שיש נפח ו-Workspace ומפסיד ביציבות, אז בוחרים לפי משימה ולא לפי ספק (שיפוט שלנו, מחירי ההשקה של גוגל)" loading="lazy" /><figcaption>Gemini מנצח איפה שיש נפח ו-Workspace ומפסיד ביציבות, אז בוחרים לפי משימה ולא לפי ספק (שיפוט שלנו, מחירי ההשקה של גוגל)</figcaption></figure>
+
+## מי צריך לבחור בו ברבעון הזה
+
+- **ארגון שיושב על Workspace**: כן. אתם כנראה כבר משלמים. תפעילו באדמין קונסול לקבוצת פיילוט, לא לכל הדומיין.
+- **מוצר עם הרבה קריאות API צרות** (סיווג, extraction, תיוג): 3.8 Flash. עם model ID מקובע, schema validation על כל תשובה, ותקציב פי 2 ליום שבו ה-introductory ייגמר.
+- **צוות פיתוח**: Claude Code נשאר הכלי הראשי לכתיבת קוד. Gemini CLI טוב כסורק שני, זול ומהיר, ל-repo גדול.
+- **מי שיש לו אתר או אפליקציה על GCP**: לפני כל השאר, האודיט מלמעלה.
+
+מה לעשות השבוע:
+
+1. להריץ את audit-keys.sh על כל פרויקט GCP שיש בו מפתח בקוד צד-לקוח.
+2. להתקין Gemini CLI על repo אחד, לכתוב GEMINI.md, ולהשוות 5 משימות מול הכלי הנוכחי. לספור false positives, לא תחושות.
+3. לבנות eval של 100 מקרים אמיתיים מהמוצר, ולהריץ אותו על 3.8 Flash. מתחת ל-95% תשובות תקינות לפי ה-schema, זה לא מוכן.
+4. לקבוע תזכורת: כל השקה של Flash, ה-eval רץ שוב לפני שמחליפים גרסה.
+
+גוגל תשחרר עוד Flash לפני שהפיילוט שלכם ייגמר. מה שאסור שישתנה איתה זה ה-eval.

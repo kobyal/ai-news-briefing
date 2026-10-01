@@ -26,7 +26,7 @@ export const statDuration = () => Math.round(STEPS_FPS * 5.5);
 const Shell: React.FC<{ lang: 'he' | 'en'; children: React.ReactNode }> = ({ lang, children }) => (
   <AbsoluteFill
     style={{
-      background: '#fbfbf9',
+      background: '#f6f3ea',
       color: INK,
       borderTop: `3px solid ${INK}`,
       fontFamily: FONT(lang),
@@ -61,7 +61,7 @@ export const Steps: React.FC<StepsProps> = ({ lang, title, steps }) => {
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 22, marginBottom: 18, opacity: p, transform: `translateX(${(1 - p) * (lang === 'he' ? 30 : -30)}px)` }}>
               <div style={{
                 width: 46, height: 46, borderRadius: 23, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: active ? INK : '#fbfbf9', border: `1.5px solid ${INK}`, color: active ? '#fbfbf9' : INK, fontFamily: DISPLAY, fontWeight: 700, fontSize: 22,
+                background: active ? INK : '#f6f3ea', border: `1.5px solid ${INK}`, color: active ? '#f6f3ea' : INK, fontFamily: DISPLAY, fontWeight: 700, fontSize: 22,
                 transition: 'background 0.2s',
               }}>{i + 1}</div>
               <div style={{ fontSize: 36, fontWeight: 500, lineHeight: 1.25 }}>{s}</div>

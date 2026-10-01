@@ -59,13 +59,13 @@ def diagram(key: str, d2_src: str, theme: int = 0) -> str | None:
 _HERO_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@500;700&family=Frank+Ruhl+Libre:wght@700;800&display=swap');
-body{{margin:0;width:1200px;height:630px;overflow:hidden;background:#12121c;color:#fbfbf9;font-family:Heebo,system-ui,sans-serif;position:relative}}
+body{{margin:0;width:1200px;height:630px;overflow:hidden;background:#12121c;color:#f6f3ea;font-family:Heebo,system-ui,sans-serif;position:relative}}
 svg{{position:absolute;inset:0}}
 .in{{position:absolute;inset:0;padding:52px 72px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between}}
 .top{{display:flex;justify-content:space-between;align-items:center;font-family:ui-monospace,Menlo,monospace;font-size:17px;letter-spacing:.12em;text-transform:uppercase;color:rgba(251,251,249,.62);direction:ltr}}
 .top b{{color:{hue};font-weight:600}}
 .term{{font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:{tfs}px;line-height:.95;letter-spacing:-.025em;direction:ltr;text-align:left;
-color:#fbfbf9;text-shadow:0 2px 40px rgba(0,0,0,.5);margin:0;max-width:1056px;overflow-wrap:anywhere}}
+color:#f6f3ea;text-shadow:0 2px 40px rgba(0,0,0,.5);margin:0;max-width:1056px;overflow-wrap:anywhere}}
 .term i{{font-style:normal;color:{hue}}}
 h1{{font-weight:700;font-size:{fs}px;line-height:1.25;margin:0;max-width:900px;color:rgba(251,251,249,.86);text-align:start;unicode-bidi:plaintext}}
 .bot{{display:flex;justify-content:space-between;align-items:flex-end;gap:40px}}
@@ -241,7 +241,7 @@ def video(key: str, lang: str, term: str, scenes: list[dict], diagram_png: Path 
 _COMPARE_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@700;800&display=swap');
 html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#12121c}}
-.card{{position:relative;width:1200px;height:675px;overflow:hidden;background:#fbfbf9;padding:56px 72px 72px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
+.card{{position:relative;width:1200px;height:675px;overflow:hidden;background:#f6f3ea;padding:56px 72px 72px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
 h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:44px;font-weight:700;margin:0 0 34px;line-height:1.15}}
 .cols{{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}}
 .col{{border-top:1px solid #12121c;padding-top:18px}}
@@ -256,7 +256,7 @@ li{{font-size:28px;line-height:1.4;margin-bottom:14px;color:#3b3b4f}} ul{{paddin
 
 _CARD_CSS = """@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@500;700;800&display=swap');
 html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#12121c}}
-.card{{position:relative;width:1200px;height:675px;overflow:hidden;background:#fbfbf9;padding:56px 72px 72px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
+.card{{position:relative;width:1200px;height:675px;overflow:hidden;background:#f6f3ea;padding:56px 72px 72px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
 .brand{{position:absolute;bottom:28px;right:72px;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:18px;color:#a0a0b2;direction:ltr}}
 """
 
@@ -271,7 +271,7 @@ _TIMELINE_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta c
 h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:40px;font-weight:700;margin:0 0 40px;line-height:1.15}}
 .tl{{position:relative;padding-inline-start:36px;border-inline-start:2px solid #12121c}}
 .ev{{position:relative;margin-bottom:26px}} .ev:last-child{{margin-bottom:0}}
-.ev::before{{content:"";position:absolute;inset-inline-start:-44px;top:10px;width:14px;height:14px;border-radius:50%;background:#fbfbf9;border:2.5px solid #12121c}}
+.ev::before{{content:"";position:absolute;inset-inline-start:-44px;top:10px;width:14px;height:14px;border-radius:50%;background:#f6f3ea;border:2.5px solid #12121c}}
 .ev.last::before{{background:#4f46e5;border-color:#4f46e5}}
 .when{{font-family:ui-monospace,Menlo,monospace;font-size:20px;color:#3730a3;letter-spacing:.04em;direction:ltr;display:inline-block}}
 .what{{font-size:28px;line-height:1.3;margin-top:2px}}
@@ -281,7 +281,7 @@ h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:40px;font-weight:700;
 
 _STRIP_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@700;800&display=swap');
-html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#fbfbf9}}
+html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#f6f3ea}}
 .card{{width:1200px;height:420px;background:#12121c;padding:56px 72px;box-sizing:border-box;display:grid;grid-template-columns:repeat({n},1fr);gap:40px;align-items:center;position:relative}}
 .it{{border-inline-start:2px solid rgba(251,251,249,.18);padding-inline-start:26px}}
 .v{{font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:96px;line-height:1;letter-spacing:-.03em;color:{hue};direction:ltr;text-align:start}}
@@ -292,15 +292,15 @@ html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;co
 _BOXES_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@700;800&display=swap');
 html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#12121c}}
-.card{{position:relative;width:1200px;height:675px;background:#fbfbf9;padding:52px 72px 64px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
+.card{{position:relative;width:1200px;height:675px;background:#f6f3ea;padding:52px 72px 64px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
 h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:40px;font-weight:700;margin:0 0 6px;line-height:1.15}}
 .sub{{font-family:ui-monospace,Menlo,monospace;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:#6d6d80;margin-bottom:34px;unicode-bidi:plaintext}}
 .row{{display:flex;align-items:center;gap:14px;margin-bottom:22px;flex-wrap:wrap}}
 .lab{{font-family:ui-monospace,Menlo,monospace;font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:#3b3b4f;min-width:230px}}
 .bx{{font-family:ui-monospace,Menlo,monospace;font-size:17px;padding:10px 16px;border-radius:5px;white-space:nowrap;unicode-bidi:plaintext}}
-.ink{{background:#12121c;color:#fbfbf9}} .accent{{background:{hue};color:#12121c}} .muted{{background:#e9e9e2;color:#6d6d80}} .ghost{{border:1.5px dashed #cfcfc6;color:#a0a0b2}}
+.ink{{background:#12121c;color:#f6f3ea}} .accent{{background:{hue};color:#12121c}} .muted{{background:#e3dfd2;color:#6d6d80}} .ghost{{border:1.5px dashed #c9c3b1;color:#a0a0b2}}
 .note{{font-family:ui-monospace,Menlo,monospace;font-size:15px;color:#3730a3;margin-inline-start:auto;white-space:nowrap;direction:ltr;unicode-bidi:isolate}}
-.tag{{position:absolute;bottom:24px;left:72px;font-family:ui-monospace,Menlo,monospace;font-size:13px;letter-spacing:.12em;text-transform:uppercase;background:#12121c;color:#fbfbf9;padding:6px 12px;direction:ltr}}
+.tag{{position:absolute;bottom:24px;left:72px;font-family:ui-monospace,Menlo,monospace;font-size:13px;letter-spacing:.12em;text-transform:uppercase;background:#12121c;color:#f6f3ea;padding:6px 12px;direction:ltr}}
 .brand{{position:absolute;bottom:24px;right:72px;font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:18px;color:#a0a0b2;direction:ltr}}
 </style></head><body><div class="card"><h1>{title}</h1><div class="sub">{sub}</div>{rows}
 <div class="tag">{tag}</div><div class="brand">blog.aibriefing.dev</div></div></body></html>"""
@@ -308,7 +308,7 @@ h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:40px;font-weight:700;
 _CHART_HTML = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@700;800&display=swap');
 html{{overflow:hidden}} body{{margin:0;font-family:Heebo,system-ui,sans-serif;color:#12121c}}
-.card{{position:relative;width:1200px;height:675px;background:#fbfbf9;padding:52px 72px 72px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
+.card{{position:relative;width:1200px;height:675px;background:#f6f3ea;padding:52px 72px 72px;box-sizing:border-box;border-top:3px solid #12121c;display:flex;flex-direction:column;justify-content:center}}
 h1{{font-family:'Frank Ruhl Libre',Georgia,serif;font-size:40px;font-weight:700;margin:0 0 30px;line-height:1.15}}
 .r{{display:grid;grid-template-columns:300px 1fr 150px;align-items:center;gap:22px;margin-bottom:18px}}
 .k{{font-size:22px;color:#3b3b4f;text-align:end}} .b{{height:34px;border-radius:4px;background:#12121c}} .b.acc{{background:{hue}}}
@@ -358,7 +358,7 @@ def _transcript(prompt: str, lang: str) -> tuple[str, str]:
 
 _SVG_SHELL = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@500;700;800&display=swap');
-html,body{{margin:0;width:1200px;height:675px;overflow:hidden;background:#fbfbf9}}
+html,body{{margin:0;width:1200px;height:675px;overflow:hidden;background:#f6f3ea}}
 svg{{display:block;width:1200px;height:675px;font-family:Heebo,system-ui,sans-serif}}
 </style></head><body>{svg}</body></html>"""
 

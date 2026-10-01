@@ -126,12 +126,12 @@ ALSO produce:
   On-screen text SHORT (<=14 words per line). First scene title, one scene image, last outro.
 - visuals: 2–4 figures, placed where the prose needs them (never two in one section; NOT always after the first
   section). Each has "after" = the exact ## heading text it belongs to, and a "caption" that argues (see above).
-  THE RULE THAT MATTERS: every post has at least one `svg` figure YOU DRAW for this specific idea, and figures across
+  THE RULE THAT MATTERS: every post has at least one `svg` figure YOU DRAW for this specific idea (two is fine), and figures across
   posts must not share a composition. A reader who has seen three posts should not be able to guess the fourth's figure.
   {"kind":"svg","after":..,"svg":"<svg …>","caption":..}
       You author the SVG. 1200×675 viewBox, no external refs, no <script>/<foreignObject>, no gradients needed.
-      Style guide (so it still looks like us): background #fbfbf9 (draw a full rect first); ink #12121c; one accent
-      only — the HUE given in the prompt; muted #6d6d80 and rule #e4e4dc for secondary strokes; text in
+      Style guide (so it still looks like us): background #f6f3ea (draw a full rect first); ink #12121c; one accent
+      only — the HUE given in the prompt; muted #6d6d80 and rule #dcd7c8 for secondary strokes; text in
       font-family="Heebo" (Hebrew allowed; NEVER set direction= — right-align a Hebrew label with text-anchor="end" at its right x,
       left-align with text-anchor="start"; keep every label inside x 40–1160) and titles
       in font-family="Frank Ruhl Libre" font-weight="700"; stroke-width 2 for structure, 1 for guides; rx 6 on boxes.
@@ -203,8 +203,9 @@ def _check(doc: dict, lang: str, kind: str) -> str:
         return "every scene needs narration"
     vis = doc.get("visuals") or []
     kinds = [v.get("kind") for v in vis if isinstance(v, dict)]
-    if not isinstance(vis, list) or not (1 <= len(vis) <= 4) or not set(kinds) <= VISUAL_KINDS or len(kinds) != len(set(kinds)) or any(not v.get("after") for v in vis):
-        return f"visuals shape wrong (2-4 items, kinds {sorted(VISUAL_KINDS)}, each kind once, each with after)"
+    dup = [k for k in set(kinds) if kinds.count(k) > 1 and k not in ("svg", "image")]  # several drawn figures / images are fine
+    if not isinstance(vis, list) or not (1 <= len(vis) <= 4) or not set(kinds) <= VISUAL_KINDS or dup or any(not v.get("after") for v in vis):
+        return f"visuals shape wrong (2-4 items, kinds {sorted(VISUAL_KINDS)}, template kinds at most once, each with after)"
     if lang == "he" and "svg" not in kinds:
         return "every post needs at least one authored `svg` figure"
     legacy = {"steps", "stat", "compare", "quote", "timeline", "boxes", "d2"}

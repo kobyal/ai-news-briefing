@@ -1,0 +1,719 @@
+[0:00] This is so cool.
+[0:30] Let's do it.
+[1:00] Thank you.
+[1:30] Please welcome to the stage, Head of Engineering for the Cloud Platform at Anthropic, Caitlin
+[1:56] Katelyn Les.
+[1:58] STAGE-E-YOU-KOSO.
+[2:00] Anthropic Cloud Platform Engineering Sekininsha.
+[2:04] Katelyn Les-sama.
+[2:16] Good morning, Tokyo.
+[2:18] This is the first time that we've brought Code with Cloud to Japan,
+[2:21] and we're grateful to spend the next couple of days with all of you.
+[2:25] This morning, we'll be talking about our models, our platform, and our products.
+[2:30] But before we get into it, I want to start by sharing that just a few hours ago,
+[2:35] we released the fifth generation of Claude models, Claude Mythos 5 and Claude Fable 5.
+[2:42] These are our two most capable models ever.
+[2:45] Diane, our head of product for research, will join us shortly to share a lot more about
+[2:56] why these models are so special.
+[2:58] I lead engineering for the Cloud Platform.
+[3:02] The platform gives developers the tools they need to build systems on top of Cloud to harness
+[3:07] its intelligence.
+[3:09] This is the highest leverage way for us to help solve the world's most important problems,
+[3:15] And this is why Anthropic is a platform company.
+[3:19] Developers all over the world, many in this room today,
+[3:22] produce far more value on top of the platform
+[3:25] than we could ever build on our own.
+[3:28] So let's start with what I'm seeing from our customers
+[3:30] lately.
+[3:31] There's an incredible volume of powerful application
+[3:34] shipping right now.
+[3:36] And a lot of it is coming from right here in Japan.
+[3:39] Rakuten is one of our favorite customers to work with.
+[3:43] Their team went from using cloud code to accelerate development
+[3:47] to building on cloud managed agents
+[3:49] to power custom internal agents across engineering, product,
+[3:52] sales, and finance.
+[3:55] One of their product managers coordinates teams of agents
+[3:58] exactly the same way a leader manages teams of humans.
+[4:02] Now, they're shipping major releases every two weeks
+[4:05] instead of only once per quarter.
+[4:08] And it's the same across Asia Pacific.
+[4:12] Another great customer is Canva, the Australian design
+[4:15] platform that hundreds of millions of people use.
+[4:19] Most of their users have never written a line of code.
+[4:22] But with the help of Claude, Canva code changes all of this.
+[4:27] Within a design, you can just ask for something interactive,
+[4:30] like a map, a calculator, or a widget.
+[4:33] And Claude builds it into a working mini app,
+[4:35] ready to drop right into your page.
+[4:39] All around the world, people are building new systems
+[4:42] and applications powered by Claude that nobody
+[4:45] could build before.
+[4:46] And we're all feeling this shift.
+[4:48] The landscape is changing faster than ever.
+[4:51] Things that weren't possible yesterday
+[4:53] have become possible today.
+[4:56] We're on a mission to keep raising
+[4:58] the ceiling of what's possible to build
+[5:00] by making models that are increasingly capable.
+[5:04] A couple of years ago, the frontier of model development
+[5:07] was just the ability to draft a really simple commit message.
+[5:12] And then one year ago, we were standing on stage
+[5:14] at our first ever Code with Claude event.
+[5:17] Opus 4 was the headline, and it was mind-blowing at the time
+[5:20] that Claude could build an entire feature on its own.
+[5:25] And then six months ago, agents were
+[5:27] able to run overnight to complete long-running
+[5:30] and autonomous tasks.
+[5:33] Two months ago, Mythos read the entire OpenBSD source tree
+[5:37] and found a 27-year-old vulnerability
+[5:40] that had slipped past human reviews and static analysis
+[5:42] for almost three decades.
+[5:45] And earlier today, we released Mythos 5 and Fable 5.
+[5:50] Fable 5 is state-of-the-art on nearly all tested benchmarks
+[5:55] of AI capability showing exceptional performance
+[5:58] in software engineering, knowledge work, scientific,
+[6:00] research, vision, and more.
+[6:04] These jumps keep getting bigger, but the time intervals
+[6:07] keep getting shorter.
+[6:10] But even though these model capabilities
+[6:12] are improving on this exponential,
+[6:14] most business capabilities are still on a linear.
+[6:18] So there's this growing gap between what AI can do
+[6:21] and what it's actually doing for people.
+[6:23] Closing that gap is our collective opportunity.
+[6:28] And that is why we've built the Cloud Platform.
+[6:31] It gives developers the tools they
+[6:33] need to build more powerful agents.
+[6:35] Year over year, API volume is up nearly 17 times
+[6:39] on the platform.
+[6:41] We've been shipping a lot, and there's a lot more on the way.
+[6:44] Over the next couple of days, we'll share where we're headed,
+[6:47] and we'll learn more about what you're building.
+[6:50] Our goal is to make our models, our platform, and our products
+[6:54] work better for all of you.
+[6:56] So this morning, we'll dive into each.
+[7:00] First, Diane will talk about our models.
+[7:02] She'll share more about our latest Frontier models, Mythos 5
+[7:05] in Fable 5 and what's coming next.
+[7:09] Next, Angela and I will walk you through how you can build
+[7:12] and deploy agents at scale on the Cloud platform
+[7:15] using Cloud Managed Agents.
+[7:17] And today, we're excited to share
+[7:19] that we're shipping brand new Cloud Managed Agents features.
+[7:22] You can now schedule deployments to have your agents run
+[7:25] on whatever cadence that you need.
+[7:27] And you can store environment variables in vaults
+[7:30] so your agents can securely make authenticated API requests
+[7:34] without giving them access to the keys.
+[7:37] Finally, Kat will walk you through the latest in Cloud
+[7:40] code, where the average developer is now
+[7:42] spending 20 hours per week with Cloud.
+[7:45] She'll cover the latest features like the new agent
+[7:47] view and dynamic workflows.
+[7:51] And all of this comes back to you
+[7:52] and what you're going to build.
+[7:55] Because most people will never integrate with the Cloud API
+[7:58] themselves.
+[8:00] They'll never open a terminal and type Cloud.
+[8:03] They'll experience AI through something
+[8:05] that one of you built on the Cloud platform.
+[8:08] Like a salesperson walking into a high-stakes meeting
+[8:11] fully briefed by Slack agents.
+[8:15] Or a lawyer getting a brief out the door faster than ever
+[8:19] with Lagora.
+[8:22] Or a developer using any one of the world's best coding
+[8:25] agents.
+[8:27] This is why we're a platform company.
+[8:30] Every day, I'm amazed by the collective impact
+[8:32] that you're all having, building solutions
+[8:35] to the world's most important problems.
+[8:39] So thank you for being here, for partnering with us,
+[8:41] and for showing us what's possible.
+[8:44] Arigatou gozaimasu.
+[8:52] Please welcome Diane from our research product team
+[8:55] for your first deep look at our newest models.
+[8:58] Please welcome to the stage, Head of Product Management for Research, Diane Penn.
+[9:05] Welcome to the stage, Anthropic Research Product Management, Diane Penn-sama.
+[9:13] Diana Ramos Reviewer
+[9:22] Hi, good morning, Tokyo.
+[9:25] I'm Diane, and I joined Anthropic in 2023,
+[9:30] and I've been a part of every version of Claude since Claude 2.
+[9:35] For those of you who are counting,
+[9:37] that's bringing 21 versions of Claude
+[9:40] across Haiku, Sonnet, Opus, and now Fable and Mythos
+[9:46] to end users and developers like you.
+[9:50] Our most recent launch happened just a few hours ago.
+[9:54] We released Claude Fable 5 and Claude Mythos 5,
+[9:59] the first generation of our fifth models.
+[10:03] Fable 5 is the most capable model we've ever
+[10:06] made generally available.
+[10:08] It's based on the same foundations as Mytho 5.
+[10:13] These models are already accelerating our work at Anthropic.
+[10:18] And for developers like you, Claude will be able to be stronger
+[10:22] and your starting line will move forward.
+[10:26] We talk a lot about the exponential at Anthropic,
+[10:30] but what does this actually mean?
+[10:32] For us, as model intelligence increase,
+[10:36] We believe the value of use cases it creates
+[10:39] increases exponentially.
+[10:42] For example, agentic coding that many of you are using today
+[10:46] is far more valuable than simple autocomplete
+[10:50] from just a few years ago.
+[10:52] And we are already seeing this with Fable 5.
+[10:56] Let's start with coding, because we
+[10:58] believe that's where most of you will feel the magic first.
+[11:03] Fable 5 performs the highest on SweetBench Pro,
+[11:07] but the benchmark itself undersells the story.
+[11:11] The longer and the more complicated and sophisticated
+[11:14] the task, the farther the gap between Fable
+[11:17] and every other model out there.
+[11:20] Two things drive that gap.
+[11:23] The first, single-shot correctness.
+[11:26] Give Fable 5 a complex, well-specified problem,
+[11:31] and it will nail it on the first pass.
+[11:34] Early testers have told us about single prompts
+[11:37] that essentially create work that would have taken days
+[11:40] or even weeks for a group of teams.
+[11:44] The second is long horizon autonomy.
+[11:47] Fable 5 can run for days on a single goal
+[11:50] and stay coherent the entire way.
+[11:53] It will remember your specifications,
+[11:56] even on tasks that span millions of tokens,
+[11:59] and it can dispatch sub-agents, keep them on track,
+[12:03] far more dependably and with more cost consciousness
+[12:06] in any other model we shipped.
+[12:10] One more thing, Fable 5 isn't just good at writing code.
+[12:14] It's even better at reading it.
+[12:17] It's better at triating outages and better at digging
+[12:20] through your repo history to figure out what's broken,
+[12:23] when, and also to proactively surface
+[12:26] suggestions for making it better.
+[12:30] Fable 5 is just as much of a step outside of coding.
+[12:35] Start with the work that your organizations and companies
+[12:39] actually run on, whether that's financial analysis,
+[12:43] documents, slides, spreadsheets.
+[12:46] Fable 5 manages that work end to end.
+[12:50] It'll follow instructions, stay on scope,
+[12:54] And what it creates back for you will be professional grade,
+[12:58] because this is a model that we built for workflows at scale.
+[13:03] It's also better where requests aren't clean.
+[13:06] What we've seen is that when you give Fable 5
+[13:09] something messy, multi-threaded, and ask it
+[13:12] to figure out what to do next, it could do that work
+[13:16] and outshine other versions of Claude.
+[13:20] Fable 5's version is also the best in the industry.
+[13:24] It can read dense technical images, web applications,
+[13:28] plots, diagrams, charts far more accurately
+[13:32] than any other version of Cloud we've shipped before.
+[13:36] Now, everything I've talked about
+[13:38] is about the upside of a model of this capability.
+[13:42] But intelligence of this magnitude cuts both ways.
+[13:47] Two months ago, we launched Project Glasswing
+[13:50] and made Mythos Preview available to a small group
+[13:54] of partners because its capabilities and cybersecurity
+[13:58] were strong enough to be potentially misused.
+[14:02] Since then, we built a new safeguard system.
+[14:05] And that safeguard system allows that same intelligence
+[14:09] to be shipped and created and used by everyone with Fable 5.
+[14:15] This is a little of how it works.
+[14:18] When a request first touches cybersecurity, biology,
+[14:21] or chemistry topics, Fable will route it
+[14:24] to our next most capable model, Opus 4.8.
+[14:30] The response is clearly labeled, and you're charged Opus prices.
+[14:36] We know this is not perfect yet.
+[14:38] Researchers doing legitimate work in these fields
+[14:41] will sometimes hit a block and reroute.
+[14:44] and we're continuing to work on that.
+[14:47] But that's the type of trade-off that
+[14:49] allows our most capable models to be in everyone's hands today,
+[14:54] as of this morning, instead of months from now.
+[14:57] And our customers are already finding value with Fable.
+[15:03] Rakuten found that the highest effort levels Fable 5 reflects,
+[15:08] validates its work, and for them,
+[15:11] that makes autonomous automated operations possible at scale.
+[15:16] Cognition ran Fable 5 against their Frontier Coding
+[15:20] eval, Frontier Bench, and it scored the highest
+[15:23] of any model they tested.
+[15:26] They highlighted the long horizon reasoning
+[15:29] and how it generalizes to unfamiliar tools, complex
+[15:33] contexts right out of the box.
+[15:37] And GenSpark told us that Fable 5 came out number one
+[15:41] in their evals, winning head to head
+[15:44] against every version of model they've tested.
+[15:47] It's actually the strongest on the hardest tasks,
+[15:51] such as UI design and game coding.
+[15:56] So what about Mythos 5?
+[15:58] It's the same underlying model as Fable 5,
+[16:01] but with the cyber and bio safeguards lifted.
+[16:05] For Mythos Preview, we showed what this model class can do,
+[16:09] and Mythos 5 is a step beyond that.
+[16:12] It's available today for our Glasswing partners
+[16:16] as part of Project Glasswing.
+[16:19] Later this month, we'll begin enrolling
+[16:22] more researchers from life sciences
+[16:24] to access Mythos 5, because those same capabilities
+[16:29] that make biology risky are actually
+[16:31] the same ones that have the highest impact for real good
+[16:35] with AI.
+[16:38] So as developers, what can you do with Fable 5?
+[16:43] One metric I like to look at to make sense of all
+[16:46] of this change is time horizon, which
+[16:49] is how long a model can work autonomously
+[16:53] before losing coherence on what to do next.
+[16:57] With Fable 5, we've seen agents that are proactive
+[17:01] and know what to do without being told.
+[17:04] These agents can be responsible for higher level goals,
+[17:08] responsibilities that require judgment, collaboration,
+[17:12] and proactive taste.
+[17:15] For example, instead of asking Claude
+[17:18] to write a project update, you can now
+[17:20] ask Fable to make sure the project stays on track
+[17:24] for the whole week.
+[17:27] Instead of asking Claude to produce a financial forecast,
+[17:32] you can tell Fable to own, update, iterate,
+[17:36] and improve on the forecast to keep it accurate.
+[17:41] As you've seen today, the exponential keeps moving.
+[17:45] We need to build for emerging capabilities,
+[17:48] not just for today's current models.
+[17:51] We expect future versions of Claude
+[17:54] to be more capable than the one that even we are releasing
+[17:57] today.
+[17:59] And Fable 5 and Mythos 5 are just a glimpse into that future.
+[18:06] So as developers, how do you take advantage
+[18:09] of all of this change ahead?
+[18:12] First, you should design for the next version of Claude,
+[18:15] not just the current one.
+[18:18] What we've seen is that countless times,
+[18:20] The developers who win are the ones whose architectures,
+[18:24] harnesses, and product experiences
+[18:27] are ready to absorb this next jump in intelligence.
+[18:32] Claude is intelligent and resourceful.
+[18:35] And as models become more intelligent,
+[18:38] they can actually do farther with more basic primitives,
+[18:42] such as a file system or sandbox computing environments,
+[18:46] and far less with sophisticated or too complex harnesses.
+[18:52] As models get more intelligent, you
+[18:54] will also need to start making harder evals and product
+[18:57] prototypes for experiences that may not work yet.
+[19:01] This is how you actually know that the exponential is
+[19:04] moving underneath you.
+[19:06] When a task or a prototype or a product experience that
+[19:10] wasn't quite always working well starts working,
+[19:13] That's a signal to ship something magical
+[19:16] that you couldn't have done before.
+[19:20] And finally, as the pace continues to accelerate,
+[19:23] the teams who win are the ones that
+[19:26] get the most out of quad with model upgrades
+[19:29] and treat them as business opportunities.
+[19:33] You should make model upgrades easy.
+[19:35] This means things like automated evals, testing processes,
+[19:39] and making sure that you stay hands-on testing, pushing,
+[19:44] creating new things with new versions of Cloud.
+[19:47] And this is how you'll know new capabilities
+[19:50] will be enough to deliver new experiences
+[19:52] for your customers.
+[19:56] We're seeing the exponential continue,
+[19:58] which means that Cloud will get smarter
+[20:01] and be able to pick up new capabilities at scale.
+[20:06] And you as developers are some of the first people
+[20:09] to feel that.
+[20:11] You're the ones who actually can experiment,
+[20:14] build new products, and are the first
+[20:17] to find opportunities for new markets that others don't see.
+[20:23] And we can't wait to see what you'll build next with Fable
+[20:26] 5.
+[20:28] And now Angela and Caitlin are going
+[20:30] to show you a bit of how the Cloud Platform can make this
+[20:34] a reality come to life.
+[20:36] Thank you so much.
+[20:38] Please welcome to the stage, head of product for the Cloud Platform, Angela Jane.
+[20:45] Welcome to the stage, Cloud Platform Product. Angela Jane-sama.
+[21:01] Last night, while we were all asleep, a product somewhere noticed that it was broken.
+[21:06] This product read its own error reports, it found the bug, and it wrote the fix, and rolled it out to all the users.
+[21:14] By the time the team actually woke up, the problem was gone, and the changelog was already written.
+[21:21] Now, in this situation, there was no stand-up, there was no ticket, and this is what a native AI company looks like.
+[21:28] This is not a company where people just use AI to do their work, but instead, it's a company where work itself runs on the substrate of AI.
+[21:36] and people decide what the outcome should be.
+[21:40] Now, this story can be a reality if you have the right ingredients.
+[21:44] And there's three things to that.
+[21:46] The first is the harness.
+[21:47] The second is the context.
+[21:48] The third is the infrastructure.
+[21:51] These three are what turn raw intelligence
+[21:54] into true business outcomes.
+[21:57] And that's exactly what the Claude platform provides.
+[21:59] We give you agentic harnesses, context management tools,
+[22:03] and production-grade infrastructure
+[22:05] that allows you to become truly AI native.
+[22:08] Recently, we packaged all these together
+[22:10] through Claude Managed Agents, our new product offering.
+[22:14] Fable 5 is the best model for building long-running agents.
+[22:18] And Managed Agents is purpose-built for Claude.
+[22:21] This means when you put these two together,
+[22:23] you're able to actually get better agent outcomes
+[22:25] with significantly less effort.
+[22:29] OK, let's talk about the harness.
+[22:31] So the harness is what gives Claude models the ability
+[22:33] to actually do work.
+[22:35] It includes tools, an environment, and the permission
+[22:38] to act.
+[22:39] With a harness, the model doesn't just tell you about the fix.
+[22:42] It actually makes it happen.
+[22:45] You don't want AI that just gives you helpful suggestions.
+[22:48] You want AI that can actually do the work.
+[22:52] With Quad Managed Agents, we offer an agentic harness
+[22:55] that separates the brain from the hands.
+[22:58] The brain decides what to do, and then we spin up
+[23:00] sandboxes or hands to execute the work as needed.
+[23:05] Our harness also has an iterative-based ability
+[23:09] to operate on an outcome.
+[23:11] You specify what that outcome is,
+[23:13] and then a managed agent is able to iterate
+[23:15] until it actually achieves it for you.
+[23:19] Second, let's talk about context.
+[23:21] Now, a model is only as good as the context
+[23:24] that you actually give it.
+[23:26] We offer a 1 million context window
+[23:28] so that you can have agents that consume high amounts of content
+[23:31] without any degradation.
+[23:34] But that's not all.
+[23:35] We also offer our agents memory so they can actually
+[23:38] remember what they've been doing.
+[23:40] We also give our agents the ability
+[23:42] to read and write skills of their own,
+[23:44] so they can fill in the knowledge gaps that they're missing.
+[23:47] And lastly, we give our agents the ability to dream,
+[23:50] so they can inspect over their own previous trajectories
+[23:52] and identify how to self-improve.
+[23:56] And lastly, let's talk about infrastructure.
+[23:59] Now, if you build really long-running autonomous
+[24:02] agents, this requires extreme scale and reliability.
+[24:06] This is one of the hardest parts to get right.
+[24:09] Cloud managed agents automatically
+[24:10] spins up and down sandboxes and has the ability
+[24:13] to generate multiple agentic fleets when needed
+[24:16] to help you optimize for reliable and persistent agents
+[24:19] that just get the work done without all the hard work.
+[24:23] Building self-improving companies is something
+[24:25] that can happen today.
+[24:28] We worked with so many companies that
+[24:29] have built agentic systems on Cloud Managed Agents.
+[24:32] And they've been able to do that 10 times faster,
+[24:35] because they didn't have to roll their own harness,
+[24:37] or manage their own context, or honestly,
+[24:41] build up all the infrastructure that they need.
+[24:44] Notion actually used Managed Agents
+[24:45] to power agent orchestration directly within their product.
+[24:49] As a result, their users can delegate complex, long-running
+[24:52] work to cloud directly inside their workspace.
+[24:57] And Notion isn't alone.
+[24:58] Asana used managed agents to build AI teammates.
+[25:02] These are collaborative AI agents that
+[25:04] work alongside humans inside Asana projects.
+[25:07] And these agents can take on tasks and complete deliverables.
+[25:11] Now, I'd love to welcome Caitlin back to the stage
+[25:13] to show what an AI-native company can look like if you
+[25:16] build on cloud managed agents.
+[25:22] Back in February, Claude became the official thinking partner of the Atlassian Williams
+[25:36] Formula One racing team.
+[25:38] Competing in F1 racing requires a great driver who knows the track really well.
+[25:44] But it also takes a team of engineers and researchers to build a rocket ship on four
+[25:48] wheels that can go almost 400 kilometers per hour.
+[25:53] To show you an example of Claude Managed Agents in action,
+[25:56] we worked with a fictional racing team called Shinkiro Racing.
+[26:01] And we helped them build a dashboard to analyze their car.
+[26:05] Let's see it in action.
+[26:08] Here we have the dashboard that we built for the Shinkiro
+[26:11] Racing team.
+[26:12] And you can see on the side, we've got four research projects.
+[26:15] Each of these research projects is backed by a Claude Managed Agent.
+[26:19] So we have aerodynamics, we have tire temperature, we have our power unit, and
+[26:24] we have driver safety.
+[26:25] And the goal for each of these projects is for our agents to be able to figure out
+[26:29] what needs to change in order to better optimize our car.
+[26:33] And in this, we've used the Claude Managed Agents feature called outcomes,
+[26:37] which means that when an agent is doing its work, we can use a rubric to define
+[26:41] what good looks like, and
+[26:43] And the agent can iterate until it does its work incredibly well.
+[26:47] So we could go ahead and kick off any one of these agents, and that will start a run
+[26:51] of the agent, in this case the driver safety.
+[26:55] And what's cool about this dashboard being fully powered by AI is we can go ahead and
+[26:59] ask a question like how much does the car currently weigh and how is this weight distributed?
+[27:05] And the dashboard will go ahead and refresh with this information.
+[27:09] So now we know our 800 kilograms are approximately broken down between our power unit, our battery,
+[27:14] and other components.
+[27:17] So if I were a developer working to build this dashboard, what I would use is the Claw
+[27:21] Developer Console as my home base for developer productivity, observability, and all the tooling
+[27:28] that I need in order to create these managed agents.
+[27:31] And so you can see we have all of our sessions from our past runs of our agents.
+[27:36] If we check one of these out, we can open it up
+[27:38] and see we get really rich observability
+[27:41] for everything the agent is doing.
+[27:43] We can see its responses.
+[27:44] We can see its tool calls.
+[27:46] And ultimately, when it finished its work.
+[27:49] Starting today, you can even schedule these agents
+[27:53] to run at any cadence that you want.
+[27:56] So we can come in here and click Create Deployment.
+[27:58] And maybe we want to run a nightly safety check.
+[28:02] And we'll do this using our safety agent.
+[28:08] And so here, we can decide when should the agent trigger,
+[28:12] and we can choose a schedule, such as every morning
+[28:14] at 9 o'clock AM.
+[28:18] But it's not enough for us to have agents that are really
+[28:20] easy to build and to run.
+[28:23] What's also really important is for these agents
+[28:25] to be really powerful.
+[28:26] And so we've done this in a couple of ways,
+[28:28] like Angela mentioned earlier.
+[28:30] First, we have memory.
+[28:33] With memory, our agents can choose as they're working
+[28:36] to write their findings or write their learnings
+[28:39] to a file system.
+[28:41] Then when the agents run in the future,
+[28:42] they can look back into this file system
+[28:45] on things like decisions or findings
+[28:47] in order to do a better job the next time around.
+[28:51] On top of this, we've built a feature called dreaming.
+[28:55] And so if memory is real time deciding
+[28:58] to write to a file system, dreaming
+[29:00] allows the agent to look back over all of its past sessions
+[29:04] and update its memory and its skills
+[29:06] so that it does even better next time around.
+[29:09] So if we come back to Shankiro's dashboard,
+[29:11] we can hit this button that says Dream.
+[29:13] And this will kick off a session for a new agent
+[29:16] to look back on all of the sessions for the old agents
+[29:19] and write its findings to memory and to skills.
+[29:25] So everything you just saw, like outcomes,
+[29:27] scheduled deployments, and dreaming
+[29:28] are available today on the Cloud platform.
+[29:31] Developers everywhere can start building with Fable 5
+[29:35] and managed agents today.
+[29:38] Now Kat will talk about how Cloud Code
+[29:40] is making it even more fun to ship as a developer.
+[29:47] KATE WU- Please welcome to the stage
+[29:49] head of product for Cloud Code, Kat Wu.
+[29:53] Welcome to the stage, Cloud Code Product
+[29:56] .
+[29:57] Kat Wu-Sama.
+[30:10] Katelyn and Angela just showed you
+[30:12] how to build production agents on the Cloud platform.
+[30:16] With Cloud Code, we're bringing that same leverage
+[30:19] to your work as a developer, not agents
+[30:22] you ship to customers, but agents that ship code for you.
+[30:27] First, I want to thank all the developers in the room today
+[30:30] here and watching online.
+[30:33] Thank you for trusting Quad Code back when Sonnet 3.7
+[30:37] was our frontier model and when our product
+[30:40] was rough around the edges.
+[30:43] Your support is what makes the team so excited to come in
+[30:46] every day and make the product even better.
+[30:50] Let's back up to why QuadCode exists.
+[30:54] The mission of QuadCode is to bridge the difference
+[30:57] between an idea and a shipped product.
+[31:01] The way that we enable this is we
+[31:02] build tools that elicit the frontier intelligence
+[31:06] from our models.
+[31:07] And we make these tools accessible to every builder.
+[31:11] And we don't think of ourselves as having a finished roadmap
+[31:16] to share with you.
+[31:17] We think of ourselves more like mountaineers,
+[31:20] climbing alongside you in terrain that none of us
+[31:24] has fully mapped yet, figuring out
+[31:26] what works together as we go.
+[31:30] And we're growing with you with increasing AI capabilities
+[31:34] and helping you navigate new challenges that emerge.
+[31:38] I remember just last year, I would give QuadCode a task,
+[31:42] and I would review every single edit that it made,
+[31:46] giving it detailed instructions about what it should do
+[31:49] instead, walking through on every little detail
+[31:53] of these simple tasks.
+[31:56] Now, many of us are using auto mode
+[31:59] to delegate permissions to Cloud,
+[32:01] and only checking in after Cloud Code
+[32:04] has already tested its changes and put up
+[32:07] a PR that's ready for our review.
+[32:11] Cloud Code started in the CLI.
+[32:14] And this is still the place for power users who
+[32:17] want a minimal text interface and the most control
+[32:21] and customizations.
+[32:23] Then we added the IDE for users who
+[32:27] want the same powerful agents but want to follow along
+[32:31] with all of the code changes.
+[32:34] Then we heard from many of you that you're
+[32:37] running multiple quad codes in parallel, which you've
+[32:41] affectionately called multi-clotting.
+[32:44] And we've added two new interfaces
+[32:45] to help make that easier.
+[32:48] The one that I use most frequently
+[32:50] is Cloud Code on Cloud Desktop.
+[32:53] It's designed for people who want this full screen
+[32:56] graphical interface with built-in previews, a sidebar control
+[33:00] plane, and the ability to render images and rich outputs.
+[33:06] We've built Desktop to be a single view
+[33:08] across all your local and cloud sessions,
+[33:11] with visual indicators of which agents are working
+[33:14] and which ones need your input.
+[33:17] Next is our newest surface, Claude Agents View in the CLI,
+[33:22] for those of you who want a control plane
+[33:24] without having to ever leave the terminal.
+[33:28] You can see what's waiting on you, what's running,
+[33:31] and what's already done.
+[33:33] You can reply in line to unblock or jump in and out
+[33:38] of any session without losing your place.
+[33:42] The VS Code IDE extension and the Cloud Code
+[33:46] on Cloud desktop app are built on the Cloud Agent SDK,
+[33:50] the same one that many of you are building on today.
+[33:56] Many enterprises have now adopted these Cloud Code tools
+[34:00] wall to wall.
+[34:01] At Anthropic, engineers on average
+[34:03] ship 8x more code than they did in past years,
+[34:08] even as the size of our engineering team
+[34:10] has grown substantially.
+[34:13] Together with you all, we're excited
+[34:15] to discover and redefine what the future of engineering
+[34:19] looks like by embracing new challenges that come
+[34:23] and by building automations powered by quad to attack
+[34:27] each one.
+[34:30] Here's some of the feedback that we've
+[34:31] heard from our users and the products
+[34:33] that we've built to address each one
+[34:36] with the help of folks in this community.
+[34:39] We heard from you that you want to spend less time on code
+[34:43] review, so we shift a code review product
+[34:46] that deploys a team of agents to catch critical bugs
+[34:50] in your PRs.
+[34:52] Thousands of companies use this every day,
+[34:55] and this includes all internal anthropic teams.
+[35:00] We heard from you that you really want to code on the go.
+[35:04] So we launched Remote Control and Cloud Code
+[35:07] on iOS and Android.
+[35:10] Now you're no longer walking around with this laptop
+[35:14] that's half open or stuck at your desk.
+[35:17] You can now go to a park, touch grass,
+[35:19] and still get your coding tasks done.
+[35:23] And we heard from you that you want to run Cloud Code
+[35:26] on new tickets.
+[35:28] And so we built routines.
+[35:31] You can configure this once, and it
+[35:34] will run on a schedule, a webhook, or an API call
+[35:37] to kick off quad code on the right task.
+[35:41] So the work that used to require a human to manually kick off,
+[35:45] routines can take care of for you.
+[35:49] And we heard from you that you're landing so much code
+[35:52] that your security teams are having a hard time keeping up.
+[35:57] So we built Cloud Security.
+[35:59] It scans your code base overnight.
+[36:02] It flags a range of vulnerabilities,
+[36:04] including the ones that it believes are most critical,
+[36:07] and lets you kick off a Cloud Code session to tackle each one.
+[36:13] And then finally, we heard that you
+[36:14] want better ways to run ambitious, large-scale tasks
+[36:18] across your code base, like major refactors and migrations.
+[36:23] So we launched dynamic workflows.
+[36:26] This lets you kick off code code to run in parallel
+[36:30] across tens or hundreds of agents
+[36:33] in a deterministic structure to get your most ambitious tasks
+[36:38] done.
+[36:39] Each of these primitives compose together
+[36:42] so that we can more easily adapt to the future of engineering.
+[36:47] Everything I've covered is something
+[36:49] that an individual developer can pick up today.
+[36:52] But it's especially exciting to see
+[36:53] how a range of companies are adopting this
+[36:56] at the scale of entire engineering orgs.
+[36:59] For instance, Spotify uses Claude
+[37:02] to migrate thousands of repos.
+[37:04] The team built a background agent on the Claude Agent SDK
+[37:09] that reads a migration plan in plain English
+[37:12] and then kicks off a fleet of agents that opens PRs.
+[37:17] They're merging over 1,000 PRs a month into production,
+[37:21] and they've cut migration time down by 90%.
+[37:26] Another example is Mercari, Japan's consumer-to-consumer marketplace.
+[37:32] At Mercari, the entire engineering team runs on quad code,
+[37:36] and they've measured that engineering output is up 90% year-over-year using the tool.
+[37:44] We see this across the industry.
+[37:48] Millions of developers are getting more done and at higher quality than before.
+[37:54] Now, let's see what this actually looks like in practice.
+[37:58] I'm excited to show you one of my favorite new features
+[38:01] in Cloud Code.
+[38:05] For this demo, let's imagine we're Kaizen Operations,
+[38:09] and we create apps for engineering teams.
+[38:12] Right now, our marketing website is in English only,
+[38:16] but we want to launch to 13 additional markets,
+[38:19] so we need to localize our site before the launch.
+[38:24] Let's start with how we would normally do this
+[38:27] with one CoalCode agent.
+[38:30] We'll run this prompt asking CoalCode
+[38:32] to convert our website to Japanese.
+[38:35] And we'll speed things up as it works.
+[38:38] CoalCode explores the code base, creates a language
+[38:40] picker for the website, and translates all the text
+[38:44] to Japanese.
+[38:47] So CoalCode's finished its work.
+[38:49] And let's check out the results.
+[38:53] Here, we can see a full marketing site
+[38:56] and view the new Japanese translation from Claude.
+[38:59] It took Claude about three minutes
+[39:01] to complete this one translation,
+[39:04] and we have 12 more to go.
+[39:06] If we did this one at a time sequentially,
+[39:09] it would take us almost an hour and lots
+[39:12] of manual prompting with Claude.
+[39:14] So instead, we'll use a dynamic workflow,
+[39:17] which will let Claude create a repeatable process
+[39:20] and run each of the new translations
+[39:23] at the same time in parallel.
+[39:26] We'll prompt Cod to use a workflow for our translation
+[39:29] to these 12 new languages.
+[39:33] Cod creates a workflow.
+[39:35] And once it's ready, we can open it in the side pane
+[39:40] and watch as it works.
+[39:42] This is a powerful feature of the Cod desktop app.
+[39:45] You can see all 12 translation agents running at the same time.
+[39:50] After the translation agent's complete, it's going to create 12 more agents to verify its work across these new languages.
+[39:59] This work would have previously required us to run 12 separate tasks, and it can now be done in just one prompt.
+[40:08] And we can also save this workflow as JavaScript code and reuse it for future translations.
+[40:14] Let's check out the output.
+[40:16] Quad has now created 12 new versions of the website,
+[40:22] all localized with one action.
+[40:25] We can see them all in the dropdown
+[40:27] and check out some of the different languages
+[40:29] to see its work.
+[40:33] This is just one example of dynamic workflows.
+[40:36] We can use them for large-scale migrations, code-based audits,
+[40:40] or doing performance optimizations.
+[40:44] any large job that requires running many agents at once
+[40:48] in its deterministic structure.
+[40:51] Everything you just saw is available today,
+[40:53] including dynamic workflows and Cloud Code
+[40:55] in the Cloud desktop app.
+[40:58] And our newest model, Cloud Fable 5,
+[41:01] is available to all Cloud Code users.
+[41:04] So you can use the latest intelligence
+[41:06] wherever you use Cloud Code.
+[41:09] We're so excited for you to try out these new features
+[41:12] and for you to let us know what you think.
+[41:15] We hope they continue to help you close the gap between an idea
+[41:20] and a shift product.
+[41:23] And this is really what every talk today was pointing at.
+[41:27] Diane's capability curve, Angela's agents
+[41:30] that run on infrastructure that you control,
+[41:33] and what I just showed you.
+[41:35] These are three layers to one story.
+[41:38] The remaining gap is just how fast
+[41:41] we can put these great capabilities to work for us.
+[41:46] I encourage you to spend the rest of today
+[41:48] exploring these layers.
+[41:50] Join research talks if you want to learn more
+[41:53] about the latest model capabilities.
+[41:55] Join Cloud Platform sessions if you're
+[41:57] building your own agents for your end users.
+[42:00] Or join Cloud Code workshops if you
+[42:03] want to learn more ways to bring Cloud Code
+[42:06] into your day-to-day development work.
+[42:09] All of this runs on Cloud Fable 5, the best model
+[42:12] we've ever shipped for a Gentic work, and it's live today.
+[42:17] Thank you all, and enjoy Code with Cloud.

@@ -41,7 +41,7 @@ diff default.txt ours.txt
 
 מה תראו: בריצה הראשונה המודל מחליט לבד על אורך, טון ופורמט. בשנייה, עם הקובץ שנבנה בצעד הבא, יוצא אובייקט עם שני שדות שאפשר להעביר ל-`json.loads`. בשורה התחתונה, זה כל מה ש-system prompt עושה: מחליף את הדיפולטים של המודל בדיפולטים שלכם. תשמרו את `default.txt`. זה ה-baseline שלכם.
 
-<figure><img src="/posts/prompt-engineering-2-system-prompts/v1-transcript-he.jpg" alt="בלי system prompt משלכם, המודל בוחר אורך, טון ופורמט במקומכם, ובירושה מ-Claude Code (claude -p)" loading="lazy" /><figcaption>בלי system prompt משלכם, המודל בוחר אורך, טון ופורמט במקומכם, ובירושה מ-Claude Code (claude -p)</figcaption></figure>
+<figure><img src="/posts/prompt-engineering-2-system-prompts/src3.jpg" alt="תדעו מול מה אתם משווים. claude.ai רץ עם system prompt שאנטרופיק כותבת ומעדכנת, וה-API לא מקבל אותו. לכן ה-baseline שלכם הוא המודל בלי ההוראות שלכם, לא מה שראיתם בצ'אט. (קרדיט: Anthropic, Release notes: System prompts)" loading="lazy" /><figcaption>תדעו מול מה אתם משווים. claude.ai רץ עם system prompt שאנטרופיק כותבת ומעדכנת, וה-API לא מקבל אותו. לכן ה-baseline שלכם הוא המודל בלי ההוראות שלכם, לא מה שראיתם בצ'אט. (קרדיט: Anthropic, Release notes: System prompts)</figcaption></figure>
 
 ## 02 · ארבעה בלוקים, תמיד באותו סדר
 
@@ -69,13 +69,14 @@ JSON בלבד: {"headline": "עד 12 מילים", "why_it_matters": "עד 25 מ�
 
 <figure><img src="/posts/prompt-engineering-2-system-prompts/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
 
+<figure><img src="/posts/prompt-engineering-2-system-prompts/v2-svg-he.jpg" alt="הסדר הוא לא עניין של סגנון. ארבעת הבלוקים היציבים יושבים ב-prefix שנקרא מה-cache בעשירית מהמחיר, וכל מה שמשתנה, כולל התאריך, יורד אל מתחת ל-breakpoint." loading="lazy" /><figcaption>הסדר הוא לא עניין של סגנון. ארבעת הבלוקים היציבים יושבים ב-prefix שנקרא מה-cache בעשירית מהמחיר, וכל מה שמשתנה, כולל התאריך, יורד אל מתחת ל-breakpoint.</figcaption></figure>
+
 ## 03 · XML לגבולות, markdown בתוך הבלוק
 
 הוויכוח הזה נמשך שנתיים, ובגדול הוא מיותר. אנטרופיק ממליצה על XML tags במדריך ה-prompting שלה, והסיבה פרקטית: תג סגור אומר למודל בדיוק איפה דבר אחד נגמר ואיפה השני מתחיל. markdown נוח להוראות שבן אדם עורך. אצלנו הכלל פשוט. תג לכל גבול: בין בלוקים, ובעיקר סביב כל מה שבא מבחוץ. בתוך בלוק, markdown רגיל.
 
 רגע, למה זה משנה בפועל? כי טקסט מבחוץ מכיל הוראות. כתבה שמצטטת prompt, README עם "ignore previous instructions", או Jina שמחזיר `![Image](url)` באמצע הטקסט. בתוך `<article>` המודל מבין שזה חומר גלם. בלי התג, זה נראה כמו עוד שורה ב-rules.
 
-<figure><img src="/posts/prompt-engineering-2-system-prompts/v2-compare-he.jpg" alt="התג הוא גבול, לא קישוט: טקסט מבחוץ בלי תג נראה למודל כמו עוד הוראה (אנטרופיק, Prompting best practices)" loading="lazy" /><figcaption>התג הוא גבול, לא קישוט: טקסט מבחוץ בלי תג נראה למודל כמו עוד הוראה (אנטרופיק, Prompting best practices)</figcaption></figure>
 
 ## 04 · few-shot: זוג אחד רע, זוג אחד טוב
 
@@ -129,7 +130,7 @@ def run(user_text: str):
 
 תריצו פעמיים ותסתכלו על `read` בקריאה השנייה. אם הוא אפס, משהו ב-prefix זז. ויש מינימום אורך ל-prefix שנכנס ל-cache, תלוי מודל, וה-skeleton מצעד 02 קצר ממנו. כלומר זה משתלם כשה-system prompt ארוך באמת, בדרך כלל בגלל הדוגמאות. אצלנו הכתיבה הכבדה רצה על subscription, אז החשבון הזה פחות כואב לנו. מי שמשלם API לפי token, זה ההבדל בין מספר שאף אחד לא מסתכל עליו לבין שורה בחשבון החודשי.
 
-<figure><img src="/posts/prompt-engineering-2-system-prompts/v3-strip-he.jpg" alt="ה-TTL רץ מתחילת הבקשה, אז תשובה של 4 דקות משאירה דקה לקריאה הבאה (אנטרופיק, Prompt caching)" loading="lazy" /><figcaption>ה-TTL רץ מתחילת הבקשה, אז תשובה של 4 דקות משאירה דקה לקריאה הבאה (אנטרופיק, Prompt caching)</figcaption></figure>
+<figure><img src="/posts/prompt-engineering-2-system-prompts/v3-svg-he.jpg" alt="ארבע דקות של streaming אוכלות ארבע מתוך חמש דקות ה-TTL, כי השעון התחיל לרוץ עם הבקשה. pipeline שכותב תשובות ארוכות מפספס את ה-cache בשקט, ושם TTL של שעה מחזיר את עצמו." loading="lazy" /><figcaption>ארבע דקות של streaming אוכלות ארבע מתוך חמש דקות ה-TTL, כי השעון התחיל לרוץ עם הבקשה. pipeline שכותב תשובות ארוכות מפספס את ה-cache בשקט, ושם TTL של שעה מחזיר את עצמו.</figcaption></figure>
 
 ## מה לקחת
 

@@ -1,0 +1,17 @@
+direction: right
+request: "Request (system + user)"
+prefix: "Prefix up to cache_control"
+check: "Prefix cached?"
+hit: "Cache read"
+miss: "Process full prompt"
+write: "Cache write"
+refresh: "TTL refreshed"
+response: "Response"
+request -> prefix: "stable blocks first"
+prefix -> check
+check -> hit: "yes"
+check -> miss: "no / prefix changed"
+miss -> write: "once response begins"
+hit -> refresh: "no extra cost"
+hit -> response: "~0.1x input price"
+write -> response: "1.25x input price"

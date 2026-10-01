@@ -33,9 +33,7 @@ What it isn't: it isn't "RAG with LangChain". The Italian version runs on Rails 
 
 Machine Learning Mastery gives an example that shows why you'd want this: "Compare Q3 2025 sales to Q1 2026 and summarize the risk factors from the latest SEC filing." Plain RAG embeds that whole mix and returns chunks that look like the average of three different questions. In other words, like none of them. An agent splits it into three searches, sends each one to the right source, and checks what came back.
 
-<figure><img src="/posts/agentic-rag/diagram.svg" alt="How it fits together" loading="lazy" /><figcaption>How it fits together</figcaption></figure>
-
-<figure><img src="/posts/agentic-rag/v1-compare-en.jpg" alt="Single-shot vs agentic" loading="lazy" /><figcaption>Single-shot vs agentic</figcaption></figure>
+<figure><img src="/posts/agentic-rag/v1-svg-en.jpg" alt="Plain RAG turns a three-part question into one embedding that lands in the middle, far from every answer. The agent splits the question before it searches, and that's the whole difference." loading="lazy" /><figcaption>Plain RAG turns a three-part question into one embedding that lands in the middle, far from every answer. The agent splits the question before it searches, and that's the whole difference.</figcaption></figure>
 
 ## Three tools and a loop
 
@@ -48,6 +46,10 @@ The nice thing about panasiti's post is how little changed. Same pgvector throug
 The model calls them as many times as it needs. When it has enough material, it writes an answer with citations. Everything runs in a background job, and the agent's steps stream to the browser over Turbo Streams. The user sees what it's searching for in real time.
 
 MLM breaks this into three moves: query decomposition, multi-hop chaining, self-correction. In standup terms: split the question, follow a lead, and admit when you missed and search again.
+
+<figure><img src="/posts/agentic-rag/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/agentic-rag/src3.jpg" alt="panasiti's change is smaller than you'd think: same pgvector, same chunks, the search just moved from the code into the model's hands (credit: panasiti.me)" loading="lazy" /><figcaption>panasiti's change is smaller than you'd think: same pgvector, same chunks, the search just moved from the code into the model's hands (credit: panasiti.me)</figcaption></figure>
 
 ## Ten nodes, mostly guardrails
 
@@ -65,7 +67,7 @@ There's also web search through Tavily that only runs after human approval, and 
 
 Wait, where's the agentic part? In the retriever, in tool calling for stock prices, in the decision to go to the web. Everything else is guardrails: classification, checks, retry, cache and a brake. And that's exactly what makes it something you can leave running on its own.
 
-<figure><img src="/posts/agentic-rag/v2-stat-en.gif" alt="Below this confidence, the Hallucination Guard rejects the answer" loading="lazy" /><figcaption>Below this confidence, the Hallucination Guard rejects the answer</figcaption></figure>
+<figure><img src="/posts/agentic-rag/v3-svg-en.jpg" alt="The model only gets to decide in three places. Everything else is classification, thresholds, caps and brakes, and that's what lets the system run without someone standing over it." loading="lazy" /><figcaption>The model only gets to decide in three places. Everything else is classification, thresholds, caps and brakes, and that's what lets the system run without someone standing over it.</figcaption></figure>
 
 ## Bayer called it something else
 
@@ -77,7 +79,6 @@ Context engineering decided what each model gets, what it doesn't get, and how c
 
 Read that list again. It's the same list as the Show HN project, just the pharma version with a paper in Frontiers in AI.
 
-<figure><img src="/posts/agentic-rag/v3-quote-en.jpg" alt="PRINCE team, Bayer, martinfowler.com" loading="lazy" /><figcaption>PRINCE team, Bayer, martinfowler.com</figcaption></figure>
 
 ## When to keep plain RAG
 

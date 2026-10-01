@@ -1,0 +1,15 @@
+direction: right
+cron: 06:07 cron
+agent: rss / editorial agent
+model: claude -p
+parse: parse_json
+merger: merger
+qa: QA judge
+email: daily email
+cron -> agent: start run
+agent -> model: prompt + session rules
+model -> parse: preamble + JSON
+parse -> agent: "{} no error"
+agent -> merger: empty briefing, exit 0
+merger -> qa: fewer stories
+qa -> email: all green

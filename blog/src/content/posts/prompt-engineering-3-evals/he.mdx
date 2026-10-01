@@ -43,6 +43,8 @@ madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
 
 <figure><img src="/posts/prompt-engineering-3-evals/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
 
+<figure><img src="/posts/prompt-engineering-3-evals/v1-svg-he.jpg" alt="המודל החזיר JSON תקין, רק עם משפט לפניו. ה-parser שלנו חיפש אותו בתו הראשון, נכשל, והחזיר `{}`. מכאן כל השרשרת נראתה ירוקה: הבאג היה ב-default שלנו, לא במודל." loading="lazy" /><figcaption>המודל החזיר JSON תקין, רק עם משפט לפניו. ה-parser שלנו חיפש אותו בתו הראשון, נכשל, והחזיר `{}`. מכאן כל השרשרת נראתה ירוקה: הבאג היה ב-default שלנו, לא במודל.</figcaption></figure>
+
 ## מבחוץ הכל נראה ירוק
 
 האתר עלה בזמן. מייל הסיכום הראה את כל השלבים כמצליחים. ה-QA evaluator רץ, נתן ציון לסיפורים שכן פורסמו ומצא שהם בסדר. כי הם באמת היו בסדר. פשוט היו פחות מהם, ושני מקורות שלמים חסרו.
@@ -51,9 +53,11 @@ madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
 
 שלושה ימים עד ששמנו לב.
 
+<figure><img src="/posts/prompt-engineering-3-evals/v2-strip-he.jpg" alt="שלושה בקרים, שני מקורות שלמים חסרים, ואף התראה. ה-judge דירג את מה שפורסם ומצא שהוא בסדר, כי הוא לא יודע לשאול מה היה אמור להיות שם." loading="lazy" /><figcaption>שלושה בקרים, שני מקורות שלמים חסרים, ואף התראה. ה-judge דירג את מה שפורסם ומצא שהוא בסדר, כי הוא לא יודע לשאול מה היה אמור להיות שם.</figcaption></figure>
+
 ## התיקון הראשון: עוד שורה ב-prompt
 
-הרפלקס הראשון היה לתקן במילים. הוספנו ל-prompt שהתשובה "MUST begin with '{'", ושורה שמתחילה ב-"Do not preface it with commentary" וממשיכה עד audit rules. השורה הזו עדיין יושבת ב-system prompt שכתב את הפוסט הזה. ניסינו גם `--bare` כדי לנקות את ה-context של הסשן, וזה שבר את ה-auth של ה-subscription.
+הרפלקס הראשון היה לתקן במילים. הוספנו ל-prompt שהתשובה "MUST begin with '\{'", ושורה שמתחילה ב-"Do not preface it with commentary" וממשיכה עד audit rules. השורה הזו עדיין יושבת ב-system prompt שכתב את הפוסט הזה. ניסינו גם `--bare` כדי לנקות את ה-context של הסשן, וזה שבר את ה-auth של ה-subscription.
 
 השורה עזרה. לא תמיד. ואיך ידענו שעזרה? הרצנו כמה פעמים ביד והסתכלנו. זה בדיוק ה-trial-and-error ש-promptfoo בנוי נגדו. אנטרופיק ניסחו את זה הכי טוב:
 
@@ -64,7 +68,7 @@ madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
 
 > **הדעה שלי:** אני לא קונה prompt כתיקון לבאג פרסינג. prompt מוריד הסתברות, הוא לא חוזה. אם הכישלון נראה כמו exit 0, הוא יחזור, ואתם תגלו את זה מקורא.
 
-<figure><img src="/posts/prompt-engineering-3-evals/v1-screenshot-he.jpg" alt="promptfoo כותבים כבר בעמוד הראשון ש-test-driven עדיף על trial-and-error. שלוש הרצות ביד זה לא eval (promptfoo docs)" loading="lazy" /><figcaption>promptfoo כותבים כבר בעמוד הראשון ש-test-driven עדיף על trial-and-error. שלוש הרצות ביד זה לא eval (promptfoo docs)</figcaption></figure>
+<figure><img src="/posts/prompt-engineering-3-evals/src1.jpg" alt="promptfoo בנוי בדיוק נגד מה שעשינו בשבוע ההוא: להריץ ביד כמה פעמים ולהסתכל. 'השורה עזרה, לא תמיד' זו לא תוצאה, זה מצב רוח. (קרדיט: Promptfoo)" loading="lazy" /><figcaption>promptfoo בנוי בדיוק נגד מה שעשינו בשבוע ההוא: להריץ ביד כמה פעמים ולהסתכל. 'השורה עזרה, לא תמיד' זו לא תוצאה, זה מצב רוח. (קרדיט: Promptfoo)</figcaption></figure>
 
 ## הסיבה האמיתית ישבה בקוד שלנו
 
@@ -112,3 +116,7 @@ def parse_model_json(raw: str, required=()) -> dict:
 בפועל, מה היה תופס את אוגוסט? assert על ספירה, ו-diff על traffic אמיתי. שניהם בלי מודל בכלל. ה-judge, השכבה הכי יקרה, היה מפספס.
 
 eval שלא יודע להיכשל על `{}` הוא לא eval. הוא dashboard.
+
+<figure><img src="/posts/prompt-engineering-3-evals/v4-svg-he.jpg" alt="אותו קלט רע, חמש שכבות. מה שהיה תופס את אוגוסט זה assert על ספירה ו-diff על traffic אמיתי, שניהם בלי מודל. בונים מהזול, לא מתחילים מה-judge." loading="lazy" /><figcaption>אותו קלט רע, חמש שכבות. מה שהיה תופס את אוגוסט זה assert על ספירה ו-diff על traffic אמיתי, שניהם בלי מודל. בונים מהזול, לא מתחילים מה-judge.</figcaption></figure>
+
+

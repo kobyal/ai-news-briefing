@@ -33,9 +33,7 @@ RAG עצמו הגיע מ-paper של Facebook AI Research ב-2020. ה-agentic ש�
 
 ב-Machine Learning Mastery נתנו דוגמה שמסבירה למה צריך את זה: "תשווה את המכירות של Q3 2025 ל-Q1 2026 ותסכם את גורמי הסיכון מה-SEC filing האחרון". RAG רגיל עושה embedding לכל הבליל הזה ומחזיר chunks שדומים לממוצע של שלוש שאלות שונות. כלומר, לאף אחת מהן. agent מפרק את זה לשלושה חיפושים, שולח כל אחד למקור הנכון ובודק מה חזר.
 
-<figure><img src="/posts/agentic-rag/diagram.svg" alt="איך זה עובד" loading="lazy" /><figcaption>איך זה עובד</figcaption></figure>
-
-<figure><img src="/posts/agentic-rag/v1-compare-he.jpg" alt="single-shot מול agentic" loading="lazy" /><figcaption>single-shot מול agentic</figcaption></figure>
+<figure><img src="/posts/agentic-rag/v1-svg-he.jpg" alt="שאלה עם שלושה חלקים הופכת אצל RAG רגיל ל-embedding אחד שנוחת באמצע, רחוק מכל אחת מהתשובות. ה-agent מפרק את השאלה לפני שהוא מחפש, וזה כל ההבדל." loading="lazy" /><figcaption>שאלה עם שלושה חלקים הופכת אצל RAG רגיל ל-embedding אחד שנוחת באמצע, רחוק מכל אחת מהתשובות. ה-agent מפרק את השאלה לפני שהוא מחפש, וזה כל ההבדל.</figcaption></figure>
 
 ## שלושה tools ולולאה
 
@@ -48,6 +46,10 @@ RAG עצמו הגיע מ-paper של Facebook AI Research ב-2020. ה-agentic ש�
 המודל קורא להם כמה פעמים שהוא צריך. כשיש לו מספיק חומר, הוא כותב תשובה עם ציטוטים. הכל רץ ב-background job, והצעדים של ה-agent זורמים לדפדפן ב-Turbo Streams. המשתמש רואה בזמן אמת מה הוא מחפש.
 
 ב-MLM מפרקים את זה לשלושה כוחות: query decomposition, multi-hop chaining, self-correction. בשפה של standup: לפרק את השאלה, ללכת אחרי קצה חוט, ולהודות כשפספסת ולחפש שוב.
+
+<figure><img src="/posts/agentic-rag/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/agentic-rag/src3.jpg" alt="השינוי אצל panasiti קטן ממה שחושבים: אותו pgvector, אותם chunks, רק שהחיפוש עבר מהקוד לידיים של המודל (credit: panasiti.me)" loading="lazy" /><figcaption>השינוי אצל panasiti קטן ממה שחושבים: אותו pgvector, אותם chunks, רק שהחיפוש עבר מהקוד לידיים של המודל (credit: panasiti.me)</figcaption></figure>
 
 ## עשרה nodes, ורובם גדרות
 
@@ -65,7 +67,7 @@ RAG עצמו הגיע מ-paper של Facebook AI Research ב-2020. ה-agentic ש�
 
 רגע, איפה פה ה-agentic? ב-retriever, ב-tool calling לשערי מניות, בהחלטה ללכת ל-web. כל השאר זה גדרות: סיווג, בדיקה, retry, cache ובלם. וזה בדיוק מה שהופך את זה למשהו שאפשר להשאיר לרוץ לבד.
 
-<figure><img src="/posts/agentic-rag/v2-stat-he.gif" alt="מתחת לרמת ביטחון כזו, ה-Hallucination Guard דוחה את התשובה" loading="lazy" /><figcaption>מתחת לרמת ביטחון כזו, ה-Hallucination Guard דוחה את התשובה</figcaption></figure>
+<figure><img src="/posts/agentic-rag/v3-svg-he.jpg" alt="המודל מחליט בשלושה מקומות בלבד. כל השאר זה סיווג, ספים, תקרות ובלמים, וזה מה שמאפשר להשאיר את המערכת לרוץ לבד בלי שמישהו יעמוד מעליה." loading="lazy" /><figcaption>המודל מחליט בשלושה מקומות בלבד. כל השאר זה סיווג, ספים, תקרות ובלמים, וזה מה שמאפשר להשאיר את המערכת לרוץ לבד בלי שמישהו יעמוד מעליה.</figcaption></figure>
 
 ## באייר קראו לזה אחרת
 
@@ -77,7 +79,6 @@ context engineering קבע מה כל מודל מקבל, מה הוא לא מקב�
 
 תקראו את הרשימה הזאת שוב. זו אותה רשימה של ה-Show HN, רק בגרסה של חברת תרופות עם paper ב-Frontiers in AI.
 
-<figure><img src="/posts/agentic-rag/v3-quote-he.jpg" alt="צוות PRINCE, באייר, martinfowler.com" loading="lazy" /><figcaption>צוות PRINCE, באייר, martinfowler.com</figcaption></figure>
 
 ## מתי להשאיר את ה-RAG הישן
 

@@ -41,7 +41,7 @@ diff default.txt ours.txt
 
 What you'll see: on the first run the model picks the length, tone and format on its own. On the second, with the file we build in the next step, you get an object with two fields that you can pass to `json.loads`. That's all a system prompt does: it replaces the model's defaults with yours. Keep `default.txt`. That's your baseline.
 
-<figure><img src="/posts/prompt-engineering-2-system-prompts/v1-transcript-en.jpg" alt="Without your own system prompt, the model picks length, tone and format for you, and inherits from Claude Code (claude -p)" loading="lazy" /><figcaption>Without your own system prompt, the model picks length, tone and format for you, and inherits from Claude Code (claude -p)</figcaption></figure>
+<figure><img src="/posts/prompt-engineering-2-system-prompts/src3.jpg" alt="Know what you're comparing against. claude.ai runs on a system prompt that Anthropic writes and updates, and the API doesn't get it. So your baseline is the model without your instructions, not what you saw in the chat. (credit: Anthropic, Release notes: System prompts)" loading="lazy" /><figcaption>Know what you're comparing against. claude.ai runs on a system prompt that Anthropic writes and updates, and the API doesn't get it. So your baseline is the model without your instructions, not what you saw in the chat. (credit: Anthropic, Release notes: System prompts)</figcaption></figure>
 
 ## 02 · Four blocks, always in the same order
 
@@ -69,13 +69,14 @@ The order isn't cosmetic. Stable things on top, changing things at the bottom. T
 
 <figure><img src="/posts/prompt-engineering-2-system-prompts/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
 
+<figure><img src="/posts/prompt-engineering-2-system-prompts/v2-svg-en.jpg" alt="The order isn't a matter of style. The four stable blocks sit in a prefix that's read from cache at a tenth of the price, and anything that changes, including the date, goes below the breakpoint." loading="lazy" /><figcaption>The order isn't a matter of style. The four stable blocks sit in a prefix that's read from cache at a tenth of the price, and anything that changes, including the date, goes below the breakpoint.</figcaption></figure>
+
 ## 03 · XML for boundaries, markdown inside the block
 
 This debate has run for two years, and it's mostly pointless. Anthropic recommends XML tags in its prompting guide, and the reason is practical. A closed tag tells the model exactly where one thing ends and the next begins. Markdown is convenient for instructions that a person edits. Our rule is simple. Use a tag for every boundary: between blocks, and above all around anything that comes from outside. Inside a block, use plain markdown.
 
 Why does this matter in practice? Because outside text contains instructions. An article that quotes a prompt, a README with "ignore previous instructions", or Jina returning `![Image](url)` in the middle of the text. Inside `<article>`, the model understands it's raw material. Without the tag, it looks like one more line in the rules.
 
-<figure><img src="/posts/prompt-engineering-2-system-prompts/v2-compare-en.jpg" alt="The tag is a boundary, not decoration: outside text without a tag looks to the model like one more instruction (Anthropic, Prompting best practices)" loading="lazy" /><figcaption>The tag is a boundary, not decoration: outside text without a tag looks to the model like one more instruction (Anthropic, Prompting best practices)</figcaption></figure>
 
 ## 04 · Few-shot: one bad pair, one good pair
 
@@ -129,7 +130,7 @@ def run(user_text: str):
 
 Run it twice and look at `read` on the second call. If it's zero, something in the prefix moved. There's also a minimum prefix length for caching, which depends on the model, and the skeleton from step 02 is shorter than that. So this pays off when the system prompt is genuinely long, usually because of the examples. Our heavy writing runs on a subscription, so this math hurts us less. If you pay for the API per token, it's the difference between a number nobody looks at and a line item on the monthly bill.
 
-<figure><img src="/posts/prompt-engineering-2-system-prompts/v3-strip-en.jpg" alt="The TTL runs from the start of the request, so a 4-minute response leaves one minute for the next call (Anthropic, Prompt caching)" loading="lazy" /><figcaption>The TTL runs from the start of the request, so a 4-minute response leaves one minute for the next call (Anthropic, Prompt caching)</figcaption></figure>
+<figure><img src="/posts/prompt-engineering-2-system-prompts/v3-svg-en.jpg" alt="Four minutes of streaming use up four of the TTL's five minutes, because the clock started with the request. A pipeline that writes long responses quietly misses the cache, and that's where the 1-hour TTL pays for itself." loading="lazy" /><figcaption>Four minutes of streaming use up four of the TTL's five minutes, because the clock started with the request. A pipeline that writes long responses quietly misses the cache, and that's where the 1-hour TTL pays for itself.</figcaption></figure>
 
 ## Takeaways
 

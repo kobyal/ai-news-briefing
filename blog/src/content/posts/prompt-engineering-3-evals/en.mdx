@@ -43,6 +43,8 @@ We didn't touch our prompt. What changed were rules sitting in the `claude -p` s
 
 <figure><img src="/posts/prompt-engineering-3-evals/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
 
+<figure><img src="/posts/prompt-engineering-3-evals/v1-svg-en.jpg" alt="The model returned valid JSON, just with a sentence in front of it. Our parser looked for it at the first character, failed, and returned `{}`. From there the whole chain looked green: the bug was in our default, not in the model." loading="lazy" /><figcaption>The model returned valid JSON, just with a sentence in front of it. Our parser looked for it at the first character, failed, and returned `{}`. From there the whole chain looked green: the bug was in our default, not in the model.</figcaption></figure>
+
 ## From the outside, everything looked green
 
 The site went up on time. The summary email showed every step as successful. The QA evaluator ran, scored the stories that did get published, and found them fine. Because they were fine. There were just fewer of them, and two whole sources were missing.
@@ -51,9 +53,11 @@ In their post on Agent-EvalKit, AWS wrote that an answer can look great even whe
 
 Three days before we noticed.
 
+<figure><img src="/posts/prompt-engineering-3-evals/v2-strip-en.jpg" alt="Three mornings, two whole sources missing, and not one alert. The judge scored what was published and found it fine, because it has no way to ask what was supposed to be there." loading="lazy" /><figcaption>Three mornings, two whole sources missing, and not one alert. The judge scored what was published and found it fine, because it has no way to ask what was supposed to be there.</figcaption></figure>
+
 ## The first fix: one more line in the prompt
 
-The first reflex was to fix it with words. We added to the prompt that the answer "MUST begin with '{'", plus a line that starts with "Do not preface it with commentary" and goes on to audit rules. That line still sits in the system prompt that wrote this post. We also tried `--bare` to clear the session context, and that broke subscription auth.
+The first reflex was to fix it with words. We added to the prompt that the answer "MUST begin with '\{'", plus a line that starts with "Do not preface it with commentary" and goes on to audit rules. That line still sits in the system prompt that wrote this post. We also tried `--bare` to clear the session context, and that broke subscription auth.
 
 The line helped. Not always. And how did we know it helped? We ran it a few times by hand and looked. That's exactly the trial-and-error promptfoo is built against. Anthropic put it best:
 
@@ -64,7 +68,7 @@ That's how it felt. Every fix in words moved the problem, it didn't close it.
 
 > **My take:** I don't buy a prompt as the fix for a parsing bug. A prompt lowers a probability, it's not a contract. If the failure looks like exit 0, it will come back, and you'll find out from a reader.
 
-<figure><img src="/posts/prompt-engineering-3-evals/v1-screenshot-en.jpg" alt="promptfoo say on their very first page that test-driven beats trial-and-error. Three runs by hand is not an eval (promptfoo docs)" loading="lazy" /><figcaption>promptfoo say on their very first page that test-driven beats trial-and-error. Three runs by hand is not an eval (promptfoo docs)</figcaption></figure>
+<figure><img src="/posts/prompt-engineering-3-evals/src1.jpg" alt="promptfoo is built against exactly what we did that week: run it by hand a few times and eyeball it. 'The line helped, not always' isn't a result, it's a mood. (credit: Promptfoo)" loading="lazy" /><figcaption>promptfoo is built against exactly what we did that week: run it by hand a few times and eyeball it. 'The line helped, not always' isn't a result, it's a mood. (credit: Promptfoo)</figcaption></figure>
 
 ## The real cause was in our code
 
@@ -112,3 +116,7 @@ OK, but what about a real prompt change, one that's supposed to improve content?
 In practice, what would have caught August? An assert on count, and a diff on real traffic. Neither uses a model at all. The judge, the most expensive layer, would have missed it.
 
 An eval that can't fail on `{}` isn't an eval. It's a dashboard.
+
+<figure><img src="/posts/prompt-engineering-3-evals/v4-svg-en.jpg" alt="Same bad input, five layers. What would have caught August is an assert on count and a diff on real traffic, neither using a model. Build up from the cheap layers; don't start with the judge." loading="lazy" /><figcaption>Same bad input, five layers. What would have caught August is an assert on count and a diff on real traffic, neither using a model. Build up from the cheap layers; don't start with the judge.</figcaption></figure>
+
+

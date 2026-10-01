@@ -27,9 +27,7 @@ Five months later the repo has about a million lines of code and 1,500 merged PR
 
 These are their numbers about their own product, so take them with a grain of salt. The number isn't the point of the post, though. This sentence is: the team's job is no longer to write code. It is to design the environment, define intent, and build feedback loops that let agents work reliably. They call that harness engineering.
 
-<figure><img src="/posts/harness-engineering/diagram.svg" alt="How it fits together" loading="lazy" /><figcaption>How it fits together</figcaption></figure>
-
-<figure><img src="/posts/harness-engineering/v1-stat-en.gif" alt="PRs per engineer per day, with no code written by hand" loading="lazy" /><figcaption>PRs per engineer per day, with no code written by hand</figcaption></figure>
+<figure><img src="/posts/harness-engineering/v1-strip-en.jpg" alt="These are OpenAI's numbers about OpenAI's product. The interesting part is that output per engineer rose as the team grew: what scaled was the environment, not the hands." loading="lazy" /><figcaption>These are OpenAI's numbers about OpenAI's product. The interesting part is that output per engineer rose as the team grew: what scaled was the environment, not the hands.</figcaption></figure>
 
 ## Who coined it? Depends who you ask
 
@@ -39,7 +37,7 @@ So nobody invented it alone. It showed up in several places at once and stuck. T
 
 Trivedy's line does most of the work: Agent = Model + Harness. If you're not the model, you're the harness.
 
-<figure><img src="/posts/harness-engineering/v2-quote-en.jpg" alt="Viv Trivedy, via Addy Osmani" loading="lazy" /><figcaption>Viv Trivedy, via Addy Osmani</figcaption></figure>
+<figure><img src="/posts/harness-engineering/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
 
 ## What's in a harness, and what isn't
 
@@ -53,7 +51,7 @@ What it isn't:
 - It's not a framework. You can build a harness on any SDK, or on no SDK at all.
 - It doesn't make the model smarter. The walkinglabs course says it plainly: the harness doesn't improve the model, it builds a closed working system around it.
 
-<figure><img src="/posts/harness-engineering/v3-compare-en.jpg" alt="Where you fix an agent's mistake" loading="lazy" /><figcaption>Where you fix an agent's mistake</figcaption></figure>
+<figure><img src="/posts/harness-engineering/v2-svg-en.jpg" alt="The prompt is one box out of ten. Tools, hooks, checks, and state across runs are what turn a raw model into an agent, and none of them makes the model itself any smarter." loading="lazy" /><figcaption>The prompt is one box out of ten. Tools, hooks, checks, and state across runs are what turn a raw model into an agent, and none of them makes the model itself any smarter.</figcaption></figure>
 
 ## Osmani's rule: every mistake, once
 
@@ -64,6 +62,8 @@ In practice it looks like this. The agent imported from a directory it shouldn't
 The harness tightens with every screwup. Wait, isn't this just the old test harness? Almost. Böckeler noticed that AI-written code doesn't break loudly. It compiles, passes tests, and slowly erodes the codebase. Conventions get forgotten, mistakes repeat. The degradation is quiet. So the harness has to check architecture, naming, and security too, not just whether a function returns the right value.
 
 HumanLayer go further and say most agent failures are a configuration skill issue, not a model issue. Osmani closes the loop: a decent model with a great harness beats a great model with a bad harness.
+
+<figure><img src="/posts/harness-engineering/v3-svg-en.jpg" alt="Every screwup becomes a step you never walk back down: a lint rule, a hook, a line in AGENTS.md. ‘Another line in the prompt’ gets struck out, because a prompt can be forgotten and a check can't." loading="lazy" /><figcaption>Every screwup becomes a step you never walk back down: a lint rule, a hook, a line in AGENTS.md. ‘Another line in the prompt’ gets struck out, because a prompt can be forgotten and a check can't.</figcaption></figure>
 
 ## Our pipeline: the harness is most of the code
 
@@ -82,6 +82,8 @@ Rajit Khanna built a media-generation agent at prismvideos on the Vercel SDK. It
 What did they do? Deleted their agent. They stood up an EC2 box with a Hono server, one Hermes container per customer, and feed it only what's unique to them: the system prompt, tools over MCP, skills, and connectors to Meta Ads and Google Drive.
 
 This doesn't contradict everything above. It sharpens it. There's the generic harness: session management, compaction, memory, a browser. You're probably better off taking that off the shelf. And there's your domain harness: the checks that know what valid output means for you, the permissions, the rules born from your own screwups. Nobody will build that for you.
+
+<figure><img src="/posts/harness-engineering/src5.jpg" alt="prismvideos deleted an agent that worked and put Hermes underneath. What stayed theirs is only the domain harness: prompt, tools, and connectors (credit: Rajit Khanna)" loading="lazy" /><figcaption>prismvideos deleted an agent that worked and put Hermes underneath. What stayed theirs is only the domain harness: prompt, tools, and connectors (credit: Rajit Khanna)</figcaption></figure>
 
 ## What to try this week
 

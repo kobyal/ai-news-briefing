@@ -27,9 +27,7 @@ madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
 
 אלה המספרים שלהם, על המוצר שלהם, אז קחו בערבון מוגבל. אבל מה שחשוב בפוסט הוא לא המספר. זה המשפט הזה: התפקיד של הצוות הוא כבר לא לכתוב קוד, אלא לתכנן סביבה, להגדיר כוונה ולבנות feedback loops שמאפשרים ל-agents לעבוד באמינות. לזה הם קוראים harness engineering.
 
-<figure><img src="/posts/harness-engineering/diagram.svg" alt="איך זה עובד" loading="lazy" /><figcaption>איך זה עובד</figcaption></figure>
-
-<figure><img src="/posts/harness-engineering/v1-stat-he.gif" alt="PRs למהנדס ליום, בלי שורת קוד אחת ביד" loading="lazy" /><figcaption>PRs למהנדס ליום, בלי שורת קוד אחת ביד</figcaption></figure>
+<figure><img src="/posts/harness-engineering/v1-strip-he.jpg" alt="אלה המספרים של OpenAI על המוצר של OpenAI. מה שמעניין הוא שהתפוקה למהנדס עלתה כשהצוות גדל: מה שהתרחב הוא הסביבה, לא הידיים." loading="lazy" /><figcaption>אלה המספרים של OpenAI על המוצר של OpenAI. מה שמעניין הוא שהתפוקה למהנדס עלתה כשהצוות גדל: מה שהתרחב הוא הסביבה, לא הידיים.</figcaption></figure>
 
 ## מי המציא את זה? תלוי את מי שואלים
 
@@ -39,7 +37,7 @@ madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
 
 השורה של Trivedy עושה את רוב העבודה: Agent = Model + Harness. אם אתם לא המודל, אתם ה-harness.
 
-<figure><img src="/posts/harness-engineering/v2-quote-he.jpg" alt="Viv Trivedy, דרך Addy Osmani" loading="lazy" /><figcaption>Viv Trivedy, דרך Addy Osmani</figcaption></figure>
+<figure><img src="/posts/harness-engineering/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
 
 ## מה נכנס ל-harness, ומה ממש לא
 
@@ -53,7 +51,7 @@ madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
 - זה לא framework. אפשר לבנות harness על כל SDK, או בלי SDK בכלל.
 - וזה לא הופך את המודל לחכם יותר. הקורס של walkinglabs אומר את זה ישר: ה-harness לא משפר את המודל, הוא בונה סביבו מערכת עבודה סגורה.
 
-<figure><img src="/posts/harness-engineering/v3-compare-he.jpg" alt="איפה מתקנים טעות של agent" loading="lazy" /><figcaption>איפה מתקנים טעות של agent</figcaption></figure>
+<figure><img src="/posts/harness-engineering/v2-svg-he.jpg" alt="ה-prompt הוא קופסה אחת מתוך עשר. כלים, hooks, בדיקות ו-state בין ריצות הם מה שהופך מודל גולמי ל-agent, ואף אחד מהם לא משפר את המודל עצמו." loading="lazy" /><figcaption>ה-prompt הוא קופסה אחת מתוך עשר. כלים, hooks, בדיקות ו-state בין ריצות הם מה שהופך מודל גולמי ל-agent, ואף אחד מהם לא משפר את המודל עצמו.</figcaption></figure>
 
 ## החוק של אוסמני: כל טעות, פעם אחת
 
@@ -64,6 +62,8 @@ madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
 ה-harness מתהדק עם כל פאשלה. רגע, זה לא סתם ה-test harness הישן? כמעט. בקלר שמה לב שקוד שנכתב על ידי AI לא נשבר ברעש. הוא מתקמפל, עובר טסטים, ולאט לאט שוחק את ה-codebase. conventions נשכחות, טעויות חוזרות. הדגרדציה שקטה. אז ה-harness צריך לבדוק גם ארכיטקטורה, שמות ואבטחה, לא רק אם הפונקציה מחזירה את הערך הנכון.
 
 HumanLayer הולכים רחוק יותר ואומרים שרוב הכשלונות של agents הם skill issue של קונפיגורציה, לא של המודל. ואוסמני סוגר את זה: מודל סביר עם harness מעולה מנצח מודל מעולה עם harness גרוע.
+
+<figure><img src="/posts/harness-engineering/v3-svg-he.jpg" alt="כל פאשלה הופכת למדרגה שלא יורדים ממנה: lint, hook, שורה ב-AGENTS.md. ״עוד שורה ב-prompt״ נמחקת, כי prompt אפשר לשכוח ובדיקה לא." loading="lazy" /><figcaption>כל פאשלה הופכת למדרגה שלא יורדים ממנה: lint, hook, שורה ב-AGENTS.md. ״עוד שורה ב-prompt״ נמחקת, כי prompt אפשר לשכוח ובדיקה לא.</figcaption></figure>
 
 ## אצלנו: ה-harness הוא רוב הקוד
 
@@ -82,6 +82,8 @@ HumanLayer הולכים רחוק יותר ואומרים שרוב הכשלונו
 מה הם עשו? מחקו את ה-agent שלהם. הרימו EC2 עם שרת Hono, container של Hermes לכל לקוח, ומזינים לו רק מה שייחודי להם: system prompt, כלים דרך MCP, skills ו-connectors ל-Meta Ads ול-Google Drive.
 
 טוב, זה לא סותר את כל מה שכתבתי למעלה. זה מחדד אותו. יש harness גנרי: session management, compaction, זיכרון, דפדפן. את זה כנראה עדיף לקחת מוכן. ויש harness של הדומיין שלכם: הבדיקות שיודעות מה זה פלט תקין אצלכם, ההרשאות, החוקים שנולדו מהפאשלות שלכם. את זה אף אחד לא יבנה בשבילכם.
+
+<figure><img src="/posts/harness-engineering/src5.jpg" alt="prismvideos מחקו agent שעבד ושמו מתחת את Hermes. מה שנשאר שלהם הוא רק ה-harness של הדומיין: prompt, כלים ו-connectors (credit: Rajit Khanna)" loading="lazy" /><figcaption>prismvideos מחקו agent שעבד ושמו מתחת את Hermes. מה שנשאר שלהם הוא רק ה-harness של הדומיין: prompt, כלים ו-connectors (credit: Rajit Khanna)</figcaption></figure>
 
 ## מה לנסות השבוע
 

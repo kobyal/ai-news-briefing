@@ -27,7 +27,7 @@ HOUSE = (HERE / "house_positions.md").read_text(encoding="utf-8")
 
 KINDS = ("explainer", "fieldnotes", "warstory", "faq", "deepdive")
 HOOKS = ("scene", "number", "claim", "quote", "question")
-VISUAL_KINDS = {"svg", "image", "screenshot", "transcript", "chart", "strip", "steps", "stat", "compare", "quote", "timeline", "boxes", "d2"}
+VISUAL_KINDS = {"svg", "image", "screenshot", "chart", "strip", "steps", "stat", "compare", "quote", "timeline", "boxes", "d2"}
 
 SYSTEM_HE = """You write the AI Briefing blog (blog.aibriefing.dev): AI-engineering terms and tools explained
 in HEBREW for Israeli engineers, with a clear house opinion. Author of record: Koby Almog.
@@ -81,8 +81,8 @@ STRUCTURE of body_md — THE TEMPLATE IS GIVEN IN THE PROMPT AS `KIND`. Follow i
                NOT to · who runs it in production (named, public) · vs. the neighbouring term · what to try this week.
                At least HALF the sections are practical (how / example / what to try). Headings are specific to THIS post. 700–1100 words.
   fieldnotes → numbered steps: every ## heading starts with "01 · ", "02 · " … (4–7 steps). Each step = what you do,
-               what you see, one concrete artefact (command, config, output). One step MUST be backed by a `transcript`
-               visual (a prompt we actually run) or a code block the reader would paste. Close with a short
+               what you see, one concrete artefact (command, config, output). One step MUST be backed by a code block the
+               reader would paste (with a filename). Close with a short
                "## מה לקחת" list of 3–4 habits (that heading is fine here). 900–1400 words.
   warstory   → tell ONE PUBLIC incident in order (from the sources: a company, a repo, a documented outage) — the setup
                (date, system, scale) → what broke → how it looked from outside → the wrong first fix → the real cause →
@@ -142,7 +142,6 @@ ALSO produce:
   {"kind":"image","after":..,"src":<a url from IMAGES AVAILABLE>,"caption":<claim + "(credit: source name)">}
       A real image from a source page — a product screen, a chart, a photo. Prefer this to drawing when a real one exists.
   {"kind":"screenshot","after":..,"url":<an official page from the sources>,"caption":..}  → we screenshot that page live
-  {"kind":"transcript","after":..,"label":"claude -p","prompt":<short prompt in the post language we will ACTUALLY run>,"caption":..}
   {"kind":"chart","after":..,"title":..,"bars":[3-6 of {"label":..,"value":"$15","highlight":bool}],"source":..,"caption":..} → REAL numbers only
   {"kind":"strip","after":..,"items":[3 of {"value":"300","label":<=5 words}],"caption":..}  → dark 3-number strip for a numeric hook
   Legacy card kinds (steps, stat, compare, quote, timeline, boxes, d2) exist but are the LAST resort; at most one per post.
@@ -213,8 +212,8 @@ def _check(doc: dict, lang: str, kind: str) -> str:
         return "at most one legacy card kind per post"
     if kind == "deepdive" and lang == "he" and not ({"screenshot", "image"} & set(kinds)):
         return "deepdive must include a real screenshot or source image"
-    if kind == "fieldnotes" and lang == "he" and "transcript" not in kinds and "```" not in body:
-        return "fieldnotes needs a transcript visual or a code block"
+    if kind == "fieldnotes" and lang == "he" and "```" not in body:
+        return "fieldnotes needs a code block the reader would paste"
     for v in vis:
         if v.get("kind") == "stat" and not re.match(r"^\D{0,3}\d", str(v.get("value", ""))):
             return "stat value must start with a number"

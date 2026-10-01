@@ -1,0 +1,139 @@
+---
+title: "System prompts in production: order, tags, examples, and what they cost"
+description: "Part 2: building a system prompt that holds up in production. Four blocks, XML vs markdown, few-shot, length, and prompt caching."
+lang: en
+key: prompt-engineering-2-system-prompts
+term: "system prompts"
+kind: fieldnotes
+pubDate: 2026-10-01
+tags: ["prompt-engineering", "system-prompts", "prompt-caching", "claude", "llm-ops"]
+hook: "scene"
+tldr: ["Run every prompt once with no system prompt and save the output as a baseline.", "The date and daily input go in the user message, or the cache breaks on every run.", "A rule you can check in code gets enforced in code. The prompt only needs a one-line reminder."]
+series: { slug: "prompt-engineering", name: "Prompt engineering, minus the magic", part: 2, total: 3 }
+hero: /posts/prompt-engineering-2-system-prompts/hero-en.jpg
+diagram: /posts/prompt-engineering-2-system-prompts/diagram.svg
+sources:
+  - { title: "Prompting best practices", url: "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts", date: "" }
+  - { title: "Prompt caching", url: "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching", date: "" }
+  - { title: "Claude: System Prompts", url: "https://platform.claude.com/docs/en/release-notes/system-prompts", date: "2026-08-16" }
+  - { title: "Anthropic injects reasoning_effort=25 into Claude.ai consumer system prompts", url: "https://imgur.com/AOAs7Aq", date: "2026-04-10" }
+opinion: "We don't see a system prompt as text. We see it as part of the system: it sets what the model sees and what counts as valid output, and the code around it checks whether that happened. Every time we fixed a bug with one more line in the prompt, we paid for it later. Every time we moved a rule into a validator or into code, the pipeline got cheaper and more stable. BAD/GOOD examples are the one place where we let the prompt grow without much argument. And prompt caching isn't a cost-saving trick. It's a result of order: if you separate the stable from the changing, you get it almost for free."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+On April 10, 2026, someone posted a screenshot to imgur claiming Anthropic injects `reasoning_effort=25` into the Claude.ai system prompt. It got 206 views, so not exactly a storm, and I didn't check whether it's true. But it points at something a lot of teams miss. What you get in claude.ai isn't the model alone. It's the model plus a system prompt that Anthropic writes and keeps updating. Their release notes page, in the August 16, 2026 version, says so directly:
+
+> "These system prompt updates do not apply to the Claude API."
+> — Anthropic, Release notes: System prompts
+
+On the API, nobody wrote a system prompt for you. OpenAI introduced the `system` role in its chat API in March 2023, and everyone has used the same pattern since. In the previous part we saw that format, context and retries belong in the harness. This time we cover what stays in the system prompt, in what order, and what it costs. Six steps, all from our pipeline.
+
+## 01 · Ask the same question twice
+
+Before you write a word, check what the model does without your instructions. I tried this with `claude -p`, and there's a small trap. `claude -p` with no flags doesn't run without a system prompt. It runs with Claude Code's own system prompt. `--system-prompt` replaces it, and `--append-system-prompt` adds to it. If your agent doesn't write code, this matters, because you inherit a coding tool's behavior without knowing it.
+
+```bash title="ab_system.sh"
+Q='Summarize in one line for engineers: Anthropic added a 1-hour TTL to prompt caching.'
+claude -p "$Q" > default.txt
+claude -p --system-prompt "$(cat prompts/editor_system.md)" "$Q" > ours.txt
+diff default.txt ours.txt
+```
+
+What you'll see: on the first run the model picks the length, tone and format on its own. On the second, with the file we build in the next step, you get an object with two fields that you can pass to `json.loads`. That's all a system prompt does: it replaces the model's defaults with yours. Keep `default.txt`. That's your baseline.
+
+<figure><img src="/posts/prompt-engineering-2-system-prompts/v1-transcript-en.jpg" alt="Without your own system prompt, the model picks length, tone and format for you, and inherits from Claude Code (claude -p)" loading="lazy" /><figcaption>Without your own system prompt, the model picks length, tone and format for you, and inherits from Claude Code (claude -p)</figcaption></figure>
+
+## 02 · Four blocks, always in the same order
+
+Every system prompt we have is built from the same four parts: role, rules, examples, output contract. The role is two or three lines, not "you are a world-class expert". It says who you are, who you write for, and what success looks like. The rules are boundaries: what's forbidden, what's required, what to do when information is missing. The examples are pairs. The output contract is the schema, exactly as the code will check it.
+
+```markdown title="prompts/editor_system.md"
+<role>
+AI news editor. Writes for Israeli engineers.
+Success = a headline an engineer would forward to the team chat.
+</role>
+<rules>
+- Only what's in the input. Missing info? Empty field, no guessing.
+- No superlatives, no emoji.
+</rules>
+<examples>
+<bad>Anthropic launches a groundbreaking cost-saving capability</bad>
+<good>Anthropic: 1-hour cache instead of 5 minutes</good>
+</examples>
+<output_contract>
+JSON only: {"headline": "up to 12 words", "why_it_matters": "up to 25 words"}
+</output_contract>
+```
+
+The order isn't cosmetic. Stable things on top, changing things at the bottom. The role and rules barely move between runs. The contract moves when the schema changes. Today's input doesn't go in there at all. It goes in the user message. Our merger gets a few dozen stories from ten agents every morning, and its system prompt doesn't know any of them. It only knows the rules. Remember this for step 06, where it turns into money.
+
+<figure><img src="/posts/prompt-engineering-2-system-prompts/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## 03 · XML for boundaries, markdown inside the block
+
+This debate has run for two years, and it's mostly pointless. Anthropic recommends XML tags in its prompting guide, and the reason is practical. A closed tag tells the model exactly where one thing ends and the next begins. Markdown is convenient for instructions that a person edits. Our rule is simple. Use a tag for every boundary: between blocks, and above all around anything that comes from outside. Inside a block, use plain markdown.
+
+Why does this matter in practice? Because outside text contains instructions. An article that quotes a prompt, a README with "ignore previous instructions", or Jina returning `![Image](url)` in the middle of the text. Inside `<article>`, the model understands it's raw material. Without the tag, it looks like one more line in the rules.
+
+<figure><img src="/posts/prompt-engineering-2-system-prompts/v2-compare-en.jpg" alt="The tag is a boundary, not decoration: outside text without a tag looks to the model like one more instruction (Anthropic, Prompting best practices)" loading="lazy" /><figcaption>The tag is a boundary, not decoration: outside text without a tag looks to the model like one more instruction (Anthropic, Prompting best practices)</figcaption></figure>
+
+## 04 · Few-shot: one bad pair, one good pair
+
+Zero-shot works well when the task is clear and the format is standard. Vendor classification, for example, doesn't need a model at all for us. There's `classify_vendor` with rules. Few-shot comes in when the task is "write like X" and X is hard to define in words.
+
+The clearest case for us is Hebrew translation. We tried describing "natural Hebrew, not translated Hebrew" in words. It didn't help. What helped was BAD/GOOD pairs in the translation system prompt: a sentence that sounds like a machine, and next to it how an engineer would say it. It's the strongest lever we've found, stronger than any instruction.
+
+> **My take:** One BAD/GOOD pair is worth more than a paragraph of style definitions. The model doesn't understand "natural". It understands an example. I no longer write a style instruction without a pair next to it.
+
+That said, examples are also a risk. The model copies them, including length, structure and sometimes specific words. Two or three examples that differ from each other beat five that look alike. And if all your examples are about Anthropic, you'll get headlines that mention Anthropic even when the story is about Google.
+
+## 05 · How long is too long
+
+There's no magic token count. The system prompt of the agent that writes this blog is long, and that's fine, because every section in it came from a post that turned out badly. The question isn't how many words. It's three questions about each rule:
+
+1. Can it be checked in code? "JSON only", "up to 160 characters", "no emoji". A validator catches all of these for free. So the code enforces, and the prompt just reminds in one line.
+2. Does it contradict another rule? Two rules pulling in opposite directions, and the model picks between them almost at random.
+3. What happens if you delete it? If you have no way to answer, you have no eval. More on that in part 3.
+
+A prompt bloats when every bug gets fixed with one more line. Every place where we replaced a model instruction with a rule in code came out cheaper and more reliable. The `claude -p` wrapper repairs broken JSON, so the output contract in the prompt is short and the enforcement lives in code.
+
+## 06 · Prompt caching: order is money
+
+Now the math. Anthropic's prompt caching stores a prefix of the prompt up to a breakpoint you mark with `cache_control`. The default is 5 minutes, with an option for 1 hour, and every cache hit refreshes it at no cost. In the pricing table, a 5-minute cache write is 1.25x the regular input price, and a cache read is about a tenth.
+
+This is where the order from step 02 pays off. The cache works on an exact prefix. Change one character near the top, and everything below it gets written again. The most common mistake I've seen: today's date on the first line of the system prompt. Sounds reasonable, breaks the cache on every run. The date goes in the user message.
+
+One more detail from the docs worth knowing: the TTL is measured from the start of the request, not the end of the response. If a response takes 4 minutes to stream, you have about a minute to start the next request before the 5-minute cache expires. In a pipeline that writes long responses, this is how you miss the cache without noticing. If you have agents running one after another on the same system prompt, consider the 1-hour TTL.
+
+```python title="cached_system.py"
+import anthropic
+
+client = anthropic.Anthropic()
+SYSTEM = open("prompts/editor_system.md", encoding="utf-8").read()
+
+def run(user_text: str):
+    resp = client.messages.create(
+        model="claude-sonnet-5-5",
+        max_tokens=1024,
+        system=[{
+            "type": "text",
+            "text": SYSTEM,
+            "cache_control": {"type": "ephemeral", "ttl": "1h"},
+        }],
+        messages=[{"role": "user", "content": user_text}],
+    )
+    u = resp.usage
+    print("write:", u.cache_creation_input_tokens, "read:", u.cache_read_input_tokens)
+    return resp
+```
+
+Run it twice and look at `read` on the second call. If it's zero, something in the prefix moved. There's also a minimum prefix length for caching, which depends on the model, and the skeleton from step 02 is shorter than that. So this pays off when the system prompt is genuinely long, usually because of the examples. Our heavy writing runs on a subscription, so this math hurts us less. If you pay for the API per token, it's the difference between a number nobody looks at and a line item on the monthly bill.
+
+<figure><img src="/posts/prompt-engineering-2-system-prompts/v3-strip-en.jpg" alt="The TTL runs from the start of the request, so a 4-minute response leaves one minute for the next call (Anthropic, Prompt caching)" loading="lazy" /><figcaption>The TTL runs from the start of the request, so a 4-minute response leaves one minute for the next call (Anthropic, Prompt caching)</figcaption></figure>
+
+## Takeaways
+
+- Before writing a system prompt, run without one and save the output as a baseline.
+- Role, rules, examples, contract, in that order. Anything that changes, including the date, goes in the user message.
+- All outside text goes inside a tag. Your instructions stay in markdown.
+- A rule you can check in code gets checked in code. The prompt only reminds.

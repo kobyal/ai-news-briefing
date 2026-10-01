@@ -27,7 +27,7 @@ HOUSE = (HERE / "house_positions.md").read_text(encoding="utf-8")
 
 KINDS = ("explainer", "fieldnotes", "warstory", "faq", "deepdive")
 HOOKS = ("scene", "number", "claim", "quote", "question")
-VISUAL_KINDS = {"steps", "stat", "compare", "quote", "timeline", "d2", "strip", "boxes", "chart", "screenshot", "transcript"}
+VISUAL_KINDS = {"svg", "image", "screenshot", "transcript", "chart", "strip", "steps", "stat", "compare", "quote", "timeline", "boxes", "d2"}
 
 SYSTEM_HE = """You write the AI Briefing blog (blog.aibriefing.dev): AI-engineering terms and tools explained
 in HEBREW for Israeli engineers, with a clear house opinion. Author of record: Koby Almog.
@@ -80,7 +80,7 @@ STRUCTURE of body_md — THE TEMPLATE IS GIVEN IN THE PROMPT AS `KIND`. Follow i
   deepdive   → a product/tool up close: what it actually is (one paragraph, then what it is NOT) · hands-on: what
                happens when you use it (screens, commands, output) · the numbers (price, limits, latency) · where it
                is strong · where it falls down · vs. the obvious alternative · who should pick it this quarter.
-               1100–1700 words. MUST include a `screenshot` visual of an official page and a `compare` card.
+               1100–1700 words. MUST include a real `screenshot` or source `image`, and an authored `svg` that compares it to the alternative.
 Common rules for every kind:
 - OPENING: the prompt names the HOOK you must use (scene | number | claim | quote | question). scene = a concrete
   moment from a source with a name and a date; number = a bare figure and why it matters; claim = a counterintuitive
@@ -107,23 +107,34 @@ ALSO produce:
   Scene fields: title{heading (the English term), sub}; text{heading,text}; bullets{heading,items[3-4]};
   image{heading, caption}; quote{text,who}; opinion{heading,text}; outro{text, url:"blog.aibriefing.dev"}.
   On-screen text SHORT (<=14 words per line). First scene title, one scene image, last outro.
-- visuals: 2–4 inline visuals, each kind at most once, placed where the prose needs them (never two in one section;
-  NOT always right after the first section). Vary across posts: the prompt lists the kinds the last posts used — avoid
-  those. Each has "after" = the exact ## heading text it belongs to, and "caption" that argues (see above):
-  {"kind":"strip","after":..,"items":[3 of {"value":"300","label":<=5 words}],"caption":..}                → dark 3-number strip (the hook numbers)
-  {"kind":"boxes","after":..,"title":..,"sub":<=8 words mono,"rows":[2-4 of {"label":<=3 words,"boxes":[1-6 of {"text":<=4 words,"tone":"ink|accent|muted|ghost"}],"note":<=4 words}],"tag":<=4 words,"caption":..} → bespoke explainer card (queues, batches, before/after, pipelines)
-  {"kind":"chart","after":..,"title":..,"bars":[3-6 of {"label":..,"value":"$15","highlight":bool}],"source":..,"caption":..} → bar chart from REAL numbers in the sources
-  {"kind":"screenshot","after":..,"url":<an official page from the sources>,"caption":..}                  → real screenshot of that page
-  {"kind":"transcript","after":..,"label":"claude -p","prompt":<a short prompt in the post language we will ACTUALLY run>,"caption":..} → real model output card
-  {"kind":"steps","after":..,"title":..,"steps":[3-5 items, <=7 words each],"caption":..}                  → animated step-reveal
-  {"kind":"stat","after":..,"value":"88%","label":<=12 words,"source":"Marmelab 2026","caption":..}         → one big animated number (REAL number from a source)
-  {"kind":"compare","after":..,"title":..,"left":{"title":..,"items":[3-4]},"right":{"title":..,"items":[3-4]},"caption":..} → side-by-side card
-  {"kind":"quote","after":..,"text":<=30 words verbatim from a source,"who":"Name, outlet","caption":..}    → pull-quote card
-  {"kind":"timeline","after":..,"title":..,"events":[3-5 of {"when":"2026-06","what":<=9 words}],"caption":..} → dated timeline card
-  {"kind":"d2","after":..,"caption":..,"d2":"<D2 source, 4-8 nodes, English labels>"}                     → a second diagram of a DIFFERENT mechanism
+- visuals: 2–4 figures, placed where the prose needs them (never two in one section; NOT always after the first
+  section). Each has "after" = the exact ## heading text it belongs to, and a "caption" that argues (see above).
+  THE RULE THAT MATTERS: every post has at least one `svg` figure YOU DRAW for this specific idea, and figures across
+  posts must not share a composition. A reader who has seen three posts should not be able to guess the fourth's figure.
+  {"kind":"svg","after":..,"svg":"<svg …>","caption":..}
+      You author the SVG. 1200×675 viewBox, no external refs, no <script>/<foreignObject>, no gradients needed.
+      Style guide (so it still looks like us): background #fbfbf9 (draw a full rect first); ink #12121c; one accent
+      only — the HUE given in the prompt; muted #6d6d80 and rule #e4e4dc for secondary strokes; text in
+      font-family="Heebo" (Hebrew allowed; NEVER set direction= — right-align a Hebrew label with text-anchor="end" at its right x,
+      left-align with text-anchor="start"; keep every label inside x 40–1160) and titles
+      in font-family="Frank Ruhl Libre" font-weight="700"; stroke-width 2 for structure, 1 for guides; rx 6 on boxes.
+      Composition is yours: a queue draining into one box, a stack of layers with one highlighted, a before/after
+      split with a diagonal, a matrix, a timeline with a gap, an annotated prompt with callouts, a funnel, a race of
+      bars, a loop with an exit. Label real quantities from the sources on the drawing. 12–40 elements. Draw the
+      MECHANISM of this post, not a generic flowchart. Never the same composition as another figure in this post.
+  {"kind":"image","after":..,"src":<a url from IMAGES AVAILABLE>,"caption":<claim + "(credit: source name)">}
+      A real image from a source page — a product screen, a chart, a photo. Prefer this to drawing when a real one exists.
+  {"kind":"screenshot","after":..,"url":<an official page from the sources>,"caption":..}  → we screenshot that page live
+  {"kind":"transcript","after":..,"label":"claude -p","prompt":<short prompt in the post language we will ACTUALLY run>,"caption":..}
+  {"kind":"chart","after":..,"title":..,"bars":[3-6 of {"label":..,"value":"$15","highlight":bool}],"source":..,"caption":..} → REAL numbers only
+  {"kind":"strip","after":..,"items":[3 of {"value":"300","label":<=5 words}],"caption":..}  → dark 3-number strip for a numeric hook
+  Legacy card kinds (steps, stat, compare, quote, timeline, boxes, d2) exist but are the LAST resort; at most one per post.
   All visible text in the post language (URLs/code excepted).
+- cover: how the cover should be built: {"layout":"type"|"illus"|"photo","svg":<only for illus: a 640×630 viewBox SVG motif,
+  same style guide, transparent background, ink strokes + the HUE, no text>,"image":<only for photo: a url from IMAGES AVAILABLE>}.
+  Pick photo when a strong real image exists, illus when the idea has a shape, type otherwise. Vary across posts.
 Return ONLY JSON with keys: title, description (<=160 chars, no colon at start), hook (the one you used), tldr,
-tags (3-6 English lowercase), body_md, opinion_md, diagram_d2, visuals, video_scenes,
+tags (3-6 English lowercase), body_md, opinion_md, diagram_d2, visuals, cover, video_scenes,
 sources_used (list of the source URLs you actually relied on).
 """
 
@@ -135,7 +146,7 @@ translated into a short, specific English heading (keep "01 · " style numbering
 Keep code/tables/blockquote structure identical (translate the bold aside label to **My take:** / **Caveat:**).
 Keep the house opinion in first person plural. Translate tldr (same count).
 Also produce video_scenes in English with the same scene types/order as the Hebrew ones, narration 1–2 sentences each,
-and visuals: the SAME list (same kinds, same order, same urls/d2/prompt values) with every visible string in English and
+and visuals: the SAME list (same kinds, same order, same urls/src/d2/prompt values; for "svg" re-emit the SVG with its\ntext labels translated to English and direction/text-anchor flipped for LTR) with every visible string in English and
 "after" set to the matching English ## heading text.
 Return ONLY JSON with keys: title, description (<=160 chars), tldr, body_md, opinion_md, visuals, video_scenes.
 """
@@ -177,8 +188,13 @@ def _check(doc: dict, lang: str, kind: str) -> str:
     kinds = [v.get("kind") for v in vis if isinstance(v, dict)]
     if not isinstance(vis, list) or not (1 <= len(vis) <= 4) or not set(kinds) <= VISUAL_KINDS or len(kinds) != len(set(kinds)) or any(not v.get("after") for v in vis):
         return f"visuals shape wrong (2-4 items, kinds {sorted(VISUAL_KINDS)}, each kind once, each with after)"
-    if kind == "deepdive" and lang == "he" and not {"screenshot", "compare"} <= set(kinds):
-        return "deepdive must include a screenshot visual and a compare visual"
+    if lang == "he" and "svg" not in kinds:
+        return "every post needs at least one authored `svg` figure"
+    legacy = {"steps", "stat", "compare", "quote", "timeline", "boxes", "d2"}
+    if len(legacy & set(kinds)) > 1:
+        return "at most one legacy card kind per post"
+    if kind == "deepdive" and lang == "he" and not ({"screenshot", "image"} & set(kinds)):
+        return "deepdive must include a real screenshot or source image"
     if kind == "fieldnotes" and lang == "he" and "transcript" not in kinds and "```" not in body:
         return "fieldnotes needs a transcript visual or a code block"
     for v in vis:
@@ -186,6 +202,10 @@ def _check(doc: dict, lang: str, kind: str) -> str:
             return "stat value must start with a number"
         if v.get("kind") == "screenshot" and not str(v.get("url", "")).startswith("http"):
             return "screenshot needs an http url from the sources"
+        if v.get("kind") == "svg":
+            from . import media
+            if not media.valid_svg(str(v.get("svg", ""))):
+                return "an svg figure did not parse (must start with <svg, well-formed XML, no script)"
     if lang == "he" and not re.search(r"[֐-׿]", body):
         return "body is not Hebrew"
     return ""
@@ -207,11 +227,15 @@ def _call(prompt: str, system: str, lang: str, kind: str, usage_log: list) -> di
 
 
 def write_post(term: str, key: str, sources: list[dict], usage_log: list, *, kind: str = "explainer", hook: str = "scene",
-               brief: str = "", series_ctx: str = "", avoid_visuals: list[str] | None = None) -> dict:
+               brief: str = "", series_ctx: str = "", avoid_visuals: list[str] | None = None,
+               images: list[dict] | None = None, hue: str = "#4f46e5") -> dict:
     system_he = SYSTEM_HE.replace("{glossary}", HE_TERM_GLOSSARY).replace("{house}", HOUSE)
     prompt_he = (f"TERM: {term}\nURL KEY: {key}\nKIND (template): {kind}\nHOOK (opening type you MUST use): {hook}\n"
                  + (f"BRIEF (what this post must cover / leave out): {brief}\n" if brief else "")
                  + (f"VISUAL KINDS USED BY THE LAST POSTS — avoid these: {', '.join(avoid_visuals)}\n" if avoid_visuals else "")
+                 + f"HUE (the one accent colour for svg figures and the cover motif): {hue}\n"
+                 + ("IMAGES AVAILABLE (real images mirrored from the sources — use as kind=image or cover.photo):\n"
+                    + "\n".join(f"  - {im['url']}  ← {im['title'][:80]}  ({im['source_url']})" for im in images) + "\n" if images else "IMAGES AVAILABLE: none\n")
                  + (f"\nSERIES CONTEXT:\n{series_ctx}\n" if series_ctx else "")
                  + f"\nTODAY: use the source dates to reason about the timeline.\n\nSOURCES ({len(sources)}):\n\n{_sources_block(sources)}")
     print(f"  writer: HE kind={kind} hook={hook} ({len(prompt_he)} chars, {len(sources)} sources)")
@@ -231,6 +255,7 @@ def write_post(term: str, key: str, sources: list[dict], usage_log: list, *, kin
     return {
         "key": key, "term": term, "kind": kind, "hook": he.get("hook") or hook, "tags": he.get("tags") or [], "sources": src_out,
         "diagram_d2": (he.get("diagram_d2") or "").strip(),
+        "cover": he.get("cover") if isinstance(he.get("cover"), dict) else {"layout": "type"},
         "he": {k: he[k] for k in fields},
         "en": {k: en[k] for k in fields},
     }

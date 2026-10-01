@@ -38,7 +38,7 @@ const jsonLd = {
 };
 ---
 <Base lang={lang} title={`${d.title} — AI Briefing Blog`} description={d.description} image={d.hero} type="article" jsonLd={jsonLd}>
-  <main class="wrap article">
+  <main class={`wrap article kind-${d.kind}`}>
     {d.series && <SeriesNav lang={lang} post={post} />}
     <div class="byline mono"><span class="term">{d.term}</span><span class="dot">·</span><span>{fmtDate(d.pubDate, lang)}</span><span class="dot">·</span><span>{minutes} {s.minutes}</span></div>
     <h1>{d.title}</h1>
@@ -56,14 +56,37 @@ const jsonLd = {
       </div>
     )}
 
-    {d.tldr.length > 0 && (
+    {d.kind === 'fieldnotes' && (
+      <nav class="steps-rail">
+        {headings.filter((h) => h.depth === 2 && /^\d{2} · /.test(h.text)).map((h) => (
+          <a href={`#${h.slug}`}><b>{h.text.slice(0, 2)}</b><span>{h.text.slice(5)}</span></a>
+        ))}
+      </nav>
+    )}
+    {d.kind === 'faq' && (
+      <nav class="faq-index">
+        <div class="label mono">{s.contents}</div>
+        <ol>{headings.filter((h) => h.depth === 2).map((h) => <li><a href={`#${h.slug}`}>{h.text}</a></li>)}</ol>
+      </nav>
+    )}
+    {d.kind === 'warstory' && d.tldr.length > 0 && (
+      <ol class="incident-strip">{d.tldr.map((x, i) => <li><b class="mono">{String(i + 1).padStart(2, '0')}</b><span>{x}</span></li>)}</ol>
+    )}
+    {d.kind === 'deepdive' && d.tldr.length > 0 && (
+      <aside class="spec">
+        <div class="label mono">{d.term}</div>
+        <ul>{d.tldr.map((x) => <li>{x}</li>)}</ul>
+        <div class="links mono">{d.sources.slice(0, 3).map((x) => <a href={x.url} target="_blank" rel="noopener noreferrer" dir="ltr">{new URL(x.url).hostname.replace(/^www\./, '')}</a>)}</div>
+      </aside>
+    )}
+    {d.kind === 'explainer' && d.tldr.length > 0 && (
       <aside class="tldr">
         <div class="label mono">{s.tldr}</div>
         <ul>{d.tldr.map((x) => <li>{x}</li>)}</ul>
       </aside>
     )}
 
-    {toc.length > 2 && (
+    {d.kind === 'explainer' && toc.length > 2 && (
       <nav class="toc">
         <div class="label mono">{s.contents}</div>
         <ol>{toc.map((h) => <li><a href={`#${h.slug}`}>{h.text}</a></li>)}</ol>

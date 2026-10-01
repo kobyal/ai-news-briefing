@@ -1,0 +1,114 @@
+---
+title: "Prompt evals: שלושה בוקרים של briefings ריקים, ותיקון שלא נכנס ל-prompt"
+description: "חלק 3: איך יודעים ששינוי prompt עזר. golden set, LLM-as-judge, pairwise ו-regression, דרך תקלה שרוקנה לנו את ה-pipeline שלושה ימים."
+lang: he
+key: prompt-engineering-3-evals
+term: "prompt evals"
+kind: warstory
+pubDate: 2026-10-01
+tags: ["prompt-engineering", "evals", "llm-as-judge", "regression-testing", "production"]
+hook: "claim"
+tldr: ["תוסיפו assert על פלט ריק ושדות חובה לפני כל judge.", "parser שמחזיר {} בכישלון הוא באג. שיזרוק שגיאה ויפעיל retry.", "שינוי prompt עובר pairwise ו-diff על הקלטים של אתמול לפני deploy."]
+series: { slug: "prompt-engineering", name: "Prompt engineering, בלי הקסם", part: 3, total: 3 }
+hero: /posts/prompt-engineering-3-evals/hero.jpg
+diagram: /posts/prompt-engineering-3-evals/diagram.svg
+sources:
+  - { title: "Intro | Promptfoo", url: "https://www.promptfoo.dev/docs/intro", date: "" }
+  - { title: "Define success criteria and build evaluations", url: "https://docs.anthropic.com/en/docs/test-and-evaluate/develop-tests", date: "" }
+  - { title: "Get started with Braintrust - Braintrust", url: "https://www.braintrust.dev/docs", date: "" }
+  - { title: "Evaluate AI agents systematically with Agent-EvalKit | Artificial Intelligence", url: "https://aws.amazon.com/blogs/machine-learning/evaluate-ai-agents-systematically-with-agent-evalkit", date: "" }
+  - { title: "The six generations of AI agents and how to eval them - Blog - Braintrust", url: "https://www.braintrust.dev/blog/six-generations-ai-agents", date: "" }
+  - { title: "Demystifying evals for AI agents \\ Anthropic", url: "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents", date: "" }
+opinion: "אנחנו מאמינים ש-verification שווה יותר מטיוטה ראשונה טובה יותר, והתקלה הזו הוכיחה את זה לנו בכסף של שלושה בוקרים. התיקון שעבד היה דטרמיניסטי: parser שזורק, retry, ו-floor בספירה. בכל מקום שהחלפנו בו שיקול דעת של מודל בכלל, ה-pipeline נהיה זול ואמין יותר, וזה כולל את ה-QA. LLM-as-judge ו-pairwise שווים את המחיר רק אחרי שהשכבה המשעממת כבר תופסת את הכישלונות השקטים, כי אצלנו אלה היו הבאגים הכי גרועים, לא תשובות שגויות. ושינוי prompt בלי golden set ובלי diff על traffic אמיתי, מבחינתנו, הוא ניחוש עם commit message."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+ה-eval הכי חשוב שהוספנו השנה לא בודק אם ה-prompt טוב. הוא בודק שהפלט לא ריק. נשמע טיפשי, אני יודע. אבל ב-5, 6 ו-7 באוגוסט 2026 ה-pipeline של aibriefing.dev פרסם שלושה בוקרים ברצף בלי התוכן של שני agents, וכל הבדיקות היו ירוקות. ה-judge שלנו לא התלונן. לא היה לו על מה לתת ציון.
+
+בחלק הראשון אמרנו, בעקבות אנטרופיק, שלפני שנוגעים ב-prompt צריך הגדרת הצלחה ובדיקה שאפשר להריץ. בחלק השני אמרנו שכלל שאפשר לבדוק בקוד נאכף בקוד. הפעם הסיפור שמראה למה, ואחריו הסדר שבו אני בודק היום שינוי prompt.
+
+## 06:07, ריצה רגילה
+
+ה-pipeline רץ כל בוקר מאז מאי 2026. cron מתניע אותו ב-06:07, והוא מסיים בדרך כלל בין 06:40 ל-06:55. בפנים יש בערך 10 agents: כל אחד מושך מקור אחר, קורא ל-`claude -p` דרך wrapper אחד ב-`shared/anthropic_cc.py` ומחזיר JSON. אחריהם merger מאחד הכל לכ-11 סיפורים ביום, מפרסם, ואז QA evaluator רץ על מה שפורסם ומסמן P0.
+
+כל JSON שחוזר מהמודל עובר דרך `parse_json` ב-`shared/json_repair.py`. הוא נכתב אחרי תקלה ב-31 במאי, כדי לתקן JSON שבור: פסיק מיותר, מרכאות, פלט שנקטע באמצע. וכשהוא לא הצליח לתקן, הוא החזיר `{}`. זה נראה לנו אז הגיוני.
+
+## הבוקר שבו ה-JSON התחיל במשפט
+
+`claude -p` התחיל לפתוח את התשובה בפסקה קצרה לפני ה-`{`. הערה על audit rules ועל זה שהמשימה בטוחה, ורק אחריה ה-JSON. ב-agents של rss ו-editorial זה קרה כמעט בכל ריצה.
+
+לא נגענו ב-prompt שלנו. מה שהשתנה זה כללים שישבו בסשן של `claude -p`, שהמודל קרא לפני המשימה והחליט שהוא חייב להגיב עליהם. מבחינת המודל זה שינוי prompt לכל דבר. ה-prompt הוא כל מה שהמודל רואה, לא רק מה שכתבתם בקובץ.
+
+`parse_json` קיבל מחרוזת שלא מתחילה ב-`{`, ניסה לתקן, נכשל, והחזיר `{}`. ו-`{}` זה JSON תקין. ה-agent כתב קובץ, יצא עם exit 0, וה-merger המשיך עם מה שהיה לו.
+
+<figure><img src="/posts/prompt-engineering-3-evals/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+## מבחוץ הכל נראה ירוק
+
+האתר עלה בזמן. מייל הסיכום הראה את כל השלבים כמצליחים. ה-QA evaluator רץ, נתן ציון לסיפורים שכן פורסמו ומצא שהם בסדר. כי הם באמת היו בסדר. פשוט היו פחות מהם, ושני מקורות שלמים חסרו.
+
+ב-AWS כתבו בפוסט על Agent-EvalKit שתשובה יכולה להיראות מצוין גם כשהכלים החזירו כלום. אצלנו זה היה עוד יותר פשוט: ה-judge בודק את האיכות של מה שיש. הוא לא שואל מה היה אמור להיות שם.
+
+שלושה ימים עד ששמנו לב.
+
+## התיקון הראשון: עוד שורה ב-prompt
+
+הרפלקס הראשון היה לתקן במילים. הוספנו ל-prompt שהתשובה "MUST begin with '{'", ושורה שמתחילה ב-"Do not preface it with commentary" וממשיכה עד audit rules. השורה הזו עדיין יושבת ב-system prompt שכתב את הפוסט הזה. ניסינו גם `--bare` כדי לנקות את ה-context של הסשן, וזה שבר את ה-auth של ה-subscription.
+
+השורה עזרה. לא תמיד. ואיך ידענו שעזרה? הרצנו כמה פעמים ביד והסתכלנו. זה בדיוק ה-trial-and-error ש-promptfoo בנוי נגדו. אנטרופיק ניסחו את זה הכי טוב:
+
+> "Without them, it's easy to get stuck in reactive loops—catching issues only in production, where fixing one failure creates others."
+> — Anthropic Engineering, Demystifying evals for AI agents
+
+ככה זה הרגיש. כל תיקון במילים הזיז את הבעיה, לא סגר אותה.
+
+> **הדעה שלי:** אני לא קונה prompt כתיקון לבאג פרסינג. prompt מוריד הסתברות, הוא לא חוזה. אם הכישלון נראה כמו exit 0, הוא יחזור, ואתם תגלו את זה מקורא.
+
+<figure><img src="/posts/prompt-engineering-3-evals/v1-screenshot-he.jpg" alt="promptfoo כותבים כבר בעמוד הראשון ש-test-driven עדיף על trial-and-error. שלוש הרצות ביד זה לא eval (promptfoo docs)" loading="lazy" /><figcaption>promptfoo כותבים כבר בעמוד הראשון ש-test-driven עדיף על trial-and-error. שלוש הרצות ביד זה לא eval (promptfoo docs)</figcaption></figure>
+
+## הסיבה האמיתית ישבה בקוד שלנו
+
+רגע, מה בדיוק היה הבאג? לא המודל. המודל החזיר JSON תקין, עם משפט לפניו. הבאג היה אצלנו, בשני מקומות: ה-parser לא חיפש את ה-JSON בתוך הטקסט, וכישלון נראה כמו הצלחה. `{}` כ-default זה silent failure שמחכה לקרות.
+
+התיקון נכנס ל-`shared/json_repair.py` ול-`shared/anthropic_cc.py`, אז הוא תפס את כל ה-agents בבת אחת. בגדול, זה הרעיון בגרסה מקוצרת:
+
+```python title="parse_guard.py"
+import json
+
+class EmptyModelOutput(Exception):
+    pass
+
+def parse_model_json(raw: str, required=()) -> dict:
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(raw):
+        if ch != "{":
+            continue
+        try:
+            obj, _ = decoder.raw_decode(raw, i)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict) and obj:
+            missing = [k for k in required if not obj.get(k)]
+            if missing:
+                raise EmptyModelOutput(f"empty keys: {missing}")
+            return obj
+    raise EmptyModelOutput(f"no JSON object: {raw[:120]!r}")
+```
+
+שני דברים. הוא מוצא את האובייקט הראשון שבאמת נפרס, גם אם יש לפניו פסקה. ואם אין כזה, או שהוא ריק, הוא זורק. ה-agent נכשל בקול, ה-wrapper עושה retry, והמייל אומר אדום.
+
+## מאז: asserts לפני ציונים
+
+ה-QA קיבל floors לכל agent: מינימום פריטים, שדות חובה לא ריקים. גם זה eval. משעמם, דטרמיניסטי, רץ במילישניות, והיה תופס את זה כבר בבוקר הראשון.
+
+טוב, ומה עם שינוי prompt אמיתי, כזה שאמור לשפר תוכן? הסדר שאני עובד לפיו, מהזול ליקר:
+
+- **asserts בקוד.** schema, שדות חובה, ספירה. ב-promptfoo זה YAML עם `is-json`, ורץ ב-CI.
+- **golden set.** ימים אמיתיים מה-archive, עם מה שנחשב פלט טוב. תכניסו לשם גם את הימים הרעים. 5–7 באוגוסט הם בדיוק ה-cases שצריכים לשבת שם.
+- **LLM-as-judge.** ב-Braintrust מחלקים eval לשלושה: data, task, scores. ה-judge הוא scorer אחד, לא האמת. אנטרופיק מספרים שאופוס 4.5 "נכשל" ב-τ2-bench כי מצא פרצה במדיניות ונתן למשתמש פתרון טוב יותר. graders טועים לשני הכיוונים, אז תכיילו את ה-judge מול תיוג של בן אדם.
+- **pairwise.** אותו קלט, prompt ישן מול חדש, ה-judge בוחר מי טוב יותר. קל לו יותר מציון מוחלט. תריצו פעמיים בסדר הפוך, אחרת אתם מודדים העדפה למיקום.
+- **regression על traffic אמיתי.** להריץ את ה-prompt החדש ב-shadow על הקלטים של אתמול ולעשות diff: כמה פריטים, כמה שדות ריקים, אורך. סביב הצד הזה, traces מ-production, Braintrust בנו את המוצר.
+
+בפועל, מה היה תופס את אוגוסט? assert על ספירה, ו-diff על traffic אמיתי. שניהם בלי מודל בכלל. ה-judge, השכבה הכי יקרה, היה מפספס.
+
+eval שלא יודע להיכשל על `{}` הוא לא eval. הוא dashboard.

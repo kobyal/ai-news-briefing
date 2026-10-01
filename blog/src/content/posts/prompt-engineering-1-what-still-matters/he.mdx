@@ -1,0 +1,102 @@
+---
+title: "Prompt engineering בסוף 2026: מה נשאר בתוך ה-prompt"
+description: "מה עדיין נחשב prompt engineering בסוף 2026, מה עבר ל-context ול-harness, ואילו חמישה דברים עדיין משנים תוצאה. חלק 1 מתוך 3."
+lang: he
+key: prompt-engineering-1-what-still-matters
+term: "prompt engineering"
+kind: explainer
+pubDate: 2026-10-01
+tags: ["prompt-engineering", "context-engineering", "harness", "evals", "llm", "agents"]
+hook: "number"
+tldr: ["לפני שמשנים prompt: הגדרת הצלחה ובדיקה שאפשר להריץ, לפי אנטרופיק.", "פורמט, context ו-retry שייכים ל-harness ולקוד, לא לניסוח.", "ב-prompt השאירו כוונה מלאה, גבולות, דוגמה והגדרה של גמור."]
+series: { slug: "prompt-engineering", name: "Prompt engineering, בלי הקסם", part: 1, total: 3 }
+hero: /posts/prompt-engineering-1-what-still-matters/hero.jpg
+diagram: /posts/prompt-engineering-1-what-still-matters/diagram.svg
+sources:
+  - { title: "Prompt engineering overview", url: "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview", date: "" }
+  - { title: "Prompt engineering | OpenAI API", url: "https://platform.openai.com/docs/guides/prompt-engineering", date: "" }
+  - { title: "Best practices for Claude Code - Claude Code Docs", url: "https://www.anthropic.com/engineering/claude-code-best-practices", date: "" }
+  - { title: "Prompt Engineering for Humans", url: "https://michaelheap.com/prompt-engineering-for-humans", date: "2026-03-31" }
+  - { title: "From prompt and pray to prompt engineering", url: "https://the.scapegoat.dev/from-prompt-and-pray-to-prompt-engineering", date: "2026-05-07" }
+  - { title: "Prompt Engineering Is Not. Engineering, That Is", url: "https://the-infrastructure-mindset.ghost.io/prompt-engineering-is-not", date: "2026-04-01" }
+  - { title: "Prompt Engineering Is Permanent", url: "https://yiblet.com/posts/prompt-engineering-is-permanent", date: "2026-05-03" }
+opinion: "אנחנו לא חושבים ש-prompt engineering מת. אנחנו חושבים שהוא התכווץ לחלק שרק אתם יכולים לכתוב: כוונה, גבולות והגדרה של גמור. כל השאר, כמו פורמט, context, retry ובדיקה, שייך לקוד. אצלנו, בכל פעם שהעברנו משהו מה-prompt לחוק דטרמיניסטי, זה נהיה זול ויציב יותר. לולאה שבודקת את עצמה שווה יותר מטיוטה ראשונה טובה יותר. ואם אתם רואים משרה עם “Prompt Engineer” בכותרת, תבדקו קודם אם יש שם eval."
+madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
+---
+
+שלושה. זה מספר הדברים שאנטרופיק אומרת שצריכים להיות לכם עוד לפני שמתחילים לעשות prompt engineering: הגדרה ברורה של הצלחה, דרך לבדוק אותה אמפירית, וטיוטה ראשונה של prompt. שניים מתוך השלושה הם טקסט שהמודל לא יקרא אף פעם.
+
+בשורה אחת, זה המצב בסוף 2026. רוב העבודה יצאה מה-prompt החוצה, והחלק שנשאר בפנים קטן יותר וחשוב יותר.
+
+זה חלק 1 מתוך 3. כאן נדבר על מה עדיין נחשב prompt engineering, מה עבר ל-context ול-harness, ומה חמשת הדברים שעדיין מזיזים תוצאה. המבנה של system prompt בפרודקשן מחכה לחלק 2. איך יודעים ששינוי באמת עזר מחכה לחלק 3.
+
+## הנבואה מ-2023 שהתגשמה רק בחצי
+
+אף אחד לא המציא את המונח, הוא פשוט נדבק. זה קרה סביב GPT-3, ב-2020–2021, כשאנשים גילו שאותו מודל עונה אחרת לגמרי לפי הניסוח. ב-2023 זה היה בעיקר אוסף לחשים: “think step by step”, כמה דוגמאות, “אתה מומחה עולמי ב-X”.
+
+ב-2023 Yiblet כתב שהעידן הזה יהיה “transient”, כמה שנים וזהו. במאי 2026 הוא חזר לפוסט וכתב שהוא צדק רק בחצי. הגרסה של “לשכנע chatbot לתת תשובה טובה יותר” באמת כמעט נעלמה. מה שנשאר, במילים שלו, זה לגרום למערכות AI להיות אמינות “when they have context, tools, memory, permissions, and real consequences”.
+
+בגדול, הלחשים מתו כי המודלים למדו לעשות אותם לבד. reasoning models חושבים צעד-צעד גם בלי שתבקשו. מה שלא מת זה הצורך להסביר מה אתם בעצם רוצים.
+
+<figure><img src="/posts/prompt-engineering-1-what-still-matters/v1-timeline-he.jpg" alt="בתוך חודשיים המונח הוכרז גם כ“לא הנדסה” וגם כ“קבוע”. הוויכוח הוא על השם, לא על זה שהלחשים מתו (Yiblet)" loading="lazy" /><figcaption>בתוך חודשיים המונח הוכרז גם כ“לא הנדסה” וגם כ“קבוע”. הוויכוח הוא על השם, לא על זה שהלחשים מתו (Yiblet)</figcaption></figure>
+
+## מה עבר מה-prompt ל-harness
+
+קחו prompt מ-2023 ותעברו על השורות שלו. חצי מהן היום כתובות בקוד.
+
+**פורמט.** פעם כתבנו “החזר JSON בלבד, בלי הסברים” וקיווינו לטוב. היום יש ל-OpenAI את Structured Outputs. ב-docs שלהם כתוב במפורש שה-`output` “often has more than one item”, ושלא בטוח להניח שהטקסט נמצא ב-`output[0].content[0].text`. בתרגום לעבודה היומיומית: הפורמט והפענוח הם התפקיד של ה-harness. ניסוח לא יפתור את זה.
+
+**Context.** במדריך של Claude Code אנטרופיק כותבים שכמעט כל ה-best practices נובעים מאילוץ אחד. ה-context window מתמלא מהר, והביצועים יורדים ככל שהוא מתמלא. סשן debug אחד יכול לשרוף עשרות אלפי tokens. מה נכנס ל-context, מתי מנקים ומה מסכמים זה context engineering. אי אפשר לפתור את זה עם עוד שורה ב-prompt.
+
+**בדיקה.** אותו מדריך אומר לתת לקלוד משהו שמחזיר pass או fail: טסטים, exit code, linter, diff מול fixture. הלולאה הזו יושבת ב-harness.
+
+<figure><img src="/posts/prompt-engineering-1-what-still-matters/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/prompt-engineering-1-what-still-matters/v2-boxes-he.jpg" alt="חצי מה-prompt של 2023 נכתב היום בקוד: Structured Outputs, ניהול context ולולאת בדיקה (OpenAI, אנטרופיק)" loading="lazy" /><figcaption>חצי מה-prompt של 2023 נכתב היום בקוד: Structured Outputs, ניהול context ולולאת בדיקה (OpenAI, אנטרופיק)</figcaption></figure>
+
+## מה נשאר בתוך ה-prompt
+
+מה שכן נשאר זה הדבר היחיד שאף כלי לא יכול לנחש בשבילכם, הכוונה.
+
+Michael Heap כתב במרץ 2026 על trello-cli, כלי CLI שהוא מתחזק. הוא ביקש מ-agent “Add support for showing card details” וקיבל פקודה שמציגה כותרת, תיאור ו-labels. לא היה שם due date, שזה בדיוק המידע שהכי חשוב לו, וגם לא checklists. אז הוא כתב את הבקשה מחדש. פקודת `card:show` עם הדגלים `--board` ו-`--list`, רשימה של השדות להצגה, דילוג על header של שדה ריק, ו-“+ X more” כשיש יותר מ-10 פריטים ב-checklist. הפעם זה עבד, ומשימה שהייתה לוקחת לו שעה נגמרה בכמה דקות.
+
+השורה שלו: “Nothing about the model changed. The only thing that changed was the context.” אני הייתי מנסח את זה קצת אחרת. מה שהשתנה זה שהוא הפסיק להניח שהמודל יודע מה יש לו בראש.
+
+Yiblet מוסיף את הזווית של agents. כש-chatbot לא מבין אתכם, אתם מקבלים תשובה גרועה. כש-agent לא מבין, הוא יכול לעדכן DB, לשלוח הודעה ללקוח או לדלג בביטחון מלא על צעד חשוב. לכן ה-prompt צריך לתאר גם את הגבולות: מה לא לעשות, מתי לשאול ומתי לעצור.
+
+## אז זה הנדסה או לא
+
+במרץ פורסם ב-the-infrastructure-mindset מאמר בשם “Prompt Engineering Is Not”. לכותב יש ארבעה עשורים של infrastructure מאחוריו. הוא חיפש את הדיסציפלינה, כלומר שיטות פורמליות, framework לבדיקות ומדידה. מה שהוא מצא, לדבריו, זה “creative writing advice with a technical veneer” ופוסטים שאומרים “be specific” ו-“iterate”.
+
+לגבי רוב התוכן ברשת הוא צודק. אבל תחזרו לשלושת התנאים של אנטרופיק. שניים מהם הם בדיוק מה שהוא חיפש: הגדרה של הצלחה ובדיקה אמפירית. ובאותו עמוד יש עוד משפט שרוב מדריכי ה-prompt מדלגים עליו:
+
+> Not every success criteria or failing eval is best solved by prompt engineering. For example, you can sometimes improve latency and cost more easily by selecting a different model.
+> — אנטרופיק, Prompt engineering overview
+
+בקיצור, prompt engineering בלי eval הוא באמת כתיבה יוצרתית. עם eval הוא שינוי שאפשר למדוד. ב-scapegoat.dev ניסחו את זה הכי טוב. כשמודל נכשל, יש מספר סופי של סיבות: לא ניסחתי נכון, המודל לא באמת מסוגל לזה, היה חוסר מזל, או שמשהו אחר שבור, כמו כלי או ה-harness של הספק. אפשר לאבחן כל אחת מהן.
+
+## מה ראינו אצלנו בפייפליין
+
+אצלנו ב-aibriefing.dev רץ כל יום גרף של בערך 10 agents, בפרודקשן מאז מאי 2026. כשאני מסתכל אחורה על התקלות, כמעט אף אחת מהן לא נפתרה בשינוי ניסוח.
+
+ה-wrapper שלנו סביב `claude -p` עושה retry לתקלות זמניות ומתקן JSON פגום. הלולאה הקטנה הזו סגרה שלוש תקלות פרודקשן. בכל מקום שהחלפנו קריאת LLM בחוק דטרמיניסטי, הפייפליין נהיה זול ויציב יותר. תרגום וסיווג רצים על מודלים זולים, והכתיבה הכבדה רצה על קלוד. כל אלה החלטות של מערכת, לא של prompt.
+
+מה כן עבד בתוך ה-prompt? בתרגום לעברית, הדבר שהזיז את האיכות הכי הרבה היה זוגות של משפט רע מול משפט טוב בתוך ה-system prompt. זה עבד יותר טוב מכל “תכתוב טבעי” שניסינו לפני כן.
+
+> **הדעה שלי:** רוב הזמן שאנשים שורפים על “לשפר את ה-prompt” היה צריך ללכת ל-eval. ניסחתי מחדש prompts אחרי תקלות לא מעט פעמים, וכמעט תמיד הבעיה הייתה במה שהמודל ראה, לא במה שאמרתי לו.
+
+## חמשת הדברים שעדיין מזיזים תוצאה
+
+טוב, אז מה עושים ביום ראשון. אלה חמשת הדברים שאצלנו עדיין משנים תוצאה כשהם כתובים ב-prompt:
+
+1. **להגדיר מה זה “גמור”.** לפי ה-docs של Claude Code, המודל עוצר כשהעבודה “נראית” גמורה. תכתבו מה נחשב גמור: אילו שדות, איזה טסט צריך לעבור, איזה אורך.
+2. **לכתוב את הכוונה כולה, לא רק את המשימה.** הגרסה הראשונה של Heap הייתה משפט אחד, והשנייה חמישה משפטים. כל הנחה שנשארה אצלכם בראש ולא נכנסה לטקסט, המודל ימלא לבד.
+3. **גבולות ונקודות עצירה.** מה אסור, מתי לשאול לפני שממשיכים, מתי לעצור ולדווח. ב-agent זה ההבדל בין תשובה גרועה לבין DB שהשתנה.
+4. **דוגמה אחת אמיתית, ועדיף רעה מול טובה.** תיאור של סגנון עובד פחות טוב מזוג משפטים. איך בונים את זה ומתי few-shot שווה את המחיר, נראה בחלק 2.
+5. **להגיד לו איך לבדוק את עצמו.** “תריץ את הטסטים לפני שאתה מסיים” היא שורה אחת שמחברת את ה-prompt ל-harness.
+
+שימו לב מה לא נמצא ברשימה: אף טריק ניסוח. אין “אתה מומחה עולמי”, אין CAPS ואין הבטחה לטיפ. וגם עם כל החמישה, אם אין לכם דרך למדוד אם משהו מהם עזר, אתם עדיין מושכים בידית של מכונת המזל.
+
+<figure><img src="/posts/prompt-engineering-1-what-still-matters/v3-steps-he.gif" alt="אף אחד מהחמישה הוא לא טריק ניסוח. כולם מידע שרק אתם מחזיקים (Heap, אנטרופיק)" loading="lazy" /><figcaption>אף אחד מהחמישה הוא לא טריק ניסוח. כולם מידע שרק אתם מחזיקים (Heap, אנטרופיק)</figcaption></figure>
+
+

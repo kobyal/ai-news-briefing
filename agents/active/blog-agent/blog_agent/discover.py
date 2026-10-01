@@ -105,11 +105,18 @@ def feed_titles(days: int = 35) -> list[tuple[str, datetime]]:
     return out
 
 
+_STOP_LEAD = {"the", "a", "an", "of", "and", "or", "for", "to", "in", "on", "with", "good", "bad", "new", "real", "software", "data", "my", "our", "your"}
+
+
 def mine_candidates(titles: list[tuple[str, datetime]]) -> set[str]:
+    """Terms mined from feed titles. A leading stopword ("the engineering", 2026-10-01) is a regex artefact, not a term."""
     found = set()
     for text, _ in titles:
         for m in TERM_RX.findall(text):
-            found.add(m.lower().strip())
+            t = m.lower().strip()
+            if t.split(" ")[0] in _STOP_LEAD:
+                continue
+            found.add(t)
     return found
 
 

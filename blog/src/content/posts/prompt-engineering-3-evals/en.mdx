@@ -1,0 +1,114 @@
+---
+title: "Prompt evals: three mornings of empty briefings, and the fix that didn't go in the prompt"
+description: "Part 3: how to know a prompt change helped. Golden sets, LLM-as-judge, pairwise and regression, told through a bug that emptied our pipeline for 3 days."
+lang: en
+key: prompt-engineering-3-evals
+term: "prompt evals"
+kind: warstory
+pubDate: 2026-10-01
+tags: ["prompt-engineering", "evals", "llm-as-judge", "regression-testing", "production"]
+hook: "claim"
+tldr: ["Add an assert for empty output and required fields before any judge.", "A parser that returns {} on failure is a bug. Make it raise and trigger a retry.", "A prompt change passes pairwise and a diff on yesterday's inputs before deploy."]
+series: { slug: "prompt-engineering", name: "Prompt engineering, minus the magic", part: 3, total: 3 }
+hero: /posts/prompt-engineering-3-evals/hero-en.jpg
+diagram: /posts/prompt-engineering-3-evals/diagram.svg
+sources:
+  - { title: "Intro | Promptfoo", url: "https://www.promptfoo.dev/docs/intro", date: "" }
+  - { title: "Define success criteria and build evaluations", url: "https://docs.anthropic.com/en/docs/test-and-evaluate/develop-tests", date: "" }
+  - { title: "Get started with Braintrust - Braintrust", url: "https://www.braintrust.dev/docs", date: "" }
+  - { title: "Evaluate AI agents systematically with Agent-EvalKit | Artificial Intelligence", url: "https://aws.amazon.com/blogs/machine-learning/evaluate-ai-agents-systematically-with-agent-evalkit", date: "" }
+  - { title: "The six generations of AI agents and how to eval them - Blog - Braintrust", url: "https://www.braintrust.dev/blog/six-generations-ai-agents", date: "" }
+  - { title: "Demystifying evals for AI agents \\ Anthropic", url: "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents", date: "" }
+opinion: "We believe verification is worth more than a better first draft, and this incident proved it to us at the cost of three mornings. The fix that worked was deterministic: a parser that raises, a retry, and a floor on the count. Everywhere we replaced model judgment with no model at all, the pipeline got cheaper and more reliable, and that includes QA. LLM-as-judge and pairwise are worth the cost only after the boring layer already catches the silent failures, because for us those were the worst bugs, not wrong answers. And a prompt change without a golden set and without a diff on real traffic is, as far as we're concerned, a guess with a commit message."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+The most important eval we added this year doesn't check whether the prompt is good. It checks that the output isn't empty. Sounds dumb, I know. But on August 5, 6 and 7, 2026, the aibriefing.dev pipeline published three mornings in a row without the content of two agents, and every check was green. Our judge didn't complain. It had nothing to score.
+
+In part one we said, following Anthropic, that before you touch a prompt you need a definition of success and a test you can run. In part two we said that a rule you can check in code gets enforced in code. This time, the story that shows why, and then the order I test a prompt change in today.
+
+## 06:07, a normal run
+
+The pipeline has run every morning since May 2026. Cron starts it at 06:07, and it usually finishes between 06:40 and 06:55. Inside are about 10 agents: each pulls a different source, calls `claude -p` through one wrapper in `shared/anthropic_cc.py`, and returns JSON. After them, a merger combines everything into about 11 stories a day and publishes, and then a QA evaluator runs over what was published and flags P0s.
+
+Every JSON that comes back from the model goes through `parse_json` in `shared/json_repair.py`. It was written after an incident on May 31 to repair broken JSON: a trailing comma, quotes, output cut off mid-way. And when it couldn't repair something, it returned `{}`. At the time that seemed reasonable.
+
+## The morning the JSON started with a sentence
+
+`claude -p` started opening its answer with a short paragraph before the `{`. A remark about audit rules and about the task being safe, and only then the JSON. In the rss and editorial agents this happened on almost every run.
+
+We didn't touch our prompt. What changed were rules sitting in the `claude -p` session, which the model read before the task and decided it had to respond to. As far as the model is concerned, that's a prompt change. The prompt is everything the model sees, not just what you wrote in the file.
+
+`parse_json` got a string that didn't start with `{`, tried to repair it, failed, and returned `{}`. And `{}` is valid JSON. The agent wrote a file, exited 0, and the merger carried on with what it had.
+
+<figure><img src="/posts/prompt-engineering-3-evals/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## From the outside, everything looked green
+
+The site went up on time. The summary email showed every step as successful. The QA evaluator ran, scored the stories that did get published, and found them fine. Because they were fine. There were just fewer of them, and two whole sources were missing.
+
+In their post on Agent-EvalKit, AWS wrote that an answer can look great even when the tools returned nothing. Ours was even simpler: the judge checks the quality of what's there. It doesn't ask what was supposed to be there.
+
+Three days before we noticed.
+
+## The first fix: one more line in the prompt
+
+The first reflex was to fix it with words. We added to the prompt that the answer "MUST begin with '{'", plus a line that starts with "Do not preface it with commentary" and goes on to audit rules. That line still sits in the system prompt that wrote this post. We also tried `--bare` to clear the session context, and that broke subscription auth.
+
+The line helped. Not always. And how did we know it helped? We ran it a few times by hand and looked. That's exactly the trial-and-error promptfoo is built against. Anthropic put it best:
+
+> "Without them, it's easy to get stuck in reactive loops—catching issues only in production, where fixing one failure creates others."
+> — Anthropic Engineering, Demystifying evals for AI agents
+
+That's how it felt. Every fix in words moved the problem, it didn't close it.
+
+> **My take:** I don't buy a prompt as the fix for a parsing bug. A prompt lowers a probability, it's not a contract. If the failure looks like exit 0, it will come back, and you'll find out from a reader.
+
+<figure><img src="/posts/prompt-engineering-3-evals/v1-screenshot-en.jpg" alt="promptfoo say on their very first page that test-driven beats trial-and-error. Three runs by hand is not an eval (promptfoo docs)" loading="lazy" /><figcaption>promptfoo say on their very first page that test-driven beats trial-and-error. Three runs by hand is not an eval (promptfoo docs)</figcaption></figure>
+
+## The real cause was in our code
+
+So what exactly was the bug? Not the model. The model returned valid JSON, with a sentence in front of it. The bug was ours, in two places: the parser didn't look for the JSON inside the text, and failure looked like success. `{}` as a default is a silent failure waiting to happen.
+
+The fix went into `shared/json_repair.py` and `shared/anthropic_cc.py`, so it covered every agent at once. Roughly, here's the idea in a short version:
+
+```python title="parse_guard.py"
+import json
+
+class EmptyModelOutput(Exception):
+    pass
+
+def parse_model_json(raw: str, required=()) -> dict:
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(raw):
+        if ch != "{":
+            continue
+        try:
+            obj, _ = decoder.raw_decode(raw, i)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict) and obj:
+            missing = [k for k in required if not obj.get(k)]
+            if missing:
+                raise EmptyModelOutput(f"empty keys: {missing}")
+            return obj
+    raise EmptyModelOutput(f"no JSON object: {raw[:120]!r}")
+```
+
+Two things. It finds the first object that actually parses, even if there's a paragraph before it. And if there isn't one, or it's empty, it raises. The agent fails loudly, the wrapper retries, and the email says red.
+
+## Since then: asserts before scores
+
+QA got per-agent floors: a minimum item count, required fields not empty. That's an eval too. Boring, deterministic, runs in milliseconds, and it would have caught this on the first morning.
+
+OK, but what about a real prompt change, one that's supposed to improve content? Here's the order I work in, cheapest to most expensive:
+
+- **Asserts in code.** Schema, required fields, counts. In promptfoo it's YAML with `is-json`, and it runs in CI.
+- **Golden set.** Real days from the archive, with what counts as good output. Put the bad days in there too. August 5–7 are exactly the cases that belong there.
+- **LLM-as-judge.** Braintrust splits an eval into three parts: data, task, scores. The judge is one scorer, not the truth. Anthropic say Opus 4.5 "failed" τ2-bench because it found a loophole in the policy and gave the user a better solution. Graders are wrong in both directions, so calibrate the judge against human labels.
+- **Pairwise.** Same input, old prompt vs. new, the judge picks the better one. That's easier for it than an absolute score. Run it twice in reversed order, or you're measuring position bias.
+- **Regression on real traffic.** Run the new prompt in shadow on yesterday's inputs and diff: how many items, how many empty fields, length. Braintrust built their product around this side, production traces.
+
+In practice, what would have caught August? An assert on count, and a diff on real traffic. Neither uses a model at all. The judge, the most expensive layer, would have missed it.
+
+An eval that can't fail on `{}` isn't an eval. It's a dashboard.

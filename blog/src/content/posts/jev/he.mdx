@@ -27,9 +27,7 @@ madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
 
 Jev יצא ב-15 בספטמבר 2026 מ-TypeSafe AI. המייסד הוא Diogo Almeida, שעבד ב-OpenAI על השיטות שהפכו מודלים לטובים ב-instruction following. זה המחקר שבסוף הפך ל-ChatGPT. אחרי שנתיים ב-stealth הוא חזר עם שאלה אחת: מודלים סופר-אנושיים בצ'אט כבר שנים, אז איפה כל האוטומציה?
 
-<figure><img src="/posts/jev/diagram.svg" alt="איך זה עובד" loading="lazy" /><figcaption>איך זה עובד</figcaption></figure>
-
-<figure><img src="/posts/jev/v1-stat-he.gif" alt="החלטות במשחק פוקימון שלם, בעלות כוללת של כ-$1.65" loading="lazy" /><figcaption>החלטות במשחק פוקימון שלם, בעלות כוללת של כ-$1.65</figcaption></figure>
+<figure><img src="/posts/jev/v1-strip-he.jpg" alt="המספר שמסביר את הסיפור הוא העלות להחלטה: בערך 10 סנט לאלף החלטות. במחיר כזה, החלטה כבר לא נראית כמו קריאת API שחושבים עליה פעמיים." loading="lazy" /><figcaption>המספר שמסביר את הסיפור הוא העלות להחלטה: בערך 10 סנט לאלף החלטות. במחיר כזה, החלטה כבר לא נראית כמו קריאת API שחושבים עליה פעמיים.</figcaption></figure>
 
 ## מה הוא מחזיר, ומה הוא לא
 
@@ -41,7 +39,9 @@ Jev יצא ב-15 בספטמבר 2026 מ-TypeSafe AI. המייסד הוא Diogo A
 
 רגע, ומה עם "Zero Hallucinations"? טכנית זה נכון, כי הוא לא יכול להמציא ערך שלא הגדרתם. אבל הוא בהחלט יכול לבחור את הערך הלא נכון בביטחון מלא. זו לא הזיה, זו טעות. ובפרודקשן לא ממש משנה לכם איך קוראים לזה.
 
-<figure><img src="/posts/jev/v2-quote-he.jpg" alt="Diogo Almeida, TypeSafe" loading="lazy" /><figcaption>Diogo Almeida, TypeSafe</figcaption></figure>
+<figure><img src="/posts/jev/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/jev/v2-svg-he.jpg" alt="ההבדל הוא לא בפורמט, הוא במה שהמודל בכלל מסוגל להחזיר. למעלה מחרוזת שאפשר לשבור באמצע, ולמטה בחירה מתוך רשימה שאתם כתבתם. אין מה לפרסר, ולכן type error לא יכול לקרות." loading="lazy" /><figcaption>ההבדל הוא לא בפורמט, הוא במה שהמודל בכלל מסוגל להחזיר. למעלה מחרוזת שאפשר לשבור באמצע, ולמטה בחירה מתוך רשימה שאתם כתבתם. אין מה לפרסר, ולכן type error לא יכול לקרות.</figcaption></figure>
 
 ## מה קורה בפנים
 
@@ -57,6 +57,8 @@ TypeSafe מדברים על שלושה חלקים: ארכיטקטורה חדשה,
 בגלל זה הוא כל כך מהיר: אין generation ואין לולאה על tokens.
 
 מה שבאמת מעניין אתכם זה ה-thresholds. מעל 0.95 הקוד פועל לבד, ומתחת לזה ההחלטה הולכת ל-review. בשביל זה צריך calibration. בלעדיו המספר הוא סתם קישוט.
+
+<figure><img src="/posts/jev/v3-svg-he.jpg" alt="האלכסון הוא כל המוצר: 0.9 שווה משהו רק אם הוא צודק 9 פעמים מתוך 10, ורק אז הסף של 0.95 בטוח. העקומה המקווקוות היא המחשה של מודל לא מכויל, וזה בדיוק מה שמבחן 100 הדוגמאות חושף." loading="lazy" /><figcaption>האלכסון הוא כל המוצר: 0.9 שווה משהו רק אם הוא צודק 9 פעמים מתוך 10, ורק אז הסף של 0.95 בטוח. העקומה המקווקוות היא המחשה של מודל לא מכויל, וזה בדיוק מה שמבחן 100 הדוגמאות חושף.</figcaption></figure>
 
 ## Jev ב-25 שורות פייתון
 
@@ -104,7 +106,7 @@ print(dict(zip(choices, p.round(3))))
 
 זו גם בדיוק התזה של Arcturus: אם OpenAI תצליח לשחזר את האימון, היא תעתיק את Jev מהר ותכניס את היכולת לתוך ה-agents שלה. לדעתם ה-moat היחיד של TypeSafe הוא הדאטה ותהליך האימון.
 
-<figure><img src="/posts/jev/v3-timeline-he.jpg" alt="עשרה ימים של Jev" loading="lazy" /><figcaption>עשרה ימים של Jev</figcaption></figure>
+<figure><img src="/posts/jev/v4-chart-he.jpg" alt="מודל פתוח שרץ מקומית מגיע ל-0.722 מול 0.738 של Jev, שבוע אחרי ההשקה. ה-latency לא בגרף כי הוא לא בר-השוואה (רשת מול RTX 4090 מקומי), אבל פער של 0.016 בדיוק הוא בערך כל ה-moat." loading="lazy" /><figcaption>מודל פתוח שרץ מקומית מגיע ל-0.722 מול 0.738 של Jev, שבוע אחרי ההשקה. ה-latency לא בגרף כי הוא לא בר-השוואה (רשת מול RTX 4090 מקומי), אבל פער של 0.016 בדיוק הוא בערך כל ה-moat.</figcaption></figure>
 
 ## מתי כן, מתי לא, ומה לנסות השבוע
 

@@ -27,9 +27,7 @@ For comparison, TypeSafe's homepage shows one call to a regular LLM: 8.566 secon
 
 Jev shipped on September 15, 2026 from TypeSafe AI. The founder is Diogo Almeida, who worked at OpenAI on the methods that made models good at instruction following. That research eventually became ChatGPT. After two years in stealth he came back with one question: we've had superhuman chat models for years, so where's all the automation?
 
-<figure><img src="/posts/jev/diagram.svg" alt="How it fits together" loading="lazy" /><figcaption>How it fits together</figcaption></figure>
-
-<figure><img src="/posts/jev/v1-stat-en.gif" alt="decisions in a full Pokémon playthrough, for about $1.65 total" loading="lazy" /><figcaption>decisions in a full Pokémon playthrough, for about $1.65 total</figcaption></figure>
+<figure><img src="/posts/jev/v1-strip-en.jpg" alt="The number that explains the story is cost per decision: about 10 cents per thousand. At that price, a decision stops looking like an API call you think twice about." loading="lazy" /><figcaption>The number that explains the story is cost per decision: about 10 cents per thousand. At that price, a decision stops looking like an API call you think twice about.</figcaption></figure>
 
 ## What it returns, and what it doesn't
 
@@ -41,7 +39,9 @@ What it isn't: it's not JSON mode. With structured outputs the model still write
 
 What about "Zero Hallucinations"? Technically true, since it can't invent a value you didn't define. But it can absolutely pick the wrong value with full confidence. That's not a hallucination, it's a mistake. In production, the name doesn't matter much.
 
-<figure><img src="/posts/jev/v2-quote-en.jpg" alt="Diogo Almeida, TypeSafe" loading="lazy" /><figcaption>Diogo Almeida, TypeSafe</figcaption></figure>
+<figure><img src="/posts/jev/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/jev/v2-svg-en.jpg" alt="The difference isn't the format, it's what the model is even able to return. On top, a string that can break halfway through. Below, a pick from a list you wrote. There's nothing to parse, so a type error can't happen." loading="lazy" /><figcaption>The difference isn't the format, it's what the model is even able to return. On top, a string that can break halfway through. Below, a pick from a list you wrote. There's nothing to parse, so a type error can't happen.</figcaption></figure>
 
 ## What's inside
 
@@ -57,6 +57,8 @@ Arcturus Labs bets that under the hood it's fairly close to a regular LLM. Their
 That's why it's so fast: no generation, no loop over tokens.
 
 The part that actually matters to you is thresholds. Above 0.95 your code acts on its own; below that, the decision goes to review. That only works with calibration. Without it, the number is decoration.
+
+<figure><img src="/posts/jev/v3-svg-en.jpg" alt="The diagonal is the whole product: 0.9 is only worth something if it's right 9 times out of 10, and only then is a 0.95 threshold safe. The dashed curve illustrates an uncalibrated model. The 100-example test exposes exactly that gap." loading="lazy" /><figcaption>The diagonal is the whole product: 0.9 is only worth something if it's right 9 times out of 10, and only then is a 0.95 threshold safe. The dashed curve illustrates an uncalibrated model. The 100-example test exposes exactly that gap.</figcaption></figure>
 
 ## Jev in 25 lines of Python
 
@@ -104,7 +106,7 @@ Note that Jev's latency includes the network, while the others were measured on 
 
 That's also Arcturus's thesis: if OpenAI manages to reproduce the training, it will copy Jev fast and fold the capability into its agents. In their view, TypeSafe's only moat is the data and the training process.
 
-<figure><img src="/posts/jev/v3-timeline-en.jpg" alt="Ten days of Jev" loading="lazy" /><figcaption>Ten days of Jev</figcaption></figure>
+<figure><img src="/posts/jev/v4-chart-en.jpg" alt="An open model running locally hits 0.722 against Jev's 0.738, one week after launch. Latency is left off because it isn't comparable (network vs a local RTX 4090), but a 0.016 accuracy gap is roughly the whole moat." loading="lazy" /><figcaption>An open model running locally hits 0.722 against Jev's 0.738, one week after launch. Latency is left off because it isn't comparable (network vs a local RTX 4090), but a 0.016 accuracy gap is roughly the whole moat.</figcaption></figure>
 
 ## When to use it, when not, and what to try this week
 

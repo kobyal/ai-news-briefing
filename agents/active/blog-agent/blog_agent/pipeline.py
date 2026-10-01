@@ -41,19 +41,20 @@ def run_pipeline(args) -> int:
         print("blog-agent: fewer than 3 readable sources — refusing to write (quality gate)"); return 2
     (day / f"{key}-sources.json").write_text(json.dumps([{k: v for k, v in s.items() if k != "text"} for s in sources], ensure_ascii=False, indent=1))
 
+    images = media.source_images(sources, key)
+    ser = getattr(args, "_series", None)
+    hue = (ser or {}).get("hue") or media._HUES[media._seeded(key)[0] % len(media._HUES)]
     post_path = day / f"{key}-post.json"
     if args.reuse and post_path.exists():
         post = json.loads(post_path.read_text()); print("blog-agent: reusing post.json")
     else:
         post = writer.write_post(term, key, sources, usage, kind=kind, hook=hook, brief=getattr(args, "brief", "") or "",
-                                 series_ctx=getattr(args, "_series_ctx", ""), avoid_visuals=avoid)
+                                 series_ctx=getattr(args, "_series_ctx", ""), avoid_visuals=avoid, images=images, hue=hue)
         post_path.write_text(json.dumps(post, ensure_ascii=False, indent=1), encoding="utf-8")
 
     m: dict = {}
-    m["diagram"] = media.diagram(key, post["diagram_d2"]) if post.get("diagram_d2") else None
-    ser = getattr(args, "_series", None)
-    m["hero_he"] = media.hero(key, "he", term, post["he"]["title"], date.today().isoformat(), style=(ser or {}).get("style"), hue=(ser or {}).get("hue"))
-    m["hero_en"] = media.hero(key, "en", term, post["en"]["title"], date.today().isoformat(), style=(ser or {}).get("style"), hue=(ser or {}).get("hue"))
+    m["diagram"] = media.diagram(key, post["diagram_d2"], theme=(ser or {}).get("d2_theme", 0)) if post.get("diagram_d2") else None
+    m.update(_covers(key, term, post, ser, hue))
     for lang in ("he", "en"):
         m[f"visuals_{lang}"] = media.visuals(key, lang, post[lang].get("visuals") or [])
     if args.video:  # narrated explainer — opt-in (Koby 2026-09-30: not in its current form)
@@ -82,6 +83,11 @@ def main(argv=None) -> int:
     if argv[:1] == ["series"]:  # run.py series <slug> [--all] [--publish] [--draft]
         _load_env()
         return run_series(argv[1], all_parts="--all" in argv, publish_it="--publish" in argv, draft="--draft" in argv)
+    if argv[:1] == ["revisual"]:  # run.py revisual <key>... — new figures + cover for existing posts, text untouched
+        _load_env()
+        from . import revisual
+        ok = [revisual.revisual(k) for k in argv[1:]]
+        return 0 if ok and all(ok) else 1
     if argv[:1] == ["polish"]:  # re-voice existing posts' Hebrew in place: run.py polish <key>...
         _load_env()
         from . import polish
@@ -102,6 +108,19 @@ def main(argv=None) -> int:
         return run_pipeline(args)
     except KeyboardInterrupt:
         return 130
+
+
+def _covers(key: str, term: str, post: dict, ser: dict | None, hue: str) -> dict:
+    """Both covers from the writer's cover choice (type | illus | photo), falling back to type."""
+    cov = post.get("cover") or {}
+    layout = cov.get("layout") if cov.get("layout") in ("type", "illus", "photo") else "type"
+    illus = media.valid_svg(str(cov.get("svg", ""))) if layout == "illus" else ""
+    photo = ""
+    if layout == "photo" and str(cov.get("image", "")).startswith("/posts/"):
+        photo = str(media.BLOG / "public" / str(cov["image"]).lstrip("/"))
+    kw = dict(style=(ser or {}).get("style"), hue=hue, layout=layout, illus_svg=illus, photo=photo)
+    return {"hero_he": media.hero(key, "he", term, post["he"]["title"], date.today().isoformat(), **kw),
+            "hero_en": media.hero(key, "en", term, post["en"]["title"], date.today().isoformat(), **kw)}
 
 
 # ── Rotation + series ───────────────────────────────────────────────────────

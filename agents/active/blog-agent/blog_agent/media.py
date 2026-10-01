@@ -28,7 +28,8 @@ def out_dir(key: str) -> Path:
 
 
 # ── Diagram ────────────────────────────────────────────────────────────────
-def diagram(key: str, d2_src: str) -> str | None:
+def diagram(key: str, d2_src: str, theme: int = 0) -> str | None:
+    """Hand-drawn (--sketch) so a flowchart never looks like a default D2 export; theme pinned per series."""
     d = out_dir(key)
     src = d / "diagram.d2"; svg = d / "diagram.svg"; png = d / "diagram.png"
     d2_src = d2_src.strip()
@@ -38,7 +39,7 @@ def diagram(key: str, d2_src: str) -> str | None:
     ok = False
     for layout in (["--layout=elk"], []):
         try:
-            subprocess.run(["d2", *layout, "--theme=0", "--pad=40", str(src), str(svg)], check=True, capture_output=True, timeout=120)
+            subprocess.run(["d2", *layout, f"--theme={theme}", "--sketch", "--pad=40", str(src), str(svg)], check=True, capture_output=True, timeout=120)
             ok = True; break
         except Exception as e:  # noqa: BLE001
             print(f"  media: d2 {layout or 'dagre'} failed ({e})")
@@ -70,10 +71,22 @@ h1{{font-weight:700;font-size:{fs}px;line-height:1.25;margin:0;max-width:900px;c
 .bot{{display:flex;justify-content:space-between;align-items:flex-end;gap:40px}}
 .brand{{font-family:'Frank Ruhl Libre',Georgia,serif;font-weight:800;font-size:22px;color:rgba(251,251,249,.55);direction:ltr;white-space:nowrap}}
 </style></head><body>
-<svg viewBox="0 0 1200 630" width="1200" height="630" xmlns="http://www.w3.org/2000/svg">{art}</svg>
+{photo}<svg viewBox="0 0 1200 630" width="1200" height="630" xmlns="http://www.w3.org/2000/svg">{art}</svg>{illus}
 <div class="in"><div class="top"><span>AI Briefing <b>/</b> Blog</span><span>{date}</span></div>
 <div class="term">{term_html}</div>
 <div class="bot"><h1>{title}</h1><span class="brand">blog.aibriefing.dev</span></div></div></body></html>"""
+
+# layout variants are plain CSS overrides appended to the shell
+_HERO_LAYOUT_CSS = {
+    "type": "",
+    # illustration-led: the writer's own SVG motif fills the right ~55%, type sits bottom-left and smaller
+    "illus": ".illus{position:absolute;right:0;top:0;width:660px;height:630px;display:flex;align-items:center;justify-content:center;padding:40px;box-sizing:border-box}"
+             ".illus svg{width:100%;height:100%} .in{justify-content:flex-end} .term{font-size:{tfs2}px;max-width:520px} h1{max-width:500px}",
+    # photo-led: a source image darkened under the type
+    "photo": ".photo{position:absolute;inset:0;background:url('{photo_url}') center/cover no-repeat;filter:saturate(.7) brightness(.55)}"
+             ".photo::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(18,18,28,.92) 0%,rgba(18,18,28,.55) 55%,rgba(18,18,28,.25) 100%)}"
+             "svg{opacity:.25}",
+}
 
 _HUES = ["#8b83ff", "#3ecfb2", "#ffb454", "#ff7aa8", "#9be15d", "#5fb7ff"]
 
@@ -128,8 +141,10 @@ def _constellation_body(rnd, hue: str, out: list[str]) -> str:
     return "".join(out)
 
 
-def hero(key: str, lang: str, term: str, title: str, sub: str, style: str | None = None, hue: str | None = None) -> str | None:
-    """Cover for one language. `sub` is the small top-right line (the ISO publish date); style/hue pin a series identity."""
+def hero(key: str, lang: str, term: str, title: str, sub: str, style: str | None = None, hue: str | None = None,
+         layout: str = "type", illus_svg: str = "", photo: str = "") -> str | None:
+    """Cover for one language. `sub` = small top-right line (ISO date); style/hue pin a series identity;
+    layout = type (big term) | illus (writer's SVG motif on the right) | photo (source image under the type)."""
     d = out_dir(key)
     name = "hero.jpg" if lang == "he" else "hero-en.jpg"
     fs = 34 if len(title) < 50 else 28
@@ -138,8 +153,14 @@ def hero(key: str, lang: str, term: str, title: str, sub: str, style: str | None
     words = html.escape(term.lower()).split(" ")
     term_html = " ".join(words[:-1]) + (" " if len(words) > 1 else "") + f"<i>{words[-1]}</i>"  # last word in the hue
     art, hue = _art(key, style, hue)
+    if layout == "illus" and not illus_svg: layout = "type"
+    if layout == "photo" and not photo: layout = "type"
+    extra = _HERO_LAYOUT_CSS.get(layout, "").replace("{tfs2}", str(min(tfs, 96))).replace("{photo_url}", Path(photo).resolve().as_uri() if photo and not photo.startswith("http") else photo)
     page = _HERO_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", term_html=term_html, title=html.escape(title),
-                             fs=fs, tfs=tfs, art=art, hue=hue, date=sub)
+                             fs=fs, tfs=tfs, art=art, hue=hue, date=sub,
+                             photo='<div class="photo"></div>' if layout == "photo" else "",
+                             illus=f'<div class="illus">{illus_svg}</div>' if layout == "illus" else "")
+    page = page.replace("</style>", extra + "</style>", 1)
     tmp = d / f"_hero-{lang}.html"; tmp.write_text(page, encoding="utf-8")
     try:
         from playwright.sync_api import sync_playwright
@@ -335,6 +356,92 @@ def _transcript(prompt: str, lang: str) -> tuple[str, str]:
     return text.strip(), f"claude · {__import__('time').time() - t0:.1f}s"
 
 
+_SVG_SHELL = """<!doctype html><html lang="{lang}" dir="{dir}"><head><meta charset="utf-8"><style>
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Frank+Ruhl+Libre:wght@500;700;800&display=swap');
+html,body{{margin:0;width:1200px;height:675px;overflow:hidden;background:#fbfbf9}}
+svg{{display:block;width:1200px;height:675px;font-family:Heebo,system-ui,sans-serif}}
+</style></head><body>{svg}</body></html>"""
+
+
+def valid_svg(src: str) -> str:
+    """Return a cleaned SVG string sized 1200x675, or "" if it does not parse / is not an <svg> root / has scripts."""
+    from lxml import etree
+    src = (src or "").strip()
+    if not src.startswith("<svg"):
+        return ""
+    try:
+        root = etree.fromstring(src.encode("utf-8"))
+    except Exception:  # noqa: BLE001
+        return ""
+    if etree.QName(root).localname != "svg" or any(etree.QName(e).localname in ("script", "foreignObject") for e in root.iter()):
+        return ""
+    # `direction="rtl"` flips text-anchor semantics in SVG, so right-aligned Hebrew runs off the canvas; Hebrew-only
+    # labels render correctly without it (bidi handles glyph order), so strip it everywhere.
+    for e in root.iter():
+        for attr in ("direction", "{http://www.w3.org/XML/1998/namespace}lang"):
+            if attr in e.attrib:
+                del e.attrib[attr]
+        if "style" in e.attrib and "direction" in e.attrib["style"]:
+            e.attrib["style"] = re.sub(r"direction\s*:\s*\w+;?", "", e.attrib["style"])
+    root.set("width", "1200"); root.set("height", "675")
+    if not root.get("viewBox"):
+        root.set("viewBox", "0 0 1200 675")
+    return etree.tostring(root, encoding="unicode")
+
+
+def _download_image(url: str, out: Path) -> bool:
+    import urllib.request
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (aibriefing blog mirror)"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            ct = r.headers.get("Content-Type", "")
+            data = r.read(12_000_000)
+        if "image" not in ct or len(data) < 4000:
+            return False
+        out.write_bytes(data)
+        # normalise to a 1200-wide jpeg so pages stay light and the frame is consistent
+        try:
+            from PIL import Image
+            im = Image.open(out).convert("RGB")
+            if im.width > 1200:
+                im = im.resize((1200, int(im.height * 1200 / im.width)))
+            im.save(out, "JPEG", quality=86)
+        except Exception:  # noqa: BLE001
+            pass
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def og_image(url: str) -> str:
+    """The page's own og:image / twitter:image URL, or ""."""
+    import re as _re, urllib.request
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (aibriefing blog)"})
+        with urllib.request.urlopen(req, timeout=12) as r:
+            head = r.read(400_000).decode("utf-8", "ignore")
+    except Exception:  # noqa: BLE001
+        return ""
+    m = _re.search(r'<meta[^>]+(?:property|name)=["\'](?:og:image|twitter:image)(?::url)?["\'][^>]+content=["\']([^"\']+)', head, _re.I) or \
+        _re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\'](?:og:image|twitter:image)', head, _re.I)
+    return html.unescape(m.group(1)) if m else ""
+
+
+def source_images(sources: list[dict], key: str, max_n: int = 6) -> list[dict]:
+    """Mirror each source's og:image into the post folder. Returns [{url(local), source_url, title}] for the writer."""
+    d = out_dir(key)
+    out = []
+    for i, s_ in enumerate(sources[:max_n]):
+        u = og_image(s_["url"])
+        if not u:
+            continue
+        f = d / f"src{i + 1}.jpg"
+        if _download_image(u, f):
+            out.append({"url": f"/posts/{key}/{f.name}", "source_url": s_["url"], "title": s_.get("title") or s_["url"]})
+            print(f"  media: source image {f.name} ← {u[:80]}")
+    return out
+
+
 def _shoot(page_html: str, out: Path, w: int, h: int):
     from playwright.sync_api import sync_playwright
     tmp = out.with_suffix(".html"); tmp.write_text(page_html, encoding="utf-8")
@@ -392,6 +499,25 @@ def visuals(key: str, lang: str, items: list[dict]) -> list[dict]:
                 ev_html = "".join(f'<div class="ev{" last" if i == len(evs) - 1 else ""}"><span class="when">{html.escape(str(e.get("when", "")))}</span><div class="what">{html.escape(str(e.get("what", "")))}</div></div>' for i, e in enumerate(evs))
                 _shoot(_TIMELINE_HTML.format(lang=lang, dir="rtl" if lang == "he" else "ltr", title=html.escape(str(v.get("title", ""))), events=ev_html), f, 1200, 675)
                 cap = str(v.get("title", ""))
+            elif kind == "svg":
+                f = d / f"{stem}.jpg"
+                clean = valid_svg(str(v.get("svg", "")))
+                if not clean:
+                    raise ValueError("svg did not validate")
+                (d / f"{stem}.svg").write_text(clean, encoding="utf-8")
+                _shoot(_SVG_SHELL.format(lang=lang, dir="ltr", svg=clean), f, 1200, 675)
+                cap = v.get("caption", "")
+            elif kind == "image":
+                src_url = str(v.get("src", ""))
+                if src_url.startswith("/posts/"):
+                    f = BLOG / "public" / src_url.lstrip("/")
+                    if not f.exists():
+                        raise ValueError("image not mirrored")
+                else:
+                    f = d / f"{stem}.jpg"
+                    if not _download_image(src_url, f):
+                        raise ValueError("image download failed")
+                cap = v.get("caption", "")
             elif kind == "strip":
                 f = d / f"{stem}.jpg"
                 its = [x for x in v.get("items", []) if isinstance(x, dict)][:4]
@@ -435,7 +561,7 @@ def visuals(key: str, lang: str, items: list[dict]) -> list[dict]:
                 if "direction:" not in d2:
                     d2 = "direction: right\n" + d2
                 src.write_text(d2 + "\n", encoding="utf-8")
-                subprocess.run(["d2", "--layout=elk", "--theme=0", "--pad=40", str(src), str(f)], check=True, capture_output=True, timeout=120)
+                subprocess.run(["d2", "--layout=elk", "--theme=0", "--sketch", "--pad=40", str(src), str(f)], check=True, capture_output=True, timeout=120)
                 cap = v.get("caption", "")
             else:
                 continue

@@ -57,11 +57,32 @@ def write_mdx(post: dict, media: dict, model: str, pub: date, draft: bool = Fals
         # opening isn't always "text → diagram"); its caption is the post's own description of the mechanism.
         figs = [{"after": 2, "src": media["diagram"], "caption": p.get("diagram_caption") or ("איך המנגנון עובד" if lang == "he" else "How the mechanism works")}] if media.get("diagram") else []
         figs += media.get(f"visuals_{lang}") or []
-        body = _insert_figures(body, figs)
+        body = _insert_figures(mdx_safe(body), figs)
         f = d / f"{lang}.mdx"
         f.write_text("---\n" + "\n".join(fm) + "\n---\n\n" + body + "\n", encoding="utf-8")
         out.append(f)
     return out
+
+
+def mdx_safe(body: str) -> str:
+    """Escape what MDX would read as JSX/expressions in PROSE: `{`, `}` and a bare `<` before a digit/space.
+    Code fences and inline code are left alone (2026-10-01: a literal `{` in a sentence failed the build)."""
+    out, in_fence = [], False
+    for line in body.split("\n"):
+        if line.strip().startswith("```"):
+            in_fence = not in_fence; out.append(line); continue
+        if in_fence or line.startswith("<figure"):
+            out.append(line); continue
+        parts = re.split(r"(`[^`]*`)", line)  # keep inline code verbatim
+        for i in range(0, len(parts), 2):
+            parts[i] = re.sub(r"<(?=[\d\s=])", "&lt;", parts[i].replace("{", "\\{").replace("}", "\\}"))
+        out.append("".join(parts))
+    return "\n".join(out)
+
+
+def strip_figures(body: str) -> str:
+    """Remove every <figure> line the agent inserted (used by `revisual` before re-inserting new ones)."""
+    return re.sub(r"(?m)^<figure>.*</figure>\n?", "", body)
 
 
 def _insert_figures(body: str, figs: list[dict]) -> str:

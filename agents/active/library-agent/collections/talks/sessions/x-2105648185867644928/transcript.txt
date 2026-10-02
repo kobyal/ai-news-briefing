@@ -1,0 +1,527 @@
+[0:00] Hey, everyone.
+[0:01] Great to see you all today, and hope you're all having a wonderful day so far here at
+[0:05] AI DevCon.
+[0:06] I certainly am.
+[0:08] I hope that your context windows are not too full and you have a bit of space for a
+[0:12] little bit more information about context.
+[0:15] By way of introduction, my name is Lamis.
+[0:17] I am a member of technical staff at Anthropic.
+[0:20] I work on our Applied AI team, and this is a team which sits between research, product,
+[0:25] and go-to-market.
+[0:26] So we do a mixture of working on internal projects as well as directly with customers
+[0:30] who are building agents at the frontier.
+[0:34] Me specifically, I work with startups and founders, many of whom I'm sure are in this
+[0:38] room today.
+[0:39] And I think I have the best seat in the house because these are the users that are constantly
+[0:44] pushing us right up against the boundary of what is possible with models and products
+[0:48] today.
+[0:49] And as such, we just get to ride the exponential together.
+[0:55] One thing that constantly comes up, as I'm sure you're all aware, is what it really takes
+[1:00] to take the raw model intelligence that we have today and translate that into durable,
+[1:06] scalable, useful products.
+[1:08] One of the main levers that we have in order to do this is context engineering, which will
+[1:13] be the focus of my talk today.
+[1:18] On this journey, I want to quickly do a recap of where context engineering has gone in the
+[1:23] past year.
+[1:24] a space that's completely blown up.
+[1:27] And through that, we'll kind of distill the primitives that have proven to be really useful,
+[1:30] some stuff that has been a little bit less useful.
+[1:33] Secondly, we'll talk about what the state of the art is for memory management today.
+[1:39] And thirdly, and in particular, with that, we'll talk about not just what nice theoretical
+[1:44] principles are, but what it takes to actually build these systems in production.
+[1:48] And then finally, we'll talk about where this will go on the path to continual learning,
+[1:52] and in particular, touching on a paradigm called dreaming.
+[1:56] So, we've said this before, and models, we release new models all the time, they are
+[2:04] more and more intelligent.
+[2:05] But when it comes to actually deploying these models in your agents, in your environments,
+[2:10] in your organization, the intelligence alone is not going to compound because they need
+[2:15] this context that helps them perform the specific tasks that you need them to.
+[2:19] In particular, a lot of this context is often kind of orthogonal to the model intelligence,
+[2:23] right?
+[2:24] Like, the newest model, we've just released one, isn't going to out of the box know exactly
+[2:30] what it takes to succeed in your organization and with the tasks that you want them to.
+[2:34] And so it's a really great investment to work on the context engineering part because this,
+[2:40] over time, has the effect of multiplying the intelligence even as models get smarter.
+[2:45] So I'm sure you'll all be familiar with these problems.
+[2:47] like agents not knowing their way around a codebase
+[2:49] or knowing enough about your own user preferences.
+[2:54] And then additionally, like, you don't have the effect
+[2:56] where agents are better at the task the next time they perform it,
+[2:59] so they might not learn from their mistakes,
+[3:01] and as such, you don't have this continual learning effect.
+[3:05] So, just to recap,
+[3:11] where we have got so far on this journey of context engineering.
+[3:14] At Anthropic, we like to say, do the simple thing that works.
+[3:20] This is a timeline that has only really spanned the past year, and where we started was with
+[3:24] these ClaudeMD files that we launched with Claude code.
+[3:28] What we learned from this was that it was kind of unreasonably effective, like this
+[3:31] markdown file that just gives the agent a couple of instructions about maybe your way
+[3:35] around the codebase, the organization, your own user preferences.
+[3:40] That injected into the beginning of the model context at the beginning of a session was so
+[3:44] good at steering it towards the things that mattered and helping it navigate and align
+[3:48] its actions towards your preferences.
+[3:50] However, we also learned a couple of things about what doesn't work here.
+[3:54] When we are injecting this at the beginning of the session into context, we obviously
+[3:59] start to run into problems where you get problems with context bloat, like what happens when
+[4:04] this file with very important preferences gets very, very long?
+[4:08] How do I manage that over time?
+[4:11] So we went back to the drawing board and thought about ways that we could improve this.
+[4:15] Separately though, what was true was that having just a very simple markdown file which
+[4:19] is human readable, which your agent can write to, which you can write to, is really, really
+[4:24] effective.
+[4:25] So, a second avenue that we investigated was these memory tools.
+[4:31] This is interesting because it leans into this idea of, okay, what happens if we let
+[4:37] agents autonomously manage their own memory systems?
+[4:40] We let them decide when they read, when they write,
+[4:43] and when they update memories.
+[4:45] This is all happening in band,
+[4:48] which means that it is within the context of a session.
+[4:50] During a session, an agent is thinking about
+[4:53] what might be interesting to pull from memory,
+[4:55] what might be interesting to write to memory.
+[4:59] Autonomy proves to work really well in this case.
+[5:03] Over time, we have developed that into systems
+[5:06] where we are even less opinionated
+[5:07] about what these tools need to look like,
+[5:09] and I will touch on that in a second.
+[5:12] So, the next stop on this journey was skills,
+[5:15] which I am sure you have heard a bunch about today.
+[5:18] And what this solves is this problem
+[5:21] of the ever-growing context.
+[5:22] So, we have this really clever idea of progressive disclosure.
+[5:28] The way I like to think about it is,
+[5:30] actually, first, what skills are good at?
+[5:32] It is processes where you have a procedural workflow,
+[5:35] so something where you have an opinion
+[5:37] about how the process works end-to-end
+[5:40] that you want the agent to follow.
+[5:42] And what is very clever is that the agent only looks
+[5:44] at this front matter a couple of sentences
+[5:46] at the top of the file before loading the skill,
+[5:49] but you can still load as much detail as you want
+[5:51] into the main body of the file,
+[5:52] so you are able to, at the same time,
+[5:55] have very deep levels of detail
+[5:57] whilst not overloading the model's context.
+[6:00] And the way I like to think about it
+[6:02] is as if I had a bookshelf in my room,
+[6:04] and every time someone talks to me,
+[6:07] I can scan and look at my list of books
+[6:09] and see if any of the titles might be relevant to the conversation
+[6:12] and pick that off the shelf and read it when I need to.
+[6:14] So, for example, if someone walked up to me
+[6:17] and started speaking to me in French,
+[6:18] and I noticed that I have a French dictionary,
+[6:20] I could pull that out, and it would give me context
+[6:22] kind of loaded during the conversation that would help me,
+[6:26] without me having paid attention in seven years of French classes
+[6:29] at school and having that all loaded into my context already.
+[6:31] So this was a really, really great innovation.
+[6:35] But one bottleneck potentially with it
+[6:37] is that it is still kind of driven by humans and agents together.
+[6:41] So you are still, even if you are using your agents
+[6:43] to write the skills with you,
+[6:45] you are still being quite opinionated about what things need skills.
+[6:49] So that takes me to the final step on this path,
+[6:52] which is what we perceive to be state of art for memory systems today.
+[6:56] And what we have done, and what we think is best practice,
+[7:01] is modeling these memory systems just as file systems.
+[7:04] This kind of aggregates a couple of the learnings from this path.
+[7:07] So, file systems are great.
+[7:09] You can just fill them up with Markdown.
+[7:11] Agents are actually just very good at using normal file system tools
+[7:15] like Bash and grep, so just let them search over the file system,
+[7:18] rather than being opinionated about the specific tools
+[7:21] that they should use to read and write to memory.
+[7:24] And then, yeah, that search kind of mirrors
+[7:26] this idea of progressive disclosure.
+[7:28] You can index these memory systems really well
+[7:30] so that agents can intelligently search over them.
+[7:33] That is where we have kind of got to so far.
+[7:36] Just to recap the key learnings from that,
+[7:39] format markdown is great.
+[7:41] For reading memories, allow the memories to grow large,
+[7:45] but give agents tools to quickly index
+[7:49] and search for what is relevant.
+[7:50] Finally, give agents autonomy
+[7:52] when they are writing to memories.
+[7:56] If you were to go out and build this system,
+[7:57] it would work really well.
+[7:58] You would have the feeling of continual learning
+[8:01] because your agents would get better
+[8:02] at whatever individual tasks you are doing.
+[8:08] However, as with everything, this very neat idea
+[8:12] runs into some problems when you try and scale it to production.
+[8:15] So, we have a concept for theoretically what works,
+[8:20] and when we then think about scaling these to production
+[8:24] in environments where we have many agents collaborating
+[8:27] at the same time, where they run over very long periods of time,
+[8:30] and where potentially these code bases get really complicated,
+[8:35] all manner of problems start to arise,
+[8:37] and we have seen these in production time and time again.
+[8:40] So, a couple of things just to spark your imagination.
+[8:43] Think about multiple agents trying to write to a memory file
+[8:47] at the same time. How do you manage that?
+[8:49] Think about one agent running into a problem
+[8:52] and deciding to write to the organizational-wide context
+[8:56] which every other agent is currently reading from,
+[8:58] like if something was incorrect there,
+[9:00] that would scale to all of your agents and be pretty disastrous.
+[9:05] And think about when you have humans and agents collaborating
+[9:07] on memory context together,
+[9:09] like how do you keep track of what is going on?
+[9:12] The final problem is that memories can go stale, of course.
+[9:15] Something that was relevant in the past might not be relevant today,
+[9:18] or maybe it was written incorrectly,
+[9:21] or even maliciously injected by someone trying to prompt inject your agents
+[9:26] to write bad things to memory.
+[9:27] So you have to have a lot of guardrails in place
+[9:30] to make sure that these nice autonomous memory systems
+[9:33] actually work in production.
+[9:38] And so I'm going to talk through a couple of key principles
+[9:41] that we use when designing memory systems in production
+[9:44] to make sure that we do get to use all of those nice effects
+[9:47] that we've spoken about.
+[9:50] So the very first thing is versioning.
+[9:53] So when you're designing any kind of memory system,
+[9:55] you need to be able to store versions to keep track of what is going on,
+[10:00] to allow you to roll back should you need to
+[10:02] if a new update is not particularly good.
+[10:05] Additionally, you probably want to think about,
+[10:07] like, what context was this update based on?
+[10:09] So, which agent session, which transcript resulted
+[10:13] in me wanting to make this update?
+[10:17] Additionally, you might want to track who did it,
+[10:19] which agent, which human, et cetera, et cetera.
+[10:22] So, this is really important.
+[10:23] The second thing is concurrency.
+[10:25] So, we've talked about, okay, what happens when I deploy thousands of agents all working
+[10:29] off the same memory system?
+[10:32] The solution that we've adopted here is to have this hashing system.
+[10:37] So, when an agent decides that it wants to write an update to a memory, it takes a hash,
+[10:43] it then drafts its edit, and then before it writes the update, it takes another hash.
+[10:48] If those two things do not match, then the agent cannot write it because it means that
+[10:53] some update was made in the meantime. In order to handle that, the agent re-pulls the memory,
+[10:58] drafts its new update, and then tries to commit this again. These are the kinds of just engineering
+[11:03] practices that allow you to scale multiple agent architectures, scale memory to these
+[11:08] kinds of architectures. Another couple of key principles. Permissioning is really important.
+[11:18] When you have large memory bases, you probably have a mixture of top-level, organizational-wide
+[11:24] knowledge.
+[11:25] It might be like your key, like what your organization is trying to achieve, or key
+[11:29] principles about the code base which you have really carefully curated, all the way down
+[11:34] to the level of like a scratch pad for an agent where it writes down its working memory,
+[11:39] and it is very individualized.
+[11:42] All the way in between, you can have things for specific organizations or cross-sections.
+[11:46] So it is really important that you have guardrails
+[11:49] when it comes to permissioning these memories.
+[11:51] So, like I said, you would not want one agent to just decide
+[11:54] that it should update the organization-wide context.
+[11:57] Probably you might want that as read-only.
+[11:59] However, for its own scratch pad,
+[12:01] you would want it to have write access.
+[12:04] And, yeah, yeah, that is permissioning.
+[12:09] The final thing which is kind of peripheral
+[12:11] but still really important when you design memory systems
+[12:15] is portability.
+[12:17] So, like I mentioned before, your curation of your memory systems
+[12:22] is going to be so important throughout the future.
+[12:26] This is really, really important organization, user,
+[12:29] or work-task specific context.
+[12:32] So, it is likely that if you are putting a lot of effort
+[12:34] into curating this, you want it to be accessible
+[12:38] across potentially multiple product surfaces
+[12:41] and accessible by multiple systems.
+[12:44] So, designing it in a way with a clean API in which it is portable
+[12:47] and you can access it is really important.
+[12:52] So, when you put all these things together,
+[12:54] we have the kind of learnings we have from allowing agents
+[12:57] to creatively manage their memory,
+[12:59] and then these production-level guardrails
+[13:01] that allow them to reasonably use all of those principles in practice.
+[13:06] When you do this, you get very effective results.
+[13:09] So, just sharing here a couple of learnings
+[13:11] from what we have seen deploying these large-scale memory systems in production.
+[13:18] For example, we see you get better accuracy, so you have this effect,
+[13:22] where the second time the agent does the task,
+[13:24] it actually does it better with higher results,
+[13:28] because it has noted all of those memories about what went wrong.
+[13:32] Secondly, that then has second-order effects on the speed and latency.
+[13:35] Sorry, speed and cost of your agents running,
+[13:38] because they are then spending fewer tokens.
+[13:40] they can more easily one-shot these tasks
+[13:43] because they actually know what they are doing.
+[13:45] You will see that across all sorts of different processes,
+[13:48] agents are just able to do the task better and faster.
+[13:51] Finally, having this process where your agents are starting
+[13:55] to autonomously write their own memories
+[13:58] frees up capacity and context for you as product developers
+[14:02] potentially to focus on product wins
+[14:04] while you know that the agents are doing this kind of self-learning,
+[14:07] continual learning loop in the background.
+[14:09] and, yeah, once that infrastructure is set up really well,
+[14:12] this works very symbiotically.
+[14:18] As ever, we do then reach a new bottleneck,
+[14:22] and this specifically is about in-band memory.
+[14:25] So, in-band memory, as I mentioned before,
+[14:28] is when agents are writing to and reading from memory
+[14:31] within a specific session.
+[14:33] So, if you think about Claude Code, for example,
+[14:37] when you, like, spin up a new session,
+[14:38] it is largely like focusing on that specific context
+[14:41] when it is reading and writing from memory.
+[14:45] This just architecturally or philosophically
+[14:48] has limitations in the general agent fleet's
+[14:51] continual learning objectives.
+[14:53] There are two main reasons why.
+[14:55] First of all is that you have this inherent split
+[14:58] of focus and resources,
+[14:59] so you are asking an agent to complete a task,
+[15:02] but at the same time,
+[15:03] you are also asking it to invest in memory curation,
+[15:06] which would help it perform better in a future run.
+[15:09] So, when you put these things together,
+[15:11] it's just a very difficult optimization problem,
+[15:13] because how much capacity should an agent put
+[15:15] into helping future versions of itself,
+[15:17] versus doing the task that you actually asked it to do?
+[15:21] And also, there's other effects, like latency, for example.
+[15:24] The second thing is that the agents
+[15:27] just have an inherent visibility limitation.
+[15:30] So, they only have a context of what's going on
+[15:33] in their session.
+[15:34] As such, they just won't see patterns
+[15:36] that happen across sessions, so when you get frustrated
+[15:38] that your agent keeps making the same mistake over sessions,
+[15:41] it just does not understand how frustrating that is,
+[15:43] because it has a new context window in each of those.
+[15:46] Secondly, when you are running multiple fleets of agents
+[15:48] in different environments, these single agents
+[15:51] just do not have the context of what other failures
+[15:53] other agents are running into.
+[15:56] For these two reasons, we introduced this concept
+[15:58] of some out-of-band memory curation,
+[16:00] and this helps to make these problems go away.
+[16:03] And just to introduce an analogy for why this, in theory, should work,
+[16:08] I'd like you to think about a school, for example,
+[16:12] where you have lots of students that submit a lot of work,
+[16:14] and you also have teachers that market and a head teacher that reviews everything.
+[16:19] This is a system that we have in the real world for good reason,
+[16:23] and it's because when you have certain individuals that have dedicated capacity
+[16:27] for helping people learn, that's really effective.
+[16:29] And when you also have people that have visibility
+[16:32] over the whole fleet of agents or learners,
+[16:34] and they are able to spot patterns and then kind of steer context,
+[16:37] or let us say, in this case, the curriculum,
+[16:39] that is also really effective.
+[16:41] So, as always, we kind of look to the real world
+[16:44] to think about how to build these systems.
+[16:47] Sorry, I also did not touch on a final limitation,
+[16:50] which is that memories go stale.
+[16:51] So you need something, some pass that checks that
+[16:54] everything that is written there is still correct.
+[16:57] And so, we introduced this concept of dreaming,
+[17:02] which is like a second-order process over memory.
+[17:05] So, if we think about how that has been constructed,
+[17:08] we have the actual context, which agents reference
+[17:11] and has useful information, the memory processes,
+[17:15] which allow agents to kind of autonomously manage
+[17:17] that context themselves, and then dreaming,
+[17:20] which is a process that runs in batch and asynchronously
+[17:24] with its own allocated resources to ensure that those memories themselves
+[17:29] are effective, up-to-date, and helping the agents learn over time.
+[17:37] So, what does dreaming look like?
+[17:40] Essentially, what we do is we take an existing memory store,
+[17:45] so this is a collection of memories.
+[17:48] We then take a bunch of sessions or transcripts
+[17:51] from agent interactions over a period of time,
+[17:54] We give these together to an agent, which reviews all of the transcripts, looks at the
+[18:01] memory store, and starts to identify patterns for where there could be uplift in the memories.
+[18:09] It then outputs a new memory store where there are proposed changes to the existing memory
+[18:14] store.
+[18:15] What the agent is able to do, as I mentioned, is spend tokens on solving this problem of
+[18:21] of making agents learn better,
+[18:22] identify patterns for where agents are consistently failing,
+[18:27] and then propose changes
+[18:28] for what might make a more effective memory store,
+[18:31] such that next day when you run these agents again,
+[18:34] they actually feel smarter and they're running better.
+[18:37] To go back to my analogy,
+[18:38] just to paint some pictures
+[18:40] of what this could look like in practice,
+[18:42] let's imagine that the head teacher
+[18:45] reviewing all these transcripts
+[18:46] notices that every geography student
+[18:49] has incorrectly answered a question,
+[18:51] they're just all writing like complete garbage
+[18:53] to this question, the teacher notices that actually,
+[18:57] by kind of, in this case, analyzing the memory store,
+[19:00] that entire topic is missing from the curriculum.
+[19:02] So what the teacher is able to do is notice that pattern,
+[19:06] look at the memory store,
+[19:07] and suggest a new change to that curriculum
+[19:08] such that the next day, when these agents run,
+[19:11] they now have that information that they needed.
+[19:14] To give another example, the teacher might notice
+[19:16] that in a certain maths exam, all of the answers are wrong in the same way.
+[19:21] All of the students are outputting radians when it's meant to be degrees.
+[19:24] I don't know if anyone else in GCSE maths had that problem too.
+[19:28] But what they're able to do is give an instruction saying,
+[19:31] this is how you should configure your calculators.
+[19:33] And in the case of agents, that's like noticing in the transcripts
+[19:38] that there's something wrong with the tool configuration.
+[19:40] So you might notice that something in the tool calls keeps failing.
+[19:43] What is important here is that when we look at those transcripts,
+[19:48] we are not just looking at the passes of responses
+[19:51] between the agent and the system or the user.
+[19:54] We are also really scrutinizing those tool calls
+[19:56] and all of the other metadata
+[19:58] that is really central to the agent's performance.
+[20:02] Finally, you could also notice something
+[20:04] that is fleet-wide or organization-wide.
+[20:06] For example, everybody is using too many m-dashes,
+[20:09] and you do not like that, so you want to add
+[20:12] some organizational-wide announcement or context change
+[20:16] that says not to do that.
+[20:17] And so I hope that paints a picture
+[20:19] of why this could be really, really effective.
+[20:22] And now I will just talk about how you would go about
+[20:27] designing such a system in production.
+[20:30] So you have some concepts of your memory store,
+[20:33] which is a collection of memories.
+[20:36] Memories themselves might just be markdown files
+[20:38] organized in this directory.
+[20:40] You then take a number of the transcripts, and like I mentioned, that is a mixture of
+[20:47] like the back and forth passes between the agents as well as metadata on tools, other
+[20:52] skills they used, et cetera.
+[20:54] The way that we have designed it, we have the orchestrator deploy a fleet of sub-agents
+[20:59] that go and analyze all those transcripts.
+[21:03] One point worth making here is that when you design these systems, you have the ability
+[21:07] to steer how these agents which both write memories and coordinate dreaming go about the
+[21:13] problem, and by steering I mean that you are able to tell them like in your specific case
+[21:18] these are the kinds of things I think are important and relevant, these are the kinds
+[21:21] of things that are not important and relevant. So you do have the ability there to start
+[21:25] to curate that memory and dreaming process to your organization specifically.
+[21:32] And the orchestrator then reviews all of the responses from the sub-agents, and it then
+[21:38] decides where there are prevalent enough patterns that it thinks this warrants a change in the
+[21:43] memories.
+[21:45] From there, it proposes individual changes to the memory store.
+[21:50] In our case, the way that we've designed this in production is the agent will additionally
+[21:54] give you examples of transcripts where it's noticed this pattern has happened, and also
+[21:59] also some stats on how prevalent this issue is and why this warrant is actually updating
+[22:03] the memory store.
+[22:07] So all of this works really neatly.
+[22:08] You get this output, and you as the individual can decide where you want to accept changes
+[22:14] to the memory, where you want to reject them, et cetera.
+[22:19] This works really effectively.
+[22:23] So together, we have these two processes that run in parallel.
+[22:29] The first is memory, and these agents are using some of their in-band context and in-band
+[22:38] resources to write to memory where they think it is important.
+[22:41] This is neat because it means that in the actual next run, the next session, that agent
+[22:46] will be better.
+[22:47] So there is a shorter time to kind of seeing that change, but inherently these agents have
+[22:51] have competing resources when they think about what to dedicate to memory,
+[22:55] what to dedicate to completing the task,
+[22:58] and additionally, a lack of visibility.
+[23:00] So, on the other side, we have dreaming,
+[23:03] which is this out-of-band process,
+[23:05] and this allows, again, broader visibility and dedicated capacity,
+[23:11] i.e. token spend, which is specifically directed
+[23:13] towards helping agents learn better.
+[23:16] And you might think, okay, that sounds really expensive.
+[23:19] Why would I want to chuck extra resources at this?
+[23:22] But if we kind of go back to the improvements we saw when you build effective memory stores,
+[23:27] actually, you can see a bunch of costs go down because agents are able to one-shot things
+[23:32] more effectively.
+[23:33] They have more information that they need in order to perform a task well.
+[23:39] So, to summarize, at the very least, do the simple thing that works.
+[23:48] management makes such a huge difference to your agent performance. Implementing things
+[23:54] like a .md file, like skills, which I'm sure you've heard about a bunch, and allowing agents
+[24:00] to autonomously manage these systems themselves goes a really long way. Once you think about
+[24:05] scaling those things into architectures with many agents, agents that run over a very long
+[24:11] time, situations where you will, like, continue to work and develop on a workspace or a code
+[24:17] base over a long period of time, or very complex domains, you should start thinking about adding
+[24:23] some features or some guardrails that allow those agents to manage their memory in a way
+[24:27] that is safe, verifiable, auditable.
+[24:32] I should also say here that whilst these kinds of practices are really effective when it
+[24:38] comes to coding tasks, for example, this by no means is just specific to coding.
+[24:43] I use memory all the time when I am producing presentations that has context on, like, how
+[24:47] I like to write things, how I like my slides, et cetera, et cetera, and that develops over
+[24:50] time.
+[24:51] So, this is really not coding-specific.
+[24:54] The final thing is if you really want to kind of, like, close the loop here, think about
+[24:59] adding an additional out-of-band process, like dreaming, as we call it, to consolidate
+[25:04] your memory and cut things that are no longer relevant, add things that agents are missing,
+[25:10] and clean up and organize memory systems.
+[25:15] So to close, I want to say that this journey that we have been on
+[25:19] with context engineering, a lot of this stuff
+[25:21] has only happened in this past year.
+[25:24] This is very much an open area of research and development,
+[25:27] and one which we see huge value in the future.
+[25:30] So we are so excited to see the kinds of things
+[25:32] and contributions that you will all make to this space.
+[25:35] So I encourage you to keep thinking,
+[25:36] keep learning, and keep dreaming.
+[25:38] Thank you.
+[25:40] Thank you, Lamis.
+[25:47] That was great.
+[25:49] Do you have any questions in the room?
+[25:51] Oh, golly gosh.
+[25:52] I'll dive straight here first.
+[25:56] Thank you.
+[25:57] Thanks for the presentation.
+[25:59] Do you have any memory storage implementation that you would like to suggest?
+[26:05] Any memory storage implementation that you would like us?
+[26:08] Sorry, did you say papers?
+[26:09] No.
+[26:10] Memory storage implementation.
+[26:12] Oh, okay, okay.
+[26:13] That we'd like to suggest.
+[26:15] To solve what problem specifically?
+[26:18] Well, one thing is put things in files that I have on my laptop.
+[26:22] Yeah.
+[26:23] But I think I'm looking into something more enterprisey.
+[26:26] So, what kind of solution do you suggest over there?
+[26:30] Okay, yeah.
+[26:31] So, I mean, maybe I was kind of coy in the talk because we're not allowed to make product
+[26:35] to actions, but given that you asked, we have a lot of this references the architecture
+[26:44] that we used in our memory infrastructure for our managed agent solutions.
+[26:51] When I talk about these things about productionizing memory, so everything like versioning, hashing,
+[26:58] et cetera, that is all available within our memory and dreaming API through Claude Managed
+[27:02] Agents.
+[27:03] if you did want an out of box solution for this kind of thing, that is where I would
+[27:06] point you to.
+[27:07] Thank you.
+[27:08] Hi.
+[27:09] Early on you talked about guardrails and permissions.
+[27:17] And I think, I'm sure most of us have probably read the code code leak and the memory stuff,
+[27:21] the dreaming stuff was definitely some of the most interesting in it.
+[27:24] But how do you scale that at enterprise if you've got hundreds of users with different
+[27:29] permission sets, how do you make sure dreaming follows those same guardrails? If it's happening
+[27:35] out of band and the context is different compared to say the context the agent might have when
+[27:40] a user is using it?
+[27:44] So just to check that I understand, we have like some permissioning about what agents
+[27:49] can access like in terms of memory. Yeah.
+[27:51] And then a separate like, yeah, so I mean I think these things compose quite well because
+[27:56] Because when you set up a dreaming procedure, you decide exactly which session transcripts
+[28:01] to attach.
+[28:03] And so you could build a process which mirrors whatever permission you have on the agents.
+[28:08] So yeah, I mean, if that is to say that it is not the case that when you kind of trigger
+[28:12] a dreaming job it just takes like everything in a certain time period.
+[28:15] You can configure it that way.
+[28:17] But you can also just search over whichever transcripts have the same permission set as
+[28:21] like whatever your memory store is and then make sure that that matches, if that makes
+[28:25] sense.
+[28:26] Hi, thank you. This was really, really interesting. I found it fascinating earlier when you were
+[28:33] mentioning about versioning, concurrency, durability, all these things. At what point
+[28:37] are we reinventing databases from first principles again?
+[28:43] Yeah, this is an interesting point. I still think one of the things that, and this is
+[28:53] a good reminder for me that is something I did not say. What we are trying to do here
+[28:57] is like find the right boundary to draw between kind of letting these agents autonomously
+[29:03] act and then also like which things should just be kind of programmatic things that are
+[29:09] baked into the harness. So I think what you allude to is like first of all we were just
+[29:14] kind of like letting these agents write in markdown files and just like commit whatever
+[29:17] they wanted and now we are kind of seeing having seen which primitives work really well
+[29:20] We're thinking about like kind of codifying that in the harness and so when we think about like the hashing or the versioning
+[29:25] Yeah
+[29:25] We are kind of going back to the software engineering principles that we've seen work well in the past
+[29:29] But in a way that kind of autonomous agents can act and like

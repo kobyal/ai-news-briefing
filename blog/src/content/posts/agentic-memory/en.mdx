@@ -1,0 +1,120 @@
+---
+title: "Agentic memory: why an agent with 200K tokens forgot how to write a date"
+description: "An agent on a Raspberry Pi with 200K tokens of context forgot a one-line rule. What broke, why a vector DB didn't help, and what to check."
+lang: en
+key: agentic-memory
+term: "agentic memory"
+kind: warstory
+pubDate: 2026-10-02
+tags: ["agentic-memory", "agents", "context-engineering", "claude", "evals"]
+hook: "number"
+cover: illus
+tldr: ["Put procedural rules in a file that always loads, not in a vector DB", "Run an eval after compaction and check the agent still applies the rules", "Measure memory tokens per session. If the number keeps growing, you're hoarding"]
+hero: /posts/agentic-memory/hero-en.jpg
+diagram: /posts/agentic-memory/diagram.svg
+sources:
+  - { title: "Show HN: YourMemory, agentic memory is a pruning problem, not a hoarding problem", url: "https://yourmemoryai.vercel.app", date: "2026-06-07" }
+  - { title: "I accidentally hit SOTA on agentic memory by using AI companions", url: "https://graph.coder.company", date: "2026-06-14" }
+  - { title: "Agentic Memory Bottlenecks", url: "https://jcarlosroldan.com/post/370", date: "2026-02-06" }
+  - { title: "AI Agent Memory: Types, Architecture & How It Works", url: "https://www.turingpost.com/p/aia9", date: "" }
+  - { title: "Agentic Memory: Types, Management Strategies, and LangGraph Implementation", url: "https://www.patronus.ai/ai-agent-development/agentic-memory", date: "" }
+  - { title: "AI Agent Memory: Types and Architectures Explained", url: "https://www.dataiku.com/blog/ai-agent-memory", date: "" }
+opinion: "We don't buy that agentic memory is mainly a retrieval problem. Procedural rules should be deterministic: a file that always loads, not an embedding that decides whether they're relevant today. Retrieval is for facts and events, where it's allowed to be wrong. What's actually worth money is an eval that checks the agent after compaction, because a good test beats smarter memory. The name agentic memory is useful because teams finally have a word for this, but the practical question is what always loads, what gets retrieved, and what gets deleted."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+200K tokens. That's the Opus context window Juan Carlos Roldán was working with, and he compares it to the length of "The Fellowship of the Ring." A whole book. Yet the example he picks to show where it breaks is a one-line rule: dates in YYYY-MM-DD format.
+
+Roldán published this on February 6, 2026, in a short post called Agentic Memory Bottlenecks. Nothing went down and no database got wiped. An agent ran on its own for a few weeks and got stuck exactly where anyone running long-lived agents will get stuck. That's why it's worth taking apart.
+
+## Raspberry Pi 4, a $20 subscription and one lobster
+
+The setup: an old Raspberry Pi 4, freshly formatted, with Clawd installed on it. Clawd is an agentic personal assistant with a crab persona. Roldán gave it its own $20/month Claude Pro subscription, access to Gmail and GitHub, and a Telegram bot. Almost no instructions, just a starter pack he had written a few months earlier. The model was Opus, running for about an hour every four hours.
+
+The agent named itself The Lobsterino. And mostly, it worked. Give it a simple request and it opens a repo, writes tests, loops through build and run, sets up cron jobs with subagents that review code quality, takes snapshots and opens issues. Until it gets there.
+
+Then comes the sentence this post exists for:
+
+> "Given a reliable methodology and enough time it can achieve most tasks I instructed it to do. Except when the memory starts to overflow."
+>
+> — Juan Carlos Roldán, Agentic Memory Bottlenecks
+
+<figure><img src="/posts/agentic-memory/src4.jpg" alt="$35 of hardware and a $20 subscription were enough to make the agent work. Memory was what wasn't enough (credit: jcarlosroldan.com)" loading="lazy" /><figcaption>$35 of hardware and a $20 subscription were enough to make the agent work. Memory was what wasn't enough (credit: jcarlosroldan.com)</figcaption></figure>
+
+## When context fills up, only the start and end survive
+
+Size isn't what breaks. 200K is a lot. The problem is how the model reads it. Roldán points to the U-shaped attention problem from the Lost in the Middle paper (Liu et al., 2023): in a long context, the beginning and the end get attention, and the middle gets muddled. In practice, the agent remembers the start of the conversation and the end of it.
+
+Now picture an agent that runs an hour every four hours, with a history that only accumulates. The system prompt sits at the start. The latest message sits at the end. Everything decided in between, which test failed and why, which format was agreed on, sits right in the dip of the U. Roldán calls this memory derailment.
+
+From the outside it barely looks like a failure. No exception, no crash. The agent keeps running and writing code, it just starts missing things that were already settled. A silent failure. The most expensive kind.
+
+<figure><img src="/posts/agentic-memory/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/agentic-memory/v2-svg-en.jpg" alt="The window isn't too small. The rule just sits in the dip the model barely reads (Roldán, based on Lost in the Middle)" loading="lazy" /><figcaption>The window isn't too small. The rule just sits in the dip the model barely reads (Roldán, based on Lost in the Middle)</figcaption></figure>
+
+## First fix: folders, files and grep
+
+The agent did what agents do when you hand them a filesystem: it started organizing memory per task in folders and files, and treating the context like RAM. Sounds right. It's also roughly what most frameworks offer today as long-term memory.
+
+The problem, according to Roldán, is discoverability. The agent reaches information through cycles of grep, read, grep again. Every cycle misses nuance. The file exists, the rule is written in it, but the agent didn't search for the right word.
+
+The industry's next step is well known: a vector DB or a knowledge graph. Patronus, Dataiku and Turing Post describe it almost identically: long-term memory lives in an external store and gets pulled into context at inference time. For facts, that works fine. For the date rule, it doesn't.
+
+## The real reason: the rule doesn't look like any query
+
+This is where Roldán's post is sharpest. He separates memory of facts from procedural memory, the memory of how to do something. His example: you told the agent to always format dates as YYYY-MM-DD. Later you ask it to summarize this spreadsheet. A vector search on that query looks around spreadsheet and summarize. The rule is about dates and format. In embedding space they're far apart, and the rule doesn't get retrieved.
+
+In short: the rule you need most is exactly the one that doesn't resemble the question. Semantic retrieval doesn't fail here because of a bug. It fails by design.
+
+Patronus says the same thing in their table, without making a point of it: procedural memory is usually stored as an updated system prompt or as an executable workflow. Meaning it isn't retrieved. It's loaded.
+
+## Four months later, someone measured it
+
+In June 2026, two projects hit HN that attack the same problem from different angles. graphCTX, a memory layer for coding agents, ran an eval of 14 coding tasks after compaction. No memory: 0 of 14. With a recall API: 3 of 14. With graphCTX: 14 of 14. They tie every fact to a commit and a branch instead of to the clock, and promote session memory to permanent memory only after an evidence gate. Their local lookup takes about 1ms, versus 494ms p50 for a Supermemory search.
+
+YourMemory goes the other way: memory is a pruning problem, not a hoarding problem. Every memory decays along an Ebbinghaus curve and gets deleted once its strength drops below 0.05. They report 89.4% Recall@5 on LongMemEval and 84% fewer wasted tokens after 30 sessions.
+
+> **Caveat:** All the numbers here are the authors' own, on their own evals. 14 tasks is a small sample, and we wouldn't pick a tool based on it. What's interesting is how they measure, not what came out.
+
+Meanwhile, LangChain's 2026 survey (more than 1,300 respondents) found that a third name quality as the main blocker to production, and large companies specifically call out context management.
+
+<figure><img src="/posts/agentic-memory/v3-chart-en.jpg" alt="Memory retrieved by similarity alone barely helps after compaction. Memory tied to the repo recovers everything, at least on their eval (graphCTX)" loading="lazy" /><figcaption>Memory retrieved by similarity alone barely helps after compaction. Memory tied to the repo recovers everything, at least on their eval (graphCTX)</figcaption></figure>
+
+## What to check before your agent runs all night
+
+First, separate them. Procedural rules, like formats, conventions and "don't touch main", go into a file that always loads: CLAUDE.md, AGENTS.md or the system prompt. Not into a vector store. The store is for facts and events.
+
+Second, check it with a test, not a hunch. If you have a function that assembles the context, run queries unrelated to the rules through it and assert the rules are there:
+
+```python title="test_procedural_memory.py"
+import pytest
+from my_agent.context import build_context  # your context builder
+
+PROCEDURAL_RULES = [
+    "YYYY-MM-DD",
+    "never push to main",
+]
+
+UNRELATED_QUERIES = [
+    "summarize this spreadsheet",
+    "fix the flaky login test",
+    "write release notes for v2.3",
+]
+
+@pytest.mark.parametrize("query", UNRELATED_QUERIES)
+def test_rules_survive_any_query(query):
+    ctx = build_context(query)
+    for rule in PROCEDURAL_RULES:
+        assert rule in ctx, f"rule {rule!r} missing for query {query!r}"
+
+def test_memory_budget_is_flat():
+    sizes = [len(build_context("status?", session=n)) for n in (1, 30, 120)]
+    assert sizes[-1] < sizes[0] * 2, f"memory grows with sessions: {sizes}"
+```
+
+Adapt build_context to your own signature. The second test is the hoarding check: if the context at session 120 is twice the size of session 1, your memory is accumulating instead of forgetting.
+
+Two more things. Run an eval after compaction, the way graphCTX did: in Claude Code that's `/compact`, then the same task again, and check the rules are still applied. And give every fact a source and an expiry, a commit or a timestamp, so there's something to delete.
+
+200K tokens won't help a one-line rule that sits where no query ever reaches.

@@ -1,0 +1,1258 @@
+[0:00] in partnership with Neo4j.
+[0:01] In this course, you design a multi-agent system that
+[0:05] transforms your structured and unstructured data into a knowledge draft.
+[0:09] I found knowledge drafts really useful for high stakes applications,
+[0:12] where accuracy of the information we store and retrieve is important.
+[0:17] This course will teach you why and also give you
+[0:19] a great set of tools for building these knowledge drafts.
+[0:22] I'm delighted to instructor for this course is Andres Colliger,
+[0:26] who is a developer evangelist through Genesive AI,
+[0:29] at Neo4j.
+[0:31] Thanks, Andrew.
+[0:32] I'm excited to be back here
+[0:33] and to work with you on this course.
+[0:36] Similar to RAG,
+[0:37] a knowledge graph system
+[0:39] splits your text documents into chunks
+[0:41] and stores them in the vector database.
+[0:44] But in addition to that,
+[0:45] it places the chunks into a graph structure,
+[0:48] which is chunk is linked to entities
+[0:50] extracted from the chunks.
+[0:52] For example, a text chunk from a product review
+[0:55] can contain entities such as product orders
+[0:58] or delivery issues or product defects.
+[1:00] To build a knowledge graph,
+[1:01] you extract the relevant entities from the chunks,
+[1:04] then connect the chunks and the entities
+[1:06] in the graph through edges.
+[1:08] Here, each edge represents a relationship.
+[1:11] For example, maybe it represents
+[1:12] that this chunk mentioned a certain product
+[1:14] or that that product has an issue.
+[1:17] The entities are retrieved alongside the relevant chunks
+[1:21] to provide more relevant context to the LM
+[1:24] to generate more precise and accurate answers.
+[1:28] You can also connect this type of graph
+[1:31] to another graph containing additional information
+[1:33] extracted from structured data, such as CSE files.
+[1:38] In this course, Andres will walk you through
+[1:40] how to build a multi-agent system
+[1:42] that helps you do all this work
+[1:43] of constructing this type of knowledge graph.
+[1:46] To transform your structured and unstructured data
+[1:48] into a knowledge graph,
+[1:50] you first need to decide on the graph schema,
+[1:52] meaning what types of entities or nodes you can extract from the data
+[1:56] and what relationships exist between them.
+[1:59] Once you have the schema defined,
+[2:01] you can construct the actual graph and store it in a graph database.
+[2:05] Instead of mainly looking at your data to find the graph schema,
+[2:08] you'll design a multi-agent system for doing that
+[2:11] using Google's AVK or Agent Development Kit.
+[2:14] After you learn the basic syntax with ADK,
+[2:17] you'll design your system one agent at a time.
+[2:19] The first agent will converse with you to extract the goal and type of graph you want to build.
+[2:25] Then given that goal, a group of agents will specialize in extracting the entities and relationships from your structured data,
+[2:32] and another group of agents will handle your unstructured data.
+[2:36] Finally, the final set of agents will connect the two models and construct the graph accordingly.
+[2:41] Many people have worked to create this course.
+[2:44] I'd like to thank from Mio4J, Martin O'Hanlon, and Adam Cowley.
+[2:49] From deeplearning.ai, Christopher Policastro and Hara Salami also contributed to this course.
+[2:55] In the first lesson, you'll learn more about the underlying structure of knowledge drafts
+[2:59] and how you can build one and use it to identify root causes of product issues.
+[3:04] Sounds great. Let's get started.
+[3:07] Go through what a knowledge graph means and how they help represent and retrieve relationships from your data.
+[3:12] You'll then explore the dataset you'll work on to build a knowledge graph.
+[3:17] Let's dive in.
+[3:18] So what is a knowledge graph?
+[3:20] We're going to take a step back for a moment and reflect on relational databases and what
+[3:26] a relational schema looks like.
+[3:28] We all probably are familiar with some scenario like this, where there'll be some table on
+[3:32] the left and some table on the right, and this table in the middle that is the join
+[3:36] table that allows for multiple connections between the persons and the products in this
+[3:40] particular example.
+[3:42] So let's think about these two tables with the join table.
+[3:45] If you ask a question like,
+[3:47] what products has this person purchased?
+[3:49] You'd first start with the person table
+[3:51] and select this person here, it's identified by ABK.
+[3:55] And of course you do a join over to the person product table
+[3:58] and you'd see that the person product table
+[4:00] has a join between the ABK and some chair,
+[4:03] ABK and a lamp, ABK and a desk.
+[4:05] Fantastic.
+[4:07] One more join across from the person
+[4:09] to the person product to the product table.
+[4:12] got a complete answer where from ABK you can see that here's the products that
+[4:16] ABK has purchased, this chair, lamp, and a desk, and you can get the details about
+[4:20] those purchases. What if you extended that question and you asked who else
+[4:25] bought products that ABK bought? Well you start with the same joins going from ABK
+[4:30] to the products and then you would join back to the person product table and
+[4:34] from there back to the person table and now you would get this person EE who's
+[4:40] bought some products that ABK also bought. But notice that EE has also bought one extra product.
+[4:47] That's interesting. So we could probably extend this one more step and ask, well,
+[4:53] what product should we recommend that ABK buy next? Now this is kind of the basics of doing
+[4:58] a recommendation query. If you've got some purchase pattern from ABK that matches a purchase pattern
+[5:04] from some other person or other group of people, the thing you want to recommend to ABK
+[5:09] is what that other group of people bought that ABK has not.
+[5:13] So the same joins apply from ABK through to the products,
+[5:17] back to the other people that have bought those products.
+[5:19] There's too many joins. It's getting a little confusing.
+[5:23] There's actually a nicer way to actually think about this and to query this.
+[5:27] Let's turn this into a graph.
+[5:29] The first step is to just drop all the records that don't matter.
+[5:32] All those gray records that weren't part of the original query.
+[5:35] Let's put those aside for the moment and focus on the records that we know about
+[5:38] that are part of the data set so far that matters for this query about recommending something to
+[5:43] ABK. Get rid of all the join table records in the middle, turn those into arrows connecting ABK
+[5:48] directly over to the products that he's purchased, and the same thing for EE over to the products that
+[5:53] they have purchased. And now just rearrange the records a little bit. So you've got ABK on one
+[5:58] side, EE on the other side, and now it looks much nicer. It's much easier to understand what's going
+[6:04] on both ABK and EE are connected to these products in the middle but then also this person EE is
+[6:10] connected to another product that has no connection to ABK. You can start to turn this into a query
+[6:16] by rephrasing it as a pattern match. Starting with ABK on the left side you can describe a query in a
+[6:23] query language called Cypher where it looks a little bit like SQL if SQL had pattern matching
+[6:28] abilities. So here we're going to describe a pattern that describes the data records that you
+[6:33] want to find. We're going to match from the data record that we're going to call ABK that has a
+[6:38] label of person and that has a property with the name key where the value of it is ABK. So that's
+[6:45] in round parentheses. We know that that's a node in graph terms. And then we kind of have this
+[6:50] right-facing arrow with colon purchased in there. That's a relationship type that is the purchased.
+[6:56] So match a pattern where ABK purchased over to some other parentheses that we're going to call ABK products.
+[7:03] That's going to be a pattern match from ABK to the products that ABK matched.
+[7:07] We can return those directly, and that's going to be the products in the middle there.
+[7:12] We can extend that pattern to include the other people who bought those products.
+[7:17] Since we went from ABK to the products that ABK purchased,
+[7:20] we can also have relationships going in to those products and say,
+[7:24] okay, there's some other people who bought those products.
+[7:27] This pattern will find all of the products
+[7:29] that people have in common with ABK.
+[7:31] We can extend it a little bit more
+[7:33] to ask that recommendation question problem,
+[7:35] where instead of saying
+[7:36] we just want to find these other products,
+[7:39] the other products have a unique property
+[7:41] where they're actually something that ABK does not have.
+[7:44] So we have the same pattern match from ABK
+[7:46] to some products to some other people,
+[7:49] and then extend that to other products.
+[7:52] And now we include a predicate
+[7:53] saying we actually want a negative pattern to be true,
+[7:56] that ABK has not purchased those other products.
+[7:59] So where not ABK purchased those other products?
+[8:02] So down there on the bottom,
+[8:04] that dotted line from ABK to the couch,
+[8:06] we want that to not exist.
+[8:08] Now we're describing a pattern
+[8:10] that both has records that should exist,
+[8:12] something that should not exist.
+[8:14] The other products now will be reduced
+[8:16] to only products that ABK has not purchased.
+[8:19] That's what we're going to use
+[8:19] as a recommendation that he buy.
+[8:21] So what really is a knowledge graph? It's a kind of database that represents information as nodes,
+[8:27] representing things like people, products, blogs, whatever you might want to have as
+[8:31] records in a database. But then also relationships that aren't simply a convention of using a join
+[8:37] table, but that are a first-class citizen. They're actually data records inside of the database
+[8:41] that have a semantic meaning. They actually represent how two nodes are connected,
+[8:45] and they add information about those two nodes. So both the nodes and relationships have key
+[8:50] value properties, they have multiple labels on nodes, relationships always have a direction,
+[8:55] and they have a single type. And the query language that you use for doing pattern matching
+[8:59] is called Cypher. And it turns out that this is super nice for mapping to natural language
+[9:04] and really convenient for working with Gen AI and LLMs because LLMs are really good at natural
+[9:09] language. If we go back for a moment here and just look at that query at the top, you can read that
+[9:15] out loud and make sense of it. Match ABK, who's a person whose name is ABK, that bought some products
+[9:21] that some other people have bought. They've bought some other products where ABK has not purchased
+[9:26] those other products. The other thing that's interesting about knowledge graphs is that
+[9:31] they're really convened for combining unstructured data along with that structured data, whether that
+[9:35] was some products that we have or people, whatever it might be in structured data. You can then add
+[9:41] any kind of chunked text, do a vector representation of that, store that in the database as well,
+[9:45] and combine both vector similarity search and pattern matching together for all kinds of powerful
+[9:50] access patterns. So for example, if you want to do root cause analysis, and you imagine that you're
+[9:56] a furniture manufacturer looking to understand customer complaints about your products,
+[10:01] so you turn to your team of experts, you know, data engineering, data analysis team, and say,
+[10:05] hey, could you do some root cause analysis? I've heard a lot of complaints out on the internet
+[10:09] about our products, let's try to figure out what's going on.
+[10:13] So the root cause analysis would include questions like,
+[10:16] which products have the most issues?
+[10:17] And then based on those products,
+[10:19] well, what part of the product is the actual problem?
+[10:21] And then you might want to ask a question like,
+[10:23] is there a problem with the part itself?
+[10:25] Perhaps there are other things that are going on.
+[10:27] People just don't like the product.
+[10:28] But if you can take corrective measures,
+[10:30] it would be because there's something either
+[10:31] in the manufacturing process.
+[10:33] What you're looking for here is for corrective measures
+[10:35] that you can take.
+[10:36] Do root cause analysis for something you can improve.
+[10:39] So if it's a design problem, you could turn that over to the design team.
+[10:42] They could take a look at what people's complaints are about.
+[10:45] But if it's a manufacturing problem or a problem with a part somewhere, you can do some analysis
+[10:49] on that, find the part problem, and either swap out the part for a new one or figure
+[10:54] out how to improve the process itself.
+[10:57] So as a data engineer, if you were handed this task, you would start with the usual
+[11:00] thing.
+[11:00] Ask some clarifying questions.
+[11:03] Why are we really doing this?
+[11:04] You want to be able to understand that there's possible manufacturing problems in the supply
+[11:08] chain.
+[11:09] Cool, okay.
+[11:10] Second question is, or if that's what we want to find out,
+[11:13] what data is available that we can do this analysis with?
+[11:16] So it turns out in this scenario,
+[11:18] we've got a bill of materials, some CSV files
+[11:20] that connect the product all the way
+[11:22] to the suppliers from those products.
+[11:24] Maybe it came from some spreadsheets,
+[11:25] maybe it came from some relational database
+[11:28] that isn't really suited for doing analysis,
+[11:30] that's okay too.
+[11:31] And you also have some data from user reviews
+[11:33] that you scraped from some websites on the internet.
+[11:36] You want to be able to combine those into one data set
+[11:38] that you can then do some analysis on.
+[11:40] So to do that analysis,
+[11:42] you're gonna build a knowledge graph
+[11:43] that connects all the data.
+[11:45] So here's what the target data model is gonna look like.
+[11:47] On the left, in the sort of beige boxes over there,
+[11:50] you see the CSV files that are available.
+[11:52] Each one of those is gonna turn into nodes in the graph
+[11:55] or relationships in the graph.
+[11:58] That's gonna be the kind of
+[11:59] what we're gonna call the domain graph.
+[12:01] On the right-hand side, on the bottom there,
+[12:03] you also see some beige boxes that represents markdown files.
+[12:06] Those markdown files are going to be chunked up.
+[12:08] They're going to create some documents inside of the graph as well.
+[12:11] And then all of this is going to get connected.
+[12:13] We'll look at some of the details as we actually go through doing the agent descriptions themselves.
+[12:18] But what I want to call out here for you right now is that these are really very connected,
+[12:23] but also very distinct parts of the graph.
+[12:25] We've got the data sources, the structured data on the one side there.
+[12:29] That's going to turn into what we call the domain graph.
+[12:32] So that's the structured data that we know that we can query with pattern matching.
+[12:36] On the other side, the unstructured data sources are not going to be queried in the same way,
+[12:41] and they're not going to be imported in the same way either.
+[12:43] So they're going to turn into what we call the lexical graph,
+[12:46] which represents the original textual data,
+[12:48] plus also the structure around that textual data.
+[12:51] To connect those two pieces, the unstructured data and the structured data,
+[12:55] we've got this part in the middle that we're going to call the subject graph.
+[12:59] The subject graph is going to be subjects or entities that we pull out of the chunks.
+[13:03] So the chunks will have some text.
+[13:04] they'll be talking about products.
+[13:06] Maybe they'll be usernames and things.
+[13:08] All of those things might be entities.
+[13:10] We're gonna find those, call those things subjects.
+[13:13] And those subjects are gonna be connected to objects.
+[13:15] So the subjects talk about something.
+[13:16] So some user, let's say that it's me, user ABK,
+[13:20] loves this table.
+[13:22] And so there'll be a subject predicate object
+[13:24] in the subject graph that talks about ABK loving some table.
+[13:29] That also, because ABK loves a table,
+[13:32] the table can correspond with the product
+[13:34] that we have in the structured data.
+[13:36] If ABK mentions a table, and the table is a product
+[13:39] that exists in the structured data,
+[13:41] we can then connect the entities
+[13:43] that we've extracted from the text
+[13:45] all the way over to the structured data
+[13:47] that we've got in from the CSV files.
+[13:49] Don't worry, we're gonna do this step by step.
+[13:52] On a high level, this is what you're gonna end up with,
+[13:55] a graph with subgraphs within it,
+[13:57] a domain graph, a subject graph, and a lexical graph.
+[14:01] All of the knowledge graph you'll build,
+[14:03] Let's go through the details of the multi-agent system
+[14:06] you'll design to first find the graph model
+[14:08] and then construct the graph.
+[14:10] There are lots of definitions for an agent.
+[14:12] Here's my definition.
+[14:13] I like to think about agents
+[14:14] from an engineering perspective.
+[14:16] And for me, it's a fancy new kind of control flow operator.
+[14:19] Basically you have a loop and inside of the loop,
+[14:22] there's a call to an LLM that then figures out
+[14:25] what it wants to do.
+[14:26] And then based on what it wants to do,
+[14:28] passes that back over to the computer side,
+[14:31] to the client side,
+[14:32] and really runs into a switch statement
+[14:34] that performs potential actions.
+[14:37] So in this loop, this is really just intelligent behavior
+[14:40] that's happening because of the LLM call,
+[14:42] but the execution of that intelligent behavior
+[14:44] is still happening through code.
+[14:46] What's great about this architecture, of course,
+[14:48] is that agents are really powerful
+[14:49] because you've got an LLM there to do some reasoning
+[14:52] and call out to tools that can do anything
+[14:54] you can do with code.
+[14:55] And it's adaptive because the LLM is given memory,
+[14:58] so it can learn what's happened
+[14:59] either through the conversation
+[15:01] or things that you've saved into memory
+[15:03] that are important for it to decide future outcomes.
+[15:06] And it's pretty easy to get started
+[15:08] because you're really just doing natural language descriptions
+[15:10] through the prompts about what the agent should do.
+[15:13] But all this power and ease comes with some downsides.
+[15:16] It can be slow working with an agent
+[15:18] because the calls out to a remote LLM
+[15:20] is a bit expensive and slow.
+[15:22] It's also non-deterministic,
+[15:23] well, because LLMs are non-deterministic.
+[15:26] And, you know, token cost over time
+[15:28] can really add up quite a lot.
+[15:30] So if you're running an agent over time in production for thousands and thousands of calls,
+[15:35] the token cost gets really expensive really quickly.
+[15:38] That's one of the advantages of moving to a multi-agent system
+[15:41] is that you can actually prove some of the downsides here.
+[15:45] So what is exactly a multi-agent system?
+[15:47] It is, of course, just a system where you have multiple agents working collaboratively on a single goal.
+[15:52] The agents typically are arranged into a kind of a hierarchy
+[15:55] where you have a top-level agent that manages the overall flow,
+[15:57] and then as many sub-level agents as you'd like to
+[16:00] that have either different phases of the work
+[16:03] or very specific tasks that they're performing.
+[16:05] The agents interact in a couple different ways.
+[16:08] There's a main conversational thread
+[16:10] that's basically happening with the user
+[16:11] where the user might have some message
+[16:13] that they kick off the work with.
+[16:15] And then each of the agents can decide,
+[16:17] is this work that I can do
+[16:18] or something that somebody else should do?
+[16:20] So can I delegate this to a different agent?
+[16:23] So you can see in this illustration here
+[16:25] that the root agent is able to delegate to either agent A or agent B. Internally, agent A and agent
+[16:30] B can do some work using the tools that they've been given. One of the tools in agent B is unique.
+[16:36] This p agent here, this p function, is actually going to be an agent itself, but being called as
+[16:42] if it were a tool. So there's two ways for tools to interact, either agents delegating to each other
+[16:46] or an agent that's behaving as a tool being called by another agent. And along the way,
+[16:52] you've got specific checkpoints with the user that are possible whenever you have
+[16:55] any of these transitions. So what is the multi-agent system that you'll build?
+[16:59] You'll build parts of a knowledge graph agent focusing on the sub-agents that
+[17:04] perform knowledge graph construction. You'll learn the basics of building an
+[17:08] agent using Google's ADK. You'll learn what memory is and how to use it for
+[17:12] recording critical information. You'll define some tools and of course all of
+[17:16] this will converge from open-ended conversation to executable code. This
+[17:21] beautiful diagram are all the agents and the flow of agents and their interactions.
+[17:25] Let's walk through this a little bit at a time. At the top level this is the agent
+[17:31] that manages the overall introduction of the user to what's possible, what the
+[17:35] agent's responsibility is, and helping the user understand what's the workflow
+[17:40] that's possible here from the knowledge graph construction all the way to doing
+[17:44] graph retrieval. So this is really a conversational agent that itself is not
+[17:48] going to do any work but it's going to guide the user through the different
+[17:51] phases of work that are gonna occur.
+[17:53] It's this next level of agents down
+[17:55] that are really gonna manage the individual workflows.
+[17:58] And there are three major workflows.
+[18:00] It really on the left, we've got two workflows,
+[18:02] the structured data agent and the unstructured data agent.
+[18:06] These are responsible for taking the user through the idea
+[18:09] of like what they might wanna do,
+[18:10] all the way to constructing a graph.
+[18:12] And then if those have done their job,
+[18:15] this third agent, the graph rag agent on the right side,
+[18:18] is responsible for helping the user actually answer questions
+[18:20] using that graph.
+[18:22] Both the structured data agent
+[18:23] and the unstructured data agent are workflow agents.
+[18:26] They perform their work by interacting with the user
+[18:29] and helping them go through the steps
+[18:31] of what needs to happen from the idea
+[18:33] of what they wanna do all the way to describing the graph.
+[18:35] And they do that by delegating to sub-agents
+[18:37] that specialize in each phase of the workflow.
+[18:40] You'll see some replication here
+[18:41] that both the structured and unstructured data
+[18:44] have some agents that are in common,
+[18:46] and I'll touch on those as we get into the one level down.
+[18:49] Okay, so here's the sub-agents
+[18:50] that are actually doing the workflow for structured data.
+[18:53] Let's walk through these one at a time.
+[18:55] And also what's important to note here
+[18:57] is the output of actually these agents doing their work.
+[19:00] If you think about yourself as being a data engineer
+[19:03] that's been given the task of actually performing this work,
+[19:06] each of these agents are kind of what you would do yourself
+[19:08] if you're engaging in the work.
+[19:11] This first one, the user intent agent,
+[19:13] is what you would do when you've been asked
+[19:15] to do some task for data analysis.
+[19:17] And whoever asked that, you respond to with some questions.
+[19:20] Hey, could you clarify what you want me to do?
+[19:23] Give me, you know, what are the goals you're after?
+[19:25] What kind of analysis do you want me to perform?
+[19:27] And it's really important to nail that down up front.
+[19:30] This is the kind of the requirements
+[19:31] or the direction overall of what the job is.
+[19:34] So this user intent agent,
+[19:36] even though it's collaborative and kind of conversational,
+[19:39] the output of this is really important.
+[19:41] We're capturing what is the user goal
+[19:43] and what are they trying to get out of this work?
+[19:45] Based on that user goal then,
+[19:46] this next agent down, the file suggestion agent,
+[19:49] it's gonna take into account what has been established
+[19:52] through the user intent agent as the direction
+[19:55] and the goal of what the work is.
+[19:57] And then it's gonna look at the data files
+[19:58] that are available and try to find from those data files
+[20:01] which ones are useful for actually achieving that goal.
+[20:04] There might be more files that are available,
+[20:05] there might be even multiple data sources
+[20:07] that are available.
+[20:08] Here we're simplifying it down to just making suggestions
+[20:10] for files that are available on disk.
+[20:13] The output of that ends up being a list of suggested files
+[20:16] that have been approved by the user,
+[20:18] and then that gets input into the next agent,
+[20:21] which is the schema proposal agent.
+[20:23] The schema proposal agent is actually a pair of agents
+[20:26] formed in a critic pattern,
+[20:27] where one of the agents is responsible
+[20:29] for making a proposal about what the schema could look like,
+[20:32] and the next one is gonna be a critic saying,
+[20:34] well, maybe that's not quite so right,
+[20:36] think about changing it in this way or that way.
+[20:38] We'll look at the details in a later lesson.
+[20:40] But the idea here is that this pairing of agents
+[20:44] internally will loop through what's possible,
+[20:46] self-criticize itself, and the outcome of that
+[20:48] should be a good graph schema that uses the files
+[20:51] that were approved from the previous agent
+[20:53] and also in compliance with user goals
+[20:55] that were set by the first agent,
+[20:57] producing a graph schema that can answer questions
+[20:59] that are useful for the user.
+[21:01] So the output of all of that
+[21:03] we're calling a graph construction plan.
+[21:05] It's not a graph itself,
+[21:06] but it's a description about how to construct that graph.
+[21:09] The second workflow in the middle,
+[21:11] the first two parts of that workflow
+[21:13] are the exact same as the structured data workflow.
+[21:16] Here in the middle, we're dealing with unstructured data,
+[21:18] but it still begins with understanding
+[21:20] what is the user intent for bringing in the unstructured data,
+[21:23] and here that's markdown files.
+[21:25] And then, okay, if you understand
+[21:27] why the user wants to bring in some markdown files,
+[21:29] you can identify which files are relevant.
+[21:32] Again, a file suggestion agent would do that.
+[21:34] Similar behavior to the structured data,
+[21:37] but this third step is different.
+[21:39] In the third step, rather than designing a schema
+[21:42] based on some CSV files, all you have is text.
+[21:46] And from that text, how do you create a graph?
+[21:48] Well, the approach here is that we're gonna have
+[21:49] two specialized agents that look through the text
+[21:53] and identify what are called entities,
+[21:54] so people, places, and things that occur within the text,
+[21:58] and also for those entities, it identifies what facts
+[22:01] are describing those entities within the text.
+[22:05] So let's say that it was, you know, I was in the text
+[22:08] and I had some reviews of local coffee shops.
+[22:11] it might reveal that ABK really loves
+[22:13] to store a coffee from fills, because who doesn't?
+[22:17] So those are facts that could be extracted from the text.
+[22:20] The goal of this agent is actually to find out
+[22:22] what kinds of facts can be extracted,
+[22:24] and not do the extraction,
+[22:25] but simply describe what's possible.
+[22:27] And so that we're gonna be calling
+[22:29] a knowledge extraction plan.
+[22:31] The knowledge extraction plan,
+[22:33] paired with the graph construction plan
+[22:34] from the structured data,
+[22:35] together give all the rules that we need
+[22:38] using the graph construction plan
+[22:39] the graph extraction plan this red box down in the corner then is just a single
+[22:43] tool that has multiple tools internally that actually can take those plans and
+[22:47] do the extraction itself and do the construction itself it'll loop over all
+[22:52] the construction rules to create a domain graph loop over all the markdown files
+[22:56] chunk them up do the vector embedding of those and then also extract entities and
+[23:01] the facts and then connect those to the structured data in lessons 4 through 8
+[23:06] you'll go through the entire workflow for structured data from user intent file
+[23:11] suggestions to the schema proposal then we'll skip over to the unstructured data
+[23:16] just the entity in fact type proposal and then finally we'll look at the
+[23:21] particular tool in lesson 8 that does the graph construction itself it does
+[23:24] all the hard work that the previous agents really did the reasoning about
+[23:28] what the work should be in the next lesson we'll actually get into doing
+[23:32] some coding building your first agent we're going to be using Google's ADK if
+[23:36] If you're already familiar with Google ADK,
+[23:38] you could skip over that lesson and move on to actually
+[23:40] building the multi-agent system.
+[23:42] But I think it's a really good overview.
+[23:44] And also, it helps you understand how I think about it
+[23:46] and how I've implemented it in this particular multi-agent
+[23:49] system.
+[23:50] So it's nice to walk through.
+[23:51] I'll see you there.
+[23:53] To build the multi-agent system,
+[23:55] you'll use Google's ADK, or Agent Development Kit,
+[23:59] which is a framework for developing agents.
+[24:01] In this lesson, you'll learn how to create and run one agent
+[24:05] as well as a team of agents.
+[24:07] All right, let's go.
+[24:09] In this lesson, you'll familiarize yourself
+[24:11] with Google's Agent Development Kit,
+[24:13] and you'll use that for building agents
+[24:15] throughout this multi-agent system.
+[24:17] In this lesson, you'll learn how to create
+[24:19] and run an agent using ADK,
+[24:21] and the imports that we're doing here,
+[24:23] of course, the standard OS,
+[24:24] and then a bunch of stuff from Google ADK itself.
+[24:27] We're gonna import this agent,
+[24:28] which is gonna be the key thing
+[24:30] for actually describing what an agent is.
+[24:32] For interacting with an LLM,
+[24:34] we're going to be using the LiteLLM library,
+[24:35] so we're going to import that here.
+[24:36] And this is a little wrapper for letting Google ADK talk to OpenAI.
+[24:41] And then we're also going to need some memory for the agent.
+[24:44] For the memory, we're going to use the memory session service.
+[24:46] And then finally, the agent also needs a way to run,
+[24:48] so we're going to import a runner.
+[24:50] We also have some typing stuff here
+[24:52] that's not really so important for how all this works.
+[24:54] Let's go ahead and make sure that all that imports.
+[24:56] Great. All the libraries are imported.
+[24:59] So the next part then is just start defining the models that we're going to use.
+[25:03] We're going to be using OpenAI for this course.
+[25:06] So let's go ahead and import.
+[25:07] We'll define what the model is going to be itself, is OpenAI as GPT-4-0.
+[25:12] Again, we're going to be using LiteLLM for actually reaching out to the OpenAI API.
+[25:17] And we're just going to go ahead and try a sample execution of completing a chat with that.
+[25:22] So if you look at the chat here, you'll notice that we're just setting up a message that we're going to send to OpenAI.
+[25:28] And we're going to ask it the question, are you ready?
+[25:31] So if that all works successfully, we'll get a good message from OpenAI letting us know that this works.
+[25:38] Looking at the model of response, there's a lot of information here,
+[25:41] but the key part is that the response includes a message from OpenAI saying,
+[25:45] yes, I'm ready. How can I assist you today?
+[25:47] OpenAI is all set to go.
+[25:49] We're also using Neo4j today, so we're going to import a helper library
+[25:52] that combines Neo4j with Google AVK in a nice way.
+[25:56] And that library is something we can take a look at to see the details of what's going on.
+[26:01] The import that we're going to use is just from Neo4j for ADK, import the GraphDB library.
+[26:07] Let's take a look at those details.
+[26:09] Okay, now we're inside of Neo4j for ADK.
+[26:12] And you can see it starts off pretty simply.
+[26:14] We import some stuff from the operating system.
+[26:16] We, of course, load up the environment.
+[26:18] And then from Neo4j, the Python package, we load up the graph database.
+[26:22] And you also get a result class definition.
+[26:25] Now a bunch of these functions that are in here are just really nice for just wrapping up how you interact with Neo4j and presenting the results from Neo4j in a way that Google ADK likes to see things.
+[26:35] One of the key things is that results should come back either as a dictionary with a status that is a success or a status that is an error.
+[26:44] These two helper functions help do that.
+[26:46] You can call a tool success or tool error along with some extra arguments and actually get a nicely formatted result from any kind of call.
+[26:52] To that we then go ahead and also integrate helper library.
+[26:56] Results that are handled by Google ADK need to be easily persisted.
+[27:00] So this function called here2python basically goes through all the different kinds of results you can get back from Neo4j
+[27:06] and makes them easily serializable in a nice format for Google ADK.
+[27:10] You can look at the details if you want to see what's going on here.
+[27:13] The key part of course is this function that takes the Neo4j result, here passed in as just a result,
+[27:19] basically calls a 2Python package, packages all that up into a result that is easily used by Google ADK.
+[27:26] Each of those helper functions is then also used by this upper-level class called Neo4j for ADK,
+[27:32] and this is really a wrapper that combines a Neo4j driver, initializes the environment variables used there,
+[27:38] allows access to the driver, and then has a special function here for sending queries,
+[27:42] and it'll send any kind of query you'd like to, but then uses those helper functions for actually
+[27:46] reformatting those results into a nice Google ADK result. At the end then, because we're just going
+[27:53] to have one driver and one connection that we're using, we're going to have a singleton of this
+[27:56] class that we're using. This is the GraphDB that we're going to actually expose as a variable and
+[28:01] use that through all the notebooks. Okay, we took a look at Neo4j for ADK. Let's continue with the
+[28:06] notebook. So now we've got everything set up and we can start to define an agent itself. Okay, with
+[28:12] our Neo4j wrapper ready, let's go ahead and give it a try. You can just send any kind of Neo4j
+[28:16] query that you'd like to as long as it's valid cipher.
+[28:19] Here the cipher that we're sending is a very simple cipher statement that
+[28:22] doesn't do any work other than directly return a result.
+[28:25] Here the result is a string, Neo4j is ready, passing that back
+[28:29] aliased as a message variable. So if we run this and then print the results,
+[28:34] you'll see that it's been packaged up into this nice little dictionary
+[28:37] with a status success and then the query result containing an array
+[28:41] of all the rows returned from the database.
+[28:45] Great, with OpenAI ready and Neo4j ready, we can start to define our tools themselves and the agent eventually.
+[28:52] Tool definition is an important part in actually defining an agent.
+[28:55] Without tools, an agent can do a lot of thinking, maybe have some chats,
+[28:59] but it can't really do any interactions with the environment or with the world around it.
+[29:03] So we're going to define a very simple tool just to kind of illustrate what kind of things an agent can do.
+[29:08] Hello World is the classic, of course.
+[29:10] So we're going to develop the Hello World version for an agent's tool,
+[29:13] and we're going to call it say hello. So tools can be simply defined as functions. Here the
+[29:19] function is just say hello. It takes a single argument, person name as a string, and it returns
+[29:23] a dictionary. Of course that dictionary is the Google ADK dictionary that likes to see all results
+[29:27] in. And it also has a couple important parts here. There's a doc string that's here which is always
+[29:33] nice when you're writing code. It's also especially critical when you're developing tools for Google
+[29:37] ADK. This doc string is what lets Google ADK understand what actually this tool does.
+[29:43] This gets passed along to the LLM when the LLM is told,
+[29:47] here's all the tools that are available,
+[29:48] and also here's what those tools are described as doing.
+[29:52] So there's a couple of important parts that we should go through here.
+[29:54] You describe what the tool does.
+[29:56] Here it just formats a welcome message to a named person.
+[29:59] Of course, passed in is person name.
+[30:01] You describe the arguments that are being passed in, and also the result.
+[30:05] The result here is consistent through all of the tools
+[30:07] because the result is a dictionary that Google A.E.K. likes to see.
+[30:11] But you can add a little extra detail if you want to here.
+[30:13] For instance, if you know the kinds of errors that might come back, you could explain that here as well.
+[30:18] Inside, the function is incredibly simple.
+[30:20] All we're doing is using Neo4j again to actually do a hello world.
+[30:25] We're going to call out to Neo4j, sending a query where we're still going to return a hello to you,
+[30:31] but then we're also going to concatenate that with this person name,
+[30:34] which is passed in as an argument to the function.
+[30:37] That's going to get passed in as a query parameter to this query.
+[30:40] whenever you see that dollar sign in a new for J cipher statement that means
+[30:44] here's a query parameter so here in this array in this dictionary that's being
+[30:48] passed in you'll see the person name is being passed in as person name that'll
+[30:53] get substituted in as this variable here not as a template substitution but as
+[30:56] the value gets passed in and then this whole query will get executed so let's
+[31:01] define that function and of course because this function is just a normal
+[31:04] function we can try to write it so we can print saying hello to a B K and
+[31:08] and expect to see a very nice Google ADK formatted result
+[31:13] that was successful where the query result
+[31:15] that was sent off to Neo4j has the reply,
+[31:18] hello to you ABK, doing that concatenation.
+[31:21] Fantastic.
+[31:22] Now, just a side note here about query parameters,
+[31:25] part of why we're doing that,
+[31:26] this is good discipline for any kind of query language
+[31:28] they're using.
+[31:29] Most query languages have the ability
+[31:30] to have query parameters.
+[31:32] And one of the reasons you do that
+[31:33] is to avoid injection attacks, right?
+[31:35] So that people can't pass in values
+[31:37] that look like SQL statements or cipher statements
+[31:40] or any other query language statement as a value
+[31:43] and have that concatenated into a string,
+[31:45] that can cause all kinds of mayhem.
+[31:47] So instead, you pass in a query parameter.
+[31:50] And here, for instance, if I pass in the name and say,
+[31:52] actually, the name's going to be, hey, return some string here,
+[31:55] this could be some malicious code instead
+[31:57] that gets passed in as the person's name.
+[31:59] If you just concatenated that as a string,
+[32:02] all kinds of bad things can happen.
+[32:03] Instead, because it's a query parameter
+[32:05] that still just behaves as a variable,
+[32:07] It gets passed in, it gets concatenated as a string with the other string,
+[32:11] and the result is simply hello to the somewhat friendly and malicious injection attack.
+[32:17] And of course, it's been avoided now.
+[32:20] We have a basic tool available.
+[32:21] Now we can define an agent that's going to use that tool.
+[32:25] Now there are a couple of components of defining an agent.
+[32:27] It's common across all frameworks.
+[32:29] They'll do some variations of the same idea.
+[32:31] Let's take a look at what's happening inside of Google ADK to define an agent.
+[32:34] Now if you recall earlier we had imported this agent class from Google ADK. So we're going to
+[32:42] make an instance of that class and it takes a bunch of parameters. So the first thing that's
+[32:46] important is that every agent is given a name. Here we're going to call it hello agent underscore
+[32:51] v1. This is in case you have multiple versions of the agent that you want to have at the same time
+[32:56] or if you want to actually have different version instructions as well. Having an idea of what the
+[33:01] version of this agent is, is very helpful for debugging later on. You also pass in the model
+[33:06] that you want to use. If you recall, we defined LLM before as being a call through light LLM
+[33:12] out to open AI. So we're going to use that here. And these next two are pretty critical for how
+[33:17] the Google ADK actually orchestrates and executes agents. The first part is this description of the
+[33:23] agent. This is a little bit like the dockstring of the tool, what describes what does this agent do.
+[33:29] This lets Google ADK and also the other agents understand
+[33:32] what is the purpose of this agent,
+[33:34] and is there occasions when I should call this agent
+[33:37] rather than doing something myself,
+[33:39] what's called agent delegation.
+[33:41] So that's for other agents to know what to do with the agent here.
+[33:45] Then for the agent itself, you provide some instruction.
+[33:48] And the instruction is basically the same kind of thing
+[33:50] you would have done when you're doing prompt engineering
+[33:52] and you're defying the system prompt for the LLM.
+[33:56] This is the same kind of thing that you would do there.
+[33:58] This is a hello world agent, so it is of course very helpful.
+[34:02] It's a helpful assistant that's going to chat with the user, and it really only has one tool that it wants to use.
+[34:07] So you describe that tool here so that the agent understands, not just from the tool definition,
+[34:11] but also from your instructions that you're giving it, how to think about that tool and when to use that tool.
+[34:16] So here if the user provides their name, you know, use the say hello tool to give them a custom greeting.
+[34:24] And then the final part, of course, is we have to make those tools available.
+[34:30] The tools get passed in as an array of just the function names themselves.
+[34:34] So we're going to pass in and say hello, and then the agent then has access to that
+[34:38] tool.
+[34:39] It knows what to do with that tool because we give it instructions and other agents,
+[34:42] if there are other agents, know what this agent's role is.
+[34:46] Now that we have an agent and the agent has the tool and it has instructions about how
+[34:50] to use that tool, now we need to run the agent.
+[34:53] This is the final part in creating a very basic agentic system.
+[34:57] An agent has to have an execution environment.
+[35:00] So if you look at this diagram here, you'll see that inner box here.
+[35:03] This is the execution environment that happens.
+[35:05] There's a runner class that actually manages all the event loops basically for calling
+[35:10] out to the LLM, passing results from the LLM to particular agents, and coordinating all
+[35:14] the agents themselves and how they execute.
+[35:17] Each of those runners also has access to various services, whether that is in-memory services
+[35:22] for like doing actual memory.
+[35:24] Memory could be in memory
+[35:25] or it could be, you could use a database
+[35:26] like Neo4j for memory as well.
+[35:28] So that gets you access to storage.
+[35:30] Then there's the execution logic
+[35:31] that inside of the execution loop,
+[35:33] here are the steps for actually running things
+[35:35] and cording the agent,
+[35:37] whether agents are running in parallel
+[35:38] or in sequence or in a loop.
+[35:40] This all together actually is the execution environment
+[35:43] for the agent.
+[35:44] Okay, we're going to do this by hand first
+[35:47] and then show how we can wrap this up
+[35:48] to a little convenience method.
+[35:50] When you're doing your own development
+[35:51] with Google ADK. Google ADK has really great tooling for just defining an agent and using
+[35:56] the tooling for actually just running that agent and providing it the full execution environment
+[36:00] that it needs. We're going to be doing that by hand inside of the notebook, so let's do that
+[36:04] one step at a time and then wrap it up into a little helper. So there are a couple things you're
+[36:09] going to need to actually set up the execution environment. Every runtime actually runs within
+[36:14] a session. You could of course have multiple sessions that are running in some production
+[36:18] environment. Here we're going to have a single session where we're going to go ahead and just
+[36:21] set up the in-memory service which provides context and state for the agent as it's running.
+[36:26] We're going to create the session service based on that memory and also for the particular agent
+[36:32] that we're writing and also assuming that we have a user we're going to assume that we have a single
+[36:36] user a single application that we're running and a single session. All that is going to be used here
+[36:41] in the create session to actually create a single executable state to actually be run and then the
+[36:47] runner is going to run that state given the agent that it has. So here the runner combines the agent
+[36:53] that we want to run, our hello world agent. The app name is going to be the same as we passed into
+[36:57] the session here. And also the session service is going to be the session within which this agent
+[37:02] runs. Again in a production environment there might be multiple sessions, there might be multiple
+[37:07] applications that are using this agent. That's why these are all different arguments to run.
+[37:12] Okay now there's a lot to walk through just to actually do the running of the agents as well.
+[37:16] So let's go through this step by step and take our time.
+[37:19] We know that we just have this runner available that we just defined.
+[37:22] And we're going to do just a single loop through with a single user message
+[37:25] and allow the runner to execute the agent reacting to that message from the user.
+[37:31] So we're going to define a user message.
+[37:33] And I'm simply going to say, hello, I'm ABK.
+[37:35] And we'll go ahead and print that message out in a friendly way
+[37:37] so we ourselves can see as this is running what's going on.
+[37:41] That message that is just a string has to get packed up into a data structure
+[37:45] that Google ADK, the runtime environment expects.
+[37:48] Usually this is handled behind the scenes for you, of course,
+[37:50] but we're going to do this by hand.
+[37:52] So we're going to create this content class here.
+[37:55] And the role of the content that we're creating is from the user.
+[37:58] This is a user message.
+[38:00] Content can have multiple parts.
+[38:02] So we're going to create an array of parts
+[38:04] where one of the parts has some text,
+[38:07] where the text is a user message.
+[38:09] This is all bundled up to do more complex things.
+[38:11] Here we're just trying to run a single message from a single user
+[38:14] but this gives you lots of flexibility when you have lots of extra things going on
+[38:19] and this is basically creating a content event
+[38:21] that then has to get processed by the agent runtime system.
+[38:25] Also, we're going to go ahead and set up a response from the agent system
+[38:29] in case it doesn't do anything.
+[38:32] So after you pass in a message,
+[38:34] we're going to actually go through running that message
+[38:35] and letting the agent get a chance to respond,
+[38:38] but it's possible that the agent doesn't respond.
+[38:41] There's this notion of having a final response,
+[38:43] which is a flag that an agent can set in different ways to actually indicate,
+[38:48] okay, I'm done thinking about this or I'm done processing this.
+[38:51] So you can go on and go back to the user.
+[38:53] In case the agent does nothing, a final response may not get set.
+[38:57] So we preset it here with a default value to let us know that nothing has happened.
+[39:02] We're going to run through without any verbose output right now.
+[39:05] And you can see in a second what the verbose output might look like.
+[39:08] This is the event loop itself.
+[39:10] Well, one step I should say of the event loop,
+[39:12] for this one message, where given the user message,
+[39:16] we're going to asynchronously use the runner
+[39:18] and call out to the LLM using the message that was passed in,
+[39:23] the agent that was defined to use that model,
+[39:25] and all the instructions that we had given it.
+[39:28] So the first thing that you'll notice is that when we call this async,
+[39:30] we also pass in all the same information we had for creating the session.
+[39:34] This is because you can run things.
+[39:36] Again, there can be multiple sessions going on,
+[39:38] so you have multiple event loops running around.
+[39:39] and asynchronously you pass in,
+[39:42] here's the context that I'm currently operating in.
+[39:45] It's for this user in this session
+[39:47] and here's the content that's getting passed in.
+[39:49] Go ahead and execute this once.
+[39:51] Let the LLM do some work on this.
+[39:54] This is inside of a for loop
+[39:56] because this is an agentic system.
+[39:58] So once the agent is given this message,
+[40:00] it might do a bunch of things
+[40:02] before actually having that final response.
+[40:04] So the event loop here pulls out events
+[40:07] from the asynchronous running of the agent
+[40:09] every event is some update from the agent itself. As the events come in if the verbose mode is
+[40:16] turned on we'll print out here's an event that happened here's who created that event. The
+[40:21] initial event of course should be that the user message was passed in so we should see the event
+[40:25] author was the users themselves and you'll see the content of the event as well. You can take a look
+[40:31] what's happening here in the debug statement. A bunch of things get printed out which are helpful
+[40:35] to understand what's going on and then this is the key concept for keeping the event loop running
+[40:39] for as long as you'd like it to run.
+[40:42] Hopefully the agent will run only as much as it needs to.
+[40:45] But as each event comes in, there's a flag that says,
+[40:48] okay, this is the final event.
+[40:50] I'm done processing this.
+[40:51] The agent is done processing.
+[40:53] If it has set this, then you know that, okay,
+[40:55] the processing is over.
+[40:57] You can take a look at the content
+[40:58] and decide what the final response might be.
+[41:01] Here we're taking a look at the content
+[41:03] if they have some multiple parts.
+[41:06] So if it's a non-zero array of text that come back,
+[41:08] we're going to take the first message back from the parts zero here, grab the text from that,
+[41:14] and here we're making some assumptions that the text response in the first part is actually the
+[41:18] right one. Turn that into the final response text. Alternatively, the agent could have decided this
+[41:24] is my final response, and by the way, I don't have actually a response. What I've asked the
+[41:29] runtime system to do is actually to escalate. Now here escalation ends up meaning the agent is
+[41:35] running knows that it's a sub-agent and it can't handle or it can't do any more work with what's
+[41:39] currently available. So it's basically saying, hey, escalate this to somebody else, either my
+[41:43] parent or to some other agent that might be appropriate. In that case, the final response
+[41:49] text that we're going to set is based on that. We're going to say that the agent has decided to
+[41:53] escalate the current handling of the message and that we don't have any specific message or there's
+[41:57] an error message, if there is one there, and return that as the final message. All that is to continue
+[42:04] to run through one round through the event loop instigated by a single user message and then at
+[42:09] the end we'll go ahead and print out the final agent response that's kind of a lot to go through
+[42:14] but keep that in your heads a little bit as you're going through all the notebooks internally this is
+[42:18] really what's happening to actually make all the machinery run for all that work there we go simple
+[42:24] chat hello i'm abk hello to you abk of course because we're going to be doing a lot of calling
+[42:31] to agents manually. We're going to set up a helper class to actually let us do that a little bit more
+[42:36] easily. And I'm going to call that helper class agent caller. This agent caller basically wraps
+[42:43] up those functions that we went through each one at a time here. And also the event loop itself
+[42:49] into one class. And if you look through the details, it is doing all the things that we'd
+[42:56] seen above. It's saving the single user ID, the single session ID, the current agent that we're
+[43:03] going to be running, and also the runner that's been set up. It has access to getting the session
+[43:07] that it uses internally for actually managing stuff. And this call function here is what actually
+[43:14] instigates one round trip through the event loop based on a user message. So it does just what we
+[43:19] saw above, takes the user message, packages it up so that it's available as content to be processed
+[43:25] by the agent and then it runs through the event loop.
+[43:29] Same kind of debug options are available as well.
+[43:33] And this is really a stylistic choice.
+[43:35] I'm not a native Python developer and so this is the way I like to do things.
+[43:38] I prefer having factory methods for things that are a little bit complex to construct.
+[43:43] So rather than having a complex constructor inside of that class, I created a separate
+[43:47] class that actually does the construction.
+[43:51] And this here, this utility function, make agent caller, is what will create an instance of the agent caller.
+[43:57] You will be passing into it all the necessary information that it has.
+[44:01] What's the agent that you want to be running?
+[44:02] And also, what is the initial state of that agent?
+[44:05] Where the state is the agent's internal memory.
+[44:08] All of this should look just like what we had run through before, but now packaged up into here's the different elements,
+[44:14] the major components that should be combined into the agent caller.
+[44:17] What is the current app?
+[44:18] The user, the session ID.
+[44:19] create a session service for both memory and also for managing the session itself.
+[44:25] Then finally, also create a runner.
+[44:27] Then having construct all those things, pass those into the agent caller,
+[44:31] which wraps those all up into an execution loop.
+[44:35] Okay, now that we have some utility functions for running an agent,
+[44:38] we can run a conversation with the say hello agent that we created earlier.
+[44:44] So to create a new agent caller for our hello agent,
+[44:48] we're going to actually call out the helper function to make agent caller
+[44:51] passing in the hello agent itself and we'll just call that the hello agent caller.
+[44:56] Then to run a conversation we're going to have an asynchronous function
+[45:00] that has multiple user messages that we're going to pass in to the agent caller
+[45:04] using the call method. First I'll say hello I'm ABK
+[45:07] and then I'll say I am excited. We'll go ahead and run that conversation
+[45:11] and see what that looks like. Awesome we have created a friendly chat
+[45:16] agent. Good work. So now that you've gotten this far, you know the basics about using Google ADK,
+[45:23] how to create an agent, how to give that agent tools that it can use, then also how to create
+[45:28] an execution environment for that agent. Finally, with all that in hand, you can script interactions
+[45:34] with the agent here in the notebook, passing in user messages that let you then test out how the
+[45:39] agent is going to work. So this fantastic agent caller class that we created, and then this
+[45:44] construction method, the factory method called makeAgentCaller. We're going to be using that
+[45:48] through all the other notebooks to make it easy for once we were to find an agent, we can easily
+[45:52] create a runtime environment using that function. So you'll get a lot of use with that. In the
+[45:58] previous lesson, you learned how to create an agent using Google ADK. And now we're going to
+[46:04] create multiple agents, a team of agents working together. We're going to have a root agent and
+[46:09] then two subagents. We'll build on what we did previously where we had a say hello agent.
+[46:13] We'll introduce a new agent that can say goodbye, and then we'll have another agent that puts
+[46:18] them together into one multi-agent system.
+[46:21] As usual, we'll go ahead and start with importing the libraries that we need.
+[46:25] And then, of course, we'll go ahead and set up the LLM that we're going to use.
+[46:28] Again, this is OpenAI.
+[46:29] We'll define the LLM, and we'll also go ahead and do a quick sanity check by passing out
+[46:34] a message to make sure that it's ready.
+[46:36] Always fun to see what OpenAI might say on any given day.
+[46:40] usually with friendly messages it's pretty good about saying friendly things
+[46:43] back next you can set up the agent caller we're going to use the same class that
+[46:48] we defined before in lesson 3 part 1 rather than defining all that again
+[46:53] we're just going to import the tool that we need if you remember from part 1 we
+[46:57] had this helper function make agent caller that's going to create the agent
+[47:00] caller class with all that it needs to run okay with everything ready you can
+[47:04] now begin to create the multi-agent system you're going to create multiple
+[47:08] specialized agents each designed for a specific capability. You'll create one
+[47:13] agent in charge of handling greetings that's the say hello agent we had before
+[47:16] the new agent is going to take charge of saying goodbye. To combine those you're
+[47:22] going to have what's called a root agent and you'll hear terms like orchestrator
+[47:25] or coordinator top-level agent it all really means having an agent that's
+[47:30] going to wrap up two other agents and then manage their execution. That root
+[47:35] agent is going to receive the initial user request, the hello or whatever the
+[47:39] user decides to say, and then decide how to process that either itself or by
+[47:43] what's called delegating, handing off to one of the sub-agents. So the root agent,
+[47:48] this top-level orchestrator, is going to be delegating both hello and goodbye,
+[47:52] hopefully, to the sub-agents that specialize in those tasks. Okay, let's
+[47:56] start to assemble our multi-agent system. Again, we're going to have the say hello
+[48:00] agent that we had before. We're going to add a say goodbye agent and then we'll
+[48:04] combine them together. First, we'll define the tools for our subagents. The first tool is the
+[48:10] same say hello tool that we had from the previous lesson. This is the hello world function, takes in
+[48:15] a person's name and creates a hello world message as a response. To that, we're going to include a
+[48:21] say goodbye function. Now, this tool is going to be even simpler than the say hello because it
+[48:26] doesn't accept any arguments whatsoever. It has a constant reply, goodbye from the cipher, no matter
+[48:32] what you want to do, this is what you're going to get as a response saying goodbye to the user.
+[48:37] With those two tools defined, we can now define some agents that will use those tools.
+[48:42] Now we're going to have a special agent for greeting and a special agent for farewell,
+[48:45] but you'll see it's pretty straightforward.
+[48:50] Now as we're defining these sub-agents, I really want to emphasize the best practices here and how
+[48:54] important it is to have really good descriptions of each of these agents and also instructions
+[48:59] that you're handing to them.
+[49:00] You're gonna spend most of your time,
+[49:02] once you've set up any kind of multi-agent system,
+[49:04] most of your time is gonna be spent
+[49:05] in actually optimizing these instructions.
+[49:08] This is back to classic prompt engineering
+[49:09] and also this description.
+[49:12] To repeat what I had said in the previous lesson,
+[49:14] the description is what allows other agents to know
+[49:16] what does this agent do and when should I use this agent?
+[49:20] That's called delegation.
+[49:22] And the instructions are for the agent itself
+[49:24] to understand what is its purpose,
+[49:25] what is it trying to do,
+[49:27] and what tools does it have available
+[49:28] and when to use them. So this is our greeting sub-agent. It's the say hello agent that has
+[49:33] access to only the say hello tool. And then we'll add our farewell agent. The farewell agent is
+[49:40] pretty straightforward. It's similar to the hello agent. You can look through the description here
+[49:45] of what the instructions are. And these instructions are actually useful to take a closer look at.
+[49:51] It seems obvious. Okay, your job as the farewell agent is to respond whenever a user says goodbye
+[49:57] in some kind of way. Well, people say goodbye in lots of different ways. So this is a very small
+[50:02] example of how to do some few-shot learning within the agent instructions. So here we have in
+[50:06] parentheses some examples like when the user uses words like bye, goodbye, thanks, bye, or see you,
+[50:13] those are all ways of saying goodbye. Now, most LLMs don't need this extra bit of examples,
+[50:19] but this is a good practice to have overall is to think, how can I help the LLM understand what
+[50:24] this agent's purpose is and actually when to execute and what to do in its role. And of course,
+[50:30] we're going to hand it the say goodbye tool that we defined earlier. Great. You know, I have two
+[50:35] sub-agents ready to go. Now we need to combine them. We're going to do that by defining the root
+[50:40] agent, which is going to understand both of these sub-agents and when to delegate a task to them.
+[50:45] It's similar to doing tool calling, but the agent knows that it's talking to another agent.
+[50:49] So the entire conversational history gets passed along and actually control of the conversation
+[50:54] gets passed along to the sub-agent. So it's a little bit different than tool call. But the same
+[50:58] idea is current workflow is going to go from the agent who is in charge, here the root agent,
+[51:04] to one of the sub-agents. So this is similar to tool calling, but let's take a careful look at how
+[51:09] agent delegation works here. We know that the agents themselves have described what their role
+[51:14] is, like the say hello agent versus the say goodbye agent, both have some understanding about
+[51:19] what it is they're supposed to do, and their descriptions describe to other agents what it is
+[51:23] their job is. We're going to double down on that in the instructions that we give to the root agent.
+[51:28] The root agent is to be told, your job is to coordinate a team of subagents. So you can see
+[51:33] that in the instructions here, and that its primary goal is to be friendly. In order to be friendly,
+[51:39] it has actually two specialized subagents. So you would describe what those are so that the agent
+[51:43] understands when it actually should use the subagents. This is like describing when you
+[51:48] should use particular tools. The greeting agent should be used for handling simple greetings,
+[51:52] like hello or hi.
+[51:54] And of course the farewell agent should be used
+[51:56] for saying goodbye, whether that's bye,
+[51:59] see you, or anything else.
+[52:00] And we're explicit here about saying
+[52:03] when those messages are received from the user,
+[52:05] go ahead and delegate to the sub-agents
+[52:06] to actually respond to the user
+[52:08] rather than responding directly as the coordinator.
+[52:11] So if this works well, the coordinator
+[52:12] shouldn't do anything other than answer general questions,
+[52:15] and when you say hello or goodbye,
+[52:17] it should delegate to the sub-agents
+[52:19] for actually executing a response
+[52:21] or generating a response to the user.
+[52:23] This top-level coordinator doesn't have any tools to use whatsoever.
+[52:27] It can only chat or delegate to the sub-agents.
+[52:30] We're also going to hand out the list of sub-agents here in the sub-agents key.
+[52:34] So the sub-agents are the greeting sub-agent and the farewell sub-agent.
+[52:38] Now that we have a team of agents all put together into a multi-agent system,
+[52:41] let's go ahead and interact with it.
+[52:43] This is similar to what we did in part one of lesson three,
+[52:46] where we had an asynchronous function that managed a conversation.
+[52:50] So here the conversation is going to be just what we did before, hello, I'm ABK.
+[52:54] And then later, rather than saying I'm excited, this transcript is going to say thanks, bye.
+[53:00] This is going to be the second user message.
+[53:03] We've also added this true here.
+[53:05] So if you look at the call to this agent caller, the second argument that's passed in is whether
+[53:11] or not to be verbose in responses.
+[53:12] We're going to turn on verbosity here so you can see all of what's going on beyond the
+[53:16] scenes so you can understand both the user message going in, see the delegation, see
+[53:21] the tool calls, and also see the responses. It's a lot to walk through but it's worth
+[53:25] walking through at least once to get familiar with what you can see when
+[53:28] you're debugging an agent interaction.
+[53:32] All right, this starts off innocently enough. We get the user's message, hello I'm ABK.
+[53:38] And you can see that the initial event comes from the friendly agent team. So
+[53:43] but this is the top level coordinator,
+[53:45] so the team coordinator that's gonna call the subagents.
+[53:48] And you can see the first action that it takes
+[53:51] is that it wants to transfer to agent,
+[53:52] so transfer or delegating to a subagent,
+[53:55] and it's gonna transfer to the greeting subagent.
+[53:58] So that's perfect.
+[53:59] In response to hello, I may be Kay,
+[54:01] the top level coordinator realized,
+[54:03] I've got an agent who's really good at saying hello.
+[54:05] Let me transfer control over to that agent.
+[54:08] So the transfer of response doesn't have any value
+[54:11] whatsoever, it's just a none,
+[54:13] What we should see next is that the greeting subagent
+[54:15] takes control.
+[54:16] So here's another event, but now from the greeting subagent.
+[54:20] And it's going to look at the transcript
+[54:22] and see the user's message and realize that, OK,
+[54:25] it's now my job to actually do something about this.
+[54:27] The greeting subagent is going to respond
+[54:29] by making a tool call.
+[54:31] You can see this function call here.
+[54:33] And the name of the function that it wants to call
+[54:35] is called sayHello.
+[54:36] And it's going to pass in some arguments
+[54:38] where the one argument that's passing in is the person name
+[54:41] is ABK.
+[54:42] So the agent has realized that from the statement here,
+[54:46] of course, hello, I'm ABK,
+[54:48] is able to extract that ABK must be the person's name.
+[54:51] And it's gonna make a function call to the tool
+[54:53] passing in that name.
+[54:56] And then you can receive the response.
+[54:58] Here's the function response.
+[55:00] And the response is hello to you ABK.
+[55:02] Perfect.
+[55:04] Now the greetings sub-agent is done.
+[55:06] It goes ahead and you can see that the final message is true.
+[55:09] So that's the flag that says,
+[55:10] I'm done processing this message.
+[55:12] We can go ahead and terminate this particular event loop.
+[55:15] And the final agent response ends up being
+[55:18] the response that came back from the tool,
+[55:20] hello to you ABK.
+[55:22] We send in the second query then,
+[55:24] or message from the user,
+[55:26] and the user says thanks, bye.
+[55:29] And again, the top level agent is gonna go ahead,
+[55:31] oh actually no, it's still in the control
+[55:33] of the greeting sub-agent.
+[55:35] So the greeting sub-agent itself is gonna realize,
+[55:37] okay, this is not something I should use.
+[55:39] Please transfer this to the farewell sub-agent.
+[55:41] So it's aware of the other agents that are available,
+[55:44] transfers to the farewell sub-agent,
+[55:47] and that is the end of that function response.
+[55:51] Here you can see then a message
+[55:53] from the farewell sub-agent itself.
+[55:55] It again is gonna look at the transcript
+[55:57] now that it's been given control of the current conversation.
+[56:00] The first thing it's gonna do is realize,
+[56:01] okay, the user said goodbye.
+[56:04] Let me go ahead and call the say goodbye tool
+[56:05] to figure out how to respond to them.
+[56:07] And so here's the function call to say goodbye,
+[56:10] And of course it takes no arguments as expected,
+[56:15] but the response to it is the constant
+[56:17] that we saw earlier in the tool definition.
+[56:19] It's gonna get a farewell that is goodbye from Cypher.
+[56:23] And that again is the final response for this event loop.
+[56:26] And so that is gonna be the final agent response,
+[56:29] goodbye from Cypher.
+[56:31] Okay, that was a lot to walk through.
+[56:32] It's worth taking the time to do that
+[56:34] for anything else we do in these notebooks.
+[56:36] You can really see all of the interactions
+[56:38] about tool calls, agent delegation,
+[56:40] and also the responses and the changes in state overall.
+[56:44] So really useful to do.
+[56:45] We're not gonna do that for every notebook,
+[56:47] but if you'd like to on your own time,
+[56:49] please do take the time to really understand
+[56:50] what's happening behind the scenes.
+[56:52] Because what's happening behind the scenes
+[56:54] is gonna affect of course,
+[56:56] how you do the overall agent definitions
+[56:58] and also the agent orchestration.
+[57:01] You're gonna take one more step in this multi-agent system.
+[57:04] We have an execution environment for agents,
+[57:07] We've got a team of multiple agents that can work together.
+[57:09] They can delegate tasks to each other.
+[57:12] And then each of those agents also has tools that they can use.
+[57:15] The last important component for all the agent systems is having memory.
+[57:19] Memory is just internal state happening for a particular session
+[57:23] across any agents that are involved in that session.
+[57:26] And of course, the user themselves.
+[57:28] What is session state really?
+[57:29] Session state in Google ADK, by default, is really just a dictionary that's available
+[57:34] that you can update keys within that dictionary.
+[57:37] And when you update values of those keys,
+[57:40] Google ADK tracks those changes.
+[57:42] It tracks deltas to the state, basically,
+[57:44] and updates the overall session state
+[57:46] to keep it consistent across all agents,
+[57:49] whether they're running in parallel or running sequentially.
+[57:52] Because it's an asynchronous system at its heart,
+[57:54] it manages all the state updates.
+[57:58] Agents have a few different ways of interacting with state.
+[58:00] One way, the way that I prefer in the primary method
+[58:03] for interacting with state is through the tool context.
+[58:06] So whenever a tool is called,
+[58:08] there's an extra parameter that's available
+[58:10] that is the context within which that tool has been called.
+[58:14] Given that tool context, the tool itself then has access
+[58:17] to the current state or the current memory of the agent,
+[58:20] and it can use that memory for actually making
+[58:23] either different decisions, creating different output,
+[58:25] whatever is appropriate for the memory.
+[58:27] The other way that agents can interact with state
+[58:29] is by using an output key.
+[58:32] So rather than using a tool call for updating some memory
+[58:35] or for accessing memory,
+[58:36] you can take the actual output from an agent,
+[58:39] that final response,
+[58:40] rather than just turning that back
+[58:42] as the response from the agent,
+[58:43] you can save that into state by defining an output key.
+[58:47] So when you see this final true,
+[58:50] the message related to the final true,
+[58:51] here to be the text goodbye from Cypher,
+[58:54] could get used for updating state itself.
+[58:57] That's very convenient sometimes
+[58:58] and we'll do a little bit of that later on
+[59:00] in some of these notebooks.
+[59:02] Okay, in this next step, we're going to set up some memory.
+[59:05] We always have the in-memory session that we're using right now.
+[59:08] So the memory is saved just within RAM that's not being persisted to a database.
+[59:13] Of course, that's the best thing to do for a production system.
+[59:16] But for convenience, having in-memory state is perfectly fine.
+[59:20] We're going to update both of our tools to actually take advantage of using that in-memory state.
+[59:25] So both for say hello and say goodbye, we're going to update those tools to take advantage of the tool context
+[59:31] to update session state or memory.
+[59:34] You should do this one at a time
+[59:36] and take a careful look at the differences here.
+[59:39] You'll notice that we're importing tool context
+[59:41] from Google ADK.
+[59:42] Tool context is the class that takes care
+[59:45] of keeping track of the session state
+[59:46] in addition to other things
+[59:48] that is useful for tools to have access to.
+[59:51] So we're going to update the say hello function
+[59:53] to be say hello stateful.
+[59:56] It still accepts an argument for the user's name,
+[59:59] but it now has this extra argument
+[1:00:00] called tool context. It's the tool context that's going to let us get access to the tool context
+[1:00:06] passed in for the session by the execution environment. So in the tool context there's
+[1:00:12] this state dictionary and we're just going to update the username key and the name that was
+[1:00:17] passed into the function we're going to use for updating the session memory or the session state
+[1:00:22] for the username key. So this is pretty straightforward username username. Now we have
+[1:00:28] a dictionary that is shared across all agents and across all tools that will have that value
+[1:00:33] that was passed into this function. This is a way of sort of keeping track of things by
+[1:00:38] natural use of functions and also then preserving them for later use.
+[1:00:44] For debugging purposes, when this tool is called, we'll go ahead and print out the update to the
+[1:00:48] session state, particularly to the username key. And then of course we'll do what we had done in
+[1:00:53] in the previous say hello, we'll send a query off to Neo4j
+[1:00:57] using a query parameter that is the username.
+[1:01:00] So let's go ahead and define that.
+[1:01:02] Now that you've defined that,
+[1:01:04] you can define the same thing for the say goodbye.
+[1:01:07] And again, as you're defining this,
+[1:01:08] this is just an update to the say goodbye
+[1:01:10] that we had before.
+[1:01:12] Now the difference is that this say goodbye,
+[1:01:13] even though it doesn't take an argument
+[1:01:15] for anything related to the person,
+[1:01:17] it has no custom arguments here,
+[1:01:20] it does get this tool context passed in.
+[1:01:22] I should mention that this is something that Google ADK does automatically.
+[1:01:26] When it sees a tool where the last argument to the tool is tool context,
+[1:01:30] it automatically injects that to the tool call.
+[1:01:33] So when say goodbye stateful is called here,
+[1:01:36] it's going to get tool context but nothing else.
+[1:01:39] But because say hello stateful has set the state,
+[1:01:43] the user name into the state,
+[1:01:46] say goodbye can actually access the user name.
+[1:01:49] So now we have remembered what the user's name is.
+[1:01:51] We can access the state for the state key username and then have a default value in case the user didn't identify themselves.
+[1:01:59] But we can get from the dictionary the username or default, assign that to the username,
+[1:02:04] then use that for actually generating a goodbye statement.
+[1:02:10] You can then define a new stateful agent for farewell.
+[1:02:13] And again, that's going to be the same as we had as the previous farewell agent,
+[1:02:17] but now it's going to be called the say goodbye stateful tool.
+[1:02:21] As before, you can combine those into a multi-agent system by having a root level agent or a
+[1:02:27] coordinator agent that's going to use both of those as sub-agents. And this is exactly the same
+[1:02:33] as the other root agent that we had, but now it's just using all the sub-agents that have
+[1:02:38] ultimately down at their core these tools that are stateful based.
+[1:02:43] You now have a multi-agent system that takes advantage of memory. You can give it a try.
+[1:02:48] You will use our friend the make agent caller, passing in that new root agent stateful that is the top level coordinator, create a caller for that.
+[1:02:58] And to see the change in the session, we'll go ahead and get the session directly from the caller.
+[1:03:03] Remember, there is a utility function for getting that if you look back at the agent caller class.
+[1:03:08] We'll go ahead and get the session, and then based on that session, we'll print out the initial state when this is created.
+[1:03:13] And we should see that there's nothing in the current state.
+[1:03:16] As expected, the initial state is empty.
+[1:03:18] You can now define a conversation.
+[1:03:22] It's the same conversation we've been having.
+[1:03:24] Say hello, say goodbye, and let's see what happens.
+[1:03:27] Actually, I'm going to take out these verbose statements right now,
+[1:03:31] and you can decide to keep those in or add them if you'd like.
+[1:03:34] Run it either way.
+[1:03:35] But just to keep the output to a minimum,
+[1:03:37] we'll go ahead and run this without the debugging statements.
+[1:03:40] And what's really important here is that we saw that the initial state was empty,
+[1:03:44] and we expect that once these calls are done,
+[1:03:47] the initial state should turn into a final state.
+[1:03:51] Here we're gonna get it again,
+[1:03:53] and that the final state should actually have
+[1:03:55] the user's name as defined by the call to say hello.
+[1:04:03] Awesome.
+[1:04:04] So our utility functions printed out
+[1:04:06] this update to the user name here.
+[1:04:09] And we also see when we get the session
+[1:04:11] and then get the state from that session
+[1:04:14] that the final state includes the user name,
+[1:04:17] ABK. Fantastic. Everything's working as expected.
+[1:04:22] Now if you'd like to, you can actually run this in an interactive environment, even within this notebook.
+[1:04:28] You can set up a small helper function that's going to have a loop for getting messages from the user
+[1:04:33] and then just calling our caller, passing in that message.
+[1:04:36] This will run as long as the user doesn't pass in a message that says exit.
+[1:04:42] When you set that up and then run it, you'll see a little box appear.
+[1:04:45] So when you run the interactive session, you can type in a message and just see what happens.
+[1:04:53] And I'll start by not revealing my name, see what happens.
+[1:04:57] Okay, that's kind of funny.
+[1:04:59] So the LLM decided that my name is there based on this message.
+[1:05:03] That's not really great.
+[1:05:05] Let's correct it.
+[1:05:05] Let's say.
+[1:05:06] and you can see just by passing in my name is ABK that the tool context actually updated
+[1:05:15] with ABK. So there's a tool call still to say hello to ABK and because of that the LLM correctly
+[1:05:22] identified my name is ABK. Save that into memory. This is fantastic. If I say goodbye again,
+[1:05:28] we should now get a nice message by ABK as before. Give this a try, interact with it,
+[1:05:33] and see what you can come up with.
+[1:05:34] And of course, if you'd like to, change any of the code
+[1:05:37] and see what the impact is of that.
+[1:05:39] Okay, you've gotten all the way to the end of lesson three.
+[1:05:43] You've created a basic agent,
+[1:05:46] that is a single agent that says hello.
+[1:05:48] And then you created a multi-agent system
+[1:05:50] with two sub-agents specialized in saying hello
+[1:05:52] or saying goodbye, and then a root agent
+[1:05:55] that coordinates their interactions with the user.
+[1:05:58] With this in hand, you're ready to continue
+[1:06:00] to actually doing agentic knowledge graph construction.
+[1:06:04] In this course, you learned how to build a multi-agent system
+[1:06:07] that transforms your structured and unstructured data
+[1:06:10] into a knowledge graph.
+[1:06:12] You learned how to set up each specialized agent
+[1:06:15] in your system, what prompt to use and what tools to define,
+[1:06:18] and how to share context among the agents.
+[1:06:21] Congratulations on completing this course,
+[1:06:24] and I'm looking forward to seeing
+[1:06:25] what you'll build on your own.

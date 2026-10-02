@@ -31,10 +31,22 @@ export interface EventItem {
   stale_since?: string;
 }
 
+/** One fetcher of the events agent. "listing" = read straight from the site's
+ *  own event data; "ai_search" = an LLM web search for events listings miss. */
+export interface EventSource {
+  key: string;
+  label: string;
+  url: string;
+  method: "listing" | "ai_search";
+  found: number;   // local candidates this run, before the relevance filter
+  listed: number;  // events in the current feed that came from it
+}
+
 export interface EventsFeed {
   generated_at: string;
   window: { from: string; to: string };
   count: number;
+  sources?: EventSource[];
   events: EventItem[];
 }
 

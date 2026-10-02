@@ -5,7 +5,7 @@ import { useLang } from "@/context/LangContext";
 import { FilterCarousel } from "@/components/ui/FilterCarousel";
 import {
   BUCKET_LABELS, VENDOR_EVENT_TAG, bucketOf, dateBadge, eventVendors, fetchEvents, googleCalendarUrl,
-  type EventBucket, type EventItem,
+  type EventBucket, type EventItem, type EventSource,
 } from "@/lib/events";
 
 // "Upcoming events" — rendered once at the top of /community. Reads
@@ -101,6 +101,40 @@ function EventCard({ ev, isHe }: { ev: EventItem; isHe: boolean }) {
   );
 }
 
+/** Every place the events agent reads, with how many listed events each
+ *  contributes — a side rail on desktop, a collapsible under the list on phones. */
+function SourcesList({ sources, isHe }: { sources: EventSource[]; isHe: boolean }) {
+  return (
+    <>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        {sources.map((s) => (
+          <li key={s.key} className="flex items-center gap-2" style={{ fontSize: "12px", padding: "5px 0", borderBottom: "1px dashed #ececf4" }}>
+            {s.url ? (
+              <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: "#0f0f1a", fontWeight: 600 }}>{s.label}</a>
+            ) : (
+              <span style={{ color: "#0f0f1a", fontWeight: 600 }}>{s.label}</span>
+            )}
+            {s.method === "ai_search" && (
+              <span style={{ ...CHIP, color: "#7c3aed", background: "#f5f3ff", borderColor: "#ddd6fe" }}>{isHe ? "חיפוש AI" : "AI search"}</span>
+            )}
+            <span
+              style={{ marginInlineStart: "auto", color: s.listed ? ACCENT : "#b4b4c8", fontWeight: 700, whiteSpace: "nowrap" }}
+              title={isHe ? "אירועים ברשימה מהמקור הזה" : "Events in the list from this source"}
+            >
+              {s.listed}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p style={{ fontSize: "11px", color: "#6b6b8a", margin: "10px 0 0", lineHeight: 1.5 }}>
+        {isHe
+          ? "האירועים נקראים ישירות מנתוני האירועים של כל אתר. חיפוש AI משלים כנסים גדולים שהרשימות מפספסות — תאריך שלא אומת מול דף האירוע מסומן \"תאריך לא סופי\". מודל מסנן רלוונטיות ומתרגם; סינון המיקום הוא כללים קבועים."
+          : "Events are read straight from each site's own event data. An AI search adds big conferences the listings miss — dates not confirmed on the event page are marked \"date TBC\". A model filters for relevance and translates; the location filter is fixed rules."}
+      </p>
+    </>
+  );
+}
+
 interface EventsSectionProps {
   /** Active chip of the page's vendor ribbon (null = All). Narrows the list
    *  via VENDOR_EVENT_TAG so the ribbon and the section agree. */
@@ -113,6 +147,7 @@ interface EventsSectionProps {
 export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) {
   const { isHe } = useLang();
   const [events, setEvents] = useState<EventItem[]>([]);
+  const [sources, setSources] = useState<EventSource[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [filter, setFilter] = useState<string | null>(null);
@@ -127,6 +162,7 @@ export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) 
       if (!alive || !feed) return;
       const upcoming = feed.events.filter((e) => e.date >= today);
       setEvents(upcoming);
+      setSources(feed.sources ?? []);
       onVendors?.(eventVendors(upcoming));
     });
     return () => { alive = false; };
@@ -164,8 +200,8 @@ export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) 
 
   if (events.length === 0) return null;
 
-  // Group by date bucket; within a bucket, in-person events lead — a reader
-  // scanning "this week" wants the room they can walk into before the streams.
+  // Group by date bucket, chronological within each (the feed arrives sorted by
+  // date+time; the "In person" chip is how a reader narrows to rooms).
   const today = localToday();
   const groups = new Map<EventBucket, EventItem[]>();
   for (const e of filtered) {
@@ -175,9 +211,8 @@ export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) 
   }
   let budget = showAll ? Infinity : COLLAPSED_COUNT;
   for (const [b, items] of groups) {
-    const ordered = [...items.filter((e) => e.format !== "online"), ...items.filter((e) => e.format === "online")];
-    groups.set(b, ordered.slice(0, Math.max(0, budget)));
-    budget -= ordered.length;
+    groups.set(b, items.slice(0, Math.max(0, budget)));
+    budget -= items.length;
   }
 
   return (
@@ -266,6 +301,8 @@ export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) 
             </FilterCarousel>
           )}
 
+          <div className="lg:flex">
+          <div className="min-w-0 lg:flex-1">
           {[...groups].filter(([, items]) => items.length > 0).map(([bucket, items]) => (
             <section key={bucket}>
               <div
@@ -294,6 +331,29 @@ export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) 
                 ? (isHe ? "הצג פחות" : "Show less")
                 : (isHe ? `הצג את כל ${filtered.length}` : `Show all ${filtered.length}`)}
             </button>
+          )}
+
+          </div>
+          {sources.length > 0 && (
+            <aside
+              className="hidden lg:block shrink-0 px-4 py-3"
+              style={{ width: "270px", borderInlineStart: "1px solid #f0f0f6", background: "#fafafc", ...(isHe ? { direction: "rtl" as const, textAlign: "right" as const } : {}) }}
+            >
+              <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9a9ab8", marginBottom: "8px" }}>
+                {isHe ? `המקורות שלנו (${sources.length})` : `Our sources (${sources.length})`}
+              </div>
+              <SourcesList sources={sources} isHe={isHe} />
+            </aside>
+          )}
+          </div>
+
+          {sources.length > 0 && (
+            <details className="lg:hidden" style={{ borderTop: "1px solid #f0f0f6", background: "#fafafc", ...(isHe ? { direction: "rtl" as const, textAlign: "right" as const } : {}) }}>
+              <summary className="px-5 py-3" style={{ cursor: "pointer", fontSize: "12px", fontWeight: 600, color: "#5a5a7a" }}>
+                {isHe ? `מאיפה האירועים מגיעים (${sources.length} מקורות)` : `Where these events come from (${sources.length} sources)`}
+              </summary>
+              <div className="px-5 pb-4"><SourcesList sources={sources} isHe={isHe} /></div>
+            </details>
           )}
         </>
       )}

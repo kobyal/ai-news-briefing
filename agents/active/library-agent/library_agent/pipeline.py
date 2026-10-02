@@ -61,12 +61,20 @@ def _save_state(state: dict):
     STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
+def _prefix(url: str) -> str:
+    """Session-dir prefix by source: yt-<id> for YouTube, x-<id> for X posts."""
+    return "x" if "x.com/" in url or "twitter.com/" in url else "yt"
+
+
 # ── stages ──────────────────────────────────────────────────────────────────
 
 def _pick(state: dict, args, budget: Budget) -> dict | None:
     """Which talk to produce: --url > an unfinished one from last run > ranking."""
     if args.url:
-        vid = args.url.split("v=")[-1].split("&")[0].split("/")[-1]
+        if "youtu" in args.url:
+            vid = args.url.split("v=")[-1].split("&")[0].split("/")[-1]
+        else:
+            vid = args.url.split("/video/")[0]  # X/other: yt-dlp takes the post URL
         info = discover.video_info(vid)
         if not info:
             raise RuntimeError(f"yt-dlp returned no metadata for {args.url}")
@@ -182,7 +190,7 @@ def run_pipeline(args) -> int:
                 break
             state["in_progress"] = info
             _save_state(state)
-            session = SESSIONS / f"yt-{info['id']}"
+            session = SESSIONS / f"{_prefix(info['url'])}-{info['id']}"
             print(f"\n▶ {info['title']}  ({info['channel']}, {info['minutes']}m) → {session.name}")
 
             budget.check("prep")

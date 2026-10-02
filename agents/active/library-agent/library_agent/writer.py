@@ -27,7 +27,7 @@ SYSTEM = """You turn a recorded talk into a review document readers use INSTEAD 
 Output ONE JSON object in this schema (nothing else):
 
 {{"lang": "{lang}", "rtl": {rtl}, "title": "...", "subtitle": "...",
- "meta": ["<speaker(s)> · <channel> · <date>", "<duration line> · YouTube", "<generated-by line>"],
+ "meta": ["<speaker(s)> · <channel> · <date>", "<duration line> · {platform}", "<generated-by line>"],
  "speakers": "<speaker names in English, comma separated>",
  "topics": ["<2-4 short English topic tags>"],
  "blocks": [ ... ]}}
@@ -59,6 +59,9 @@ Slides — the step that makes the document worth reading:
    Each thumbnail is labelled with its file name k_NNN.jpg. Choose {n_images} frames that are actual SLIDES
    (text, diagrams, code, charts, demo screens). NEVER pick stage/speaker/audience shots, title cards that
    repeat, sponsor bumpers or near-duplicates. Reference them exactly as "file": "k_NNN.jpg".
+ - Interviews, panels and podcasts often have NO slides — every frame is people on a stage. Then set
+   "no_slides": true at the top level and include at most one image (a frame that identifies the speakers),
+   or none. Never pad the document with speaker shots to reach a count.
  - Interleave images with the argument they support; never append them at the end. Each caption describes
    what the slide shows (not the chapter heading). Use width 5.6 (6.3 for dense diagrams/code).
 
@@ -79,6 +82,10 @@ _L10N = {
 }
 
 
+def _platform(url: str) -> str:
+    return "X" if "x.com/" in url or "twitter.com/" in url else "YouTube"
+
+
 def _transcript(session_dir: Path) -> str:
     text = (session_dir / "transcript_blocks.txt").read_text(encoding="utf-8")
     if len(text) <= MAX_TRANSCRIPT:
@@ -93,12 +100,19 @@ def _transcript(session_dir: Path) -> str:
 
 def _build_input(session_dir: Path, info: dict) -> str:
     sheets = sorted(str(p.resolve()) for p in (session_dir / "frames").glob("sheet_*.jpg"))
+    repost = ""
+    if _platform(info["url"]) == "X":
+        repost = ("NOTE: this video was taken from an X (Twitter) repost. TITLE, CHANNEL and DESCRIPTION are the "
+                  "reposter's caption — often exaggerated, misattributed or with invented quotes. Do NOT treat them as "
+                  "facts: take the title, speakers, event and every claim from the transcript and slides only. If the "
+                  "slides/transcript show the original event or channel, name it in meta[0]; otherwise say the original "
+                  "source is unidentified. Do not repeat a caption quote unless it is verbatim in the transcript.\n\n")
     chapters = "\n".join(f"  [{c['t'] // 60}:{c['t'] % 60:02d}] {c['title']}" for c in info.get("chapters") or [])
-    return (
+    return repost + (
         f"TITLE: {info['title']}\nCHANNEL: {info['channel']}\nUPLOAD DATE: {info['upload_date']}\n"
         f"DURATION: {info['minutes']} minutes\nURL: {info['url']}\n\n"
         f"DESCRIPTION:\n{info.get('description', '')[:1500]}\n\n"
-        f"CHAPTERS (from YouTube):\n{chapters or '  (none)'}\n\n"
+        f"CHAPTERS (from the video page):\n{chapters or '  (none)'}\n\n"
         f"SHEETS (contact sheets of the extracted slides — Read each one):\n" + "\n".join(f"  {s}" for s in sheets)
         + f"\n\nTRANSCRIPT (timestamped ~90s blocks):\n{_transcript(session_dir)}\n"
     )
@@ -122,7 +136,7 @@ def _validate(doc: dict, crop_dir: Path) -> tuple[dict, str]:
         kept.append(b)
     n_img = sum(b["kind"] == "image" for b in kept)
     doc["blocks"] = kept
-    if len(kept) < MIN_BLOCKS or n_img < MIN_IMAGES:
+    if len(kept) < MIN_BLOCKS or n_img < (0 if doc.get("no_slides") else MIN_IMAGES):
         return doc, f"too thin: {len(kept)} blocks, {n_img} images"
     return doc, ""
 
@@ -130,7 +144,7 @@ def _validate(doc: dict, crop_dir: Path) -> tuple[dict, str]:
 def write_content(session_dir: Path, info: dict, lang: str, usage_log: list) -> dict:
     """LLM → validated content.json (saved). Raises if two attempts are both thin."""
     n_sheets = len(list((session_dir / "frames").glob("sheet_*.jpg")))
-    l10n = dict(_L10N[lang], lang=lang, language_rules=_LANG[lang][1],
+    l10n = dict(_L10N[lang], lang=lang, language_rules=_LANG[lang][1], platform=_platform(info["url"]),
                 n_images="8-15", duration_fmt=_L10N[lang]["duration_fmt"].format(minutes=info["minutes"]))
     system = SYSTEM.format(**l10n)
     prompt = _build_input(session_dir, info)

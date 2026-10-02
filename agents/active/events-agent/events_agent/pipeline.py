@@ -668,6 +668,23 @@ def publish() -> None:
           else f"  ⚠ invalidation failed: {res.stderr.strip()[:160]}")
 
 
+# What /community shows under "Where these events come from": one row per
+# fetcher in main()'s `sources`, with the page a human would browse.
+SOURCE_INFO = {
+    "meetup": ("Meetup", "https://www.meetup.com/find/?location=il--Tel%20Aviv&source=EVENTS&keywords=AI", "listing"),
+    "eventbrite": ("Eventbrite", "https://www.eventbrite.com/d/israel--tel-aviv-yafo/ai/", "listing"),
+    "luma": ("Luma", "https://luma.com/tel-aviv", "listing"),
+    "aws": ("AWS events directory", "https://aws.amazon.com/events/explore-aws-events/", "listing"),
+    "aws_loft": ("AWS Experience Tel Aviv", "https://aws-experience.com/emea/tel-aviv", "listing"),
+    "aws_ug": ("AWS Israel user group", "https://www.meetup.com/aws-il/", "listing"),
+    "microsoft": ("Microsoft Reactor", "https://developer.microsoft.com/reactor/", "listing"),
+    "gdg": ("Google Developer Groups", "https://gdg.community.dev/", "listing"),
+    "cloudonair": ("Google Cloud OnAir", "https://cloudonair.withgoogle.com/", "listing"),
+    "nvidia": ("NVIDIA events", "https://www.nvidia.com/en-eu/events/", "listing"),
+    "perplexity": ("AI web search (Perplexity)", "", "ai_search"),
+}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--publish", action="store_true")
@@ -709,6 +726,7 @@ def main() -> int:
             reason = _locality(r)
             if reason:
                 r["local_reason"] = reason
+                r["via"] = name
                 local.append(r)
         counts[name] = len(local)
         candidates += local
@@ -740,6 +758,9 @@ def main() -> int:
         "generated_at": started.isoformat(timespec="seconds"),
         "window": {"from": today.isoformat(), "to": until.isoformat()},
         "count": len(events),
+        "sources": [{"key": k, "label": SOURCE_INFO[k][0], "url": SOURCE_INFO[k][1], "method": SOURCE_INFO[k][2],
+                     "found": counts.get(k, 0), "listed": sum(e.get("via") == k for e in events)}
+                    for k in sources],
         "events": events,
     }
     if args.dry_run:

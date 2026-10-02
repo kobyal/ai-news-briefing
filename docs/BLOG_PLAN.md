@@ -1,7 +1,8 @@
 # blog.aibriefing.dev — research + plan (2026-09-29)
 
-Status: **PLAN ONLY — nothing built.** Research by an agent on 2026-09-29; sources
-linked inline. Decisions marked ⚑ are Koby's to make.
+Status: **SHIPPED 2026-09-29, rebuilt 2026-09-30 → 10-02.** The research below is the
+original plan; the "State" section at the end records what was actually built and why it
+changed. Decisions marked ⚑ were Koby's; most are now made.
 
 ## 1. What it is
 
@@ -159,3 +160,28 @@ existing `send_email.py` tables.
 2. Hebrew: full HE post, or EN post + HE summary/video only?
 3. Remotion vs Marp for v1 video? (Remotion = nicer + brand-consistent; Marp = a day less work.)
 4. Should the main site's `/main` weekly editorial move into the blog, or stay separate?
+
+
+## State as of 2026-10-02
+
+Built and live: 20 posts, 4 series, daily post from `local-cycle.sh` (~20 min of the run).
+
+What changed from the plan, and why (all Koby feedback, 2026-09-30 → 10-01):
+- **Design** "not wow" → editorial system (cream paper, serif display, generated covers);
+  then "same structure / same diagrams" → figures are now authored per post as SVG by the
+  writer, real source images + screenshots, D2 in sketch mode, page skeleton varies by kind
+  (explainer / fieldnotes / warstory / faq / deepdive), hooks and cover layouts rotate.
+- **Voice** "sounds AI-ish", then "English thinking in Hebrew words" → register rules from
+  real Israeli LinkedIn posts, a calque blacklist, and a second `_decalque` pass.
+- **Examples** "don't write about our site" → public cases only; our pipeline ≤ 1 sentence;
+  lint rejects more. War stories must be public incidents.
+- **Practical first** → half the sections how/example; every post ends with what to do this week.
+- **Series** → `series.json` plans; `run.py series <slug>`; hubs + prev/next on the site.
+  Claude series rebuilt around Claude Code in practice (5 parts), not just headless.
+- **Transcript figures disabled** after `claude -p` output leaked global CLAUDE.md content into
+  a public image. `--bare` breaks subscription auth; `--system-prompt` / `--setting-sources`
+  don't suppress it. Needs a scrubbed runner before re-enabling.
+
+Open follow-ups: mixed Hebrew/English labels inside authored SVGs can order oddly (pure-Hebrew
+labels are fine); GIF kinds exist but are rarely chosen; `discover.pick()` still needs a
+stopword/quality review (it picked "the engineering" once).

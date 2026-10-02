@@ -401,6 +401,19 @@ Deferred (with reasons):
   adk `prompts.py` VENDOR_ENUM, merger `pipeline.py` subprocess, merger
   `tools.py` module-level `_Path`, prewarm `re`, a few assigned-never-read locals.
 
+Blog (blog.aibriefing.dev) follow-ups — 2026-10-02
+--------------------------------------------------
+- ⏳ Safe "we tried it" transcript figure: `claude -p` always loads the operator's global
+  CLAUDE.md/memory (leaked 2026-10-01). Options: API path with a scrubbed system prompt,
+  or a dedicated OS user/HOME with its own login. Kind is disabled until then.
+- ⏳ Bidi inside authored SVG figures: mixed Hebrew+Latin labels can render out of order.
+  Guide the writer to keep each `<text>` single-script, or split labels into tspans.
+- ⏳ `discover.py` term quality: stopword-led regex artefacts filtered; still worth a
+  weekly review of `state/terms.jsonl` picks before they publish.
+- ⏳ Series ideas queued by Koby: more hot-topic series (assistants done); consider
+  MCP in practice, evals in practice.
+- ⏳ Daily blog step costs ~20 min of the 04:45 cycle; fine for 06:30 target, watch it.
+
 Known limitations (worth documenting, not necessarily fixing)
 -------------------------------------------------------------
 

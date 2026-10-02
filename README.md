@@ -688,31 +688,28 @@ The maintainer's deployment has two extra components in the public repo's tracke
 
 ## Blog (blog.aibriefing.dev)
 
-A companion blog — one AI-engineering term a day, explained in Hebrew (English mirror
-under `/en/`) with diagrams, animated GIFs (step reveals, stat count-ups), comparison
-cards and a hero card. A narrated Remotion explainer video exists behind `--video`
-(off by default — Koby 2026-09-30: not in its current form).
-Plan + rationale: `docs/BLOG_PLAN.md`.
+A companion blog for the Israeli tech public: AI-engineering terms and tools explained
+in Hebrew (English mirror under `/en/`), practical first, with examples from PUBLIC
+sources only. 20 posts in 4 series as of 2026-10-02 (prompt engineering, Claude Code in
+practice, the new tools, the 2026 assistants). Plan + history: `docs/BLOG_PLAN.md`.
 
-- **Site:** `blog/` (Astro 7, MDX content collection `src/content/posts/<key>/{he,en}.mdx`,
-  schema in `src/content.config.ts`). Assets per post in `blog/public/posts/<key>/`.
-- **Visuals:** `blog/video/` (Remotion). `Steps`/`Stat` compositions render inline GIFs;
-  `Explainer` is the opt-in narrated video. Compare cards + hero = HTML → Chrome screenshot.
-- **Agent:** `agents/active/blog-agent/` — `discover.py` (term velocity over HN / Arctic
-  Shift / arXiv / feeds, seeded by `BACKLOG`), `research.py` (sources via
-  `shared.article_reader`), `writer.py` (two `claude -p` calls: HE canonical, EN edition;
-  voice from `house_positions.md` + `shared/he_glossary`), `media.py` (D2 diagram, hero
-  via Chrome screenshot, edge-tts narration, Remotion render), `publish.py` (MDX → astro
-  build → S3 `ai-news-briefing-blog` → CloudFront `E30X41I4MDIA4Z`, constants in
-  `shared/aws_config.py`).
-- **Run:** `python agents/active/blog-agent/run.py [--term "…"] [--seed URL] [--publish] [--video] [--draft] [--reuse]`.
-  Default is build-only; `--publish` syncs + invalidates and marks the term covered
-  (`state/covered.json`). Runs daily from `local-cycle.sh` (after library-agent,
-  fail-soft); the cycle's commit picks up `blog/src/content`, `blog/public/posts`
-  (mp4/gif are gitignored — S3 is the store for those) and the agent state.
-- **Editorial rules:** named author, "how this was made" badge, ≥3 sources,
-  opinion written from `house_positions.md` (edit that file to change the voice).
-- **DNS** for the subdomain is at Cloudflare (token in `private/.env`, `CLOUDFLARE_*`).
+- **Site:** `blog/` (Astro 7 + expressive-code, MDX collection `src/content/posts/<key>/{he,en}.mdx`,
+  schema in `src/content.config.ts`). Editorial design: cream paper, Frank Ruhl Libre + Heebo,
+  generated dark covers (type / illustration / photo layouts), per-kind page skeletons
+  (explainer · fieldnotes · warstory · faq · deepdive), series hubs at `/series/<slug>/`.
+- **Figures are authored per post:** the writer draws each figure as SVG inside a style guide
+  (`kind: svg`), places real images mirrored from the sources (`image`) or live screenshots
+  (`screenshot`); D2 diagrams render in `--sketch` mode; legacy card kinds (steps/stat GIFs,
+  compare, quote, timeline, boxes, chart, strip) are a last resort. `transcript` is disabled —
+  `claude -p` output carries the operator's CLAUDE.md/memory and leaked once (2026-10-01).
+- **Agent:** `agents/active/blog-agent/` — `discover.py` (term velocity), `research.py`,
+  `writer.py` (HE canonical → de-translationese pass → EN edition; templates, hook rotation,
+  calque list, public-examples + practical-first rules, lints), `media.py`, `publish.py`
+  (MDX-safe escaping → astro build → S3 `ai-news-briefing-blog` → CloudFront).
+  Voice + example rules: `house_positions.md`. Series plans: `series.json`.
+- **Run:** `run.py [--term …] [--kind …] [--hook …] [--seed URL] [--publish]`;
+  `run.py series <slug> [--all]`; `run.py revisual <key>` (new figures, text untouched);
+  `run.py polish <key>` (re-voice Hebrew). Daily from `local-cycle.sh` after library-agent.
 
 ## Forking & customizing
 

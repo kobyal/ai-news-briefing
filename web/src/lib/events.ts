@@ -29,6 +29,8 @@ export interface EventItem {
   local_reason?: string;     // "in_person:Tel Aviv" | "online:hebrew" | "online:israeli-community"
   date_unverified?: boolean; // LLM-sourced date the event page didn't confirm
   stale_since?: string;
+  scale?: "major" | "community"; // classifier: conference/summit vs meetup/workshop/webinar
+  region?: "il" | "global";      // global = online event from outside Israel (absent = il)
 }
 
 /** One fetcher of the events agent. "listing" = read straight from the site's
@@ -58,20 +60,6 @@ export async function fetchEvents(): Promise<EventsFeed | null> {
   } catch {
     return null;
   }
-}
-
-/** Vendor ribbon name (VENDOR_LIST in vendors.ts) → event tag the agent emits.
- *  "Azure" and "Microsoft" both mean the microsoft tag; ribbon vendors with no
- *  event tag (Meta, xAI…) simply hide the section's events when selected. */
-export const VENDOR_EVENT_TAG: Record<string, string> = {
-  AWS: "aws", Google: "google", Azure: "microsoft", Microsoft: "microsoft",
-  NVIDIA: "nvidia", Anthropic: "anthropic", OpenAI: "openai",
-};
-
-/** Ribbon vendor names carried by at least one of `events` (via VENDOR_EVENT_TAG). */
-export function eventVendors(events: EventItem[]): Set<string> {
-  const tags = new Set(events.flatMap((e) => e.tags));
-  return new Set(Object.keys(VENDOR_EVENT_TAG).filter((v) => tags.has(VENDOR_EVENT_TAG[v])));
 }
 
 export type EventBucket = "this_week" | "next_two_weeks" | "later";

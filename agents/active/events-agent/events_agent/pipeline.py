@@ -46,6 +46,11 @@ ROOT = repo_root()
 OUT_PATH = ROOT / "docs/data/events.json"
 RUN_LOG = ROOT / "docs/data/_events_runs.jsonl"
 CACHE_PATH = Path(__file__).resolve().parents[1] / "cache/classified.json"
+GROUPS_PATH = Path(__file__).resolve().parents[1] / "cache/meetup_groups.json"
+# Bump when the classifier's input or output changes: cached verdicts with an
+# older version are re-judged once (v2 = judged on the event page's own agenda
+# + carries `scale`; v1 often saw only the group's generic blurb).
+VERDICT_VERSION = 2
 
 TZ = ZoneInfo("Asia/Jerusalem")
 WINDOW_DAYS = 60
@@ -183,7 +188,7 @@ def _rec(*, title, url, start, end="", city="", venue="", organizer="", desc="",
         "price": price,
         "tags": [],
         "image": image or "",
-        "_desc": (desc or "")[:600],   # classifier input only, stripped before write
+        "_desc": (desc or "")[:1500],  # classifier input only, stripped before write
     }
 
 
@@ -223,6 +228,7 @@ def fetch_meetup() -> list[dict]:
                            source="meetup", fmt="online" if online else "in_person",
                            price="paid" if fee.get("amount") else "free")
                 if rec:
+                    rec["_group"] = group.get("urlname", "")
                     out[ev["id"]] = rec
     return list(out.values())
 
@@ -262,10 +268,11 @@ def fetch_eventbrite() -> list[dict]:
     return list(out.values())
 
 
-def fetch_luma() -> list[dict]:
+def fetch_luma(page: str = "tel-aviv") -> list[dict]:
     # luma.com/israel is a calendar page and /ai is a global category — only
-    # the city page lists local events (verified 2026-09-28).
-    r = _get("https://luma.com/tel-aviv")
+    # the city page lists local events (verified 2026-09-28). Other pages are
+    # vendor/community calendars for the global (online) list.
+    r = _get(f"https://luma.com/{page}")
     if not r or r.status_code != 200:
         return []
     data = _next_data(r.text).get("props", {}).get("pageProps", {}).get("initialData", {}).get("data", {})
@@ -288,6 +295,15 @@ def fetch_luma() -> list[dict]:
         if rec:
             out.append(rec)
     return out
+
+
+# Official/community calendars whose ONLINE events feed the "Global" tab
+# (verified 2026-10-03 to expose events in page data; luma.com/grok etc. don't).
+GLOBAL_LUMA = ["claudecommunity", "genai-collective", "cursor"]
+
+
+def fetch_luma_global() -> list[dict]:
+    return [r for page in GLOBAL_LUMA for r in fetch_luma(page) if r["format"] == "online"]
 
 
 def fetch_aws(today: date, until: date) -> list[dict]:
@@ -374,6 +390,26 @@ def _meetup_group(urlname: str, source: str) -> list[dict]:
                    price="paid" if (ev.get("feeSettings") or {}).get("amount") else "free")
         if rec:
             out.append(rec)
+    return out
+
+
+# Meetup groups polled in full, whatever their event titles say: keyword search
+# misses AI-adjacent engineering talks ("Migrations at Scale" at Wix, 2026-10-03).
+# Seeds = company/community groups verified to exist; any group that posts an
+# event the classifier keeps is added automatically (cache/meetup_groups.json).
+SEED_GROUPS = ["at-wix", "AppsFlyer", "Platform-Engineers-Tel-Aviv", "nodejs-israel", "PyData-Tel-Aviv",
+               "data-science-tel-aviv", "Tel-Aviv-Data-Science-ODSC", "cloud-native-israel", "gdg-tel-aviv"]
+
+
+def _known_groups() -> list[str]:
+    learned = json.loads(GROUPS_PATH.read_text()) if GROUPS_PATH.exists() else []
+    return list(dict.fromkeys(SEED_GROUPS + learned))
+
+
+def fetch_meetup_groups() -> list[dict]:
+    out = []
+    for urlname in _known_groups():
+        out += _meetup_group(urlname, "meetup")
     return out
 
 
@@ -555,6 +591,43 @@ def fetch_perplexity(today: date, until: date) -> list[dict]:
 # Classification (relevance + Hebrew), cached by id
 # ---------------------------------------------------------------------------
 
+def _page_description(url: str) -> str:
+    """The event page's own JSON-LD Event.description (Luma, Meetup and
+    Eventbrite all publish it) — the agenda/speakers, where listings only
+    carry the group's generic blurb."""
+    try:
+        r = _get(url, timeout=15, retries=1)
+    except requests.RequestException:  # redirect loops etc. — keep the listing blurb
+        return ""
+    if not r or r.status_code != 200:
+        return ""
+    for m in re.finditer(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', r.text, re.S):
+        try:
+            j = json.loads(m.group(1))
+        except json.JSONDecodeError:
+            continue
+        for item in j if isinstance(j, list) else [j]:
+            if isinstance(item, dict) and "Event" in str(item.get("@type", "")) and item.get("description"):
+                return _strip_html(str(item["description"]))
+    return ""
+
+
+def _needs_verdict(c: dict, cache: dict) -> bool:
+    return (cache.get(c["id"]) or {}).get("v") != VERDICT_VERSION
+
+
+def enrich(candidates: list[dict], cache: dict) -> int:
+    """Swap the listing blurb for the event page's agenda on every candidate
+    about to be (re)judged. Only those — judged events aren't refetched daily."""
+    from concurrent.futures import ThreadPoolExecutor
+    todo = [c for c in candidates if _needs_verdict(c, cache) and c["source"] in ("luma", "meetup", "eventbrite")]
+    with ThreadPoolExecutor(8) as ex:
+        for c, desc in zip(todo, ex.map(lambda c: _page_description(c["url"]), todo)):
+            if len(desc) > len(c["_desc"]):
+                c["_desc"] = desc[:1500]
+    return len(todo)
+
+
 CLASSIFY_INSTRUCTIONS = f"""You curate an "Upcoming events" list for an AI-news site read by Israeli developers.
 For EACH candidate return a verdict keyed by its id. Be strict: quality over quantity.
 relevant=true ONLY for: AI / ML / LLMs / agents / GenAI / Claude / Copilot / AI infrastructure; data+AI;
@@ -566,29 +639,41 @@ relevant=false for: generic language/framework meetups (Node.js monthly, Rust, G
 about AI; WordPress, microservices, service discovery, platform plumbing with no AI angle; pure security
 (AppSec, BSides, Cyber Week, pentesting) unless the title is explicitly AI security; hackerspace socials;
 startup pitch / networking / investor nights; job-search, marketing, HR, real-estate, crypto/web3; tours.
+Judge by the AGENDA (talk titles, speakers, workshop content), not the host's name: a Node.js or
+platform-engineering meetup whose talks cover MCP, agents or AI-assisted engineering IS relevant; an
+"AI" group whose session is a networking night is not. AI-assisted engineering counts even when the
+event's theme is something else: a talk on an AI-driven migration platform, AI debugging or coding agents
+makes the whole event relevant.
+region=global (an ONLINE event from outside Israel): relevant ONLY when an AI vendor/lab hosts it (Anthropic,
+OpenAI, Google, AWS, Microsoft, Nvidia, xAI, Meta, Hugging Face, Cursor…) or it is a well-known conference
+livestream or flagship series; reject generic webinars, sales demos, and local meetups in other cities.
+scale: "major" = a large conference/summit/expo or multi-track/multi-day event (AWS Summit, TECH1,
+AI Week, DeepTech Week, Cyber Week, DevOpsDays, vendor flagship days) — typically hundreds+ attendees;
+"community" = a meetup, single talk, workshop, webinar or small gathering. When unsure, "community".
 tags: pick from {TAGS} (2-5). title_he: natural Hebrew title (keep product/company names in Latin).
 blurb: <=160 chars English, factual, no hype. blurb_he: Hebrew equivalent.
 price: free|paid|unknown (infer from text; keep given value when unsure). format: in_person|online|hybrid.
-Output: {{"verdicts": {{"<id>": {{"relevant": bool, "tags": [], "title_he": "", "blurb": "", "blurb_he": "", "price": "", "format": ""}}}}}}"""
+Output: {{"verdicts": {{"<id>": {{"relevant": bool, "scale": "", "tags": [], "title_he": "", "blurb": "", "blurb_he": "", "price": "", "format": ""}}}}}}"""
 
 
 def classify(candidates: list[dict], cache: dict) -> int:
-    new = [c for c in candidates if c["id"] not in cache]
+    new = [c for c in candidates if _needs_verdict(c, cache)]
     # Chunked so no single response nears the wrapper's first-message limit
     # (the first full run had 108 candidates × 3 Hebrew/English fields each);
     # a truncated response would silently drop that day's verdicts.
-    for i in range(0, len(new), 40):
-        chunk = new[i:i + 40]
+    for i in range(0, len(new), 25):
+        chunk = new[i:i + 25]
         payload = [{"id": c["id"], "title": c["title"], "organizer": c["organizer"], "city": c["city"],
-                    "source": c["source"], "format": c["format"], "price": c["price"],
-                    "description": c["_desc"][:400]} for c in chunk]
+                    "source": c["source"], "format": c["format"], "price": c["price"], "region": c.get("region", "il"),
+                    "description": c["_desc"][:1200]} for c in chunk]
         raw = anthropic_cc.agent(json.dumps(payload, ensure_ascii=False), instructions=CLASSIFY_INSTRUCTIONS,
-                                 json_mode=True, label=f"EventsClassify[{i // 40 + 1}]")
+                                 json_mode=True, label=f"EventsClassify[{i // 25 + 1}]")
         verdicts = parse_json(raw).get("verdicts", {}) or {}
         for c in chunk:
             v = verdicts.get(c["id"])
             if isinstance(v, dict) and "relevant" in v:
-                cache[c["id"]] = {k: v.get(k) for k in ("relevant", "tags", "title_he", "blurb", "blurb_he", "price", "format")}
+                cache[c["id"]] = {**{k: v.get(k) for k in ("relevant", "scale", "tags", "title_he", "blurb",
+                                                           "blurb_he", "price", "format")}, "v": VERDICT_VERSION}
     # Missing verdicts stay uncached so the next run retries them.
     return len(new)
 
@@ -602,6 +687,7 @@ def apply_verdict(rec: dict, v: dict) -> dict:
         rec["tags"].insert(0, vendor)
     for k in ("title_he", "blurb", "blurb_he"):
         rec[k] = (v.get(k) or "")[:200]
+    rec["scale"] = "major" if v.get("scale") == "major" else "community"
     if v.get("price") in ("free", "paid", "unknown"):
         rec["price"] = v["price"]
     if v.get("format") in ("in_person", "online", "hybrid"):
@@ -614,7 +700,7 @@ def apply_verdict(rec: dict, v: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 def _title_key(rec: dict) -> str:
-    return re.sub(r"[^a-z0-9֐-׿]+", "", rec["title"].lower()) + "|" + rec["date"]
+    return re.sub(r"[^a-z0-9֐-׿]+", "", rec["title"].lower())
 
 
 def merge(fresh: list[dict], previous: list[dict], today: date, until: date, cache: dict) -> list[dict]:
@@ -631,13 +717,22 @@ def merge(fresh: list[dict], previous: list[dict], today: date, until: date, cac
             continue
         if rec["id"] in cache and not cache[rec["id"]].get("relevant"):
             continue
+        if rec["id"] in cache:
+            rec["scale"] = "major" if cache[rec["id"]].get("scale") == "major" else "community"
         # Same for the locality gate: a carried-over event must still pass
         # today's rules (2026-09-29: ODSC's global webinar lingered as "stale"
         # for a week after ODSC was added to the global-feed list).
-        if _locality(rec) is None:
+        if _locality(rec) is None and not (rec.get("region") == "global" and rec["format"] == "online"):
             continue
         u, t = _canon_url(rec["url"]), _title_key(rec)
-        if u in seen_urls or t in seen_titles:
+        # Same title within 3 days = one event reported with two dates (AI Week
+        # 2026 listed on Nov 2 AND Nov 3, 2026-10-03); a monthly series a month
+        # apart stays separate.
+        # An AI-search result re-reports the same conference with a drifting date
+        # (AI Week: Nov 2 one day, Nov 9 the next) — give those a 14-day window.
+        prior = seen_titles.get(t)
+        window = 14 if "perplexity" in (rec["source"], (prior or {}).get("source")) else 3
+        if u in seen_urls or (prior and abs((date.fromisoformat(prior["date"]) - date.fromisoformat(rec["date"])).days) <= window):
             continue
         seen_urls[u], seen_titles[t] = rec, rec
         out.append(rec)
@@ -651,7 +746,17 @@ def merge(fresh: list[dict], previous: list[dict], today: date, until: date, cac
             if (today - date.fromisoformat(rec["stale_since"])).days > 7:
                 continue
         kept.append(rec)
-    return sorted(kept, key=lambda r: (r["date"], r["time"] or "99:99", r["title"]))
+    kept.sort(key=lambda r: (r["date"], r["time"] or "99:99", r["title"]))
+    # Global tab: the 5 soonest per organizer, so one vendor's series can't fill it.
+    per_org: dict[str, int] = {}
+    capped = []
+    for r in kept:
+        if r.get("region") == "global":
+            per_org[r["organizer"]] = per_org.get(r["organizer"], 0) + 1
+            if per_org[r["organizer"]] > 5:
+                continue
+        capped.append(r)
+    return capped
 
 
 def publish() -> None:
@@ -673,7 +778,9 @@ def publish() -> None:
 SOURCE_INFO = {
     "meetup": ("Meetup", "https://www.meetup.com/find/?location=il--Tel%20Aviv&source=EVENTS&keywords=AI", "listing"),
     "eventbrite": ("Eventbrite", "https://www.eventbrite.com/d/israel--tel-aviv-yafo/ai/", "listing"),
+    "meetup_groups": ("Meetup groups (Wix, AppsFlyer, PyData…)", "https://www.meetup.com/at-wix/", "listing"),
     "luma": ("Luma", "https://luma.com/tel-aviv", "listing"),
+    "luma_global": ("Luma calendars (Claude community, GenAI Collective, Cursor)", "https://luma.com/claudecommunity", "listing"),
     "aws": ("AWS events directory", "https://aws.amazon.com/events/explore-aws-events/", "listing"),
     "aws_loft": ("AWS Experience Tel Aviv", "https://aws-experience.com/emea/tel-aviv", "listing"),
     "aws_ug": ("AWS Israel user group", "https://www.meetup.com/aws-il/", "listing"),
@@ -698,8 +805,10 @@ def main() -> int:
 
     sources = {
         "meetup": fetch_meetup,
+        "meetup_groups": fetch_meetup_groups,
         "eventbrite": fetch_eventbrite,
         "luma": fetch_luma,
+        "luma_global": fetch_luma_global,
         "aws": lambda: fetch_aws(today, until),
         # Vendor-owned pages (see SOURCE_TAG): the AWS Loft calendar + AWS IL
         # user group, Reactor TLV, GDG/Cloud OnAir, Nvidia's EMEA calendar.
@@ -721,12 +830,17 @@ def main() -> int:
             print(f"  ⚠ {name} failed: {type(e).__name__}: {str(e)[:160]}")
             recs = []
         # Locality is a hard gate, applied before anything costs money.
+        # An online event that fails the gate goes to the Global tab instead of
+        # being dropped; the classifier applies a stricter vendor/flagship bar there.
         local = []
         for r in recs:
+            r["via"] = name
             reason = _locality(r)
             if reason:
-                r["local_reason"] = reason
-                r["via"] = name
+                r["local_reason"], r["region"] = reason, "il"
+                local.append(r)
+            elif r["format"] == "online" and not re.search(r"\((español|français|deutsch|português)\)", r["title"], re.I):
+                r["region"] = "global"
                 local.append(r)
         counts[name] = len(local)
         candidates += local
@@ -744,13 +858,26 @@ def main() -> int:
     if args.dry_run:
         fresh = candidates
     else:
-        classified_new = classify(candidates, cache)
+        print(f"  enriched {enrich(candidates, cache)} candidates with their event-page agenda")
+        # Events carried over from earlier runs (e.g. a Perplexity find not re-found
+        # today) also need a current-version verdict, or they never get `scale`.
+        seen = {c["id"] for c in candidates}
+        carried = [{**p, "_desc": p.get("blurb", "")} for p in previous
+                   if p["id"] not in seen and _needs_verdict(p, cache)]
+        classified_new = classify(candidates + carried, cache)
         CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
         CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False, indent=1, sort_keys=True))
         fresh = [apply_verdict(c, cache[c["id"]]) for c in candidates
                  if c["id"] in cache and cache[c["id"]].get("relevant")]
+    # A global syndicated feed (Reactor TLV) is not a local group — learning it
+    # flooded the Global tab with 24 Reactor sessions (2026-10-03).
+    learned = {c["_group"] for c in fresh if c.get("_group") and not GLOBAL_FEEDS_RE.search(c["_group"].replace("-", " "))}
+    if learned and not args.dry_run:
+        known = json.loads(GROUPS_PATH.read_text()) if GROUPS_PATH.exists() else []
+        GROUPS_PATH.write_text(json.dumps(sorted(set(known) | learned), indent=1))
     for rec in fresh:
         rec.pop("_desc", None)
+        rec.pop("_group", None)
         rec.setdefault("added", today.isoformat())
 
     events = merge(fresh, previous, today, until, cache)

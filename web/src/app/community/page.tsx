@@ -735,16 +735,9 @@ function CommunityPageInner() {
   }, [hasMoreOlderDays, loadingOlder, loadNextOlderDay]);
 
   // Must be before conditional returns — hooks must be called unconditionally
-  // Vendors with an upcoming event (reported by EventsSection once its feed
-  // loads) light up the ribbon too — selecting AWS then shows AWS events even
-  // on a day with no AWS pulse item.
-  const [eventVendors, setEventVendors] = useState<Set<string>>(new Set());
   const todayVendors = useMemo(
-    () => new Set([
-      ...((data?.community_pulse_items || []).map((i) => i.related_vendor).filter(Boolean) as string[]),
-      ...eventVendors,
-    ]),
-    [data, eventVendors]
+    () => new Set((data?.community_pulse_items || []).map((i) => i.related_vendor).filter(Boolean) as string[]),
+    [data]
   );
 
   const vendors = useMemo(() => {
@@ -789,16 +782,23 @@ function CommunityPageInner() {
             : "Upcoming events · Posts from X · LinkedIn · Reddit threads · Community pulse (HN, arXiv, Lobsters, Dev.to)"}
         </p>
 
-        {/* Vendor filter ribbon */}
+        {/* Upcoming events — self-contained, with its own filters */}
+        <EventsSection />
+
+        {/* Social section — the vendor ribbon filters only the feed below it */}
+        <div className="flex items-center gap-3 mt-10 mb-3">
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 800, color: "var(--text-primary)", margin: 0, whiteSpace: "nowrap" }}>
+            {isHe ? "מה מדברים ברשתות" : "Social pulse"}
+          </h2>
+          <span style={{ fontSize: "12px", color: "#9a9ab8", whiteSpace: "nowrap" }}>X · LinkedIn · Reddit · HN</span>
+          <div style={{ flex: 1, height: "1px", background: "var(--border-subtle, #e4e4f0)" }} />
+        </div>
         <VendorFilterBar
           activeVendor={activeVendor}
           onSelect={setActiveVendor}
           vendors={vendors}
           todayVendors={todayVendors}
         />
-
-        {/* Upcoming events — one section, above the day blocks */}
-        <EventsSection vendor={activeVendor} onVendors={setEventVendors} />
 
         {/* Today's block */}
         <CommunityDayBlock data={data} vendorFilter={activeVendor} />

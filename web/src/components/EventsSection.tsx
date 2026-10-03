@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLang } from "@/context/LangContext";
 import { FilterCarousel } from "@/components/ui/FilterCarousel";
+import { whatsappShareUrl } from "@/lib/share";
 import {
-  BUCKET_LABELS, VENDOR_EVENT_TAG, bucketOf, dateBadge, eventVendors, fetchEvents, googleCalendarUrl,
+  BUCKET_LABELS, bucketOf, dateBadge, fetchEvents, googleCalendarUrl,
   type EventBucket, type EventItem, type EventSource,
 } from "@/lib/events";
 
@@ -14,6 +15,7 @@ import {
 // hole in the page.
 
 const ACCENT = "#0f766e";
+const MAJOR = "#4f46e5"; // conferences/summits — set apart from the teal community events
 const COLLAPSED_COUNT = 8;
 
 const TAG_LABELS_HE: Record<string, string> = {
@@ -43,11 +45,16 @@ function EventCard({ ev, isHe }: { ev: EventItem; isHe: boolean }) {
     : ev.format === "hybrid" ? (isHe ? "היברידי" : "Hybrid") : (isHe ? "פרונטלי" : "In person");
   const price = ev.price === "free" ? (isHe ? "חינם" : "Free") : ev.price === "paid" ? (isHe ? "בתשלום" : "Paid") : null;
   const rtl = isHe ? { direction: "rtl" as const, textAlign: "right" as const } : {};
+  const major = ev.scale === "major";
+  const shareText = `${title}\n${badge.weekday} ${badge.day} ${badge.month}${ev.city ? ` · ${ev.city === "Online" ? (isHe ? "אונליין" : "Online") : ev.city}` : ""}\n${ev.url}\n\n${isHe ? "עוד אירועי AI:" : "More AI events:"} https://aibriefing.dev/community/`;
 
   return (
     <div
       className="flex gap-3 px-5 py-3.5"
-      style={{ borderBottom: "1px solid #f0f0f6", ...rtl }}
+      style={{
+        borderBottom: "1px solid #f0f0f6", ...rtl,
+        ...(major ? { background: "#f5f5ff", borderInlineStart: `4px solid ${MAJOR}` } : {}),
+      }}
     >
       {/* Date badge */}
       <div
@@ -77,6 +84,9 @@ function EventCard({ ev, isHe }: { ev: EventItem; isHe: boolean }) {
           <p style={{ fontSize: "12px", color: "#3a3a55", margin: "4px 0 0", lineHeight: 1.45 }}>{blurb}</p>
         )}
         <div className="flex flex-wrap items-center gap-1.5" style={{ marginTop: "6px" }}>
+          {major && (
+            <span style={{ ...CHIP, color: "#fff", background: MAJOR, borderColor: MAJOR }}>{isHe ? "כנס גדול" : "Major event"}</span>
+          )}
           <span style={{ ...CHIP, color: ACCENT, background: "#ecfdf5", borderColor: "#a7f3d0" }}>{fmt}</span>
           {ev.date_unverified && (
             <span style={{ ...CHIP, color: "#b45309", background: "#fffbeb", borderColor: "#fde68a" }} title={isHe ? "התאריך לא אומת מול דף האירוע" : "Date not confirmed on the event page"}>
@@ -95,7 +105,55 @@ function EventCard({ ev, isHe }: { ev: EventItem; isHe: boolean }) {
           >
             {isHe ? "+ ליומן Google" : "+ Google Calendar"}
           </a>
+          <a
+            href={whatsappShareUrl(shareText)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={isHe ? "שיתוף ב-WhatsApp" : "Share on WhatsApp"}
+            style={{ ...CHIP, color: "#128c4a", borderColor: "#a7e8c0", background: "#effcf3" }}
+          >
+            WhatsApp
+          </a>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** The next few conferences/summits, pinned above the chronological list so a
+ *  two-day summit isn't visually equal to a pizza-and-talks meetup. */
+function MajorStrip({ events, isHe }: { events: EventItem[]; isHe: boolean }) {
+  if (events.length === 0) return null;
+  return (
+    <div className="px-5 pt-3 pb-3" style={{ borderBottom: "1px solid #f0f0f6", background: "#fafaff", ...(isHe ? { direction: "rtl" as const, textAlign: "right" as const } : {}) }}>
+      <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: MAJOR, marginBottom: "8px" }}>
+        {isHe ? "כנסים גדולים" : "Major events"}
+      </div>
+      {/* Swipe row on phones (four stacked cards pushed the list off-screen); grid from sm up. */}
+      <div className="flex gap-2 overflow-x-auto sm:grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", scrollSnapType: "x mandatory" }}>
+        {events.slice(0, 4).map((ev) => {
+          const b = dateBadge(ev.date, isHe);
+          const end = ev.end_date && ev.end_date !== ev.date ? dateBadge(ev.end_date, isHe) : null;
+          return (
+            <a
+              key={ev.id}
+              href={ev.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block hover:shadow-md transition-shadow"
+              style={{ borderRadius: "10px", border: `1px solid #c7d2fe`, background: "#fff", padding: "10px 12px", flex: "0 0 72%", scrollSnapAlign: "start" }}
+            >
+              <div style={{ fontSize: "11px", fontWeight: 800, color: MAJOR }}>
+                {b.day}{end ? `–${end.day}` : ""} {end && end.month !== b.month ? `${b.month}–${end.month}` : b.month}
+                {ev.date_unverified ? <span style={{ color: "#b45309", fontWeight: 600 }}> · {isHe ? "תאריך לא סופי" : "date TBC"}</span> : null}
+              </div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f0f1a", lineHeight: 1.3, marginTop: "2px" }}>
+                {isHe && ev.title_he ? ev.title_he : ev.title}
+              </div>
+              <div style={{ fontSize: "11px", color: "#6b6b8a", marginTop: "2px" }}>{ev.city === "Online" ? (isHe ? "אונליין" : "Online") : ev.city}</div>
+            </a>
+          );
+        })}
       </div>
     </div>
   );
@@ -135,18 +193,12 @@ function SourcesList({ sources, isHe }: { sources: EventSource[]; isHe: boolean 
   );
 }
 
-interface EventsSectionProps {
-  /** Active chip of the page's vendor ribbon (null = All). Narrows the list
-   *  via VENDOR_EVENT_TAG so the ribbon and the section agree. */
-  vendor?: string | null;
-  /** Fires once the feed loads with the ribbon vendors that have events, so
-   *  the page can light up those chips. */
-  onVendors?: (vendors: Set<string>) => void;
-}
-
-export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) {
+export function EventsSection() {
   const { isHe } = useLang();
-  const [events, setEvents] = useState<EventItem[]>([]);
+  const [allEvents, setAllEvents] = useState<EventItem[]>([]);
+  // Israel = in-person in central Israel or Hebrew/Israeli online; Global = online
+  // vendor/conference events from anywhere (Grok Bot, Anthropic, AWS, Reactor…).
+  const [region, setRegion] = useState<"il" | "global">("il");
   const [sources, setSources] = useState<EventSource[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [showAll, setShowAll] = useState(false);
@@ -161,14 +213,14 @@ export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) 
       // that has already passed so a morning viewer never sees yesterday.
       if (!alive || !feed) return;
       const upcoming = feed.events.filter((e) => e.date >= today);
-      setEvents(upcoming);
+      setAllEvents(upcoming);
       setSources(feed.sources ?? []);
-      onVendors?.(eventVendors(upcoming));
     });
     return () => { alive = false; };
-    // onVendors is a setState from the page — stable, and re-fetching on identity change would loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const events = useMemo(() => allEvents.filter((e) => (e.region ?? "il") === region), [allEvents, region]);
+  const globalCount = useMemo(() => allEvents.filter((e) => e.region === "global").length, [allEvents]);
 
   // Filter chips: tags carried by ≥2 events, then organizers with ≥3 events.
   const chips = useMemo(() => {
@@ -185,20 +237,15 @@ export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) 
 
   const filtered = useMemo(() => {
     let list = events;
-    if (vendor) {
-      // A ribbon vendor without an event tag (Meta, xAI…) has no events by definition.
-      const tag = VENDOR_EVENT_TAG[vendor];
-      list = tag ? list.filter((e) => e.tags.includes(tag)) : [];
-    }
     if (fmt !== "all") list = list.filter((e) => (fmt === "online" ? e.format === "online" : e.format !== "online"));
     if (filter) {
       const [kind, val] = [filter.slice(0, 3), filter.slice(4)];
       list = list.filter((e) => (kind === "tag" ? e.tags.includes(val) : e.organizer === val));
     }
     return list;
-  }, [events, filter, fmt, vendor]);
+  }, [events, filter, fmt]);
 
-  if (events.length === 0) return null;
+  if (allEvents.length === 0) return null;
 
   // Group by date bucket, chronological within each (the feed arrives sorted by
   // date+time; the "In person" chip is how a reader narrows to rooms).
@@ -238,7 +285,9 @@ export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) 
               {isHe ? "אירועים קרובים" : "Upcoming events"}
             </h2>
             <p style={{ fontSize: "11px", color: "#9a9ab8", margin: 0 }}>
-              {isHe ? "AI · ענן · מפתחים · מרכז הארץ, 60 הימים הקרובים" : "AI · cloud · developers · central Israel, next 60 days"}
+              {region === "il"
+                ? (isHe ? "AI · ענן · מפתחים · מרכז הארץ, 60 הימים הקרובים" : "AI · cloud · developers · central Israel, next 60 days")
+                : (isHe ? "אונליין מכל העולם · ספקים וכנסים גדולים, 60 הימים הקרובים" : "Online from anywhere · vendors & big conferences, next 60 days")}
             </p>
           </div>
         </div>
@@ -263,10 +312,31 @@ export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) 
 
       {!collapsed && (
         <>
+          {globalCount > 0 && (
+            <div className="flex gap-1 px-5 pt-3" style={isHe ? { direction: "rtl" } : undefined} role="tablist">
+              {([["il", isHe ? "בישראל" : "In Israel", allEvents.length - globalCount], ["global", isHe ? "גלובלי · אונליין" : "Global · online", globalCount]] as const).map(([k, label, n]) => {
+                const active = region === k;
+                return (
+                  <button
+                    key={k}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => { setRegion(k); setFilter(null); setFmt("all"); setShowAll(false); }}
+                    style={{
+                      fontSize: "12px", fontWeight: 700, padding: "6px 14px", borderRadius: "8px", cursor: "pointer",
+                      border: `1px solid ${active ? ACCENT : "#e4e4f0"}`, background: active ? ACCENT : "#fff", color: active ? "#fff" : "#5a5a7a",
+                    }}
+                  >
+                    {label} <span style={{ opacity: 0.75, fontWeight: 600 }}>{n}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {chips.length > 0 && (
             <FilterCarousel activeKey={filter} style={{ borderBottom: "1px solid #f0f0f6", padding: "6px 0" }}>
               {/* Format toggle first — "can I show up in person?" is the primary question. */}
-              {([["in_person", isHe ? "פרונטלי" : "In person"], ["online", isHe ? "אונליין" : "Online"]] as const).map(([k, label]) => {
+              {region === "il" && ([["in_person", isHe ? "פרונטלי" : "In person"], ["online", isHe ? "אונליין" : "Online"]] as const).map(([k, label]) => {
                 const active = fmt === k;
                 return (
                   <button
@@ -300,6 +370,8 @@ export function EventsSection({ vendor = null, onVendors }: EventsSectionProps) 
               })}
             </FilterCarousel>
           )}
+
+          <MajorStrip events={filtered.filter((e) => e.scale === "major")} isHe={isHe} />
 
           <div className="lg:flex">
           <div className="min-w-0 lg:flex-1">

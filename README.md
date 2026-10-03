@@ -496,29 +496,37 @@ web build so the new `/library/<slug>/` page is statically generated.
   (assets to S3, manifest + invalidation). ~5 min per talk end to end.
 - **Resumable:** `LIBRARY_TIME_BUDGET_S` (default 1500) stops between stages; an unfinished
   talk resumes next run, and is parked after 3 failed runs.
-- Flags: `--dry-run` (ranking only), `--url <youtube>` (force), `--lang he|en`,
+- Flags: `--dry-run` (ranking only), `--url <youtube | x.com post>` (force; X reposts get an
+  `x-<id>` session and the writer is told the caption is not a source), `--lang he|en`,
   `--no-publish`, `--max N`. If `yt-dlp` returns 403, `brew upgrade yt-dlp`
   (`YT_CLIENT=web_embedded` is the pinned workaround).
 
-### Events Agent — `agents/active/events-agent/` (added 2026-09-29, daily)
+### Events Agent — `agents/active/events-agent/` (added 2026-09-29, daily; reworked 2026-10-03)
 
-Builds `docs/data/events.json` — upcoming AI / cloud / developer events in central Israel
-for the next ~60 days — rendered as "Upcoming events" at the top of `/community/`
-(`web/src/components/EventsSection.tsx`, `web/src/lib/events.ts`).
+Builds `docs/data/events.json` — upcoming AI / cloud / developer events for the next ~60 days —
+rendered as "Upcoming events" at the top of `/community/` (`web/src/components/EventsSection.tsx`,
+`web/src/lib/events.ts`). Two tabs: **In Israel** (in-person in central Israel, or Hebrew/Israeli
+online) and **Global · online** (vendor/flagship online events); conferences get a "Major events" strip.
 
-- **Sources (no JS, plain `requests`):** Meetup (`__NEXT_DATA__` Apollo `Event:` objects),
-  Eventbrite (JSON-LD `ItemList`), Luma (`/tel-aviv` page data), the AWS events directory
-  API, and one Perplexity search for vendor/conference events; each source is retry-wrapped
-  and fail-soft.
-- **Gates:** in-person events must be in a central-Israel city allowlist; online events only
-  when clearly aimed at Israelis (Hebrew, or an Israeli community — global feeds branded
-  "Tel Aviv" are dropped). One batched `claude -p` call classifies AI relevance, tags,
-  price/format and writes the Hebrew title + blurb; verdicts are cached by event id in
-  `cache/classified.json`. Perplexity-sourced dates are checked against the event page and
-  flagged `date_unverified` otherwise.
-- **Merge:** previous still-future events are kept (dropped after 7 days unseen), past events
-  dropped, deduped by URL and (title, date). `--publish` uploads to `s3://<bucket>/data/events.json`
-  and invalidates; `--dry-run` scrapes only. Run log: `docs/data/_events_runs.jsonl`.
+- **Sources (no JS, plain `requests`; `SOURCE_INFO` in `pipeline.py` = what the page's sources rail
+  shows):** Meetup keyword search + whole Meetup groups (`SEED_GROUPS` — Wix, AppsFlyer, PyData… —
+  plus groups learned from kept events in `cache/meetup_groups.json`; global feeds like Reactor TLV
+  are never learned), Eventbrite (JSON-LD), Luma (`/tel-aviv` + `GLOBAL_LUMA` calendars), dev.events
+  (JSON-LD), AWS Experience TLV, Reactor, GDG, Cloud OnAir, NVIDIA, and one Perplexity search for
+  big conferences. Each source is retry-wrapped and fail-soft.
+- **Agenda, not blurb:** candidates about to be judged get their event page's JSON-LD
+  `Event.description` (talks, speakers) — listings often carry only the group's generic text.
+- **Gates + classifier:** locality rules decide `region` (il / global; non-Israeli online events go
+  to global instead of being dropped). One batched `claude -p` call per 25 events decides relevance
+  (global has a stricter vendor/flagship bar), `scale` (major / community), tags, price/format and
+  the Hebrew title + blurb. Verdicts are cached in `cache/classified.json` keyed by id and
+  `VERDICT_VERSION` — bump it to force a one-time re-judge. Perplexity dates are checked against the
+  event page and flagged `date_unverified` otherwise.
+- **Merge:** previous still-future events kept (dropped after 7 days unseen); deduped by URL and by
+  title within 3 days (14 for Perplexity results, whose dates drift); Global capped at 5 per
+  organizer. Each event records the fetcher it came from (`via`); `events.json.sources` carries
+  per-source counts. `--publish` uploads + invalidates; `--dry-run` scrapes only.
+  Run log: `docs/data/_events_runs.jsonl`.
 
 ### Mobile verification — `scripts/mobile_shots.sh`
 

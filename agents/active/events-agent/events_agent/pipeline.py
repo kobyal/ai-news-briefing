@@ -306,6 +306,37 @@ def fetch_luma_global() -> list[dict]:
     return [r for page in GLOBAL_LUMA for r in fetch_luma(page) if r["format"] == "online"]
 
 
+# dev.events: a developer-events directory with clean JSON-LD Event records. Its
+# Israel pages caught conferences no other source had (hayaData, LLMDay + Data
+# TLV — 2026-10-03). Non-AI conferences on the tech page are left to the classifier.
+DEVEVENTS_PAGES = ["https://dev.events/meetups/AS/IL/Tel_Aviv/ai", "https://dev.events/AS/IL/tech"]
+
+
+def fetch_devevents() -> list[dict]:
+    out: dict[str, dict] = {}
+    for page in DEVEVENTS_PAGES:
+        r = _get(page)
+        if not r or r.status_code != 200:
+            continue
+        for m in re.finditer(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', r.text, re.S):
+            try:
+                j = json.loads(m.group(1))
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(j, dict) or "Event" not in str(j.get("@type", "")) or j.get("url") in out:
+                continue
+            online = "Online" in (j.get("eventAttendanceMode") or "")
+            addr = ((j.get("location") or {}).get("address") or {})
+            # Dates are midnight UTC placeholders — keep the date, drop the fake time.
+            rec = _rec(title=j.get("name"), url=j.get("url"), start=(j.get("startDate") or "")[:10],
+                       end=(j.get("endDate") or "")[:10], city=addr.get("addressLocality", ""),
+                       organizer=((j.get("organizer") or j.get("performer") or {}) or {}).get("name", ""),
+                       desc=j.get("description"), source="devevents", fmt="online" if online else "in_person")
+            if rec:
+                out[j["url"]] = rec
+    return list(out.values())
+
+
 def fetch_aws(today: date, until: date) -> list[dict]:
     # `events-master` is the live directory (`events-master-main` returns 0).
     # The Israel tag mostly matches evergreen on-demand items dated year 3000;
@@ -620,7 +651,7 @@ def enrich(candidates: list[dict], cache: dict) -> int:
     """Swap the listing blurb for the event page's agenda on every candidate
     about to be (re)judged. Only those — judged events aren't refetched daily."""
     from concurrent.futures import ThreadPoolExecutor
-    todo = [c for c in candidates if _needs_verdict(c, cache) and c["source"] in ("luma", "meetup", "eventbrite")]
+    todo = [c for c in candidates if _needs_verdict(c, cache) and c["source"] in ("luma", "meetup", "eventbrite", "devevents")]
     with ThreadPoolExecutor(8) as ex:
         for c, desc in zip(todo, ex.map(lambda c: _page_description(c["url"]), todo)):
             if len(desc) > len(c["_desc"]):
@@ -780,6 +811,7 @@ SOURCE_INFO = {
     "eventbrite": ("Eventbrite", "https://www.eventbrite.com/d/israel--tel-aviv-yafo/ai/", "listing"),
     "meetup_groups": ("Meetup groups (Wix, AppsFlyer, PyData…)", "https://www.meetup.com/at-wix/", "listing"),
     "luma": ("Luma", "https://luma.com/tel-aviv", "listing"),
+    "devevents": ("dev.events", "https://dev.events/AS/IL/tech", "listing"),
     "luma_global": ("Luma calendars (Claude community, GenAI Collective, Cursor)", "https://luma.com/claudecommunity", "listing"),
     "aws": ("AWS events directory", "https://aws.amazon.com/events/explore-aws-events/", "listing"),
     "aws_loft": ("AWS Experience Tel Aviv", "https://aws-experience.com/emea/tel-aviv", "listing"),
@@ -809,6 +841,7 @@ def main() -> int:
         "eventbrite": fetch_eventbrite,
         "luma": fetch_luma,
         "luma_global": fetch_luma_global,
+        "devevents": fetch_devevents,
         "aws": lambda: fetch_aws(today, until),
         # Vendor-owned pages (see SOURCE_TAG): the AWS Loft calendar + AWS IL
         # user group, Reactor TLV, GDG/Cloud OnAir, Nvidia's EMEA calendar.

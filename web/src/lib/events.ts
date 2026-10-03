@@ -20,7 +20,7 @@ export interface EventItem {
   venue: string;
   organizer: string;
   url: string;
-  source: "meetup" | "eventbrite" | "luma" | "aws" | "microsoft" | "google" | "nvidia" | "perplexity";
+  source: "meetup" | "eventbrite" | "luma" | "devevents" | "aws" | "microsoft" | "google" | "nvidia" | "perplexity";
   format: EventFormat;
   price: EventPrice;
   tags: string[];

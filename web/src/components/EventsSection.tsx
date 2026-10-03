@@ -165,7 +165,8 @@ function SourcesList({ sources, isHe }: { sources: EventSource[]; isHe: boolean 
   return (
     <>
       <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-        {sources.map((s) => (
+        {/* Busiest sources first; quiet ones (0 right now) sink to the bottom. */}
+        {[...sources].sort((a, b) => b.listed - a.listed).map((s) => (
           <li key={s.key} className="flex items-center gap-2" style={{ fontSize: "12px", padding: "5px 0", borderBottom: "1px dashed #ececf4" }}>
             {s.url ? (
               <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: "#0f0f1a", fontWeight: 600 }}>{s.label}</a>

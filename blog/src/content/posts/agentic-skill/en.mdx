@@ -1,0 +1,149 @@
+---
+title: "Agentic skill: how to write a SKILL.md that doesn't become another system prompt"
+description: "Six steps to an Agent Skill that works: a description that triggers right, a body of steps, a checking script, a 10-request eval and an expiry date."
+lang: en
+key: agentic-skill
+term: "agentic skill"
+kind: fieldnotes
+pubDate: 2026-10-03
+tags: ["agent-skills", "claude-code", "skill-md", "context-engineering", "agents"]
+hook: "claim"
+cover: photo
+tldr: ["Move single-task instructions out of CLAUDE.md into a folder under .claude/skills", "Write the description with the words from the request, and test it against 10 requests", "Any rule you can check with a regex goes into a script with an exit code"]
+hero: /posts/agentic-skill/hero-en.jpg
+diagram: /posts/agentic-skill/diagram.svg
+sources:
+  - { title: "Agentic Skill Decay", url: "https://addyo.substack.com/p/agentic-skill-decay", date: "2026-08-31" }
+  - { title: "Agent Skills Explained: What They Are, What They Aren't, and How to Use Them - DEV Community", url: "https://dev.to/loc_carrre_0d798813c662/agent-skills-explained-what-they-are-what-they-arent-and-how-to-use-them-bf9", date: "" }
+  - { title: "Agent Skills Explained: When to Use Them and Why They Fail | Aerospike", url: "https://aerospike.com/blog/agent-skills-guide", date: "" }
+  - { title: "Why skills are emerging across the agentic universe | IBM", url: "https://www.ibm.com/think/insights/why-skills-are-emerging-across-agentic-universe", date: "" }
+opinion: "We're not excited by the name. An Agent Skill is a runbook with a trigger, and we've had runbooks for a long time. That said, this time it does change something in daily work: you take single-task text out of the context sent on every call, and pay for it only when you need it. The real value isn't in the Markdown file, it's in the script that checks. Every rule we moved from the model to code got cheaper and more reliable. A skill without a check is just another prompt, in a tidier folder."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+Most skills people write today are a system prompt that moved house. Same "You are a senior database expert", same 40 lines of rules, just in a different folder. That saves nothing. It just gives the agent one more decision to make.
+
+First, what it is. Anthropic added Agent Skills to Claude, and in December 2025 released the format as an open standard at agentskills.io. Codex, Copilot, VS Code and Cursor now read the same format. A skill is a folder with a `SKILL.md` file: front matter with `name` and `description`, a body with instructions, and sometimes scripts and reference files next to it.
+
+All the value sits in one mechanism: progressive disclosure. Anthropic's docs describe three levels. Every skill's metadata loads at the start of the session, roughly 100 tokens per skill. The body loads only when the task matches, and should stay under 5,000 tokens. Scripts and reference files are read only if the instructions point to them, and from a script only the output enters the context, not the code.
+
+In practice, 20 skills cost about 2,000 tokens per session. Compare that with the system prompt described in a dev.to post: it started at 200 tokens, grew to 5,000, and was sent on every call, even when the task had nothing to do with it. Anyone who has maintained a CLAUDE.md for six months knows that curve.
+
+So a skill is only worth something if it's built like a runbook: a sharp trigger, steps, and a check that runs without a model. Here's how I build one, on a boring and useful task: a Postgres migration.
+
+## 01 · Find what you explain to the agent for the third time
+
+Open your CLAUDE.md or AGENTS.md and mark every paragraph that's relevant to only one kind of task. Migrations, release notes, handling a flaky test. A good start: `grep -n -i -E "migration|release|deploy" CLAUDE.md AGENTS.md`.
+
+What you'll see: a decent chunk of the file is sent on every call for a task that happens once a week. That's your candidate.
+
+My sorting rule is simple. What's always relevant, like the repo layout and how to run tests, stays in CLAUDE.md. What's relevant to one task moves to a skill. Aerospike adds a useful split: a skill describes how to think about a problem, MCP and tools carry it out. If what you need is access to Jira, that's not a skill. And if the knowledge changes every day, that's not a skill either, that's context. A skill fits knowledge that holds for weeks.
+
+## 02 · Write the description before anything else
+
+Until the agent decides to load a skill, it sees only two lines: `name` and `description`. So the description isn't a description. It's the trigger. Per the spec, `name` is up to 64 characters, lowercase letters, digits and hyphens. `description` is up to 1,024 characters.
+
+Put two things in it: what the skill does, and when to use it, in the words people actually type. "Helps with databases" is bad. The agent will either ignore it or load it on every SQL question. Something like "Write and validate a Postgres schema migration. Use when the user asks to add or change a table, column or index" works, because it contains the words that will show up in the request.
+
+One more small thing: write the description in the third person. It goes into the system prompt, and "I can help you" there just confuses the model.
+
+<figure><img src="/posts/agentic-skill/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/agentic-skill/v1-svg-en.jpg" alt="20 skills cost less than half of a bloated system prompt, and a skill's body is paid for only on the task that needs it (Anthropic docs; dev.to)" loading="lazy" /><figcaption>20 skills cost less than half of a bloated system prompt, and a skill's body is paid for only on the task that needs it (Anthropic docs; dev.to)</figcaption></figure>
+
+## 03 · The body: numbered steps, no lecture
+
+The body is read only after the trigger fires, so there's no room in it for "you are an expert". The model already knows SQL. What it doesn't know is how you do migrations. Only that goes in.
+
+```markdown title=".claude/skills/pg-migration/SKILL.md"
+---
+name: pg-migration
+description: Write and validate a Postgres schema migration. Use when the user asks to add or change a table, column or index, or mentions migration, schema change or ALTER TABLE.
+---
+
+# Postgres migration
+
+## Steps
+1. Read the current definition of every table you touch: `psql "$DATABASE_URL" -c '\d+ <table>'`.
+2. Create `migrations/<timestamp>_<slug>.up.sql` and a matching `.down.sql`. One change per file.
+3. Indexes: `CREATE INDEX CONCURRENTLY`, in its own file, outside a transaction.
+4. New NOT NULL column on an existing table: add it nullable, backfill in batches, then `SET NOT NULL` in a separate migration.
+5. Run `python .claude/skills/pg-migration/scripts/check_migration.py <up-file>`. Fix and re-run until it exits 0.
+6. If a touched table has more than 1M rows, read `reference/locks.md` before writing ALTER TABLE.
+
+## Never
+- Never apply a migration to a non-local database.
+- Never DROP a column or table without asking first.
+
+## Output
+The file paths, the full output of the check, and one line: which locks this takes and for how long.
+
+Owner: platform team. Last verified: 2026-10-01.
+```
+
+A few decisions I made there. First, every step is a command, not a principle. Also, there's a short "Never" section and a fixed output format, so the result looks the same every time. And `locks.md` loads only conditionally, when the table is large. That's progressive disclosure inside the skill itself. Anthropic recommends keeping the body under 500 lines. Over that? Split into reference files.
+
+## 04 · What you can check without a model goes into a script
+
+Three of the rules above are really regexes. There's no reason the model should have to "remember" them. Put them in code:
+
+```python title=".claude/skills/pg-migration/scripts/check_migration.py"
+import re, sys, pathlib
+
+up = pathlib.Path(sys.argv[1])
+sql = up.read_text()
+errors = []
+
+if re.search(r"CREATE\s+(UNIQUE\s+)?INDEX(?!\s+CONCURRENTLY)", sql, re.I):
+    errors.append("CREATE INDEX without CONCURRENTLY")
+if re.search(r"CONCURRENTLY", sql, re.I) and re.search(r"\bBEGIN\b", sql, re.I):
+    errors.append("CONCURRENTLY inside a transaction")
+if re.search(r"\bDROP\s+(COLUMN|TABLE)\b", sql, re.I):
+    errors.append("DROP needs human approval")
+
+down = up.with_name(up.name.replace(".up.sql", ".down.sql"))
+if not down.exists():
+    errors.append(f"missing {down.name}")
+
+for e in errors:
+    print("FAIL:", e)
+print("OK" if not errors else f"{len(errors)} problem(s)")
+sys.exit(1 if errors else 0)
+```
+
+What you'll see when the agent writes an index without CONCURRENTLY: `FAIL: CREATE INDEX without CONCURRENTLY` and exit code 1. It fixes it, runs again, and hands you the `OK` in its output. The script costs no tokens for its code, only for two lines of output.
+
+That's the difference between a skill that asks the model to be careful and a skill that checks. The first works most of the time. When the second fails, you know.
+
+## 05 · Test that it fires, and that it doesn't fire for nothing
+
+Write 10 requests. 5 that should trigger the skill, like "add an index on orders.created_at" or "rename users.fullname". And 5 that shouldn't, like "why is this query slow" or "write a SELECT for the dashboard". Run each one in a fresh session and count in the transcript how many times the agent read `SKILL.md`.
+
+The target: 5 out of 5, and 0 out of 5. Missed one? Fix the description, not the body. On a miss, the body is never read. A common case: a request like "make the orders table faster to query" triggers nothing, because it doesn't contain a single word from the description. Either add that phrasing, or decide it really isn't a migration task.
+
+It's a small eval, ten minutes. Keep the 10 requests in a file next to the skill, and rerun them every time someone touches the description.
+
+## 06 · Give the skill an expiry date, and do the task by hand once a month
+
+In July 2026 IBM wrote what anyone who has maintained a wiki already knows: a hand-written skill is static, and without maintenance it goes stale. They also describe the other direction: skills derived from a successful agent trajectory, then updated or forked. Their example: an order-to-cash skill that runs on SAP, and then you acquire a subsidiary that runs on Oracle. Either you take an Oracle skill, or you fork and adapt.
+
+> **My take:** I don't buy skills that the agent writes for itself and that go in without review. One successful trajectory is an anecdote, not a procedure. Let the agent propose a skill as a PR, and let a human approve it.
+
+In practice: the skill lives in git, changes to it go through a PR like code, and the end of the body has an owner and a last-verified date. Once a month you go over the list. A skill that didn't fire for a whole month gets deleted.
+
+And while you're at it, do the task itself without the skill. Addy Osmani wrote about this on August 31:
+
+> Agents can skip much of that work, so building your reps has to be deliberate.
+>
+> — Addy Osmani, "Agentic Skill Decay"
+
+Two things happen when you do a migration by hand. You see whether the skill still describes reality, because the schema grew or Postgres got upgraded. And you keep the ability to judge what the agent wrote. Without that, your review becomes a rubber stamp.
+
+<figure><img src="/posts/agentic-skill/src1.jpg" alt="The agent gains a new skill and you lose yours, unless you do the task by hand now and then (credit: Addy Osmani, Substack)" loading="lazy" /><figcaption>The agent gains a new skill and you lose yours, unless you do the task by hand now and then (credit: Addy Osmani, Substack)</figcaption></figure>
+
+## Takeaways
+
+- One task, one skill. What's always relevant stays in CLAUDE.md.
+- Write the description first, and test it against 10 requests.
+- Any rule you can check with a regex goes into a script with an exit code.
+- A skill without an owner and a date goes stale. And if you haven't done the task by hand in six months, you won't notice.

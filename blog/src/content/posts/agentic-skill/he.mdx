@@ -1,0 +1,149 @@
+---
+title: "Agentic skill: איך כותבים SKILL.md שלא הופך לעוד system prompt"
+description: "שישה צעדים ל-Agent Skill שעובד: description שמדליק נכון, גוף של צעדים, script שבודק, eval של 10 בקשות ותאריך תפוגה."
+lang: he
+key: agentic-skill
+term: "agentic skill"
+kind: fieldnotes
+pubDate: 2026-10-03
+tags: ["agent-skills", "claude-code", "skill-md", "context-engineering", "agents"]
+hook: "claim"
+cover: photo
+tldr: ["תעבירו הוראות של משימה אחת מ-CLAUDE.md לתיקייה ב-.claude/skills", "תכתבו description עם המילים מהבקשה, ותבדקו אותו מול 10 בקשות", "כל כלל שאפשר לבדוק ב-regex עובר ל-script עם exit code"]
+hero: /posts/agentic-skill/hero.jpg
+diagram: /posts/agentic-skill/diagram.svg
+sources:
+  - { title: "Agentic Skill Decay", url: "https://addyo.substack.com/p/agentic-skill-decay", date: "2026-08-31" }
+  - { title: "Agent Skills Explained: What They Are, What They Aren't, and How to Use Them - DEV Community", url: "https://dev.to/loc_carrre_0d798813c662/agent-skills-explained-what-they-are-what-they-arent-and-how-to-use-them-bf9", date: "" }
+  - { title: "Agent Skills Explained: When to Use Them and Why They Fail | Aerospike", url: "https://aerospike.com/blog/agent-skills-guide", date: "" }
+  - { title: "Why skills are emerging across the agentic universe | IBM", url: "https://www.ibm.com/think/insights/why-skills-are-emerging-across-agentic-universe", date: "" }
+opinion: "אנחנו לא מתרגשים מהשם. Agent Skill הוא runbook עם טריגר, ו-runbooks יש לנו מזמן. מה שכן, הפעם זה משנה משהו בעבודה היומיומית: מוציאים טקסט של משימה אחת מה-context שנשלח בכל קריאה, ומשלמים עליו רק כשצריך. הערך האמיתי לא בקובץ ה-Markdown, הוא ב-script שבודק. כל כלל שהעברנו ממודל לקוד נהיה זול יותר ואמין יותר. skill בלי בדיקה הוא עוד prompt, רק בתיקייה מסודרת."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+רוב ה-skills שאנשים כותבים היום הם system prompt שעבר דירה. אותו "You are a senior database expert", אותן 40 שורות של כללים, רק בתיקייה אחרת. זה לא חוסך כלום. זה רק מוסיף ל-agent עוד החלטה.
+
+טוב, מה זה בכלל. אנטרופיק הכניסה את Agent Skills לקלוד, ובדצמבר 2025 שחררה את הפורמט כסטנדרט פתוח ב-agentskills.io. היום Codex, Copilot, VS Code ו-Cursor קוראים את אותו פורמט. Skill הוא תיקייה עם קובץ `SKILL.md`: front matter עם `name` ו-`description`, גוף עם הוראות, ולפעמים גם scripts וקבצי reference לידו.
+
+כל הערך יושב במנגנון אחד, progressive disclosure. בתיעוד של אנטרופיק יש שלוש רמות. ה-metadata של כל skill נטען בתחילת ה-session, בערך 100 טוקנים ל-skill. הגוף נטען רק כשהמשימה מתאימה, ועדיף שיישאר מתחת ל-5,000 טוקנים. scripts ו-reference נקראים רק אם ההוראות שולחות אליהם, ומ-script נכנס ל-context רק הפלט, לא הקוד.
+
+בפועל, 20 skills עולים בערך 2,000 טוקנים ל-session. מולם יש את ה-system prompt שמתואר בפוסט ב-dev.to: התחיל ב-200 טוקנים, הגיע ל-5,000, ונשלח בכל קריאה גם כשהמשימה בכלל לא קשורה. מי שתחזק CLAUDE.md חצי שנה מכיר את הגרף הזה.
+
+אז skill שווה משהו רק אם הוא בנוי כמו runbook: טריגר חד, צעדים, ובדיקה שרצה בלי מודל. הנה איך אני בונה אחד, על משימה משעממת וטובה: migration ל-Postgres.
+
+## 01 · תמצאו את מה שאתם מסבירים ל-agent בפעם השלישית
+
+תפתחו את ה-CLAUDE.md או ה-AGENTS.md שלכם ותסמנו כל פסקה שרלוונטית רק לסוג אחד של משימה. migrations, release notes, טיפול ב-flaky test. התחלה טובה: `grep -n -i -E "migration|release|deploy" CLAUDE.md AGENTS.md`.
+
+מה שתראו: חלק לא קטן מהקובץ נשלח בכל קריאה בשביל משימה שקורית פעם בשבוע. זה המועמד.
+
+הכלל שלי למיון פשוט. מה שרלוונטי תמיד, כמו מבנה ה-repo ואיך מריצים tests, נשאר ב-CLAUDE.md. מה שרלוונטי למשימה אחת עובר ל-skill. ב-Aerospike מוסיפים חלוקה טובה: skill מתאר איך לחשוב על בעיה, MCP ו-tools מבצעים אותה. אם מה שאתם צריכים זה גישה ל-Jira, זה לא skill. ואם הידע משתנה כל יום, זה גם לא skill, זה context. Skill מתאים לידע שמחזיק שבועות.
+
+## 02 · תכתבו את ה-description לפני כל השאר
+
+עד שה-agent מחליט לטעון skill, הוא רואה רק שתי שורות: `name` ו-`description`. אז ה-description הוא לא תיאור. הוא הטריגר. לפי המפרט, `name` עד 64 תווים, אותיות קטנות, ספרות ומקפים. `description` עד 1,024 תווים.
+
+תכתבו בו שני דברים: מה ה-skill עושה, ומתי להשתמש בו, במילים שאנשים באמת מקלידים. "Helps with databases" זה גרוע. ה-agent או יתעלם ממנו, או יטען אותו על כל שאלה עם SQL. משהו כמו "Write and validate a Postgres schema migration. Use when the user asks to add or change a table, column or index" כבר עובד, כי יש בו את המילים שיופיעו בבקשה.
+
+ועוד דבר קטן: את ה-description כותבים בגוף שלישי. הוא נכנס ל-system prompt, ו-"I can help you" שם רק מבלבל את המודל.
+
+<figure><img src="/posts/agentic-skill/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/agentic-skill/v1-svg-he.jpg" alt="20 skills עולים פחות מחצי מ-system prompt מנופח, וגוף ה-skill משולם רק במשימה שצריכה אותו (התיעוד של אנטרופיק; dev.to)" loading="lazy" /><figcaption>20 skills עולים פחות מחצי מ-system prompt מנופח, וגוף ה-skill משולם רק במשימה שצריכה אותו (התיעוד של אנטרופיק; dev.to)</figcaption></figure>
+
+## 03 · הגוף: צעדים ממוספרים, בלי הרצאה
+
+ה-body נקרא רק אחרי שהטריגר עבד, אז אין בו מקום ל-"you are an expert". המודל כבר יודע SQL. מה שהוא לא יודע זה איך אצלכם עושים migration. רק את זה שמים שם.
+
+```markdown title=".claude/skills/pg-migration/SKILL.md"
+---
+name: pg-migration
+description: Write and validate a Postgres schema migration. Use when the user asks to add or change a table, column or index, or mentions migration, schema change or ALTER TABLE.
+---
+
+# Postgres migration
+
+## Steps
+1. Read the current definition of every table you touch: `psql "$DATABASE_URL" -c '\d+ <table>'`.
+2. Create `migrations/<timestamp>_<slug>.up.sql` and a matching `.down.sql`. One change per file.
+3. Indexes: `CREATE INDEX CONCURRENTLY`, in its own file, outside a transaction.
+4. New NOT NULL column on an existing table: add it nullable, backfill in batches, then `SET NOT NULL` in a separate migration.
+5. Run `python .claude/skills/pg-migration/scripts/check_migration.py <up-file>`. Fix and re-run until it exits 0.
+6. If a touched table has more than 1M rows, read `reference/locks.md` before writing ALTER TABLE.
+
+## Never
+- Never apply a migration to a non-local database.
+- Never DROP a column or table without asking first.
+
+## Output
+The file paths, the full output of the check, and one line: which locks this takes and for how long.
+
+Owner: platform team. Last verified: 2026-10-01.
+```
+
+כמה החלטות שקיבלתי שם. קודם כל, כל צעד הוא פקודה, לא עיקרון. חוץ מזה, יש סעיף "Never" קצר ופורמט פלט קבוע, כדי שהתוצאה תיראה אותו דבר בכל פעם. וקובץ ה-`locks.md` נטען רק בתנאי, כשהטבלה גדולה. זה progressive disclosure בתוך ה-skill עצמו. אנטרופיק ממליצים לשמור את ה-body מתחת ל-500 שורות. עברתם? תפצלו ל-reference.
+
+## 04 · מה שאפשר לבדוק בלי מודל, עובר ל-script
+
+שלושה מהכללים למעלה הם בעצם regex. אין סיבה שהמודל "יזכור" אותם. תשימו אותם בקוד:
+
+```python title=".claude/skills/pg-migration/scripts/check_migration.py"
+import re, sys, pathlib
+
+up = pathlib.Path(sys.argv[1])
+sql = up.read_text()
+errors = []
+
+if re.search(r"CREATE\s+(UNIQUE\s+)?INDEX(?!\s+CONCURRENTLY)", sql, re.I):
+    errors.append("CREATE INDEX without CONCURRENTLY")
+if re.search(r"CONCURRENTLY", sql, re.I) and re.search(r"\bBEGIN\b", sql, re.I):
+    errors.append("CONCURRENTLY inside a transaction")
+if re.search(r"\bDROP\s+(COLUMN|TABLE)\b", sql, re.I):
+    errors.append("DROP needs human approval")
+
+down = up.with_name(up.name.replace(".up.sql", ".down.sql"))
+if not down.exists():
+    errors.append(f"missing {down.name}")
+
+for e in errors:
+    print("FAIL:", e)
+print("OK" if not errors else f"{len(errors)} problem(s)")
+sys.exit(1 if errors else 0)
+```
+
+מה שתראו כשה-agent כותב index בלי CONCURRENTLY: `FAIL: CREATE INDEX without CONCURRENTLY` ו-exit code 1. הוא מתקן, מריץ שוב, ומחזיר לכם את ה-`OK` בתוך הפלט. ה-script לא עולה טוקנים על הקוד שלו, רק על שתי שורות פלט.
+
+זה ההבדל בין skill שמבקש מהמודל להיזהר לבין skill שבודק. הראשון עובד ברוב הפעמים. כשהשני נכשל, אתם יודעים.
+
+## 05 · תבדקו שהוא נדלק, ושהוא לא נדלק סתם
+
+תכתבו 10 בקשות. 5 שצריכות להדליק את ה-skill, כמו "add an index on orders.created_at" או "rename users.fullname". ו-5 שלא, כמו "why is this query slow" או "write a SELECT for the dashboard". תריצו כל אחת ב-session חדש, ותספרו ב-transcript כמה פעמים ה-agent קרא את ה-`SKILL.md`.
+
+היעד: 5 מתוך 5, ו-0 מתוך 5. פספס? תתקנו את ה-description, לא את ה-body. כשיש פספוס, ה-body בכלל לא נקרא. מקרה נפוץ: בקשה כמו "make the orders table faster to query" לא מדליקה כלום, כי אין בה אף מילה מה-description. או שתוסיפו ניסוח כזה, או שתחליטו שזו באמת לא משימה של migration.
+
+זה eval קטן, עשר דקות. תשמרו את 10 הבקשות בקובץ ליד ה-skill, ותריצו אותן שוב בכל פעם שמישהו נוגע ב-description.
+
+## 06 · תנו ל-skill תאריך תפוגה, ותעשו את המשימה ביד פעם בחודש
+
+ב-IBM כתבו ביולי 2026 את מה שכל מי שתחזק wiki יודע: skill שנכתב ביד הוא סטטי, ובלי תחזוקה הוא מתיישן. הם מתארים גם את הכיוון השני, skills שנגזרים מ-trajectory מוצלח של ה-agent ואחר כך מתעדכנים או מתפצלים. הדוגמה שלהם: skill של order-to-cash שעובד על SAP, ואז קונים חברת בת שרצה על Oracle. או שלוקחים skill של Oracle, או שעושים fork ומתאימים.
+
+> **הדעה שלי:** אני לא קונה skills שה-agent כותב לעצמו ונכנסים בלי review. trajectory מוצלח אחד הוא אנקדוטה, לא נוהל. תנו ל-agent להציע skill כ-PR, ותנו לבן אדם לאשר.
+
+בפועל: ה-skill יושב ב-git, שינוי בו עובר PR כמו קוד, ובסוף ה-body יש owner ותאריך אימות אחרון. פעם בחודש עוברים על הרשימה. skill שלא נדלק חודש שלם, מוחקים.
+
+ובאותה הזדמנות, תעשו את המשימה עצמה בלי ה-skill. אדי אוסמני כתב על זה ב-31 באוגוסט:
+
+> Agents can skip much of that work, so building your reps has to be deliberate.
+>
+> — Addy Osmani, "Agentic Skill Decay"
+
+שני דברים קורים כשעושים migration ביד. אתם רואים אם ה-skill עדיין מתאר את המציאות, כי ה-schema גדל או שה-Postgres התעדכן. ואתם שומרים על היכולת לשפוט את מה שה-agent כתב. בלי זה, ה-review שלכם נהיה חותמת גומי.
+
+<figure><img src="/posts/agentic-skill/src1.jpg" alt="ה-agent מקבל skill חדש ואתם מאבדים את שלכם, אלא אם עושים את המשימה ביד מדי פעם (credit: Addy Osmani, Substack)" loading="lazy" /><figcaption>ה-agent מקבל skill חדש ואתם מאבדים את שלכם, אלא אם עושים את המשימה ביד מדי פעם (credit: Addy Osmani, Substack)</figcaption></figure>
+
+## מה לקחת
+
+- משימה אחת, skill אחד. מה שרלוונטי תמיד נשאר ב-CLAUDE.md.
+- כותבים description קודם, ובודקים אותו מול 10 בקשות.
+- כל כלל שאפשר לבדוק ב-regex עובר ל-script עם exit code.
+- skill בלי owner ותאריך מתיישן. ואם לא עשיתם את המשימה ביד חצי שנה, לא תשימו לב שהוא התיישן.

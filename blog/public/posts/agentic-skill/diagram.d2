@@ -1,0 +1,16 @@
+direction: down
+start: Session start
+meta: Load name + description (~100 tokens each)
+req: User request
+match: Match against descriptions
+body: Load SKILL.md body (<5k tokens)
+check: Run check script (output only)
+out: Result + check output
+start -> meta
+meta -> match
+req -> match
+match -> body: match
+match -> out: no match, no skill
+body -> check
+check -> body: FAIL, fix and re-run
+check -> out: exit 0

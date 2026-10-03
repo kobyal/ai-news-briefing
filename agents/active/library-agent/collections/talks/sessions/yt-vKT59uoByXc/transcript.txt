@@ -1,0 +1,888 @@
+[0:00] Oh my god, I ran out six Codex subscriptions in a week.
+[0:03] Isn't that amazing?
+[0:04] What did you ship, dude?
+[0:05] A sloth code bench?
+[0:06] Oh, that's incredible.
+[0:07] Have you seen this?
+[0:08] Do not mortgage your code base in the hopes that in a year,
+[0:12] the model will come out that's smart enough to fix all your problems.
+[0:15] I'm never letting anyone merge anything with this pattern in it again.
+[0:18] Am I 99th percentile?
+[0:19] Am I being left behind?
+[0:21] Do less things in parallel.
+[0:23] The same thing that was always true about engineering is still true in all work.
+[0:26] Today I'm joined by Dex Horthy, CEO of HumanLayer, the man who coined the term context engineering.
+[0:32] We talk about most of what you see online for agents is completely fake.
+[0:36] Why token maxing doesn't work in the real world, how benchmarks work, and which one you should look at.
+[0:40] How much faster you should actually aim to be with agents.
+[0:43] And it's not 100x.
+[0:45] And at the end he shares his agentic engineering workflow.
+[0:48] What is automated, what is a software factory, and where does he still spend his time?
+[0:52] i saw a bunch of people commenting as well that like astra got much better at computer use
+[0:58] it got much better at like blenders and like game slop and this kind of stuff um but it didn't
+[1:05] actually get that much better at like writing maintainable code or like controlling complexity
+[1:10] or like you know removing things or like changing abstractions or whatever it is uh
+[1:15] and uh i think i think i think that was my feeling a lot and like a lot of people had the vibe and
+[1:21] So one of the things we're talking about tomorrow is sort of this benchmark I discovered called Slop Code Bench.
+[1:28] It was made by the lab of Gabe Orlansky.
+[1:32] He's like a researcher at the University of Wisconsin.
+[1:34] Have you seen this?
+[1:35] No.
+[1:35] Oh, Slop Code Bench?
+[1:36] Oh, it's incredible.
+[1:37] It's an entire benchmark designed around proving that like models make code bases worse over time.
+[1:43] Really?
+[1:43] Yeah.
+[1:44] Okay.
+[1:44] So up until that point, there have been like, I would say like three flavors of benchmarks.
+[1:48] there's like the core like sweet bench benchmark which is like here's a tiny PR from a real open
+[1:56] source repo uh we'll rewind the repo to before the PR was made we'll like pull the tests out
+[2:02] of the PR and basically say hey model here's the issue that was filed yeah 10 years ago on this
+[2:06] random Ruby project or whatever it is uh go like fix the issue and then we would take basically
+[2:13] any changes it made to the test we would throw them out and we would drop new test like the test
+[2:17] in from the benchmark case
+[2:18] and then we would run those tests against the model's code.
+[2:21] And then if it passed, it would get a reward.
+[2:23] And if it failed, then it also has to do it
+[2:24] without breaking any other tests.
+[2:27] But it's very, very small, targeted.
+[2:29] Can you get the test to pass?
+[2:33] Obviously, these are benchmarks.
+[2:34] They're different from verifiers.
+[2:35] But it's like all the benchmark,
+[2:37] oh, this model score is 95% on SweetBench.
+[2:39] Coding is solved.
+[2:40] And it's like, that's not what real coding looks like.
+[2:44] So you have this other chapter of things
+[2:45] where it's like, okay, cool.
+[2:46] instead of solving this one little PR,
+[2:48] it's like rebuild all of Microsoft Excel
+[2:50] from scratch with every single feature
+[2:52] or rebuild all of Redis from the specs
+[2:54] with every single feature.
+[2:56] So you have these like marathon benchmarks.
+[2:59] Those two are from one called
+[3:00] SWE Marathon actually.
+[3:02] It was like four to 400 hour tasks.
+[3:05] And then Cognition introduced
+[3:06] this idea of like, yes, okay, we're going to use much bigger tasks.
+[3:09] And also we are
+[3:10] going to have a judge model run afterwards
+[3:12] and give like contribute to
+[3:14] the score on the exercise
+[3:16] of like, did this thing break any of our code-based rules
+[3:20] or conventions or patterns or whatever it is?
+[3:22] So it's sort of like telling it like,
+[3:24] hey, look, in C++, we can't do logging like this.
+[3:26] It has to be like this.
+[3:28] But none of those really map to how real software is built,
+[3:32] which is they all give the model the entire problem up front.
+[3:35] Here's the thing, solve this thing.
+[3:38] And what Slopcodebench does is really interesting
+[3:40] is it gives the model a thing to build, Greenfield,
+[3:43] and then it says cool now take that code base and add this feature now take that code base and add
+[3:49] this feature now take that and so they have these like challenges each has like three to ten
+[3:54] checkpoints in it yeah and so the problem is like what it's trying to demonstrate is like
+[3:58] as models continue to work unattended in the same code base without knowing the whole problem up
+[4:05] front it's like if you know the whole problem up front you can architect for it but without knowing
+[4:08] the whole problem up front you have this you have this problem where like the code gets worse and
+[4:12] worse over time and it kind of shows that like the number of failing tests just like trends up
+[4:17] for all the models and like i think gpt 5.5 codex when they ran it in may got like a 15 percent on
+[4:24] this oh yeah and i just ran it i've been doing some like independent research because they're
+[4:28] they're a lot they're not super funded so we've been kind of sponsoring some research there and
+[4:31] we did it for astra and astra got like 16.5 okay at one point higher the ability to maintain like
+[4:38] complex code bases over time so anyway we're gonna talk about that because it used to be a vibe and
+[4:41] And now there's like, OK, there's so I mean,
+[4:43] it's one benchmark out of one lab.
+[4:45] It hasn't really been adopted by a lot of model cards.
+[4:47] I think partially because it's really
+[4:48] slow and expensive to run.
+[4:50] But I think it's a fascinating proof
+[4:54] that models are still not great at maintaining
+[4:59] a codebase over time.
+[5:00] Do you expect that to change, that models
+[5:02] will get better at codebases over time,
+[5:05] or will we solve that with regards to harness engineering?
+[5:08] Well, so here's the crazy thing is,
+[5:09] We used to do this thing in the like Claude 3.5, 3.7, maybe like Opus 4 days where you'd
+[5:16] say like, cool, we're just going to, yes, I know the code is sloppy, but by the time
+[5:20] that matters, that'll be GPT-7's problem.
+[5:23] We were on GPT-6 and we haven't made a lot of progress there.
+[5:27] So it's like, you can't guess when that will happen.
+[5:30] It will probably eventually happen, but it seems like the labs are much more interested
+[5:33] in hill climbing on other sorts of things
+[5:37] like computer use and other frontiers
+[5:39] that the last 10% of software maintainability
+[5:43] may be as hard or harder than the whole first 90%
+[5:46] that we spent the last three or four years on.
+[5:49] Yeah, interesting.
+[5:50] What are some of the problems where you think
+[5:52] the industry is headed?
+[5:54] I heard a lot of conversations yesterday
+[5:56] about remote agent execution, a lot about multiplayer.
+[6:00] I still don't know exactly how that's going to play out in practice.
+[6:02] like the theory makes a lot of sense.
+[6:04] Yeah.
+[6:05] Get it running off my machine.
+[6:06] Get it running somewhere locally or centrally,
+[6:09] where other colleagues can also look at the context
+[6:11] and contribute in essence.
+[6:12] But I haven't seen a company kind of succeed with that.
+[6:14] I feel like that's quite frontier stuff, yeah.
+[6:16] Yeah, and I mean, a lot of the cloud agent vendors,
+[6:18] like you look at Cursor Cloud agents and Cognition
+[6:20] and Devon and things like this, they've made good progress there.
+[6:25] But I think the challenge, we work with a lot
+[6:28] of larger enterprises.
+[6:29] Our whole thing is like, OK, if you have 100 or more engineers,
+[6:32] That's where like we have plenty of five person teams that love human layer, but if you have a hundred plus engineers, that's where human layer has like the biggest impact because it is all driven around this collaboration. And those teams tend to hit a lot of friction when building with cloud agents because they have 10 years of history and hundreds of repos and lots of like opinions and asterisks and special things about how dev environments are run and how can the agent test its work and things like this that become quite complex.
+[7:00] so I do think the future is kind of remote background agents both for the collaboration
+[7:04] angle and also for the like hey I want to be able to close my laptop and do this
+[7:08] or it's like for small stuff if I can kick off a copy change from Slack and I don't
+[7:12] have to bother a developer with it like but I think
+[7:16] setting up a like ticket to PR or like Slack to PR workflow is
+[7:20] pretty straightforward for the small stuff right like Ramp and
+[7:24] Brex and all these companies they've all like published papers on like hey we built this background agent
+[7:28] and it solves 50% of our PRs or whatever.
+[7:32] I actually think that's not that exciting
+[7:33] because I've talked to people who've built that
+[7:35] in a weekend or a hack week or something.
+[7:37] The bigger question that I think
+[7:40] I'm especially excited about trying to figure out
+[7:43] a human layer is like,
+[7:44] how do we enable people to collaborate meaningfully
+[7:47] on the bigger pieces of work?
+[7:50] Where it's like, yeah, I could tell the agent
+[7:52] to do this thing and then I would get a PR out
+[7:54] and then it would probably be somewhat right,
+[7:58] but it would have a bunch of issues.
+[7:59] Then I'm talking back and forth with the agent on PR comments
+[8:02] or back in Slack thread or wherever it is.
+[8:04] But it's like, okay, you went and wrote the code and it's not good.
+[8:08] And it's a lot harder to basically fix what was already built.
+[8:12] The agent's kind of already committed to a thing.
+[8:13] There's a lot of context to think through.
+[8:16] And so our whole thing is what teams have been doing for 30 or 40 years
+[8:19] back when building a feature took hours or days, not five minutes,
+[8:22] is they would get together and they would align on what's being built
+[8:25] either with the agent or with each other or both.
+[8:29] I mean, the metaphorical,
+[8:30] whoever's actually going to build the PR
+[8:31] is going to talk to the senior engineer,
+[8:33] staff engineer, and just like have a conversation
+[8:35] and like, okay, here's the approaches we're thinking about.
+[8:37] And this usually happens in like Google Docs
+[8:39] or Confluence or whatever it is.
+[8:40] But this whole shift left idea of like,
+[8:43] can we, and like, you're never going to one-shot it, right?
+[8:46] There's no amount of effort where it's like,
+[8:48] okay, we're going to spend like five hours
+[8:50] in a meeting building a perfect plan.
+[8:52] And then we're going to give that to the agent.
+[8:53] And the thing that comes out is going to be perfect.
+[8:54] is like no there's still going to be issues with it like you can't capture everything
+[8:58] and the source of truth should be the code not some specification or plan but can you in this
+[9:04] planning process eliminate as many failure modes as possible can you just you know from a 25 000
+[9:11] foot view of the problem like a one pager can i eliminate like 50 of the bad things that the agent
+[9:17] might have done not necessarily going to do but could have done and then can we zoom into you
+[9:21] the 10,000 foot view and eliminate another 80% of bad solutions to this problem.
+[9:28] So that by the end, when the code comes out, it's more likely to be 0% to 10% rework required
+[9:33] rather than 25% to 50% to 75% rework, which is common with if you try to one-shot most larger
+[9:40] agent PRs. People don't just say, hey, Claude, go do this thing. They're sitting there working
+[9:44] back and forth if it's large. Which ingredients make it a successful plan in the end? Because
+[9:49] you mentioned, okay, what we've already been doing
+[9:51] when features are kind of more expensive
+[9:53] or more time intensive to build,
+[9:55] we're doing that now more and more.
+[9:57] I feel like we're leaning towards
+[9:58] or experimenting with spec-driven frameworks,
+[10:00] which I think is good as well.
+[10:02] But when we're talking about, okay,
+[10:03] is this problem actually worth solving?
+[10:05] Is that then part of the plan
+[10:06] or how we solve it from an interface perspective?
+[10:09] Is that part of the plan or more part of the spec?
+[10:11] Where are the lines?
+[10:12] Yeah, I mean, I think the words plan and spec
+[10:15] kind of mean different things to everybody.
+[10:17] so I don't want to get up and be like,
+[10:20] the spec is this, and here's what it looks like,
+[10:22] and here's what it's for, and the plan is this,
+[10:23] and here's how it should be formatted,
+[10:25] and here's how it should be used.
+[10:26] I think every team's going to kind of come
+[10:29] to their own kind of taste on this.
+[10:31] I think we have some opinions
+[10:32] on what a good starting point would be,
+[10:34] but when we work with customers,
+[10:35] we always end up like, okay, cool,
+[10:37] let's add a little bit of customization to your,
+[10:40] we call it a design doc rather than a plan
+[10:42] because we separate out like, okay, cool,
+[10:44] where are we going?
+[10:45] What's the end state versus how do we actually get there?
+[10:47] What are the changes we're going to make?
+[10:49] But our design doc often is like,
+[10:51] we'll put some customization in there for users
+[10:54] when we're kind of forward deploying with them
+[10:56] and just say like, OK, cool, your design doc also
+[10:58] needs these four questions answered at the top
+[11:00] before we get into everything else that it kind of comes by default.
+[11:03] Yeah.
+[11:05] I don't know if that really answers your question.
+[11:07] I think personally it does, as long as it's fine.
+[11:10] If it's fine that teams will eventually define
+[11:13] what is the plan and what is the spec
+[11:14] and what works for our environment,
+[11:15] rather than following some standard.
+[11:18] In essence, they have to be effective as a team,
+[11:20] and I think it's very context-dependent,
+[11:22] also organizationally.
+[11:23] So in the end, I think that's fine.
+[11:26] You mentioned Humilay is good when the engineers
+[11:29] are in the hundreds or even beyond,
+[11:30] at a bigger scale.
+[11:32] And for me, I am wondering
+[11:35] when agentic engineering breaks,
+[11:38] or at what scale.
+[11:39] So if we're talking about 100 engineers,
+[11:40] or in my context, I have 1,000 engineers,
+[11:43] we're trying to figure out how to
+[11:44] enable people in terms of agentic engineering.
+[11:48] One of the pain points I see is that we make models available,
+[11:51] we make onboarding as seamless as possible, give people access to internal services
+[11:54] through their agentic tools. And what I still have a challenge with,
+[11:58] and I don't know how to solve yet, is how do I prevent everyone from using the biggest,
+[12:02] most expensive model for everything? Not just for where it's actually necessary,
+[12:07] but for everything.
+[12:08] Yeah, we work with plenty of teams where Fable has just been banned.
+[12:12] yeah it's like figure out how to make it work with opus and like you have to you can submit a
+[12:16] special request for like temporary access to fable for like a specific thing but you kind of have to
+[12:20] sell it it's straight to jail fable yeah um yeah i mean i think the reason why we care about this
+[12:30] space is one like i've been building software factories my whole career basically uh for my
+[12:34] first job i was like i was just a back-end platform engineer and i immediately identified
+[12:38] like oh that guy over there like one of the first engineers at the company that maintains
+[12:42] the deployment system and the rollout system
+[12:44] and the staging environment
+[12:45] and how engineers create preview environments
+[12:48] of like, hey, here's my feature work in progress.
+[12:50] Like, hey, PM, here's a URL on the internal network.
+[12:54] Like you can go look at what I'm working on kind of thing.
+[12:57] That seemed to be the most impactful person in the company.
+[13:01] And so that was kind of the work I was always drawn towards.
+[13:04] And what we're finding is like a lot of tools work great
+[13:08] in this space that if you're just building
+[13:11] an XJS app or you have a mono repo with everything in it, there's a lot less friction. But I think
+[13:19] there's a lot more flexibility and thought called for in the case where it's a larger team with a
+[13:25] lot of baggage and opinions and dev environments are complicated and hundreds of repos. And I don't
+[13:31] know, we had a, I won't call it a complaint, but a pain point that some people were having is like,
+[13:36] Well, we really want to get our PMs using AI as well, product managers to build better PRDs.
+[13:42] And of course, like someone who doesn't have a lot of skill with AI, they say, go write this thing.
+[13:46] And they get a 10 page document out and they're like, amazing.
+[13:48] Here, let me go give it to the team.
+[13:50] And the whole team is like, oh my God, what is this like AI psychosis slop that you're making me try to read through?
+[13:56] And part of that is just like giving the model better steering and skills of like, hey, here's how to keep it concise.
+[14:01] Make sure you're writing for humans, not for whatever.
+[14:04] and so make it clear and make it visual
+[14:06] but it's also
+[14:07] it would find that a lot of the things proposed
+[14:10] in these PRDs were so detached
+[14:12] from reality in terms of like
+[14:14] how does the code base work and what are the systems
+[14:16] and so like a weird
+[14:18] tactical thing we found that works really really
+[14:20] well is like give
+[14:22] a product
+[14:24] person who's technical enough to like
+[14:26] check out the repos on their box and things like this
+[14:28] or like set up a github MCP
+[14:30] to go get repo contents
+[14:32] and have them drop in a two-sentence prompt
+[14:37] and then let a pipeline take over.
+[14:40] Cool, here's the thing we want to build.
+[14:41] Go research everything.
+[14:43] Go find across all 200 repos.
+[14:45] Find the seven that matter to this product feature.
+[14:47] Pull all that context together in one thing
+[14:50] and then interrogate the user,
+[14:53] the product person in this case,
+[14:54] of cool, what problem are we solving?
+[14:56] Basically, all the things go into a good product requirements.
+[14:58] What problem are we solving?
+[15:00] How are we going to measure success?
+[15:02] like how are we going to know that it's working or if we should throw it out and abandon this
+[15:06] thing because everything's like in these bigger companies everything kind of is an experiment
+[15:09] right uh and then going through like cool how should it work should it work like this or should
+[15:14] it work like this sort of the like grill me style thing um and so like this is just one example of
+[15:20] like that's not really built in and like some teams will build that internally and they'll come
+[15:25] up with these things slowly over time and what we're trying to help people do is like speed run
+[15:29] that process. If you don't have any opinions about how to build good product specs with AI,
+[15:35] here's a thing that will work for 80% of teams, no matter how many repos you have,
+[15:39] no matter how old your code base is. And so it's basically, as much as anything, it's about raising
+[15:46] the floor. That's why staff principal engineers that come to Human Layer and say, oh, I like this.
+[15:52] I can see this maps onto how I was working, but I had no idea how I would ever be able to take
+[15:58] how I was working and give it to everybody else on the team.
+[16:02] Yeah. Yeah. I like that you highlight that. The decision-making in the end,
+[16:06] that's still what a human does, right? You bring all the context and it's baked in the harness or
+[16:10] people are self-solutioning kind of something similar. And in the end, it tries to provide
+[16:15] whoever is the user with all the context necessary to try and make decisions. And likely, if they
+[16:20] don't know the decision, they can still kind of spar, ask questions, or kind of in a grill me way,
+[16:25] get to an answer in the end yeah for me when i heard that dark factories is kind of in my bubble
+[16:30] a lot of organizations are striving for dark factories how do we get there how do we do that
+[16:35] and i still don't know i still don't know if that's like a realistic outcome because especially
+[16:40] when someone gives me a magical answer and it's not what i want i'm just gonna say well it's not
+[16:44] what i wanted but if i created this magical answer based on my decision like i'm building my own
+[16:49] conviction that this is the answer yeah so i have way the buy-in is very different i was
+[16:55] I was sitting in a meeting yesterday.
+[16:57] It's all hype.
+[16:57] It's everyone wants to impress each other.
+[16:58] Everyone wants to claim they've figured out the dark factory thing.
+[17:01] I think most of it is BS.
+[17:03] Okay.
+[17:04] I was sitting in a meeting yesterday with the head of a department for a very old company,
+[17:10] thousands and thousands of engineers, and talking with principal engineers on the ground
+[17:16] who are drowning in slop PRs from people who either just don't care or don't have a strong
+[17:22] software engineering background.
+[17:23] and he's like, so you're telling me that the code that is written by these people using AI
+[17:28] is bad. And the two principal engineers are like, oh yeah. And he pulls up a PR
+[17:32] and it's like, look at this 30,000 lines of slop or whatever it is.
+[17:35] All right, well, I got to go talk to my friends at really big
+[17:39] company and other really big company who have claimed that 90%
+[17:43] of this org's code is written by AI now and I got to figure out
+[17:47] what they're talking about because you're telling me that that's completely infeasible and
+[17:51] like I either have to figure out what they're doing that's special or I have to like figure out
+[17:55] why what is the agenda anyways the point is like there's this whole like I don't know uh
+[18:02] it's like a posturing game among all the top executives at all the top companies and everyone
+[18:08] in in big enterprises everyone's like am I 90th percentile am I 99th percentile am I being left
+[18:13] behind and this is like a thing that this conversation at every executive meeting that
+[18:18] happens is people are just like everyone writes down their number of like where do you think we
+[18:21] are from zero to a hundred among all other companies in our kind of zone or size yeah um
+[18:29] i talked to andre brestloff today actually yeah and he coined something which i'm going to steal
+[18:34] he said this is kind of the instagram phase yeah right now everything is fake god i love it
+[18:39] everything is bells and whistles and if you say well actually for me it doesn't work people say
+[18:43] a skill issue because how dare you kind of try and disprove my accuracy of what I'm portraying
+[18:49] online. That's incredible. I love that. I mean, a lot of it happens on Twitter, but yeah, it's the
+[18:55] same thing. It's like everyone is running around talking about how cool their factory is and how
+[18:59] many things they have and how much adversarial review they're doing, posting videos of the cool
+[19:04] thing they built. And I don't know, for a while there was a thing of like how many tokens there
+[19:08] was. People have gone off on this a little bit, but it was like the token maxing thing of like,
+[19:11] oh my god I ran out six codex subscriptions in a week yeah isn't that amazing and it's like what
+[19:17] did you ship dude it's like oh I made like a bunch of games for myself that no one will ever play and
+[19:21] I'm like yeah that's what I thought I've also done that I mean it's fine it's and it's trying to be
+[19:26] like hey I made this cool thing check it out I don't think it's okay to be like if you're not
+[19:30] maxing out six codex subs then you're a bad engineer I think that's like hurtful to the
+[19:34] industry and it's like it's already there's already a lot of noise and hype and confusion and
+[19:38] And my sort of crusade has always been like, okay, what actually kind of works?
+[19:43] What is practical?
+[19:44] And what understanding can you build up from first principles rather than working backwards from what you see on the internet?
+[19:51] Yeah.
+[19:52] If we give productivity a multiplier, is 10x then realistic?
+[19:56] Or when should people be happy?
+[19:58] Is it like 2x, 5x, 3x?
+[20:00] Do you have a number?
+[20:01] I mean, if you think about it in terms of economic impact in the world, I think every engineer going 2 to 4x faster
+[20:07] would be transformational to human society.
+[20:10] The amount of value that we would get,
+[20:12] the extent to which our cities would improve,
+[20:15] the value of things would improve,
+[20:18] just life would get better would be insane.
+[20:23] But everyone's going to miss out on that
+[20:24] because they're too busy trying to get to 100x.
+[20:27] And I think 10x is possible.
+[20:29] Sorry, what were you going to say?
+[20:30] I was saying people are trying to go infinite.
+[20:32] We don't need engineers anymore.
+[20:33] Yeah, people are trying to go infinite or 100x
+[20:36] or 10x or whatever it is,
+[20:37] then it's like, figure out how to go two to three times faster.
+[20:40] And then you can go do two to three times on top of that
+[20:43] and two to three times up on that.
+[20:44] But if you try to throw out everything we've done,
+[20:46] I mean, there's something to be said for like,
+[20:48] don't get stuck and shackled to your traditions.
+[20:50] And like some things that you used to do
+[20:51] may not be necessary anymore.
+[20:53] But if you go and throw out everything that we've been doing
+[20:56] and try to like rebuild all of engineering from scratch,
+[20:59] it's not going to work.
+[21:00] It's just like when an engineer sets to do a project
+[21:02] and they're like, ah, yes, I'll architect it
+[21:03] to be able to do this, this, this, this, and this.
+[21:05] when all you needed was this one small thing
+[21:08] and what is it, the Yagni?
+[21:10] You ain't going to need it.
+[21:12] It's the same thing.
+[21:12] It's just the same story over again.
+[21:15] People want to have this perfect magic.
+[21:17] And there is a time when you're like,
+[21:18] cool, we've kind of taped this together enough.
+[21:20] But now we understand the problem.
+[21:21] Now we can go build the next thing.
+[21:23] And too many people are trying to skip that step.
+[21:24] Trying to skip the like,
+[21:26] okay, let's just get faster and faster and faster
+[21:28] incrementally over time.
+[21:29] Because that compounds exponentially.
+[21:31] I was looking to Dario this morning
+[21:34] and he said from his perspective
+[21:37] what makes his team at AMP really productive
+[21:39] has nothing to do with AI
+[21:40] is they don't do pull requests anymore.
+[21:43] Yeah, I heard about this. Everyone just pushes to main.
+[21:45] Exactly. So no pull request fatigue.
+[21:47] No one wants to do code reviews anymore.
+[21:49] Still do code reviews.
+[21:50] I'm like, huh, maybe it's time for me to run an experiment
+[21:52] to see if it's actually now's the time to do something like that.
+[21:55] I think it's worth trying.
+[21:56] The thing about pull requests is every team's pull request
+[21:59] culture is different.
+[22:00] At my first job, everyone had merge on main
+[22:03] and there was no pull request requirement that was enforced.
+[22:06] It was a cultural thing.
+[22:07] It was like, you don't merge without getting a review
+[22:09] from somebody else on the team.
+[22:10] And then culture beats process every single time.
+[22:14] And so if you have a team where like,
+[22:16] okay, we have a cultural thing of like,
+[22:17] you don't push slop to main.
+[22:19] And it's like, you don't shirk responsibly.
+[22:22] Well, the reviewer reviewed it too.
+[22:23] So we're both guilty if it's bad.
+[22:25] It's like, no, you own it.
+[22:26] You are the only person who owns it.
+[22:28] And if someone finds it and like realizes that it's bad
+[22:30] or you realize that it's bad later,
+[22:31] like it's still on you it's just uh we you know we're changing we're changing the process of like
+[22:37] how do we guarantee quality and what are the outcomes and how do we manage risks and things
+[22:40] like this i feel like to get to that culture that could be a fun experiment right you remove the pull
+[22:46] requests and see if because you're doing that you can get to a culture of we own what we push to
+[22:51] production or to main yeah we don't push any slop especially with agents how easy it is nowadays you
+[22:56] take ownership see if that kind of is a cycle that then starts the role do you did he mention
+[23:01] like is is it the pull requests aren't required or like pull requests are not just not a thing
+[23:06] it's just killed because i could i could see a world where like okay look i don't require review
+[23:12] but i want to review on yes yeah we have this for doc review right like i don't recommend anybody
+[23:16] say like oh design doc reviews are required before you write the code if you didn't get your design
+[23:21] doc review the pr is not relevant and it's like no i'm incentivized to send my co-founder who's
+[23:26] the cto is like the kind of slop the slop gatekeeper and make sure that like the code base
+[23:31] stays maintainable over time and things like this i send him my design docs because i know it's a lot
+[23:36] faster for him to be like no no no on it's easier for him and easier for me for us to have that
+[23:41] discussion on a one page or a two pager and then when we get to pr time like after i've polished
+[23:48] it and I've got the tests working and I've maybe
+[23:50] done some stuff that wasn't in the plan of like
+[23:52] okay let's just change this UI and like riff a little
+[23:54] bit over here
+[23:55] and then he says oh this entire
+[23:58] architecture is wrong or like I don't like that this
+[24:00] was a separate table and it should be this instead
+[24:02] like so I think there
+[24:04] are incentives to get
+[24:06] feedback from people
+[24:08] as early in the process as possible
+[24:10] and like it's easier to fix things before you merge it
+[24:12] than after once it's in there then it's like okay
+[24:14] cool now we're like fixing bugs in production
+[24:16] yeah 100%
+[24:17] Yeah.
+[24:19] How has your thinking evolved when people said,
+[24:21] we're no longer looking at the code or doing code reviews
+[24:24] specifically?
+[24:25] We have so many deterministic tools
+[24:27] that look at code conventions, and now we even
+[24:29] have built-in verification layers where the agent just
+[24:32] sends me screenshots or sends me videos
+[24:34] about the functionality that it's being built.
+[24:36] So I don't necessarily look at the code anymore.
+[24:38] Well, there's two reasons to look at the code.
+[24:39] One is to make sure it's correct,
+[24:41] and one is to make sure it's maintainable.
+[24:42] I mean, there's a bunch of other reasons.
+[24:43] Alignment with the team and things like this.
+[24:45] But in that world, the video and the screenshots
+[24:49] tell you whether it's correct in terms of the features there.
+[24:51] It doesn't tell me anything about whether the code is maintainable.
+[24:54] And I have seen many, many deterministic litters.
+[24:57] We use a bunch of them.
+[24:58] I'm going to talk about some of them actually tomorrow
+[25:00] during my talk that help block large categories of slop.
+[25:07] And you can do things like cyclomatic complexity
+[25:09] that tries to keep you from creating functions that
+[25:12] are too chaotic and hard to grok for a human.
+[25:15] But I have never seen a prompt or a deterministic tool
+[25:22] that can drive codebase maintainability
+[25:26] and fight the model's tendency to write unmaintainable code
+[25:31] in any meaningful way without a human in the loop.
+[25:33] Do you think we can close that gap with deterministic tooling?
+[25:36] that would be uh you would make a lot of money if you could figure that out um and to this is an
+[25:44] interesting company in that space right because they're doing deterministic tooling for correctness
+[25:48] but not for maintainability no but you want maintainability you want maintainability uh
+[25:53] i use uh matt pocock has a skill called improve code base architecture yeah which i use quite a
+[25:57] bit and it does it does help um and there is there are times where i'll just like run this skill and
+[26:04] then like cool i'm not even gonna read the the the discussion just go make the first three fixes
+[26:08] there because i'm sure it's probably better than what was there in the first place but i think in
+[26:12] general like that the thing that makes that skill useful is is having a human in the loop the ability
+[26:17] to be like no i don't like i don't want to refactor it that way i want to refactor it this way and
+[26:21] like i think humans are good at this uh skilled experienced software engineers are good at this
+[26:26] because they have like been bitten by bad architecture so many they've been up at three
+[26:32] in the morning trying to fix an issue and being like, oh my God, I hate this pattern. I'm never
+[26:36] letting anyone merge anything with this pattern in it again. And you do that hundreds and hundreds
+[26:40] of times over the course of five, 10 year career, you build up this taste. And we haven't figured
+[26:46] out how to put that taste into models. And so for now, humans have to do it. We might try to figure
+[26:50] it out. Literally the last model came out, the Astro came out. And my buddy Ian, who ran and
+[26:55] built a coding agent startup that got acquired by Expo, he posted, he's like, I am begging the
+[26:59] RL researchers at the lab, please start including tasks that have like deletion of code as the goal
+[27:06] or like, hey, let's take these three things and refactor out a good abstraction. Like,
+[27:11] it's just so obvious that like either we don't know how to do it or we don't care to do it in
+[27:16] the RL like layer. So it could get cracked. I mean, anything can happen. But again, also is like,
+[27:23] cool, there's all this hype and what is the future and no one knows when it's going to happen. And
+[27:26] And my advice is always, do not mortgage your code base
+[27:30] in the hopes that in a year or six months or 18 months,
+[27:34] a model will come out that's smart enough
+[27:36] to fix all your problems.
+[27:37] Yeah.
+[27:38] Someone listening might think, I fully agree
+[27:40] with the taste aspect, but I don't have 10 years under my belt.
+[27:44] I don't have 15 years under my belt.
+[27:46] Pre-agentic tools or pre-agentic era.
+[27:48] How do people still build taste from your perspective nowadays,
+[27:51] and how can they do that?
+[27:53] I mean, I think it comes from burning yourself
+[27:55] and stubbing your toe.
+[27:56] I think it can also come through mentorship.
+[27:58] And this is a thing I think about a lot and I don't have a good answer for, which is like, how do we bring on the next generation of software engineers?
+[28:05] It used to be through pull request review, right?
+[28:08] And you think about the goal of the worst pull request comment is like, this is wrong.
+[28:13] I rewrote it for you.
+[28:14] Here you go.
+[28:15] The person learns nothing.
+[28:17] And they learn that if they write bad code, someone will just come fix it for them.
+[28:20] So a good pull request for a good senior engineer or manager will be like, hey, I don't think this is quite right.
+[28:25] can you like look at how we do this over here yeah and like do that pattern or why did you do this
+[28:29] yeah like try and probe exactly what's the logic behind this why why why not you know whatever
+[28:34] whether you give them the answer or not it's like okay why do we do this can you is there any other
+[28:37] places in the code base where and that forces you to learn right you have to go read other code oh
+[28:42] that's okay cool that's cool I like that and it like you reinforce uh and now if you give comments
+[28:48] like that that used to be really helpful they're not because I I mean I talk to people all the time
+[28:53] like yeah i'm commenting on this pr and i know that the person is not they don't understand the
+[28:57] code they wrote and they're not really going to understand the comment and they're just going to
+[29:00] paste the comments to their ai and it's going to make the fixes and at that point like i'm doing
+[29:04] every part of your job that matters you didn't think about or understand the code before you
+[29:08] committed it and shipped it you just love the agent do it and then like you're not even thinking
+[29:12] and under you you have the option some people will but like you have the option to sometimes
+[29:16] it just feels like i'm just talking to your agent yeah at which point like i might as well just have
+[29:20] my agent do it zero zero value on top yeah um so i don't know i've seen mitchell hashimoto do this
+[29:26] actually a couple times on on ghost dprs where he doesn't even say hey this needs to be like that
+[29:31] over there he says ask your claude why this is wrong that's it he gives no hints or anything yeah
+[29:37] he's just like i will tell you that this is wrong i won't tell you why i'm forcing you to whether
+[29:42] by understanding the software and building taste in software engineering or by understanding agentic
+[29:46] coding and being good at using agents to understand the code base whatever it is like you need to go
+[29:52] you need to go do some more homework yeah so i think i think that's directionally correct um
+[29:58] i also think there's going to be a lot more the same way we collaborate on code and pull requests
+[30:02] right now as the as as design docs and plans become more standardized and formalized or at
+[30:09] least their purpose parts of them become more universal there will be a lot of training and
+[30:14] coaching that happens during design because design doc is basically a prompt and so two people five
+[30:19] people commenting on a design doc you're teaching the author how to prompt better it's like okay
+[30:24] cool like i don't like this section like you know you need to go find other patterns or whatever it
+[30:29] is and that that there's still a flavor of this where it's like okay i'm just gonna give it to my
+[30:32] agent and we're gonna like i'm not gonna learn anything but like i think like learning how to
+[30:37] build a really good design doc which again learning how to build a really good prompt for the whatever
+[30:42] session is going to be building or in that session is going to emerge as well as just
+[30:48] as important, if not more important than code review.
+[30:51] I feel like I learned a lot through defining solutions in a team early in my career, because
+[30:58] I came from not a traditional computer science education.
+[31:01] I got rolled into a team because I said I want to do engineering, not just operations,
+[31:04] because I was responsible for operations.
+[31:06] And then I learned the process of refinement.
+[31:08] And in that team specifically, we had the convention of, we also define the solution
+[31:13] direction.
+[31:13] Not always, but most of the time.
+[31:16] And sometimes as part of executing on the work that needs to be done, the person executing
+[31:20] would define the solution direction and align on the way.
+[31:24] But for the ones where we did that in advance, I love just listening and learning and asking
+[31:28] questions on Y, X, Y, and Z.
+[31:31] And thinking back now, likely whatever we captured back then in Jira would have been
+[31:36] great food for an agent to then execute on.
+[31:38] And even the person picking up that task of the work that needed to be done didn't have to do too much thinking anymore of exactly kind of how to execute or what to execute.
+[31:48] Maybe how still, because you always have new findings, but mainly why and what was answered, which I loved and I learned a lot from.
+[31:55] Now it's kind of up to the individual, I feel like.
+[31:58] And my fear is that because it's so easy to be on an island with your agent and go into execution mode, create slop or create something valuable, it's really up to the user.
+[32:07] that you lose that, that kind of collaborative effort
+[32:11] and also interaction.
+[32:13] I feel like we'll miss that if we don't put extra effort in that.
+[32:17] Yeah, I mean, we're talking about building a feature
+[32:19] in the human layer where you can call someone on your team
+[32:22] and do a voice call, and then the transcript becomes
+[32:25] an artifact attached to the task,
+[32:27] because that's the last piece, right?
+[32:29] I think the AI native forge is much more than GitHub
+[32:32] that manages code. It's going to be the code,
+[32:34] it's going to be the artifacts and it's going to be the sessions themselves all kind of linked
+[32:39] together at like the top level and the last part is like the human conversation and so like maybe
+[32:45] that's that's part number four is like can you reify those things for the agent but yeah I totally
+[32:50] agree it's like a lot of the learning happens in those human conversations with the people who have
+[32:56] that learning and like if if we can't rely on the models to absorb that taste that things then we
+[33:03] have to find other ways to give them to people.
+[33:05] Yeah.
+[33:06] As a last thought, I wanted to zoom in on kind of what your
+[33:08] agentic engineering workflow looks like nowadays.
+[33:11] Yeah.
+[33:11] Because I feel like people listening, they might see
+[33:12] something online, all Instagrammified.
+[33:15] I'm going to keep using that and keep echoing that because I
+[33:17] think it's quite accurate.
+[33:18] And if they ask a question, someone might say,
+[33:20] skill issue.
+[33:21] I have no clue what's real or what's not real.
+[33:23] What works for you nowadays?
+[33:25] Yeah.
+[33:26] So we do, and I did a pretty fairly deep breakdown on this.
+[33:30] I'll give you a link to put in the show notes or whatever.
+[33:32] but I basically have a page that is all the podcasts we've ever done.
+[33:34] All the,
+[33:34] all the written content and video content we've done.
+[33:37] And I've done a couple deep dives on our process with screen share and stuff.
+[33:40] Awesome.
+[33:40] Um,
+[33:41] I would say probably at least 50 to 60% of our work is like basically one
+[33:46] shotted,
+[33:46] uh,
+[33:47] not one shotted,
+[33:47] like to perfection,
+[33:48] but like we don't do any planning upfront and it's literally just like,
+[33:51] if it's going to be under a couple hundred lines,
+[33:53] then,
+[33:53] um,
+[33:54] then we just do that.
+[33:54] About 10% of our PRs are merged by,
+[33:57] you know,
+[33:58] I call them like janitor bots or whatever that run overnight.
+[34:00] my co-founder gave a talk on like control loops and how we build all of this but we basically have
+[34:04] like things that we want to be true about the code base like desired end state and then we
+[34:09] have like a process to progress the code base that direction it's kind of like a thermostat right okay
+[34:14] i want it to be 71 or whatever the european version of 71 is uh and it's 69 cool we're
+[34:20] going to turn on the heat um and so it's like we wake up every morning to a handful of prs along
+[34:26] different dimensions of cleaning up something in the code, refactoring,
+[34:30] fixing a React doctor rule, migrating an endpoint from the old framework to the new one.
+[34:34] Everything we do automatically in the factory is very small because we want it to be
+[34:38] digestible. If the PR is too big, it never gets merged. That's probably like 10%
+[34:42] of our PRs. Again, about 50% are just like, hey, I want to make this small fix.
+[34:46] Go do it. And then I'll test it and maybe send a couple more prompts on it.
+[34:50] Does your day then also start? Wake up, look at the PRs that ran overnight, were
+[34:54] created then.
+[34:54] Yep.
+[34:55] We don't merge them every day.
+[34:56] It has like a Kanban thing where like if it doesn't get merged,
+[34:58] the thing doesn't run the next day.
+[35:00] There's always only for each type of PR of which there are like three or four
+[35:04] or five, maybe six now, there's only a max one open at any time.
+[35:10] And then we use labels to basically say like, OK,
+[35:12] there's already open PR with that label.
+[35:14] Don't try to fix that thing because you might just try to fix the same thing
+[35:17] again.
+[35:18] Yeah.
+[35:19] And then probably about 30% of our 30% of our like code shipped.
+[35:24] probably fewer PRs, but about 30% of what we ship is done doing through a specific process that we
+[35:30] use called RPI or the new version of it is like Crispy, although now it's like QR, DOI,
+[35:39] Cordoi, I don't know. Anyways, we've lost, I stopped using acronyms, but it's all, I would
+[35:44] count it all in the RPI family, which is like, go do a bunch of code-based research, take what the
+[35:48] user asks for, go build a query plan, then do another session that doesn't know what the ticket
+[35:53] it was, have that do the research, and then one or two or three sets of planning sessions.
+[36:00] If it's a very ambiguous, large thing, we'll do a product requirements first.
+[36:05] Otherwise, we'll get straight into the technical design.
+[36:08] And then if it's fairly small, if it's too big to one shot because it just needs a lot
+[36:12] of context from a lot of places, but it's fairly small, we might skip the actual, here's
+[36:17] the steps.
+[36:17] It's like, cool, just go implement this design.
+[36:19] or if it's quite large and I want to check it along the way I'll work with a model in a third
+[36:24] type of document that is like breaking down what order are we going to do this in
+[36:28] and like how am I going to check it along the way because like it's a lot easier to ship 10,000
+[36:33] lines of code if you check it every thousand lines and like before it gets out because if you
+[36:38] get to 10,000 lines of code and it's broken then you have a massive surface area to debug across
+[36:44] but if you can get it you can get a 90% in the first thousand and like fix that and then do the
+[36:49] next thousand okay that's okay the next thousand fix 10 it's like much less overall work and i
+[36:54] think much less mental effort as you go you're like checkpointing along the way to get to the
+[36:59] final solution sometimes we even do them as individual prs like well what's the plan for
+[37:03] stacked prs on this and like what's the first mergeable bit that we can do yeah uh and then
+[37:07] we go implement and like use we use sub agents we sometimes we'll use like you know fable
+[37:12] orchestrating soul or we use soul orchestrating fable or we use just opus as the as the main
+[37:18] thing and opus is the sub agent like kind of depends on the task i use soul for almost everything now
+[37:23] for user chooses um yeah the user chooses what the parent model is and then there's a couple
+[37:29] there's a couple like less obvious hacks you can do to do like cross provider uh like if you want
+[37:34] fable to orchestrate soul sub agents you have to tell it to use the codex cli right now um we do
+[37:38] have a custom harness that will support that soon uh because we just think it's a cool pattern that
+[37:42] works well um but uh yeah and then from implementation you know it's review the code
+[37:48] as you go or review the code at the end uh make sure it's good we have a kind of an internal
+[37:53] cultural rule is like do not send anyone code for review that you yourself have not read
+[37:57] like do a pass on it don't just make me read your agent slop sometimes i read the code and i have
+[38:01] to change 50 of it sometimes i have to read the code and i actually throw it all out and go back
+[38:05] to the design because i'm like oh kyle's never going to approve this okay what's a simpler way
+[38:09] to do this.
+[38:09] And sometimes I read the code and it's perfect.
+[38:13] I think people underestimate that you can just throw out the output and try again.
+[38:17] Well, that's why also I love this incremental zooming in planning process, like product,
+[38:21] tech, and then the plan of the steps that we're going to do.
+[38:24] Because at any point, you're getting more and more specific.
+[38:28] At any point, you can be like, oh, I don't like this.
+[38:30] Okay, throw this out.
+[38:31] We're going to go back to design.
+[38:32] We're going to change some stuff.
+[38:33] Because if we have to do that, then I don't want to do it.
+[38:35] Do you ever see a world where, because this is also kind of in my bubble, what people that are in leadership teams are envisioning, that a lot of the day is working on more of the planning or specification, how that is defined within the org or the team, and then overnight the work executes.
+[38:52] Yeah, I mean, I don't want to wake up to 10,000 lines of code.
+[38:57] If I'm planning on reading the code, I think the work is a lot more human in the loop than that.
+[39:02] there are very specific things that
+[39:04] lend themselves to hill climbing
+[39:06] overnight
+[39:07] but I think a lot of the work you do you're just gonna
+[39:10] you're going to enjoy it more
+[39:12] you're going to get more done you're actually
+[39:14] gonna have more through because that also requires
+[39:16] you to do a ton of paralyzations
+[39:17] plan 10 things and then kick them all off overnight
+[39:20] and then when I'm gonna spend the first 4 hours of my day
+[39:22] reviewing code
+[39:23] no I'm gonna plan 2 things I'm gonna start
+[39:26] them now I'm gonna watch
+[39:28] them as they go and I'm gonna get changes
+[39:30] landed in production today. It's much better to do two things, two things, two things than
+[39:34] like, okay, I have 10 things in flight and they're all kind of going and oh, I forgot
+[39:38] about two of them. And by four days later, I did ship two of them, but the other three
+[39:42] are still in flight. It's just the same thing that was always true about engineering is
+[39:45] still true and all work is like do less things in parallel. It feels more efficient to like,
+[39:53] I don't know how to say like to like try to like multitask really hard. But your end to
+[39:58] end throughput of like value delivered to the customer will be faster if you do less things
+[40:02] like a little bit slower and just like take a little bit more care with them interesting
+[40:07] i wonder if the way we get access to models like if i look at myself my own license with cloud code
+[40:14] yeah i spent 200 bucks a month yep at least uh i have weekly limits for my models yep abel has a
+[40:21] little bar that i want for clothes otherwise i don't feel like i squeezed enough juice out of
+[40:25] license yep so when it's friday and i know it's saturday and it's reset time um and i still have
+[40:31] a lot of work to do that's really when i kick out these night processes where sometimes i don't
+[40:35] really care about the code i want to parallelize i want to maximize my usage yeah um i wonder if
+[40:42] that way of thinking or that way of execution has also primed then and kind of catapulted us into
+[40:48] maybe this is what the future of engineering is going to look like the only way we got here is
+[40:52] because of these limitations on how we can access models in the first place well and this is like
+[40:57] also like the biggest disconnect of like everyone who's posting their like maxed out all six subs on
+[41:02] twitter versus like the real world is like no enterprise has subscription plans they're all
+[41:05] paying per token and so there's this whole cultural thing of like if you can get all three thousand
+[41:11] dollars of spend out of your two hundred dollar thing then you're winning I don't know what you
+[41:15] built and like what what value it is and who's going to use it but like that's how you win and
+[41:19] And it's like, no, the skill issue is not like couldn't use enough tokens,
+[41:23] because that doesn't apply to most people who are doing serious work.
+[41:28] We have companies like customers with 15 engineers,
+[41:31] and they're all on non-subscription plans
+[41:35] because they need security requirements,
+[41:37] they need data retention requirements,
+[41:38] they need all this stuff that you can only get on an enterprise plan,
+[41:40] which means you can only get paying per token.
+[41:43] So yeah, I think we're going to look back on the era of subscription maxing,
+[41:49] I don't know if it's like
+[41:50] the intelligence is going to get too cheap to meter
+[41:52] it's going to get so cheap that they won't need subscriptions
+[41:54] you'll just pay for it and it'll be good value
+[41:57] or the subscriptions are going to go away
+[41:59] at some point
+[42:00] because all it is is a loss leader
+[42:02] and a way for them to get data on you
+[42:04] and train the next model
+[42:06] of course
+[42:06] I think we'll probably look back and be like
+[42:10] all that token maxing stuff was just because of how
+[42:12] the model, I think you're right, it's like because of how we
+[42:14] access the models, because of how they're
+[42:17] distributed to
+[42:18] especially independent hackers and builders
+[42:21] that it became this thing that seemed much more important
+[42:24] and got a lot of attention,
+[42:26] and then one day it was just like nobody cared.
+[42:28] Yeah, it feels like there's a lot of FOMO
+[42:31] if you don't max out whatever plan you have.
+[42:33] And the best way to do so, if I work during the day,
+[42:36] is going to be that I do my thinking
+[42:38] and I let it run overnight.
+[42:40] But I don't think that's how actually I want my day to also be.
+[42:44] I do think there's value in blocks of thinking
+[42:47] and blocks of coding, right?
+[42:49] Like my thought is like, you know,
+[42:50] when you run human layer,
+[42:50] it does this research step.
+[42:52] It's slow.
+[42:52] In a large code base,
+[42:53] it can take 10, 15, 20 minutes.
+[42:55] And so I might kick off
+[42:56] two or three of those things
+[42:57] and let it run and go get a cup of coffee
+[42:59] or something.
+[43:00] But it's like,
+[43:00] rather than me going back and forth
+[43:02] with the model and telling,
+[43:03] okay, now go look over here.
+[43:04] Okay, now go look.
+[43:05] And then I noticed,
+[43:05] oh, you didn't understand that thing.
+[43:07] Yeah, we also have to go look over there
+[43:08] and see how that works.
+[43:09] And like, you're constantly like
+[43:10] catching the model's lack of understanding
+[43:12] versus like,
+[43:14] I'm willing to like async for 15, 20 minutes
+[43:16] and just guarantee that it's like going to have 90% or 99% of the context that it needs to do this
+[43:22] task almost certainly. And anything that it missed is like very easy to go find. That is worth a
+[43:28] little bit of async. And then while those are running, I'm like reading another plan and going
+[43:32] back and forth on that. But I try not to paralyze too hard. And when I do paralyze, I have one most
+[43:38] important thing. And it's not like, okay, launch three tasks. Okay, get this one to design. Now
+[43:42] get this one to design. Now get this one to design. Okay, now move this one forward. Now move this.
+[43:45] It's like when the most important thing is unblocked,
+[43:48] we drop whatever we're doing.
+[43:50] Even if it's like I'm in the middle of writing a prompt,
+[43:52] I will go back to the most important one
+[43:54] because the goal should be like land one thing.
+[43:56] You should always have one most important thing,
+[43:57] and your top goal is to get that thing landed.
+[43:59] And the other stuff you're working on
+[44:01] is just like stuff to fill the time while you're
+[44:04] waiting for that thing to be unblocked.
+[44:05] Yeah, you should always know what the most important thing is.
+[44:08] As has always been true in engineering and everything,
+[44:11] really.
+[44:12] The feeling of parallelization is very cool, though.
+[44:15] And I haven't done any measurements.
+[44:17] But overall, if you look at the most important thing
+[44:20] that needs to go out and you parallelize along the way,
+[44:22] I wonder if that thing would go faster
+[44:24] if you just wait and just focus on that one thing.
+[44:28] Like traditionally.
+[44:29] I want to see a study.
+[44:30] It would be very zen.
+[44:31] I want to see a study of like the, you know,
+[44:34] they hook up like the brain scans
+[44:35] and like watch someone's brain as it's working.
+[44:38] I want to see someone running six clods in parallel.
+[44:41] I want to see one person running one coding agent at a time.
+[44:44] And then I want to see someone sitting in a casino,
+[44:47] cranking the thing.
+[44:49] And I want to slot machine.
+[44:49] Yeah,
+[44:50] exactly.
+[44:51] And then maybe,
+[44:52] maybe the person doing slot machine and then maybe someone else at like the
+[44:55] poker table,
+[44:55] or it's like a poker,
+[44:56] you play one hand at a time and you focus.
+[44:59] Yeah.
+[44:59] Good stuff.
+[45:00] Thanks so much for coming on Dex.
+[45:01] This was great.
+[45:02] Yeah,
+[45:02] man,
+[45:02] this is super fun.
+[45:03] I'm really excited for the show.
+[45:04] I think you've had some really dope people on here.
+[45:06] So hopefully,
+[45:07] hopefully I don't,
+[45:07] I don't tank your tank,
+[45:09] your rep,
+[45:09] man.
+[45:10] Should be good.
+[45:11] Thanks.
+[45:12] Thanks again, Patrick.
+[45:13] That's it.

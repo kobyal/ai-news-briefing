@@ -1,0 +1,10 @@
+direction: down
+goal -> planner: break into tasks
+planner -> progress_json: tasks + check commands
+progress_json -> worker: one pending task
+worker -> evaluator: fresh session output
+evaluator -> checkpoint: exit 0
+checkpoint -> progress_json: git commit, status done
+evaluator -> rollback: exit != 0
+rollback -> progress_json: last_error saved
+evaluator -> human: 3 failures, blocked

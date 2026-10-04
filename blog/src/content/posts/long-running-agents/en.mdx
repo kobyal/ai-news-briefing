@@ -1,0 +1,133 @@
+---
+title: "Long-running agents: how an agent works for 36 hours without losing the thread"
+description: "Long-running agents without the hype: why 1M tokens isn't enough, a loop with a progress file and automated checks, and a one-page harness to copy."
+lang: en
+key: long-running-agents
+term: "long-running agents"
+kind: explainer
+pubDate: 2026-10-04
+tags: ["long-running-agents", "agents", "harness", "context-engineering", "claude", "cursor"]
+hook: "scene"
+cover: type
+tldr: ["Every task runs in a fresh session. The only things carried forward are progress.json and git.", "Every task needs a check command with an exit code, not a model passing judgment.", "After 3 failures, stop and hand it to a human. Don't let it keep trying."]
+hero: /posts/long-running-agents/hero-en.jpg
+diagram: /posts/long-running-agents/diagram.svg
+sources:
+  - { title: "Show HN: Superserve – Firecracker microVM sandboxes for long-running AI agents", url: "https://www.superserve.ai", date: "2026-07-21" }
+  - { title: "Long-Running Agents", url: "https://addyo.substack.com/p/long-running-agents", date: "2026-04-30" }
+  - { title: "Nvidia released Nemotron 3 Ultra, a new open model", url: "https://developer.nvidia.com/blog/nvidia-nemotron-3-ultra-powers-faster-more-efficient-reasoning-for-long-running-agents", date: "2026-06-04" }
+  - { title: "Curosr: Expanding our long-running agents research preview", url: "https://cursor.com/blog/long-running-agents", date: "2026-02-14" }
+  - { title: "Own the Loop — An Agent-Agnostic Guide to Long-Running Agents", url: "https://medium.com/@vinodh.thiagarajan/own-the-loop-an-agent-agnostic-guide-to-long-running-agents-42cbdd632533", date: "" }
+  - { title: "AddyOsmani.com - Long-running Agents", url: "https://addyosmani.com/blog/long-running-agents", date: "" }
+  - { title: "Build a Long Running AI Agent + Full Code", url: "https://srinithyathimmaraju.substack.com/p/building-long-running-ai-agent-full", date: "" }
+opinion: "We buy this term, because unlike a lot of the *-engineering wave, it changes how you work tomorrow morning: a progress file, a context reset between tasks, and a check command for every task. What we don't buy is the race over context window size, because more context doesn't give you more memory. The leverage isn't in the model but in the system around it: what it sees, what it's allowed to touch, how it gets checked and when it gets reset. Wherever you can replace a model's judgment with a command that returns an exit code, do it. It's cheaper and more reliable, and a loop that checks itself is worth more than a better first draft."
+madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
+---
+
+## 36 hours on one task
+
+On February 12, 2026, Cursor opened its long-running agents to all Ultra, Teams and Enterprise users. One run from the research preview is hard to miss: an agent that built a new chat platform on top of an existing open-source tool. It ran for 36 hours. Next to it on the list: a mobile app built from an existing web app in 30 hours, and a refactor of an auth and RBAC system in 25.
+
+But no model holds 36 hours in one context. What Cursor built is a harness. Their post says frontier models fail at long tasks in fairly predictable ways: they forget the big picture, lose the thread, and stop halfway. So their agent proposes a plan and waits for approval before it touches code. During the run, several agents check each other's work. The result they chose to highlight: much larger PRs, with a merge rate similar to other agents.
+
+<figure><img src="/posts/long-running-agents/v1-screenshot-en.jpg" alt="Runs of 25 to 36 hours don't come from a smarter model. They come from a plan approved up front and agents that check each other (Cursor)" loading="lazy" /><figcaption>Runs of 25 to 36 hours don't come from a smarter model. They come from a plan approved up front and agents that check each other (Cursor)</figcaption></figure>
+
+## What a long-running agent is, and isn't
+
+Nobody coined the term. It just stuck during 2026. Addy Osmani wrote the most useful definition, in a post from April 28:
+
+> A long-running AI agent can keep making progress over hours, days, or weeks. It can do this across many context windows and sandboxes, recover from failure, leave structured artifacts behind, and resume where it left off.
+> — Addy Osmani, "Long-running Agents"
+
+Osmani separates two things that keep getting mixed up. Long-horizon reasoning is about the model: how many dependent steps it can hold without getting lost. METR measures this, and their metric has doubled roughly every 7 months since 2019. Long-running execution is about the harness: the process runs for hours or days, and the model gets called thousands of times along the way. This post is about the second one, because you can build it today.
+
+What it isn't: a long chat. It also isn't "an agent with a million-token context." That's exactly the mistake.
+
+<figure><img src="/posts/long-running-agents/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## Why a million tokens doesn't fix it
+
+On March 13, 2026, Anthropic made the 1M context window GA on Opus 4.6 and Sonnet 4.6, with no surcharge. A 900K request costs the same per token as a 9K one. Sounds like the answer.
+
+Not really. Dex Horthy at HumanLayer analyzed 100,000 developer sessions and named the problem the Dumb Zone: in the middle of the window, roughly 40% to 60%, recall drops and reasoning starts to slip. Vinodh Thiagarajan described it from the field: the agent starts strong, and somewhere around 400K something changes. Answers get vague, and it starts "wrapping up" work that isn't finished. Anthropic calls this context anxiety.
+
+Compaction doesn't save you either. A summary of the history loses the nuance of earlier decisions, and the model invents details that were in the original but didn't make it into the summary.
+
+The fix everyone landed on, each from a different direction: throw the context away. Every session starts clean, and the handoff between sessions goes through structured artifacts: a progress file, a task list, git commits. Not compressed history.
+
+<figure><img src="/posts/long-running-agents/v2-svg-en.jpg" alt="More context isn't more memory. Past 40% of the window the model enters the Dumb Zone, so split the work into short sessions that pass on only a file and a commit (HumanLayer, Thiagarajan)" loading="lazy" /><figcaption>More context isn't more memory. Past 40% of the window the model enters the Dumb Zone, so split the work into short sessions that pass on only a file and a commit (HumanLayer, Thiagarajan)</figcaption></figure>
+
+## The loop, step by step
+
+It's always the same structure. Anthropic's public repo, cwc-long-running-agents, splits it into a planner, a generator and an evaluator, with default fail criteria and evaluation in a clean context, so the same agent doesn't both do the work and grade it. Microsoft's Agent Framework gets to the same place from the workflow side: checkpoints, resume, human gates.
+
+1. A planner turns the goal into a task list, with a check command for each task, and saves it to a file.
+2. A worker picks one pending task, in a fresh session, in a sandbox with limited tools.
+3. An evaluator runs the check. A command (tests, schema) beats a model.
+4. Passed? Commit and checkpoint. Failed? Roll back, save the error, and the task goes back to pending.
+5. After 3 failures the task moves to blocked and a human looks at it.
+6. Process died halfway? Run it again and it picks up from the last checkpoint.
+
+## A one-page harness
+
+This is the minimum I'd run before buying a platform. progress.json holds a task list in the form `{"id": 3, "goal": "...", "check": "pytest -q tests/test_auth.py", "status": "pending"}`, and NOTES.md is the log the agent itself writes at the end of each task. Both files live in git.
+
+```python title="harness.py"
+import json, pathlib, shlex, subprocess
+
+STATE = pathlib.Path("progress.json")
+MAX_ATTEMPTS = 3
+
+def sh(cmd: str) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
+state = json.loads(STATE.read_text())
+
+for task in state["tasks"]:
+    if task["status"] != "pending":
+        continue
+    prompt = (
+        f"Read progress.json and NOTES.md first. Do ONLY task {task['id']}: {task['goal']}. "
+        f"Previous failure, if any: {task.get('last_error', 'none')}. "
+        "Before you stop, append to NOTES.md what you changed and what is left."
+    )
+    # fresh session every task: no history beyond the files
+    sh(f"claude -p {shlex.quote(prompt)} --max-turns 40")
+
+    check = sh(task["check"])  # deterministic evaluator: exit code, not a model
+    if check.returncode == 0:
+        task["status"] = "done"
+        STATE.write_text(json.dumps(state, indent=2))
+        sh(f"git add -A && git commit -qm 'agent: task {task['id']} done'")
+    else:
+        sh("git checkout -- . && git clean -fdq")  # never build on a broken attempt
+        task["attempts"] = task.get("attempts", 0) + 1
+        task["last_error"] = (check.stdout + check.stderr)[-1500:]
+        task["status"] = "blocked" if task["attempts"] >= MAX_ATTEMPTS else "pending"
+        STATE.write_text(json.dumps(state, indent=2))
+        break  # next run starts from a clean tree, with the error in hand
+```
+
+Run it in a loop, say `for i in $(seq 20); do python harness.py; done`, in a container or a separate worktree. Three things here do all the work. First, every call to `claude -p` is a fresh session, with no history beyond the two files. Second, the evaluator is an exit code, not a model. Third, a failure triggers a rollback, so the next attempt starts on clean code with only the error in hand.
+
+> **My take:** The evaluator is the core here, not the agent. A long-running agent without a deterministic check is just an expensive way to produce a lot of code nobody checked. If you don't have a command that says pass or fail, the task isn't ready to run alone overnight.
+
+## Who runs this, and when not to
+
+We've already seen Cursor: a plan approved up front and agents that check each other. Superserve, which launched on Show HN in July, solved the infrastructure side: Firecracker microVMs with no 24-hour limit, indefinite pause so you don't pay for idle, snapshot and fork, and a credentials broker that sits between the agent and the APIs, so the model never holds keys. Billing is per second.
+
+Nvidia went after the model. Nemotron 3 Ultra, released June 4, is a 550B MoE with 55B active, scoring 95% on Ruler at 1M. But the interesting idea in their post is a system of models: a frontier model for planning and the hard calls, and a cheap model for execution, checks and tool calls. Most calls in a long run are routine, and there's no reason to pay Opus prices for them.
+
+So when not to? When the task has no automated check. When the task takes less than an hour, a regular agent is enough. And when the agent needs production credentials to make progress. A 30-hour run is a lot of calls, and each one is a chance to make a mistake with real permissions.
+
+<figure><img src="/posts/long-running-agents/src4.jpg" alt="The sandbox is half the harness. A VM you can pause with no 24-hour limit and resume in exactly the same state saves more than any prompt trick (credit: Superserve)" loading="lazy" /><figcaption>The sandbox is half the harness. A VM you can pause with no 24-hour limit and resume in exactly the same state saves more than any prompt trick (credit: Superserve)</figcaption></figure>
+
+## What to try this week
+
+- Pick one task from the backlog that already has a test suite, and split it by hand into 3 to 5 tasks in progress.json. Give each one a `check` field with a real command.
+- Run the harness above overnight, in a container or a git worktree, with no production credentials at all.
+- In the morning, measure three numbers: how many tasks passed on the first attempt, the average number of attempts, and the cost per task.
+- If more than a third of the tasks ended up blocked, the problem is probably the task split, not the model. Make them smaller.
+- Keep `--max-turns` and `MAX_ATTEMPTS` hard. An agent with no ceiling will keep burning tokens on the same error until morning.
+
+An agent that runs for 36 hours without a check isn't long-running. It's just long.

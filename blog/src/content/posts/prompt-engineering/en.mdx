@@ -1,0 +1,116 @@
+---
+title: "Prompt engineering: six words and a command with no due date"
+description: "Michael Heap gave an agent six words and got a command without a due date. What went wrong, why regenerate doesn't help, and what goes in TASK.md."
+lang: en
+key: prompt-engineering
+term: "prompt engineering"
+kind: warstory
+pubDate: 2026-10-05
+tags: ["prompt-engineering", "agents", "coding-agents", "postmortem", "specs"]
+hook: "number"
+cover: illus
+tldr: ["Before you run an agent, write down every open decision: fields, flags, edge cases.", "After a failure, don't hit regenerate. Check whether the cause is the prompt, the model's ability, luck, or the tooling.", "Give every task a done line you can check: a command that runs, a test, or sample output."]
+hero: /posts/prompt-engineering/hero-en.jpg
+diagram: /posts/prompt-engineering/diagram.svg
+sources:
+  - { title: "Prompt Engineering for Humans", url: "https://michaelheap.com/prompt-engineering-for-humans", date: "2026-03-31" }
+  - { title: "From prompt and pray to prompt engineering", url: "https://the.scapegoat.dev/from-prompt-and-pray-to-prompt-engineering", date: "2026-05-07" }
+  - { title: "Prompt Engineering Is Not. Engineering, That Is", url: "https://the-infrastructure-mindset.ghost.io/prompt-engineering-is-not", date: "2026-04-01" }
+  - { title: "Prompt Engineering Is Permanent", url: "https://yiblet.com/posts/prompt-engineering-is-permanent", date: "2026-05-03" }
+opinion: "We don't think prompt engineering is dead, but we don't buy it as a craft of clever phrasing either. What Heap wrote in the second version isn't nice wording. It's a spec: input, output, edge cases. That's old engineering with a model in the middle, and that's fine. A good name helps a team talk about it. But the real skill in 2026 is designing the system around the model: what it sees, what it can touch, and how you check what it returns. A good prompt with no check is still prompt and pray, just more polite. And wherever we could replace a model's guess with a deterministic rule, it has always come out cheaper and more reliable for us."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+Six words. "Add support for showing card details". That was the whole prompt Michael Heap gave an agent when he wanted to add a command to trello-cli, an open-source tool he maintains. The version that worked was about 60 words. Same model, same repo, same tool. The difference was 54 words.
+
+Heap published the story on March 31, 2026, in a post called Prompt Engineering for Humans. It's a small incident. No dropped database, no status page. That's why it's worth taking apart: this is what the most common prompt engineering failure looks like, and almost nobody writes a postmortem for it.
+
+## March 2026: trello-cli, a terminal, and six words
+
+Heap adds commands to trello-cli "as time allows". This time he wanted to try the agentic development everyone keeps talking about. He opened a terminal, typed six words, and let the agent run. No spec, no sample output, no tests. That's how most of us start a task with an agent.
+
+<figure><img src="/posts/prompt-engineering/v1-strip-en.jpg" alt="Same model, 10x the words, and a command that went into use right away: the whole difference was the prompt (Michael Heap)" loading="lazy" /><figcaption>Same model, 10x the words, and a command that went into use right away: the whole difference was the prompt (Michael Heap)</figcaption></figure>
+
+## The output: a command with no due date
+
+The agent added a command that shows the title, description, and labels. Looks reasonable. It's only missing the most important thing on a Trello card: the due date. And checklists? "Nowhere to be seen", in Heap's words.
+
+What he actually got was code that runs, passes a quick review, and is useless. That's the most annoying kind of failure. No exception, no red test. Just a result someone has to look at and say "no, that's not it".
+
+<figure><img src="/posts/prompt-engineering/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## From the outside: the model just isn't good enough
+
+Heap's first reaction was to close the laptop, "safe in the knowledge that AI wasn't coming for my job any time soon". Anyone who saw only the output would have agreed.
+
+That's where the trouble starts, because this failure doesn't look like a failure. The author of the.scapegoat.dev put it best in 2026: diffs always look fine at a glance, "that's literally what the models are trained for". Underneath, something went wrong three tool calls earlier. You see clean code. You don't see the decision the agent made for you.
+
+<figure><img src="/posts/prompt-engineering/src2.jpg" alt="Heap concludes that managers do prompt engineering too, and that with a team, a vague prompt fails more expensively (credit: michaelheap.com)" loading="lazy" /><figcaption>Heap concludes that managers do prompt engineering too, and that with a team, a vague prompt fails more expensively (credit: michaelheap.com)</figcaption></figure>
+
+## The first fix: regenerate again
+
+So what do most of us do? Regenerate. Rephrase. "No, I meant this, not that". The same post calls this prompt and pray, and spells out the cost: the context fills with noise and the answers get worse. A slot machine that pays out in code.
+
+That said, it also gives a framework for diagnosis. When a model fails at something you expected it to do, there's a finite list of causes:
+
+- You didn't write the prompt right.
+- The model just doesn't do this reliably.
+- You got unlucky, because models are probabilistic.
+- Something else is broken: a tool, or a provider that changed something in its harness.
+
+Each of these can be checked. Regenerate checks none of them.
+
+## The real cause: the agent did exactly what it was asked
+
+Right before the laptop closed, Heap noticed: the agent had added support for showing card details. Word for word. Nobody told it which details.
+
+So he wrote it again, this time assuming the agent knew nothing about what he meant. The second version has six decisions the first one didn't. The command name, `card:show`. Two flags, `--board` and `--list`. The five fields in the output, including due date and checklists. What to do when a field is missing: skip its heading. What to do when a checklist has more than 10 items: a `+ X more` line. And a flag called `--all-details` that shows everything. None of these were written in the first version, so the agent guessed all of them.
+
+The result: a command Heap started using right away. By his estimate, an hour of work dropped to a few minutes.
+
+> Nothing about the model changed. The only thing that changed was the context.
+> — Michael Heap, Prompt Engineering for Humans
+
+In short, a vague prompt isn't a model bug. It's a list of decisions you didn't make, and the agent makes them for you, quietly.
+
+> **Caveat:** We get why people are annoyed by the name. The post Prompt Engineering Is Not (March 2026) went looking for the engineering discipline and mostly found "be specific" and "iterate", and we don't think it's wrong. What makes Heap's story engineering isn't the wording of the second version. It's that the second version has a criterion you can check.
+
+<figure><img src="/posts/prompt-engineering/v3-svg-en.jpg" alt="Six open decisions, zero written down: the agent didn't fail, it guessed (Michael Heap, trello-cli)" loading="lazy" /><figcaption>Six open decisions, zero written down: the agent didn't fail, it guessed (Michael Heap, trello-cli)</figcaption></figure>
+
+## What to check tomorrow morning
+
+In a chat, a misunderstanding costs you a bad answer. With an agent, the cost is different. In May 2026, yiblet.com published Prompt Engineering Is Permanent, by an author who predicted in 2023 that the field would disappear within a few years. Now he writes that an agent that misunderstood you can change a database, message a customer, or confidently skip an important step. So the prompt has to describe the boundaries too: what not to do, when to ask, when to stop, and what counts as success.
+
+Put a file like this in the repo, and fill it in before any task that takes more than a few minutes:
+
+```markdown title="TASK.md"
+# Task
+<verb + object, one sentence. e.g.: add a card:show command>
+
+## Input
+- <flags / parameters: --board, --list>
+
+## Output: exactly what is shown, in what order
+- <title, description, due date, checklists, labels>
+
+## Edge cases
+- Missing field: <skip its heading>
+- Long list: <over 10 items, a "+ X more" line>
+
+## Don't touch
+- <files / APIs that must not change>
+
+## Stop and ask if
+- <a public interface needs to change or a dependency needs to be added>
+
+## Done =
+- <the command runs on a real card, and the card:show test passes>
+```
+
+Three more habits:
+
+- **Count decisions.** Before you send, write down how many open decisions the task has: names, output format, edge cases, flags. Every one that isn't written down is a guess.
+- **After a failure, don't regenerate.** Assign it to one of the four causes, and change one thing only.
+- **A done line you can check.** A command that runs on real data, a test that passes, sample output. Without it, you have no way to know whether the second version is even better.
+
+Heap's agent didn't make a mistake. It was just the first reader to take the prompt literally.

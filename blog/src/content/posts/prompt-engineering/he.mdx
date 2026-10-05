@@ -1,0 +1,116 @@
+---
+title: "Prompt engineering: שש מילים, ופקודה בלי due date"
+description: "מייקל היפ נתן ל-agent שש מילים וקיבל פקודה בלי הדבר הכי חשוב. מה השתבש, למה regenerate לא עוזר, ומה לכתוב ב-TASK.md אצלכם."
+lang: he
+key: prompt-engineering
+term: "prompt engineering"
+kind: warstory
+pubDate: 2026-10-05
+tags: ["prompt-engineering", "agents", "coding-agents", "postmortem", "specs"]
+hook: "number"
+cover: illus
+tldr: ["לפני שמריצים agent, תרשמו כל החלטה פתוחה: שדות, flags, מקרי קצה.", "אחרי כשל, לא regenerate. תבדקו אם הבעיה ב-prompt, ביכולת, במזל או בכלי.", "תוסיפו לכל משימה שורת סיום שנבדקת: פקודה שרצה, טסט או פלט לדוגמה."]
+hero: /posts/prompt-engineering/hero.jpg
+diagram: /posts/prompt-engineering/diagram.svg
+sources:
+  - { title: "Prompt Engineering for Humans", url: "https://michaelheap.com/prompt-engineering-for-humans", date: "2026-03-31" }
+  - { title: "From prompt and pray to prompt engineering", url: "https://the.scapegoat.dev/from-prompt-and-pray-to-prompt-engineering", date: "2026-05-07" }
+  - { title: "Prompt Engineering Is Not. Engineering, That Is", url: "https://the-infrastructure-mindset.ghost.io/prompt-engineering-is-not", date: "2026-04-01" }
+  - { title: "Prompt Engineering Is Permanent", url: "https://yiblet.com/posts/prompt-engineering-is-permanent", date: "2026-05-03" }
+opinion: "אנחנו לא חושבים ש-prompt engineering מת, אבל גם לא קונים אותו כמקצוע של ניסוחים חכמים. מה שהיפ כתב בגרסה השנייה הוא לא מילים יפות, הוא spec: קלט, פלט, מקרי קצה. זו הנדסה ישנה עם מודל באמצע, וזה בסדר, שם טוב עוזר לצוות לדבר על זה. אבל הכישרון האמיתי ב-2026 הוא לתכנן את המערכת סביב המודל: מה הוא רואה, במה הוא נוגע, ואיך בודקים מה הוא החזיר. prompt טוב בלי בדיקה הוא עדיין prompt and pray, רק מנומס יותר. ואיפה שאפשר להחליף ניחוש של מודל בכלל דטרמיניסטי, אצלנו זה תמיד יצא זול ואמין יותר."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+6 מילים. "Add support for showing card details". זה כל ה-prompt שמייקל היפ (Michael Heap) נתן ל-agent כשרצה להוסיף פקודה ל-trello-cli, כלי open-source שהוא מתחזק. הגרסה שעבדה הייתה בערך 60 מילים. אותו מודל, אותו ריפו, אותו כלי. ההבדל היה 54 מילים.
+
+היפ פרסם את הסיפור ב-31 במרץ 2026, בפוסט Prompt Engineering for Humans. זה incident קטן, בלי DB שנמחק ובלי status page. ובגלל זה שווה לפרק אותו: ככה נראה הכשל הכי נפוץ של prompt engineering, וכמעט אף אחד לא כותב עליו postmortem.
+
+## מרץ 2026: trello-cli, טרמינל ושש מילים
+
+היפ מוסיף פקודות ל-trello-cli "as time allows". הפעם הוא רצה לנסות את ה-agentic development שכולם מדברים עליו. פתח טרמינל, כתב שש מילים, ונתן ל-agent לרוץ. בלי spec, בלי דוגמת פלט, בלי tests. ככה רובנו מתחילים משימה עם agent.
+
+<figure><img src="/posts/prompt-engineering/v1-strip-he.jpg" alt="אותו מודל, פי 10 מילים, ופקודה שנכנסה לשימוש מיד: כל ההבדל היה ב-prompt (Michael Heap)" loading="lazy" /><figcaption>אותו מודל, פי 10 מילים, ופקודה שנכנסה לשימוש מיד: כל ההבדל היה ב-prompt (Michael Heap)</figcaption></figure>
+
+## הפלט: פקודה בלי due date
+
+ה-agent הוסיף פקודה שמציגה כותרת, תיאור ו-labels. נראה סביר. חסר רק הדבר הכי חשוב בכרטיס Trello, ה-due date. ו-checklists? "nowhere to be seen", בלשון של היפ.
+
+בפועל הוא קיבל קוד שרץ, שעובר review שטחי, ושאי אפשר להשתמש בו. זה הכשל הכי מעצבן: אין exception, אין טסט אדום. יש תוצאה שמישהו צריך להסתכל עליה ולהגיד "לא, זה לא זה".
+
+<figure><img src="/posts/prompt-engineering/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+## מבחוץ: המודל פשוט לא מספיק טוב
+
+התגובה הראשונה של היפ הייתה לסגור את הלפטופ, "safe in the knowledge that AI wasn't coming for my job any time soon". מי שהיה רואה רק את הפלט היה מסכים איתו.
+
+ופה מתחילה הבעיה, כי הכשל הזה לא נראה ככשל. הכותב של the.scapegoat.dev ניסח את זה הכי טוב באפריל 2026: diffs תמיד נראים טוב במבט חטוף, "that's literally what the models are trained for". מתחת, משהו השתבש שלוש קריאות כלים קודם. אתם רואים קוד נקי. אתם לא רואים את ההחלטה שה-agent קיבל במקומכם.
+
+<figure><img src="/posts/prompt-engineering/src2.jpg" alt="היפ מסיק מזה שגם מנהלים עושים prompt engineering, ושמול צוות prompt עמום נכשל יקר יותר (credit: michaelheap.com)" loading="lazy" /><figcaption>היפ מסיק מזה שגם מנהלים עושים prompt engineering, ושמול צוות prompt עמום נכשל יקר יותר (credit: michaelheap.com)</figcaption></figure>
+
+## התיקון הראשון: עוד regenerate
+
+טוב, אז מה רובנו עושים? regenerate. ניסוח מחדש. "no, I meant this, not that". אותו פוסט קורא לזה prompt and pray, ומתאר את המחיר: ה-context מתמלא ברעש, והתשובות נהיות גרועות יותר. מכונת מזל שמוציאה קוד.
+
+מה שכן, הוא נותן מסגרת לאבחון. כשמודל נכשל במשהו שציפיתם שיעשה, יש מספר סופי של סיבות:
+
+- לא כתבתם את ה-prompt נכון.
+- המודל פשוט לא עושה את זה בצורה אמינה.
+- לא היה לכם מזל, כי מודלים הם הסתברותיים.
+- משהו אחר שבור: כלי, או ספק ששינה משהו ב-harness שלו.
+
+את כל אחת מהן אפשר לבדוק. regenerate לא בודק אף אחת.
+
+## הסיבה האמיתית: ה-agent עשה בדיוק מה שביקשו
+
+רגע לפני שהלפטופ נסגר, היפ שם לב: ה-agent הוסיף support for showing card details. מילה במילה. אף אחד לא אמר לו אילו details.
+
+אז הוא כתב שוב, הפעם מתוך הנחה שה-agent לא יודע כלום על הכוונה שלו. בגרסה השנייה יש שש החלטות שלא היו בראשונה: שם הפקודה, `card:show`. שני flags, `--board` ו-`--list`. חמשת השדות בפלט, כולל due date ו-checklists. מה עושים כששדה חסר: מדלגים על הכותרת שלו. מה עושים כש-checklist ארוך מ-10 פריטים: שורת `+ X more`. ו-flag בשם `--all-details` שמראה הכל. בגרסה הראשונה אף אחת מהן לא נכתבה, אז ה-agent ניחש את כולן.
+
+התוצאה: פקודה שהיפ השתמש בה מיד. לפי ההערכה שלו, עבודה של שעה ירדה לכמה דקות.
+
+> Nothing about the model changed. The only thing that changed was the context.
+> — Michael Heap, Prompt Engineering for Humans
+
+בקיצור, prompt עמום הוא לא באג של המודל. הוא רשימה של החלטות שלא קיבלתם, וה-agent מקבל אותן במקומכם, בשקט.
+
+> **הסתייגות:** אני מבין את מי שמתעצבן על השם. הפוסט Prompt Engineering Is Not (מרץ 2026) חיפש את הדיסציפלינה ההנדסית ומצא בעיקר "be specific" ו-"iterate", ולא נראה לי שהוא טועה. מה שהופך את הסיפור של היפ להנדסה זה לא הניסוח של הגרסה השנייה, אלא שיש לה קריטריון שאפשר לבדוק.
+
+<figure><img src="/posts/prompt-engineering/v3-svg-he.jpg" alt="שש החלטות פתוחות, אפס כתובות: ה-agent לא נכשל, הוא ניחש (Michael Heap, trello-cli)" loading="lazy" /><figcaption>שש החלטות פתוחות, אפס כתובות: ה-agent לא נכשל, הוא ניחש (Michael Heap, trello-cli)</figcaption></figure>
+
+## מה לבדוק אצלכם מחר בבוקר
+
+ב-chat, אי-הבנה עולה לכם תשובה גרועה. ב-agent המחיר אחר. ב-yiblet.com יצא במאי 2026 פוסט בשם Prompt Engineering Is Permanent, של כותב שב-2023 חזה שהתחום ייעלם תוך כמה שנים. עכשיו הוא כותב ש-agent שלא הבין אתכם יכול לשנות DB, לשלוח הודעה ללקוח או לדלג בביטחון על שלב חשוב. לכן ה-prompt צריך לתאר גם את הגבולות: מה לא לעשות, מתי לשאול, מתי לעצור, ומה נחשב הצלחה.
+
+תשימו בריפו קובץ כזה, ותמלאו אותו לפני כל משימה שלוקחת יותר מכמה דקות:
+
+```markdown title="TASK.md"
+# משימה
+<פועל + אובייקט, משפט אחד. למשל: הוסף פקודה card:show>
+
+## קלט
+- <flags / פרמטרים: --board, --list>
+
+## פלט: בדיוק מה מוצג ובאיזה סדר
+- <title, description, due date, checklists, labels>
+
+## מקרי קצה
+- שדה חסר: <מדלגים על הכותרת שלו>
+- רשימה ארוכה: <מעל 10 פריטים, שורת "+ X more">
+
+## לא לגעת
+- <קבצים / APIs שאסור לשנות>
+
+## לעצור ולשאול אם
+- <צריך לשנות ממשק ציבורי או להוסיף dependency>
+
+## סיום =
+- <הפקודה רצה על כרטיס אמיתי, והטסט של card:show עובר>
+```
+
+ועוד שלושה הרגלים:
+
+- **תספרו החלטות.** לפני שליחה, תרשמו כמה החלטות פתוחות יש במשימה: שמות, פורמט פלט, מקרי קצה, flags. כל אחת שלא כתובה היא ניחוש.
+- **אחרי כשל, לא regenerate.** תשייכו אותו לאחת מארבע הסיבות, ותשנו דבר אחד בלבד.
+- **שורת סיום שנבדקת.** פקודה שרצה על נתון אמיתי, טסט שעובר, פלט לדוגמה. בלי זה אין לכם דרך לדעת אם הגרסה השנייה בכלל טובה יותר.
+
+ה-agent של היפ לא טעה. הוא פשוט היה הקורא הראשון שלקח את ה-prompt מילולית.

@@ -1,0 +1,169 @@
+---
+title: "GraphRAG: three Postgres tables before you buy a graph DB"
+description: "GraphRAG without a graph DB, in six steps: a 20-question eval, an ontology, three Postgres tables, and a single retrieval query."
+lang: en
+key: graphrag
+term: "graphrag"
+kind: fieldnotes
+pubDate: 2026-10-06
+tags: ["graphrag", "rag", "knowledge-graph", "postgres", "retrieval"]
+hook: "claim"
+cover: photo
+tldr: ["Write 20 real questions. Fewer than five multi-hop? Don't build a graph.", "Start with entities, edges and chunks in Postgres with pgvector.", "Extract only chunks with a new hash, use a small model, and count rejections."]
+hero: /posts/graphrag/hero-en.jpg
+diagram: /posts/graphrag/diagram.svg
+sources:
+  - { title: "Show HN: Instant GraphRAG over any Postgres database", url: "https://polygres.com", date: "2026-07-07" }
+  - { title: "GraphRAG is overkill. This is what we do instead for knowledge graphs", url: "https://www.minimumviablefounder.com/p/why-ai-company-brains-fail", date: "2026-07-20" }
+  - { title: "Atomic GraphRAG Explained: The Case for a Single-Query Pipeline", url: "https://memgraph.com/blog/atomic-graphrag-explained-single-query-pipeline", date: "2026-02-27" }
+  - { title: "GraphRAG, 27,000 Aviation Accidents, and What OpenClaw Found", url: "https://paulvnickerson.substack.com/p/when-an-ai-agent-engineers-its-own", date: "2026-02-21" }
+  - { title: "Graph Database AI Agents: GraphRAG & Memory Guide", url: "https://www.falkordb.com/blog/graph-database-ai-agents", date: "" }
+  - { title: "Building Agentic GraphRAG: Unified Memory With MCP", url: "https://www.decodingai.com/p/agentic-graphrag", date: "" }
+opinion: "To us, GraphRAG is a new name for an old discipline: data modeling and JOINs, with an LLM filling the tables. That's fine. A name helps a team talk about the thing, but a name isn't a method. What we care about is what it changes on Monday: a written ontology, constraints in the database, and a 20-question eval. Wherever we can go deterministic, with unique, check and hash, we prefer that over one more LLM call. And a graph that didn't beat the baseline is, in our view, just one more pipeline to maintain."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+Most teams that say "we need GraphRAG" need three things: an ontology, an edges table, and one query that can hop twice. They don't need a graph DB or community detection. They certainly don't need Microsoft's full pipeline.
+
+Some background first. Plain RAG came out of a Meta AI paper in May 2020. You split documents into chunks, embed them, and return the top-k most similar. In 2024 Microsoft Research published GraphRAG. An LLM extracts entities and relationships from the documents, you build a knowledge graph from them, and at query time you walk the graph instead of searching for similar text. The name caught on fast, and every graph DB vendor has been selling it since.
+
+The problem it solves is real. Memgraph calls it the "one-hop wall". Vector search finds a chunk that looks like the question, but it can't connect evidence in one document to evidence in another. The cost is real too. Paul Nickerson ran Tencent's Youtu-GraphRAG (accepted to ICLR 2026) on 27,378 aviation accident reports and ended up with a 313K-node graph. All the extraction ran on a local Qwen2.5-72B, on a GH200 with 96GB of HBM3. At that volume, API calls get, in his words, "prohibitively expensive". FalkorDB writes that an enterprise corpus can generate millions of extraction calls. And Jai from QX, who builds a "company brain" for clients, wrote on July 20 that in practice GraphRAG is "complete overkill".
+
+So here is how I would do it, in order. Every step is also an exit. If a step doesn't justify the next one, stop.
+
+## 01 · Twenty questions before a line of code
+
+Write 20 real questions, ones users have already asked in Slack or in support. Next to each one, note how many documents it takes to answer and what relationship links them.
+
+Nickerson's example is classic multi-hop: "What aircraft make appears most frequently in carburetor icing accidents during winter approaches?" To answer it you have to connect accident report → aircraft make → failure → conditions → season. No single chunk holds the answer.
+
+What you'll usually see: most of the list is single-hop. Some of the multi-hop ones are really aggregations that a GROUP BY handles with no LLM at all. My rule: fewer than five multi-hop questions out of 20, stay with vector RAG and improve your chunking.
+
+```yaml title="eval/questions.yaml"
+- id: q07
+  q: "Which services are affected by this CVE through dependencies?"
+  hops: 2
+  path: [cve, package, service]
+  expected_docs: [sbom/payments.json, sbom/auth.json]
+- id: q08
+  q: "What is the log retention policy?"
+  hops: 1
+  expected_docs: [policies/logging.md]
+```
+
+The path field isn't decoration. It's what we build the ontology from in the next step.
+
+<figure><img src="/posts/graphrag/v1-svg-en.jpg" alt="The question takes four hops between entities, and vector search stops after the first. That's the whole case for a graph, and also its limit (Nickerson; Memgraph)" loading="lazy" /><figcaption>The question takes four hops between entities, and vector search stops after the first. That's the whole case for a graph, and also its limit (Nickerson; Memgraph)</figcaption></figure>
+
+## 02 · Ontology first, extraction second
+
+The most common mistake is asking the LLM to extract "all the entities". What you get is a graph where Person, person, Employee and CEO are four different types, each connected to half the world. Paul Iusztin gave this as a talk twice in one month, and he put it best:
+
+> GraphRAG isn't a retrieval algorithm, it's a data modeling problem.
+> — Paul Iusztin, Decoding AI
+
+Youtu-GraphRAG does exactly this, just with a fancier name: schema-guided extraction. The graph is limited up front to the types that matter for the analysis. In practice: 5–8 entity types, 6–10 edge types, and every edge has a direction. Anything that doesn't appear in some path in the questions file stays out.
+
+Take time seriously. Iusztin's example: Arthur tells Felix about his favorite café in Timișoara, and two months later he moves to Lisbon. If you overwrite the edge, you've lost history. Append-only with valid_from and valid_to, and that's it.
+
+<figure><img src="/posts/graphrag/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## 03 · Three tables in Postgres
+
+Before you stand up Neo4j or FalkorDB, try it on the Postgres you already have. Polygres hit Show HN on July 7 with exactly this pitch, and the engines behind it, pgGraph and pgContext, are open source and past 1K GitHub stars. You don't need their product to start. You need pgvector and three tables:
+
+```sql title="graph.sql"
+create extension if not exists vector;
+
+create table chunks (
+  id bigserial primary key,
+  doc_id text not null,
+  content_hash text not null unique,
+  body text not null,
+  embedding vector(1024)
+);
+
+create table entities (
+  id bigserial primary key,
+  type text not null check (type in ('person','team','service','package','cve','incident')),
+  name text not null,
+  norm_name text generated always as (lower(trim(name))) stored,
+  embedding vector(1024),
+  unique (type, norm_name)
+);
+
+create table edges (
+  src bigint not null references entities(id),
+  dst bigint not null references entities(id),
+  rel text not null check (rel in ('owns','used_by','affects','caused','on_call_for')),
+  chunk_id bigint not null references chunks(id),
+  valid_from timestamptz not null default now(),
+  valid_to timestamptz,
+  primary key (src, rel, dst, valid_from)
+);
+
+create index on chunks using hnsw (embedding vector_cosine_ops);
+create index on entities using hnsw (embedding vector_cosine_ops);
+create index on edges (src) where valid_to is null;
+```
+
+Set the 1024 to match your embedding model. The unique on (type, norm_name) does exactly what FalkorDB describes as schema constraints: no separate nodes for "Acme" and "acme ". The checks on type and rel are the ontology from step 02, enforced in the database. An LLM that returns a type not on the list just fails the insert.
+
+<figure><img src="/posts/graphrag/src1.jpg" alt="GraphRAG on Postgres already exists as a product, and the open engines behind it are past 1K stars. You don't need a graph DB to start (credit: Polygres)" loading="lazy" /><figcaption>GraphRAG on Postgres already exists as a product, and the open engines behind it are past 1K stars. You don't need a graph DB to start (credit: Polygres)</figcaption></figure>
+
+## 04 · Cheap extraction: hash, small model, incremental
+
+This is where most of the money burns. Three rules.
+
+First, hash every chunk. Only a content_hash that isn't already in the table goes to extraction. FalkorDB say it plainly: re-indexing the whole corpus on every document change "is not viable at scale".
+
+Second, use a small model for extraction. You're asking for JSON against a closed schema, not poetry. FalkorDB recommend batching, caching recurring entities, and small models for the first pass. Nickerson went further: an open 72B model at 4-bit, about 40GB, on his own hardware, because otherwise the economics didn't work.
+
+Finally, count how many inserts failed on the check constraints and log them. That's the cheapest eval of extraction quality you'll ever get. If the rejection rate climbs, your extraction prompt and your ontology have drifted apart, and you want to find that out before the graph fills up with junk.
+
+<figure><img src="/posts/graphrag/src4.jpg" alt="27,378 reports became 313K nodes, but only on a local GH200. Through an API, this extraction wouldn't have made economic sense (credit: Paul Nickerson)" loading="lazy" /><figcaption>27,378 reports became 313K nodes, but only on a local GH200. Through an API, this extraction wouldn't have made economic sense (credit: Paul Nickerson)</figcaption></figure>
+
+## 05 · One query, not a chain of calls
+
+Memgraph calls this Atomic GraphRAG: all of retrieval should be one database query, not a chain of steps in the application. I agree, even without a graph DB. Every round-trip between Python and the DB is more latency and one more place for a bug. The vector gives you an entry point, the edges give you the hops:
+
+```sql title="retrieve.sql"
+with seeds as (
+  select id from entities
+  order by embedding <=> $1::vector
+  limit 5
+),
+hop1 as (
+  select e.dst as id, e.chunk_id from edges e
+  join seeds s on e.src = s.id
+  where e.valid_to is null
+),
+hop2 as (
+  select e.dst as id, e.chunk_id from edges e
+  join hop1 h on e.src = h.id
+  where e.valid_to is null
+)
+select c.id, c.doc_id, c.body
+from chunks c
+where c.id in (select chunk_id from hop1 union select chunk_id from hop2)
+limit 20;
+```
+
+What you get: up to 20 chunks, each of which arrived through a specific edge. That's the explainability Memgraph talks about. You can show the user why a given chunk made it into the context. Iusztin adds a hybrid step: merge the vector, text and graph results with Reciprocal Rank Fusion. It's a few lines and worth it.
+
+## 06 · Measure against plain vector RAG, and be ready to throw it out
+
+Run the 20 questions from step 01 twice: vector only, and vector plus graph. For each version, three numbers: recall@10 against expected_docs, p50 latency, and extraction cost per 1,000 documents. Just for a sense of latency: Polygres report 91% recall@10 at 2.44ms p50 on GloVe with 1.18M vectors. That's a vector-only benchmark, not GraphRAG, but it shows how little of the budget retrieval should take.
+
+The decision is simple. The graph has to win on the multi-hop questions and not lose on the single-hop ones. If it doesn't, throw it out and keep a few JOINs.
+
+When should you move to a real graph DB, Memgraph or FalkorDB or Neo4j? When you have variable-length paths, more than three hops, or global questions across the whole corpus. That's where a recursive CTE in Postgres starts to hurt.
+
+> **My take:** community detection and community summaries, the best-known part of Microsoft's GraphRAG, are also the most expensive and least needed part in most enterprise systems. Your users don't ask "what are the main themes across the whole corpus". They ask who owns the service that just went down.
+
+## What to take away
+
+- Write 20 questions with their paths before you pick any technology.
+- The ontology lives in the database as check constraints, not just in the prompt.
+- Extract only new content_hash values, with a small model, and count rejections.
+- All of retrieval in one query. Whatever doesn't beat the baseline on your questions goes.

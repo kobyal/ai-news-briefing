@@ -1,0 +1,13 @@
+direction: down
+scenario -> sandbox: seed fresh state
+sandbox -> agent: run task
+agent -> tools: tool calls
+tools -> sandbox: side effects
+agent -> trace: steps and tokens
+sandbox -> outcome_check: SELECT end state
+trace -> trajectory_check: tools, order, forbidden
+trace -> envelope_check: steps, tokens, latency
+outcome_check -> pass_k: all k runs
+trajectory_check -> pass_k
+envelope_check -> pass_k
+pass_k -> ci_gate: block merge

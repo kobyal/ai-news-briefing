@@ -206,6 +206,8 @@ const TYPE_FILTERS: { value: TypeFilter; label: string; label_he: string }[] = [
   { value: "event",     label: "Events",    label_he: "אירועים" },
 ];
 
+const PAGE = 50;
+
 function SearchContent() {
   const { isHe } = useLang();
   const params = useSearchParams();
@@ -217,6 +219,9 @@ function SearchContent() {
   const [q, setQ] = useState(initialQ);
   const [filter, setFilter] = useState<TypeFilter>(initialFilter);
   const [results, setResults] = useState<SearchResult[]>([]);
+  // Rendered window into the matches — grows by PAGE on "show more" so older
+  // days are reachable (a fixed first-50 used to cut off after ~a week).
+  const [shown, setShown] = useState(PAGE);
   const [count, setCount] = useState(0);
   const [typeCounts, setTypeCounts] = useState<Record<string, number>>({});
   const [archive, setArchive] = useState<string[]>([]);
@@ -236,7 +241,10 @@ function SearchContent() {
       setResults([]); setCount(0); setTypeCounts({}); return;
     }
     // Filter the full corpus once for the count, slice for the rendered list
-    const all = searchIndex(index, trimmed, isHe, 5000);
+    // The index is articles-then-extras, each newest-first; interleave by date
+    // so "all" really is newest-first across types (stable sort keeps order within a day).
+    const all = searchIndex(index, trimmed, isHe, Infinity)
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     // Per-type counts for the chip badges
     const counts: Record<string, number> = { all: all.length };
     for (const r of all) {
@@ -246,7 +254,8 @@ function SearchContent() {
     setTypeCounts(counts);
     const filtered = filter === "all" ? all : all.filter((r) => (r.type || "article") === filter);
     setCount(filtered.length);
-    setResults(filtered.slice(0, 50));
+    setResults(filtered);
+    setShown(PAGE);
   }, [q, index, isHe, filter]);
 
   // Debounce input → q so as-you-type is fast but doesn't thrash. URL also
@@ -378,13 +387,26 @@ function SearchContent() {
         {index !== null && count > 0 && (
           <>
             <div className="mb-4 text-sm" style={{ color: "var(--text-ghost)" }}>
-              {isHe ? `${count} תוצאות${count > 50 ? " (מציג את 50 הראשונות)" : ""}` : `${count} matches${count > 50 ? " (showing first 50)" : ""}`}
+              {isHe
+                ? `${count} תוצאות${count > shown ? ` (מוצגות ${shown})` : ""}`
+                : `${count} matches${count > shown ? ` (showing ${shown})` : ""}`}
             </div>
             <div className="space-y-3">
-              {results.map((r, i) => (
+              {results.slice(0, shown).map((r, i) => (
                 <SearchResultCard key={`${r.type || "article"}-${r.story_id || r.url || i}-${r.date}`} result={r} isHe={isHe} />
               ))}
             </div>
+            {count > shown && (
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={() => setShown((n) => n + PAGE)}
+                  className="px-5 py-2.5 rounded-xl font-semibold"
+                  style={{ background: "#ffffff", border: "1px solid var(--border-default)", color: "#4a4a6a", fontSize: "13px", cursor: "pointer" }}
+                >
+                  {isHe ? `הצג עוד (${count - shown} נוספות)` : `Show more (${count - shown} more)`}
+                </button>
+              </div>
+            )}
           </>
         )}
       </main>

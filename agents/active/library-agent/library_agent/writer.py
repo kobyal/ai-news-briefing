@@ -7,6 +7,7 @@ the skill's schema (lib/schema.md). Validation is structural only — the
 render step is what turns this into PDF/DOCX.
 """
 import json
+import re
 from pathlib import Path
 
 from shared import anthropic_cc
@@ -118,6 +119,12 @@ def _build_input(session_dir: Path, info: dict) -> str:
     )
 
 
+# Opus repeatedly emits junk between a table's "headers" and "rows" — seen as
+# `["rows"][0]=null`, `["rows"][0] ? [] : []` and `["rows"][0]` (2026-10-09,
+# 4 talks, both attempts each) — which fails the whole parse. Strip it.
+_ROWS_JUNK = re.compile(r',\["rows"\][^{}"]*?(?=,"rows"|\})')
+
+
 def _validate(doc: dict, crop_dir: Path) -> tuple[dict, str]:
     blocks = doc.get("blocks") if isinstance(doc, dict) else None
     if not blocks or not isinstance(blocks, list) or not doc.get("title"):
@@ -133,6 +140,13 @@ def _validate(doc: dict, crop_dir: Path) -> tuple[dict, str]:
             if b.get("file") not in have:
                 print(f"    ⚠ dropped image {b.get('file')!r} (not in frames/crop)")
                 continue
+        if b["kind"] == "table" and not b.get("rows"):
+            continue
+        if b["kind"] == "bullets":
+            # The renderer unpacks list items as [lead, rest]; a 1- or 3-item
+            # list crashes it (2026-10-09) — flatten those to a plain string.
+            b["items"] = [" ".join(map(str, it)) if isinstance(it, list) and len(it) != 2 else it
+                          for it in b.get("items") or []]
         kept.append(b)
     n_img = sum(b["kind"] == "image" for b in kept)
     doc["blocks"] = kept
@@ -156,7 +170,7 @@ def write_content(session_dir: Path, info: dict, lang: str, usage_log: list) -> 
             instructions=system, json_mode=True, tools=["Read"], add_dirs=[str(session_dir)],
             label="LIB-writer", usage_log=usage_log, effort="high",
         )
-        doc, err = _validate(parse_json(text), session_dir / "frames" / "crop")
+        doc, err = _validate(parse_json(_ROWS_JUNK.sub("", text or "")), session_dir / "frames" / "crop")
         if not err:
             doc["lang"], doc["rtl"] = lang, lang == "he"
             (session_dir / "content.json").write_text(json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8")

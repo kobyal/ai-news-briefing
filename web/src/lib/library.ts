@@ -24,12 +24,19 @@ export interface LibraryItem {
   // Talks collection only (agents/active/library-agent) — absent on summit items.
   channel?: string;
   added?: string;          // YYYY-MM-DD the talk was added
+  category?: string;       // LibraryCategory.id — talks only
   video_id?: string;
   pdf: string;
   pdf_bytes: number;
   docx: string;
   docx_bytes: number;
   cover: string;
+}
+
+export interface LibraryCategory {
+  id: string;
+  title: string;
+  title_he: string;
 }
 
 export interface LibraryCollection {
@@ -41,6 +48,7 @@ export interface LibraryCollection {
   date: string | null;     // null for a rolling collection
   lang: string;
   source_label: string;
+  categories?: LibraryCategory[];  // present → filter by topic instead of track
   items: LibraryItem[];
 }
 

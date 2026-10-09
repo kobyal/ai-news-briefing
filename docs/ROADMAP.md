@@ -385,6 +385,10 @@ Code health 2026-09-28 (post model-upgrade audit)
   DONE — inverted guard at the top of the module body raises on import.
 
 Deferred (with reasons):
+- ⏳ `web/src/components/HomePage.tsx` is dead (imported nowhere) but still
+  carries the old 6-day vendor-filter loop (`slice(0, 6)`) that was fixed in the
+  live `components/briefing/BriefingPage.tsx` on 2026-10-09 (vendor filter now
+  pages the whole archive). Delete it next time in web/ — don't revive it.
 - ⏳ `publish_data.py` (~:740) raw `claude -p` TL;DR regen lacks the env-strip /
   PromptBlocked / transient-retry handling → route via `anthropic_cc.agent`.
   Deferred: file under active edit by another session.

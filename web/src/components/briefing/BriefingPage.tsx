@@ -118,6 +118,8 @@ function SectionDivider({ label, count, extra }: { label: string; count?: number
   );
 }
 
+const VENDOR_BATCH_DAYS = 7;
+
 interface OlderDay {
   date: string;
   stories: NewsItem[];
@@ -142,8 +144,9 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
   const [activeVendor, setActiveVendor] = useState<string | null>(null);
   const [multiDateStoriesByDate, setMultiDateStoriesByDate] = useState<OlderDay[]>([]);
   const [loadingMulti, setLoadingMulti] = useState(false);
-  // Track which vendor's fetch is "current" so stale responses don't overwrite
-  const fetchVendorRef = useRef<string | null>(null);
+  // Bumped on every vendor change (and StrictMode's double effect run) so a
+  // stale batch response never appends to the current list.
+  const vendorGen = useRef(0);
 
   // Infinite scroll: progressively load older days as the reader nears the
   // bottom. `olderDays` accumulates one day per fetch, in archive order
@@ -188,27 +191,34 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
     return list;
   }, [todayVendors]);
 
-  // Fetch stories from all archive dates when a vendor is selected
-  const fetchMultiDate = useCallback(async (vendor: string) => {
-    fetchVendorRef.current = vendor;
+  // Vendor filter: walk the WHOLE archive in batches of VENDOR_BATCH_DAYS, the
+  // next batch loading as the reader scrolls (a fixed 6-day window used to hide
+  // everything older). Cursor + dedup sets live in refs so batches append.
+  const vendorDates = useMemo(() => archive.filter((d) => d !== data.date), [archive, data.date]);
+  const [vendorCursor, setVendorCursor] = useState(0);
+  const vendorCursorRef = useRef(0);
+  const vendorSeenIds = useRef<Set<string>>(new Set());
+  const vendorSeenHeadlines = useRef<Set<string>>(new Set());
+  const vendorSentinelRef = useRef<HTMLDivElement | null>(null);
+  const vendorHasMore = vendorCursor < vendorDates.length;
+
+  const loadVendorBatch = useCallback(async (vendor: string) => {
+    const gen = vendorGen.current;
+    const start = vendorCursorRef.current;
+    const batch = vendorDates.slice(start, start + VENDOR_BATCH_DAYS);
+    if (batch.length === 0) return;
+    vendorCursorRef.current = start + batch.length;
     setLoadingMulti(true);
     try {
-      const otherDates = archive.filter((d) => d !== data.date).slice(0, 6); // up to 6 extra days
-      const results = await Promise.all(
-        otherDates.map((d) => fetchDayData(d).catch(() => null))
-      );
+      const results = await Promise.all(batch.map((d) => fetchDayData(d).catch(() => null)));
       // Ignore result if the user switched to a different vendor while fetching
-      if (fetchVendorRef.current !== vendor) return;
+      if (vendorGen.current !== gen) return;
       // Deduplicate by story_id AND fuzzy headline match, grouped by date
-      const seenIds = new Set(data.stories.filter((s) => s.vendor === vendor).map((s) => s.story_id));
-      const seenHeadlines = new Set(
-        data.stories.filter((s) => s.vendor === vendor)
-          .map((s) => s.headline.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 40))
-      );
+      const seenIds = vendorSeenIds.current;
+      const seenHeadlines = vendorSeenHeadlines.current;
       const grouped: OlderDay[] = [];
       for (let i = 0; i < results.length; i++) {
         const dayData = results[i];
-        const date = otherDates[i];
         if (!dayData?.stories) continue;
         const dayUnique = dayData.stories
           .filter((s) => s.vendor === vendor)
@@ -220,25 +230,47 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
             seenHeadlines.add(norm);
             return true;
           });
-        if (dayUnique.length > 0) grouped.push({ date, stories: dayUnique });
+        if (dayUnique.length > 0) grouped.push({ date: batch[i], stories: dayUnique });
       }
-      setMultiDateStoriesByDate(grouped);
-    } catch {
-      if (fetchVendorRef.current === vendor) setMultiDateStoriesByDate([]);
+      setMultiDateStoriesByDate((prev) => [...prev, ...grouped]);
     } finally {
-      if (fetchVendorRef.current === vendor) setLoadingMulti(false);
+      if (vendorGen.current === gen) {
+        setVendorCursor(vendorCursorRef.current);
+        setLoadingMulti(false);
+      }
     }
-  }, [archive, data.date, data.stories]);
+  }, [vendorDates]);
 
   useEffect(() => {
-    if (activeVendor) {
-      fetchMultiDate(activeVendor);
-    } else {
-      fetchVendorRef.current = null;
-      setMultiDateStoriesByDate([]);
-      setLoadingMulti(false);
-    }
-  }, [activeVendor, fetchMultiDate]);
+    vendorGen.current += 1;
+    vendorCursorRef.current = 0;
+    setVendorCursor(0);
+    setMultiDateStoriesByDate([]);
+    setLoadingMulti(false);
+    if (!activeVendor) return;
+    const today = data.stories.filter((s) => s.vendor === activeVendor);
+    vendorSeenIds.current = new Set(today.map((s) => s.story_id));
+    vendorSeenHeadlines.current = new Set(
+      today.map((s) => s.headline.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 40))
+    );
+    loadVendorBatch(activeVendor);
+  }, [activeVendor, loadVendorBatch, data.stories]);
+
+  // Next vendor batch when the reader nears the bottom (same pattern as the
+  // unfiltered older-days scroll below).
+  useEffect(() => {
+    if (!activeVendor || !vendorHasMore || loadingMulti) return;
+    const el = vendorSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadVendorBatch(activeVendor);
+      },
+      { rootMargin: INFINITE_SCROLL_ROOT_MARGIN }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [activeVendor, vendorHasMore, loadingMulti, loadVendorBatch]);
 
   // Read ?vendor= param on mount and initialize filter
   useEffect(() => {
@@ -531,14 +563,7 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
         {/* ── MULTI-DATE VENDOR STORIES ──────────────────── */}
         {activeVendor && (
           <>
-            {loadingMulti && (
-              <div className="flex items-center justify-center py-8 mb-8">
-                <span className="text-sm animate-pulse" style={{ color: "#9a9ab8" }}>
-                  {isHe ? `טוען כתבות ${activeVendor} מימים קודמים...` : `Loading ${activeVendor} stories from past days...`}
-                </span>
-              </div>
-            )}
-            {!loadingMulti && multiDateStoriesByDate.length > 0 && (() => {
+            {multiDateStoriesByDate.length > 0 && (() => {
               let rank = todayFiltered.length;
               return multiDateStoriesByDate.map((day) => {
                 const dayRankStart = rank;
@@ -558,7 +583,19 @@ export function BriefingPage({ data, archive }: BriefingPageProps) {
                 );
               });
             })()}
-            {!loadingMulti && todayFiltered.length === 0 && multiDateStoriesByDate.length === 0 && (
+            {vendorHasMore && (
+              <div ref={vendorSentinelRef}>
+                <LoadingSpinner label={isHe ? `טוען כתבות ${activeVendor} מימים קודמים...` : `Loading ${activeVendor} stories from past days...`} />
+              </div>
+            )}
+            {!vendorHasMore && !loadingMulti && multiDateStoriesByDate.length > 0 && (
+              <div className="flex items-center justify-center py-8 mb-8">
+                <span className="text-xs" style={{ color: "#9a9ab8", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                  {isHe ? "סוף הארכיון" : "End of archive"}
+                </span>
+              </div>
+            )}
+            {!vendorHasMore && !loadingMulti && todayFiltered.length === 0 && multiDateStoriesByDate.length === 0 && (
               <div
                 className="flex items-center justify-center py-24 rounded-2xl mb-16"
                 style={{ border: "1px dashed #e0e0ec" }}

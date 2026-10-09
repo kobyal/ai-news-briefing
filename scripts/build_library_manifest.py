@@ -53,18 +53,21 @@ COLLECTIONS = [
         "title_he": "הרצאות ששוות את הזמן",
         "blurb": (
             "Curated long-form talks on Claude Code, agentic coding and AI engineering — "
-            "from conference and official channels — reviewed in Hebrew with the speaker's "
-            "slides and timestamped quotes. One new talk is added automatically every day."
+            "from conferences, official channels and the best talks shared on X — reviewed in "
+            "Hebrew with the speaker's slides and timestamped quotes. Filter by topic or length; "
+            "one new talk is added automatically every day."
         ),
         "blurb_he": (
-            "הרצאות ארוכות ונבחרות על Claude Code, agentic coding והנדסת AI — מכנסים "
-            "ומערוצים רשמיים — מסוכמות בעברית עם הסליידים של המרצה וציטוטים עם חותמות זמן. "
-            "הרצאה חדשה נוספת אוטומטית מדי יום."
+            "הרצאות ארוכות ונבחרות על Claude Code, agentic coding והנדסת AI — מכנסים, "
+            "מערוצים רשמיים ומההרצאות הכי טובות שעוברות ב-X — מסוכמות בעברית עם הסליידים של "
+            "המרצה וציטוטים עם חותמות זמן. אפשר לסנן לפי נושא או אורך; הרצאה חדשה נוספת "
+            "אוטומטית מדי יום."
         ),
         "date": None,
         "lang": "he",
         "source_label": "YouTube",
         "sort": "newest",
+        "categories": True,
     },
     {
         "id": "aws-summit-tlv-2026",
@@ -90,6 +93,44 @@ COLLECTIONS = [
 ]
 
 TOOL_URL = "https://github.com/kobyal/recording-to-pdf"
+
+# ── Talk topics ────────────────────────────────────────────────────────────────
+# The /library filter for the talks collection. Channel/uploader names made a
+# meaningless filter ("Morty", "spect") — a reader picks by subject. An index
+# entry may carry an explicit "category" (curated); otherwise the first rule
+# whose keywords hit the title/description/topics wins, so the daily agent's
+# new talks are filed without a code change. Order = chip order on the page.
+TALK_CATEGORIES = [
+    {"id": "claude", "title": "Claude Code & Anthropic", "title_he": "Claude Code ו-Anthropic",
+     "keywords": ["claude", "anthropic", "opus", "sonnet", "mcp"]},
+    {"id": "agentic", "title": "Agentic engineering", "title_he": "הנדסה אייג'נטית",
+     "keywords": ["loop", "graph", "harness", "agentic", "multi-agent", "swarm", "agents"]},
+    {"id": "grok", "title": "GrokBot & SpaceXAI", "title_he": "GrokBot ו-SpaceXAI",
+     "keywords": ["grok", "spacexai", "xai"]},
+    {"id": "openai", "title": "OpenAI", "title_he": "OpenAI",
+     "keywords": ["openai", "chatgpt", "codex", "altman", "devday"]},
+    {"id": "courses", "title": "Courses & workshops", "title_he": "קורסים וסדנאות",
+     "keywords": ["course", "workshop", "class", "lecture", "tutorial", "prompting"]},
+    {"id": "business", "title": "AI in business", "title_he": "AI בעסק",
+     "keywords": ["business", "gtm", "sales", "marketing", "founder", "startup", "fde", "customer"]},
+    {"id": "vision", "title": "Leaders & big picture", "title_he": "מנהיגים ותמונה רחבה",
+     "keywords": []},
+]
+# Keyword precedence differs from chip order: a GrokBot talk mentions "agents"
+# and a Claude course mentions "claude", so the specific vendors match first.
+_CATEGORY_MATCH_ORDER = ["grok", "openai", "courses", "claude", "business", "agentic"]
+
+
+def talk_category(entry: dict) -> str:
+    if entry.get("category"):
+        return entry["category"]
+    meta = entry.get("meta", {})
+    hay = " ".join([entry.get("title", ""), meta.get("description", ""), meta.get("tags", "")]).lower()
+    by_id = {c["id"]: c for c in TALK_CATEGORIES}
+    for cid in _CATEGORY_MATCH_ORDER:
+        if any(k in hay for k in by_id[cid]["keywords"]):
+            return cid
+    return "vision"
 
 
 def newest(out_dir: Path, pattern: str) -> Path | None:
@@ -222,6 +263,8 @@ def build_collection(spec: dict) -> dict | None:
             "speakers": entry.get("speakers") or details.get("speakers", ""),
             "minutes": entry.get("minutes") or details.get("minutes", 0),
             "track": meta.get("track") or "",
+            # Talks are filtered by subject; summit items keep filtering by track.
+            **({"category": talk_category(entry)} if spec.get("categories") else {}),
             "level": level,
             "topics": topics,
             "lang": entry.get("asr", {}).get("language") or spec.get("lang", ""),
@@ -259,6 +302,10 @@ def build_collection(spec: dict) -> dict | None:
         "date": spec["date"],
         "lang": spec["lang"],
         "source_label": spec["source_label"],
+        **({"categories": [{k: c[k] for k in ("id", "title", "title_he")}
+                           for c in TALK_CATEGORIES
+                           if any(it.get("category") == c["id"] for it in items)]}
+           if spec.get("categories") else {}),
         "items": items,
     }
 

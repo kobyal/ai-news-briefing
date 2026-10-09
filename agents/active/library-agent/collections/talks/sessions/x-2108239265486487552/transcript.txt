@@ -1,0 +1,2830 @@
+[0:00] So large language models.
+[0:02] I guess you always, probably all of you
+[0:03] have heard of this word, large language models.
+[0:06] This is precise, I think, in some sense,
+[0:10] this is all starting from GPT-3.
+[0:12] When OpenAI released GPT-3, it used this new paradigm,
+[0:17] which is autoregressive large language models.
+[0:22] So basically, we're going to focus on that.
+[0:24] You know, autoregressive large language models,
+[0:26] we're going to skip some of the earlier versions
+[0:28] of transformer which are not autoregressive.
+[0:34] And autoregressive basically means
+[0:36] that you generate tokens one by one,
+[0:38] and each of the new tokens depends on the previous tokens,
+[0:40] and you do this, and you model the probability
+[0:43] in this kind of like autoregressive way.
+[0:45] I'm going to talk more about details.
+[0:47] In some sense, you model your language distribution
+[0:49] by using a sequential model one by one in some sense.
+[0:55] Anyway, so I think the point,
+[0:59] our goal is to talk about some details.
+[1:01] So I'll fill in more high-level stuff
+[1:02] as we talk about the details.
+[1:04] So the first thing we're going to talk about
+[1:06] is tokenization.
+[1:10] This is just to prepare us
+[1:13] to talk about the real meat in some sense.
+[1:15] So what does tokenization mean?
+[1:17] It means that you need to,
+[1:19] these transformers,
+[1:20] they are numerical architecture models, right?
+[1:23] So they take in, in some sense,
+[1:25] numerical numbers, right? But you have text. And how do you turn text into some kind of things that
+[1:31] the models can understand? So the first step is to tokenize. Tokenize means that you need to
+[1:37] decide what is the smallest unit of the input you give to the large language model. And often it's
+[1:44] not a word, right? The most natural thing you can think of is maybe the smallest unit is a character
+[1:49] or a word. If you use character level tokenization, then the issue is that often you have so many
+[1:55] characters. You need so many tokens, so many steps. And if you use word-level
+[2:01] tokenization, then often the issue is that you don't know how to deal with this
+[2:05] long word, which are very rare. For example, you have a word called, say,
+[2:09] internationalization. So if you treat this word as a single word,
+[2:14] then maybe it's too rare, and you don't leverage your understanding about other
+[2:19] words. So if you treat internationalization as one word, then it is
+[2:22] different from internationalized. It's different from like a nation, right? And they are all
+[2:28] completely different kind of things. And you cannot leverage that. For example, if you understand
+[2:34] internationalized, then you should probably understand internationalization to some degree
+[2:38] without even seeing more data. And so that's why people don't always use subword tokenization,
+[2:45] don't use word tokenization. Maybe another, okay, maybe let me give you another example,
+[2:49] For example, if you use this, I guess in my nose,
+[2:52] there is this word L-M, magnification.
+[2:55] Actually, I don't know whether this is a real word.
+[2:57] No, I think it's a new word.
+[2:58] That is a completely new word.
+[2:59] Nobody have to use it before 2020, I guess.
+[3:04] So even right now, it's not that common.
+[3:08] And if you have to treat this word as a unit,
+[3:12] then you have to see this word enough times
+[3:15] to understand what it means.
+[3:17] However, if you treat it as sub-words, then maybe you have a token called ILM.
+[3:21] You have a token which is, you have two units.
+[3:24] This is a token, this is a token.
+[3:26] So ILM is a token, infication is a token.
+[3:28] Then in some sense, you have seen ILM many, many times.
+[3:31] You already understand it.
+[3:33] And then infication has a special meaning in English.
+[3:37] And then you combine these two understanding, you understand the word.
+[3:40] So that's much more efficient understanding of the word
+[3:43] than just treating this whole thing as a single unit.
+[3:47] So, and this happens more often in, for example, biology,
+[3:53] when you have this very long word,
+[3:54] or maybe in German you have very long word,
+[3:56] but actually there are fundamentally
+[3:58] many combinations of many subwords.
+[4:00] And using subword tokenization allows you
+[4:03] to understand each of the subwords,
+[4:05] and then you can understand the combination
+[4:07] of those subwords as a whole, very efficiently.
+[4:12] So, yeah, so basically tokenization just means
+[4:14] that you have a predefined vocabulary.
+[4:18] Vocabulary.
+[4:20] And this vocabulary is a list of like subwords, right?
+[4:22] So for example, you can have many, many of this.
+[4:25] Like maybe A is a subword, is one of the token.
+[4:29] I think maybe like a dog is a token.
+[4:32] Pretty much all common words these days is a token.
+[4:35] And actually, if you look at the,
+[4:37] actually you can play with the tokenization online.
+[4:39] If you search OpenAI tokenizer,
+[4:41] OpenAI give you a playground
+[4:43] where you can see how the texts are tokenized.
+[4:46] And you'll find that actually blank dog is also a token.
+[4:52] So the blank is actually merged with dog as a token.
+[4:55] And you have so many of this.
+[4:57] Typically, this kind of tokenization right now,
+[5:01] I think for the open source models,
+[5:02] we know the number of tokens they have.
+[5:04] I think it's often on the order of 10 to the 5,
+[5:07] like 100K at least.
+[5:09] I think QN 3.5, this is the newest version
+[5:12] of the open source models, which are pretty good.
+[5:14] I think they have like 250 tokens.
+[5:18] I think 250 probably is mostly because, you know,
+[5:20] I think 250 is somehow you can represent this token
+[5:23] with like maybe eight bytes in some sense.
+[5:28] It also depends on how many bytes
+[5:30] you can present the tokens.
+[5:32] So anyway, so you have this vocabulary,
+[5:34] and then you just, given a long string of tags,
+[5:38] you just take all the subwords that are tokens and you turn it into a sequence of segments.
+[5:44] For example, if you say, if I have a dog runs,
+[5:48] suppose this is the text you see and then you'll say this is a token,
+[5:52] so this is one part and then I think blank dog is a token and blank runs is also a token,
+[6:00] and comma I think is a token by itself.
+[6:04] So, and every token has an ID, right?
+[6:06] So let's say A is probably the ID number one,
+[6:09] dog is maybe the ID number like 356, whatever,
+[6:12] and run is some ID, maybe 250.
+[6:17] I'm just writing some random numbers.
+[6:19] Everything has an ID.
+[6:21] So basically you turn every text into a sequence of IDs.
+[6:24] Each ID corresponds to one token.
+[6:28] And I think, so in this case,
+[6:30] most of these words are actually one token.
+[6:32] I think I just checked recently,
+[6:34] if you have the word happiness,
+[6:37] I think the tokenization will be unhappiness, let's say.
+[6:41] I think this part is a token.
+[6:43] H is a token.
+[6:44] And A-P-I-N-E-S-S is a token for some reason.
+[6:50] And maybe another example is this.
+[6:52] Oh, I already visited the ILM identification.
+[6:55] And this is another example we come up with.
+[7:00] I don't know actually what this word means.
+[7:02] if you have a blastoma, I think this part is a token,
+[7:05] this part is a token, and this part is token.
+[7:07] I think this is just because for these biological words,
+[7:10] biomedical words, actually every part of the word
+[7:13] has some special meaning,
+[7:15] and so you tokenize them into tokens.
+[7:19] And what is the exact vocabulary?
+[7:21] It depends on the model.
+[7:23] So basically, the algorithm that turns the text
+[7:26] into these tokens is called a tokenizer.
+[7:29] And every model has a different tokenizer,
+[7:32] Not everyone has a different one.
+[7:34] Some of them shared the same tokenizers.
+[7:36] But generally, it's specific to the tokenizer, to the model.
+[7:40] And different companies have different proprietary tokenization approach.
+[7:45] You probably heard of that recently.
+[7:47] I think Cloud Code, they update their tokenizers.
+[7:50] So that I think they make the tokenizers more granular to some degree.
+[7:54] So that the same amount of tax will be tokenized into more tokens.
+[7:58] So before it's 1,000 tokens.
+[8:00] Now it's 1.5,000 tokens.
+[8:01] I didn't verify it myself
+[8:03] but I read some news about this
+[8:05] assuming they are true
+[8:06] that means that you spend more tokens
+[8:08] you pay more to cloud code
+[8:10] with the same amount of tax
+[8:13] anyway
+[8:14] so
+[8:15] cool
+[8:16] and there are some details about how to
+[8:19] come up with the vocabulary
+[8:21] and how to kind of like
+[8:22] run this algorithm to tokenize
+[8:25] the keyword is called
+[8:27] BPE
+[8:28] BPE
+[8:30] tokenizer, byte-paired encoding.
+[8:35] So I'm not going through the details
+[8:37] because this is just a very small, quick setup.
+[8:40] It's not that important.
+[8:42] But roughly speaking, the BPE tokenization idea
+[8:45] is that you try to, in some sense,
+[8:46] you just try to find frequent subwords
+[8:49] that are most frequent, right?
+[8:51] And you use them in a vocabulary.
+[8:53] But how do you decide which one is more frequent and not?
+[8:55] I think there's a sequential algorithm.
+[8:57] you first go through maybe the smallest combinations of,
+[9:05] you go through all the characters,
+[9:06] and you try to find,
+[9:08] I think it's a greedy algorithm.
+[9:09] First, you try to find the most frequent one-character thing,
+[9:12] and you find the most frequent combination of two characters,
+[9:15] and you remove,
+[9:16] it's a little bit complicated,
+[9:17] which I, I mean, I'll try to give you a precise version,
+[9:20] but it's kind of like a greedy algorithm
+[9:23] that decides which one is more frequent,
+[9:26] so on and so forth.
+[9:27] And if you are interested, you can look up the exact algorithm.
+[9:31] Okay, so that's the tokenization.
+[9:34] So that means that from now on,
+[9:36] we just assume we have a tokenizer,
+[9:38] so every piece of text will be
+[9:40] turned into a sequence of tokens.
+[9:42] So from now on,
+[9:43] like a text just means a sequence of tokens,
+[9:47] and each of this Xi is in a vocabulary.
+[9:50] Let's call the vocabulary V.
+[9:53] and the size of the vocabulary could be like 250,000.
+[9:58] And each of these is kind of like an index in the vocabulary,
+[10:02] like this is the fifth token, this is the 150th token, so on and so forth.
+[10:07] Okay, so now the questions, now we go into the next question,
+[10:12] which is how do we model this distribution of sequence of tokens?
+[10:16] How do we create a probabilistic model to model it?
+[10:19] If you think about the support of this distribution,
+[10:24] how many possible combinations that are possible here.
+[10:28] So the number of possible combinations is,
+[10:30] you have v choice, this is the cardinality of v.
+[10:34] You have v choice, cardinality of v choice,
+[10:36] for each of the tokens, and you have a sequence of less t,
+[10:41] so you take the power to the t, right?
+[10:43] So everyone has v choice,
+[10:46] and V to the power of T is the total number of choices.
+[10:49] So you cannot assign one probability
+[10:51] for each of these sequences,
+[10:57] like a discrete categorical tokens,
+[10:59] like categorical distributions.
+[11:00] If you treat this as categorical distributions,
+[11:02] then every choice here will have one probability,
+[11:06] and that's just way too many parameters to describe it.
+[11:09] So that's why what people do is that people decompose
+[11:12] this distribution using the chain rule
+[11:14] to write it this way.
+[11:15] So you say, suppose I have a probability distribution
+[11:20] over the joint of the sequence, then I
+[11:22] can write it as the following.
+[11:24] So I can say it's equals to p of x1 times p of x2 given x1,
+[11:30] p of x3 given x2 and x1, so on and so forth,
+[11:35] and p of xt given x1 up to xt minus 1.
+[11:40] And this is the so-called conditional probability
+[11:44] decomposition, you decompose the joint distribution
+[11:47] into a product of conditional probabilities.
+[11:51] And you model each of these conditional probabilities.
+[11:53] The benefit here is that each of these conditional probabilities
+[11:56] is a distribution, is a conditional distribution,
+[11:59] but the choice of x2, for example, here is only v.
+[12:03] You have v choices here.
+[12:05] You only have to have a softmax or largest
+[12:09] over v choices for each of these.
+[12:11] So each of these will be, eventually,
+[12:13] you will see is some kind of like,
+[12:17] you have some logics and you apply some softmax,
+[12:18] you get a proper distribution over V choice.
+[12:22] So that's what we're gonna do.
+[12:24] So basically each of this will be parametrized
+[12:28] by a new network.
+[12:30] The input will be after the conditioning,
+[12:33] right, so the input here is the X1 and X2,
+[12:34] and output is the distribution of X3.
+[12:37] And this input-output relationship is modeled
+[12:40] by a neural network, which is a transformer.
+[12:46] Okay, so that's what we are going towards.
+[12:49] How do we model each of these conditional distributions?
+[12:56] So basically we're gonna describe
+[12:57] a conditional distribution P of P sub theta Xt
+[13:00] given X1 up to Xt minus one.
+[13:03] So, before going into details, let's treat this as kind of like a black box first.
+[13:12] And let's first kind of like discuss a little bit about, you know, the boundary, right, in some sense.
+[13:19] So it's kind of like there are multiple layers here.
+[13:21] So the typical way to parameterize this is the following.
+[13:26] So you use a transformer.
+[13:27] So basically what happens is that you have a sequence x1 up to xt.
+[13:32] and so first of all these are discrete IDs right so each of this means an ID for the token
+[13:40] you first have to turn them into some numerical numbers so the first step is that you say I'm
+[13:47] going to turn this into an embedding e of x1 and so basically I turn each of the token x into
+[13:54] Xt into embedding of Xt. And what is the embedding? Embedding is a d-dimensional vector in the
+[14:05] Euclidean space. And this embedding is trained. So basically you don't know what the parameters are,
+[14:10] you will just parametrize it as unknown numbers and you train the model to find the right numbers
+[14:17] for these embeddings.
+[14:20] So every token in the vocabulary
+[14:24] will have corresponding embeddings.
+[14:27] So basically, you're going to have
+[14:30] a sequence of embeddings, E1, E2.
+[14:34] This is the embedding for the first token,
+[14:35] embedding for the second token,
+[14:36] up to the embedding for the last token.
+[14:39] And in this lecture, I think we're going to use row vectors
+[14:41] because I think when you get into the implementations,
+[14:45] every vector is actually row vectors in the Python code,
+[14:49] even though in mathematics people often use column vectors.
+[14:52] So I thought about this and I thought just for this,
+[14:56] for large English model sections,
+[14:57] we'll just always use row vectors,
+[14:59] which is more consistent with the practice.
+[15:01] It looks a bit weird to me actually,
+[15:04] from a mathematical perspective.
+[15:05] I mean, if you read the papers,
+[15:06] many of the papers do use column vectors,
+[15:08] but I think we'll just use row vectors
+[15:10] to be consistent with the code.
+[15:11] So basically every embedding is a row vector,
+[15:14] And then you have this embedding matrix.
+[15:18] So this is, you have V of them,
+[15:23] and each of them is of dimension D.
+[15:24] So you have this matrix.
+[15:26] And to read off which row you are,
+[15:28] you just have to multiply,
+[15:30] either you just read off the ID, right?
+[15:31] So if you have the fifth token,
+[15:33] you just read the fifth row,
+[15:34] or you can multiply this matrix with an indicator vector
+[15:38] to gather that row, which is the same thing.
+[15:40] Anyway, so we'll just read off from this embedding matrix,
+[15:43] with the corresponding embeddings for each of the token.
+[15:46] So you get e of x2 up to e of xt.
+[15:51] And I think in many cases,
+[15:55] often people append, prepend,
+[15:58] a begin of sentence token,
+[16:00] which is just a fixed token in the very beginning.
+[16:03] This is kind of like not always necessary.
+[16:05] In some cases, you just don't do it.
+[16:07] In some cases, you do it.
+[16:08] But let's probably just introduce that.
+[16:10] You have a begin of sentence token,
+[16:12] which is one of the special tokens in this vocabulary.
+[16:15] Often, actually, what happens is that your vocabulary
+[16:18] is bigger than what is needed.
+[16:19] You always reserve a few tokens, actually, maybe
+[16:22] a thousand tokens for special tokens
+[16:25] that you can introduce for special purposes.
+[16:30] And you can introduce this begin of sentence token as x0,
+[16:33] which is always the same.
+[16:35] And then you turn them into embeddings.
+[16:38] And then what you do is that you go through this transformer,
+[16:41] which I will discuss in the later half of the lecture.
+[16:44] So this is a transformer.
+[16:48] For now, you just think of this as a new network,
+[16:50] which does a lot of computation, machine application,
+[16:53] tensions, which I'm gonna discuss.
+[16:55] A lot of operations, and then you output
+[16:58] some logits of, like you output some kind of logits
+[17:03] at each of the locations.
+[17:08] So each of these logits is supposed to describe
+[17:10] the conditional distribution before the softmax.
+[17:14] So basically,
+[17:21] what you do is you say the probability of,
+[17:25] so let's just, you say each of this U1 is,
+[17:30] let's call this U1 U theta X0,
+[17:34] and then P of X1 is
+[17:37] modeled as just the softmax.
+[17:44] This distribution P of xi is the,
+[17:47] x1 is modeled as the softmax of f theta x0.
+[17:54] So the first distribution, which is not conditional,
+[17:58] you just get the output from the x0,
+[18:01] you get some logic.
+[18:02] So this ui is in dimension v,
+[18:06] and you take a softmax, you get a probability vector.
+[18:09] So this is a probability vector
+[18:11] in this simplex of dimension V.
+[18:18] So after taking a softmax,
+[18:21] the sum of the entries is 1
+[18:22] and all of the entries are non-negative.
+[18:25] So then this is your probability for x1.
+[18:27] This is the distribution.
+[18:28] Technically, I think the distribution of this
+[18:29] is equal to softmax.
+[18:32] And then the same thing,
+[18:34] when you have x2,
+[18:36] given x1, you say this is equals to softmax of u2,
+[18:44] where u2 is the output at the second position.
+[18:48] And u2, we'll just call u2 the same as,
+[18:51] so we call u2 the output of this model
+[18:58] given x0 and x1.
+[19:04] So each of these UIs is basically the output for the sequence before it.
+[19:17] So UT plus 1 is F theta X0 up to Xt.
+[19:23] So basically, generically, P of Xt given X1 of Xt minus 1
+[19:30] is the softmax of ut, is it ut or ut plus 1?
+[19:40] ut plus ut, yes, ut, which is the softmax of f theta x0 to x2.
+[19:51] t minus 1.
+[20:00] Okay, any questions so far?
+[20:03] So I particularly chose it to index at one, yes.
+[20:10] Okay, so that's on the right.
+[20:13] Yes.
+[20:14] U is just a vector,
+[20:19] I think I can just call U,
+[20:21] I think it's kind of like I can just call U F theta x zero,
+[20:24] it's the same thing.
+[20:25] I'm not, did I answer the question?
+[20:27] Yeah, we're like .
+[20:43] So, oh, I think maybe that's the,
+[20:47] so I'm just using I of theta x0, x1
+[20:51] as a more explicit way to represent UI
+[20:55] because I'm trying to express the dependency.
+[20:58] So basically, I'm saying like a, basically,
+[21:03] I think they are the same thing.
+[21:04] Like, it's just there are no difference at all in some sense.
+[21:06] It's just how you view it, right?
+[21:07] In one way, you just say, oh, I need a notation for the vector.
+[21:11] And the other way, I need to interpret this vector
+[21:13] as a function of the inputs.
+[21:16] Right, right.
+[21:16] Yeah, I mean, that part is here.
+[21:18] Oh, OK, OK, OK.
+[21:19] So maybe I didn't have a question.
+[21:25] There's a probability of .
+[21:32] I mean, okay.
+[21:33] There's a probability of like seeing that .
+[21:38] I'm just trying to understand like,
+[21:47] and like, it's probably the one thing there.
+[21:52] The algorithm is the .
+[21:55] We just practically predict the .
+[22:00] Yes, yes, yes.
+[22:01] So I think maybe, I'm trying to figure out
+[22:04] what's the question here.
+[22:05] So I think maybe what they're asking is the following.
+[22:09] So maybe let's take this one, right?
+[22:12] So this is a vector.
+[22:14] This is a vector in dimension v, so in a vocabulary size.
+[22:20] And you have to take a softmax, it's a sequence of numbers which are all non-active and they sum to 1.
+[22:29] And what this really means is that p theta of x t is equal to 1, given x1 up to x t minus 1.
+[22:38] the chance to see the first token under this probabilistic model,
+[22:42] paramatched by theta, is equals to,
+[22:44] this is a vector, the first entry of this vector, right?
+[22:49] It's equals to softmax f theta x0 up to xt minus 1,
+[22:57] indexed by 1.
+[22:57] This is the first entry of this vector.
+[23:00] And you have many, many other entries, right?
+[23:01] Each entry is, like, you have another entry,
+[23:04] softmax f theta, sorry,
+[23:08] 2, and that is equals to P theta of Xt is equal to 2, the chance of seeing the second token given
+[23:22] X1 up to Xt minus 1. And you have so on and so forth. Does that answer the question?
+[23:29] V, yeah, this V absolute value is the size of the vocabulary.
+[23:35] OK.
+[23:37] So is this like a mass attention?
+[23:39] Because the models are conditional on the previous one
+[23:42] that's not accurate, right?
+[23:44] Yep.
+[23:45] Yep, so this is a causal model so far.
+[23:47] But I haven't defined the transformer yet.
+[23:49] But I'm insisting that this is only, so guys,
+[23:52] this is one of the reasons I'm using this notation.
+[23:54] So I'm insisting that ut is only a function of x0 and x2 minus 1,
+[23:59] but not a function of the later inputs.
+[24:04] But that will be guaranteed when we introduce
+[24:08] the exact inner working of this transformer.
+[24:27] Okay, good question.
+[24:27] So the second question is easier to answer.
+[24:30] So the embeddings is only a property of this x, right?
+[24:34] You don't have to see any other things.
+[24:35] It's just actually, it's literally,
+[24:37] if this is the first token, then you just
+[24:38] read the first row of this matrix.
+[24:40] If this is the 10th token, you use the 10th row,
+[24:43] and that's your embedding.
+[24:43] No NRL dependencies.
+[24:45] And while we are writing this as functions of the x,
+[24:48] but not an embedding, that's just the, it's just a,
+[24:53] sometimes the embedding is the inner working to some degree.
+[24:56] I'm just trying to give you more,
+[24:57] I'm trying to unpack it a little bit.
+[24:59] So if you don't have to unpack it,
+[25:01] you just work, you can work with the text.
+[25:03] That's just the representation.
+[25:06] And it's one to one, so in some sense,
+[25:07] there's no difference.
+[25:13] OK, so this is a full description
+[25:15] of the probabilistic model.
+[25:16] Once you have this probabilistic model,
+[25:17] you can compute the maximum likelihood given any data.
+[25:19] We can say, I have a data point, a sequence of data.
+[25:23] I can see under this probabilistic model, p theta,
+[25:26] what is the chance of seeing this data.
+[25:30] So that's what you need for computing,
+[25:32] do the training, right?
+[25:33] You need to compute the likelihood,
+[25:35] and then you maximize the likelihood
+[25:37] as a function of theta, right?
+[25:39] So, and let's briefly discuss for generation, right?
+[25:44] So suppose you already have the generational decoding.
+[25:50] Suppose you already have the model,
+[25:52] then a model theta, then what do you do?
+[25:55] So as you can see, the most natural thing
+[25:58] is you just keep generating x1, x2, x3, so on and so forth.
+[26:02] You just say, I'm going to generate x1 first from this,
+[26:05] you know, p, say, softmax, softmax, you know,
+[26:13] f theta x1 up to x0 up to xt, x, I guess I just did right.
+[26:20] Generically, so we generate xt minus 1 from f theta x0 up
+[26:26] to xt minus 1.
+[26:27] You can do this sequentially.
+[26:28] Sometimes people draw this in this way.
+[26:29] So you say, oh, you have x0,
+[26:31] you first go through the transformer,
+[26:35] and you get x1,
+[26:36] and you feed x1 back to this transformer.
+[26:40] Right, so,
+[26:42] and then you generate x2
+[26:46] by sampling from this software,
+[26:48] and then you feed back.
+[26:49] So that's kind of why it's called autoregressive,
+[26:51] because you have to,
+[26:53] like when you are generating,
+[26:54] you don't have the sequence, right?
+[26:56] When you are computing a log likelihood,
+[26:58] you already see the whole sequence.
+[26:59] Just trying to figure out what's the chance
+[27:01] of seeing this sequence.
+[27:02] But when you are generating, you start with nothing.
+[27:04] And then you have to generate your sequence yourself.
+[27:06] And that's why you start with the beginning of sentence
+[27:10] token, and then you generate first token.
+[27:12] And then you give the first token back to the transformer
+[27:14] and compute this softmax.
+[27:16] And then you generate second token.
+[27:19] You do a sampling to generate second token,
+[27:20] and you give it back, and you keep doing this.
+[27:23] So that's the autoregressive generation.
+[27:28] And sometimes, this generation only
+[27:31] start from certain parts, because in many cases,
+[27:34] you are not generating from nothing.
+[27:37] So you are given maybe a few tokens.
+[27:39] Maybe you are given, so sometimes it's called prompt.
+[27:43] So prompt is like something the models are given.
+[27:45] Maybe like a question, instructions, so and so forth.
+[27:48] You say you are given x-men up to x-k.
+[27:51] And then the model is supposed to complete the generation,
+[27:55] so it starts with xt plus one.
+[27:56] So xt plus one, so this is given.
+[28:00] And then you start with xt plus one,
+[28:02] you first generate xt plus one from this softmax
+[28:05] of the f theta x one up to x k,
+[28:10] and then you generate xt k plus two,
+[28:14] and then you do the same thing.
+[28:15] So it doesn't have to be always from the beginning.
+[28:18] And then there's another small thing,
+[28:20] which is that when you generate, you don't necessarily
+[28:23] have to always follow the same model.
+[28:26] And there's one thing that you can deviate from it,
+[28:28] which is that you can add additional temperature
+[28:34] where you say, as opposed to generating
+[28:39] from the original probabilistic model,
+[28:42] I'm going to divide this by a temperature T, tall, or T
+[28:46] sometimes.
+[28:49] And what does this mean is that you don't change the orders between these choices.
+[28:56] So this f theta is a vector, a V-dimensional vector
+[29:01] that describes the largest for each of the tokens in the vocabulary.
+[29:05] And when you divide by tau, you don't change their relative orders.
+[29:08] The bigger ones are still bigger, the smaller ones are still smaller,
+[29:11] but you change the scale.
+[29:14] So for example, before you could have like a, so suppose f theta x0 up to xk is equals to,
+[29:26] let's say, maybe like 2, 1, minus 1, something like this. And if you divide by tall, let's say
+[29:36] suppose you divide by tall, which is very, very small. Suppose tall is almost 0. Then after
+[29:40] dividing by tau, like if you divide by tau, then what happens is that maybe this becomes 200.
+[29:46] This becomes 100. I'm giving you a concrete example, which is a little bit unrealistic,
+[29:51] but to demonstrate a point. And what's the difference between the softmax of this vector
+[29:56] versus the softmax of the readjusted vector? The difference is that the softmax of this is much
+[30:02] sharper. So maybe let me just give you an example here. So if you just have, let's say, maybe let's
+[30:08] have three dimensions so that it's easier to demonstrate a point. So if you do softmax of this
+[30:17] vector of , what happens is that you get, in some sense you get exponential 2 over
+[30:31] exponential 2 plus exponential 1 plus exponential minus 1.
+[30:37] That's the after softmax was the probability of the first token, right?
+[30:42] And the second token will be exponential 1,
+[30:46] exponential 2 plus exponential 1 plus exponential minus 1.
+[30:52] And the third one will be the same denominator,
+[30:55] the different numerator, right?
+[30:57] So that's the softmax of this.
+[31:00] But if you take the softmax of the 200, 100, minus 100,
+[31:03] suppose you do that,
+[31:08] then this will give you exponential 200
+[31:15] versus exponential 200 plus exponential 100
+[31:21] plus exponential minus 100, blah, blah, blah.
+[31:26] So what's the difference here?
+[31:28] The difference is that in terms of the three numbers,
+[31:30] in terms of the order, it's always like this is bigger than this,
+[31:33] this is bigger than this, right?
+[31:34] Because two is bigger than one, one is bigger than minus one,
+[31:37] the order is always maintained.
+[31:39] But the relativist scale is different,
+[31:45] because here you can see exponential 200 is way, way bigger than exponential 100.
+[31:50] The difference is so astronomical.
+[31:53] The difference is too big,
+[31:55] so that these two numbers are just so small
+[31:57] compared to exponential 200.
+[31:59] So they are even negligible.
+[32:01] So basically, in this calculation,
+[32:03] these two numbers don't even have to show up here.
+[32:05] It don't even matter.
+[32:06] So you just get one.
+[32:07] So basically, the first token will just have probably
+[32:09] almost exactly one, maybe 0.9999 something.
+[32:12] And then if you look at the second entry,
+[32:15] which is exponential 100
+[32:17] divided by exponential 200 plus exponential 100
+[32:23] plus exponential minus 100.
+[32:27] Again, everything is negligible
+[32:29] compared to exponential 200.
+[32:31] So this is not very useful.
+[32:32] This is not very useful.
+[32:33] This is kind of like close to zero.
+[32:35] So basically, this entry will be zero.
+[32:37] So that's why after you divide by tall
+[32:40] to make this bigger,
+[32:41] then this is just approximately 1, 0, and 0.
+[32:45] So that's what I mean by it's much sharper.
+[32:47] So you sharpen the distribution
+[32:50] to make it most of the distribution
+[32:52] to be the probability mass to be on the most likely token.
+[32:56] However, here, expansion of two and expansion of one
+[32:59] are not that different.
+[33:00] If you compute this, you'll get something like maybe
+[33:03] the first one will be like maybe 0.7,
+[33:05] the second one will be 0.3.
+[33:06] I don't know.
+[33:07] We can use a calculator to see.
+[33:09] But it will still be like this one is bigger than this,
+[33:11] and the second one is bigger than the third one,
+[33:13] but it won't be like all the masses on the first token.
+[33:17] So basically what I'm trying to say is that
+[33:18] if tau is a small number,
+[33:20] so that you amplify the lodges,
+[33:24] then you are sharpening the resulting distribution
+[33:26] to make it more like a similar state distribution.
+[33:28] And then as a result, you are just generating,
+[33:32] you are just sampling from the most likely token.
+[33:35] You are taking the max as opposed to sampling from it.
+[33:39] And that's actually what people actually do.
+[33:44] They say, basically, I think actually,
+[33:47] in API call, you have the choice to choose the temperature.
+[33:51] And if you choose a small temperature,
+[33:52] it means that you want more deterministic generation.
+[33:55] If you choose a temperature to be zero,
+[33:56] it means that your generation
+[33:57] will just be always deterministic
+[33:59] every time you take the largest, most likely token,
+[34:04] and then keep going on, right?
+[34:05] And of course, you can also change the temperature
+[34:07] to be smaller than, bigger than one,
+[34:10] which makes the distribution more softer,
+[34:12] so that you focus on more the long tail,
+[34:15] like you can generate more tokens from the tail,
+[34:18] so you have more stochasticity and uncertainty in your generation.
+[34:21] Sometimes that's useful because you want to encourage
+[34:24] some diversity in your generation, and you do that.
+[34:27] Especially in the RL, sometimes you have to do that.
+[34:31] Cool.
+[34:32] Okay, sounds good.
+[34:34] And sometimes there are also other ways of sampling,
+[34:36] which is probably I shouldn't go into details.
+[34:39] There are some notes in the lecture notes.
+[34:41] So another way to do it is that you,
+[34:45] this vector right now, I have three dimensions,
+[34:47] but actually it's like a,
+[34:48] the dimensionality is V, right?
+[34:50] Which is like 250 or something.
+[34:52] You can take top K
+[34:53] and then drop all of the other dimensions.
+[34:56] So you may sample from the most likely K tokens
+[34:59] and you renormalize the distribution.
+[35:01] So basically the first K tokens
+[35:03] may not cover all the probability mass.
+[35:07] But still, that's probably easier to generate
+[35:09] because you don't want to generate two rare tokens.
+[35:12] So you just drop everything below top K
+[35:14] and then generate.
+[35:17] Okay, sounds good.
+[35:19] So I think I'm probably...
+[35:26] And then, okay, so once you have...
+[35:29] So this is the generation.
+[35:30] And then for the training,
+[35:32] I think I already kind of like described it a little bit.
+[35:36] So when you do the training,
+[35:37] you just compute a log likelihood, the negative log likelihood, the negative log likelihood,
+[35:55] and you say this is a log. So if you have an example x1 up to xt, so the minus log p theta x1
+[36:04] up to Xt, capital T, is just minus log, the product of all of this, right? P theta X1,
+[36:16] P theta X2 given X1, so on and so forth.
+[36:27] And this is the minus the sum of the log of the P of Xt given X1.
+[36:34] up to xt minus 1. And then you change this to log of the softmax of p1 of this f theta.
+[36:53] And here this xt is a particular choice of xt, right, which is seen in the data. So that means
+[36:59] you are looking at the XT's entry of the softmax.
+[37:02] This softmax will give you the probability
+[37:04] for every possible tokens, and then you are only interested
+[37:07] in the probability to see that particular token XT.
+[37:10] So that's why you're looking at XT index of that vector.
+[37:14] And that's a single scalar.
+[37:16] You take the log and you take the sum over T,
+[37:19] and that's your loss function.
+[37:22] And then you can optimize this loss function by, for example,
+[37:25] some optimizers like SGD or IDEM.
+[37:29] We didn't discuss item in this lecture, which is the extension of the SGD optimizer,
+[37:33] but mostly you can just call the optimizer as a black box to optimize the loss function.
+[37:54] It's actually not the last one, right?
+[37:55] because this is sum from t to one to capital T.
+[38:00] The little t and larger t.
+[38:10] OK, sounds good.
+[38:13] OK, so then in the next 30 minutes,
+[38:16] I'm going to tell you what this function f is, right?
+[38:20] Maybe what's hidden in this transformer?
+[38:22] What's the operation we have to do to compute the largest here?
+[38:29] And it's pretty complicated.
+[38:31] So it probably takes more than 30 minutes,
+[38:33] but I will see how much I can do.
+[38:36] So any questions before that?
+[38:43] Okay.
+[38:44] So at a high level, this transformer has multiple layers.
+[38:47] and so you start with like ex1 up to ext
+[38:52] and you first apply a so-called attention layer
+[38:56] which I will define
+[38:59] and then you apply the so-called MLP
+[39:01] so first of all the attention layer
+[39:05] the attention always takes in a sequence of vectors
+[39:08] and output a sequence of vectors
+[39:10] so you output a bunch of vectors
+[39:13] at each position you output one vector
+[39:14] and then each of these vectors will go through an MLP.
+[39:19] MLP means like a multilayer perception,
+[39:21] which is just a two or three layer network.
+[39:25] And each of these vectors will go through this MLP
+[39:28] and then you apply another attention.
+[39:33] This attention will take in many, many vectors
+[39:36] and then output a sequence of vectors.
+[39:40] And then you do the MLP.
+[39:41] So that's the high level structure of this attention.
+[39:49] And eventually you have to output, remember, eventually you have to output a sequence of
+[39:53] vectors.
+[39:54] So basically you do enough of these alternations between these two and eventually you have
+[39:58] this MLP and you output some vectors U1 up to UT.
+[40:06] And you alternate between attention and MLP.
+[40:10] That's the hell of an idea.
+[40:12] And I think we'll focus most of our energy
+[40:16] on defining our attention, which is kind of like the most
+[40:19] new thing, right?
+[40:20] Because MLP is just a two-layer network
+[40:22] with some special kind of gating or some kind of special
+[40:26] activation functions.
+[40:28] And another small thing is that the MLP
+[40:31] are sharing the parameters, and they are applying
+[40:33] independently.
+[40:34] So each of these vectors is processed
+[40:37] by the MLP in an independent fashion.
+[40:39] there's no kind of dependencies between positions when you apply the MLP.
+[40:43] They are just very separate operations. So the only way that you are using, you are kind of like
+[40:49] you fuse the input from different positions or different time steps is the attention. So the
+[40:54] attention will look at all those vectors and process a little bit and then output a sequence
+[40:59] of vectors. And MLP is very parallelized and parallelizable and independent. Okay, so now let's
+[41:08] This is the final test.
+[41:15] This entire thing will be true as a single system.
+[41:17] So basically, once you define the architecture,
+[41:19] you apply the auto differentiation.
+[41:22] You train this whole thing as a gigantic network,
+[41:26] yeah, end to end.
+[41:27] But it's like a little different ..
+[41:29] that when you run a little bit of efficiency so far,
+[41:31] which is like one, like,
+[41:32] like, like, like,
+[41:34] like, like,
+[41:35] yeah, but the auto differentiation still works.
+[41:39] So the auto differentiation,
+[41:41] I think as we discussed,
+[41:42] if you remember, like,
+[41:44] it's kind of like fundamentalist claiming
+[41:45] that if you have a way to compute your forward path,
+[41:48] as long as there are compositions
+[41:50] of many, many different components,
+[41:51] you know, like, basic components,
+[41:53] you can compute a backward path the same way.
+[41:56] So here, it's indeed a composition
+[41:58] many, many small arithmetic operations.
+[42:01] Because as you see, the attention layer
+[42:04] has many small matrix modifications,
+[42:06] and the MLP has many matrix applications,
+[42:08] and you can automatically differentiate.
+[42:17] So now let's talk about attention.
+[42:28] So for tension, one thing to remember first is that the type signature is that you input a sequence of vectors to the tension, and then you output a sequence of vectors.
+[42:41] And we're going to start with the so-called single-head attention.
+[42:51] So the single-head attention is like this.
+[42:53] So you first have an input as a sequence of vectors.
+[43:00] Let's say h1 in up to ht in.
+[43:07] And you want to output h.
+[43:10] I'm trying to define the tap signature.
+[43:13] So you output h1 out up to ht out.
+[43:19] And what you do is the following.
+[43:21] So the first thing is that you turn these input vectors
+[43:26] into a set of query, key, and value vectors.
+[43:32] So basically, you say H1N.
+[43:40] You multiply it by a matrix, WQ.
+[43:42] This is a weight matrix.
+[43:43] This is a parameter.
+[43:46] And by the way, let's treat all of this as row vectors,
+[43:49] and then all the multiplication is on the right-hand side
+[43:51] as opposed to on the left-hand side.
+[43:53] So every vector is a row vector,
+[43:55] and you multiply on the right-hand side,
+[43:56] you get another row vector.
+[43:58] So this H in, let's say this is like a dimension D, R D.
+[44:03] Let's say R1 by D,
+[44:05] and this WQ is in dimension...
+[44:09] So this is R1 by D,
+[44:11] and this WQ is in R D by D H.
+[44:17] dh is a parameter, it's a dimension you choose.
+[44:22] And then the resulting thing is called q1,
+[44:28] which is in dimension dh, maybe 1 by dh,
+[44:32] depending on how you think about it.
+[44:35] And you can do this for every index, every time step.
+[44:38] Here I'm only doing it for time step 1.
+[44:39] You can do it for time step t, so you have qt.
+[44:42] So basically this gives you a sequence of vectors,
+[44:45] Q1 up to Q T, each of them is in dimension 1 by dH.
+[44:52] And these are called queries.
+[44:56] And you do the same thing for keys and values.
+[44:59] So keys, let me define them first.
+[45:02] So it's the same thing.
+[45:04] You say the HTN multiplied by a so-called key projection matrix, WK,
+[45:11] and that's your KT.
+[45:12] And the dimensionality, I think, is the same.
+[45:14] So this is also in the same dimension,
+[45:17] and the kt is in the same dimension.
+[45:18] And it's the same thing for value vectors,
+[45:21] not value functions, ht in times w v.
+[45:28] So in some sense, maybe this is the right time
+[45:33] to talk about some of the intuitions for the tensions,
+[45:36] which is not that obvious because eventually it just
+[45:39] works, nobody really knows exactly how it works.
+[45:42] But the rough intuition is that you
+[45:44] have to have some interactions between these inputs
+[45:47] to make it meaningful.
+[45:48] Because if everything is independent,
+[45:49] then you're just dealing with all the time steps
+[45:51] independently.
+[45:52] So that's why you have to have some interactions.
+[45:56] And interactions sometimes is about how do you retrieve
+[46:00] or pay attention to each other.
+[46:03] So that's actually how the word attention come from.
+[46:05] So basically, when you are processing maybe this vector,
+[46:09] you probably should attend to or pay attention
+[46:11] to some other vectors which have relevant information.
+[46:15] And which one you pay attention to
+[46:17] is what we're going to decide here
+[46:19] with this query and key and vectors.
+[46:21] So in some sense, intuitively, what attention will do,
+[46:24] which I didn't show you yet, is that you try to,
+[46:29] for processing each of the vectors,
+[46:31] you try to figure out which are the relevant vectors that
+[46:34] has relevant information.
+[46:36] And then you pay actual attention to those vectors.
+[46:39] And then you compute the output
+[46:41] depending on those special vectors to some degree.
+[46:45] So that's what we are trying to do.
+[46:48] And to kind of decide which one you pay attention to,
+[46:52] you have to prepare these queries and key and value vectors.
+[46:56] And how do you use them?
+[46:57] So use the query and keys as a way to decide
+[47:00] which one you pay attention to.
+[47:02] So basically, let's say,
+[47:03] suppose you have the t's position, right?
+[47:07] I want to decide what the t's position should pay attention to.
+[47:13] And the way to do it is you say you compute the query, qt.
+[47:19] This is the query at t's position.
+[47:22] And you multiply the query with the keys at all the other positions.
+[47:28] So maybe I would just draw it.
+[47:30] So you have queries q1 up to qt.
+[47:34] And one of them is q little t.
+[47:36] and you have k1 up to kt.
+[47:42] And you multiply q's with all the k's.
+[47:49] So you have q1 times k1 transpose,
+[47:53] qt times k2 transpose,
+[47:57] and qt times k capital T transpose.
+[48:02] And sometimes there's a scaling factor here
+[48:05] to kind of like normalize this in a way that makes it a little more kind of like well behaved.
+[48:11] But I think for the moment, you probably don't have to pay too much attention to the scaling factor.
+[48:15] So the important thing is that you are taking the inner product between Q's and each of the other K's.
+[48:20] And this Q T transpose K, Q K transpose is actually inner product because Q is a row vector
+[48:28] and K transpose is a column vector.
+[48:31] and you are taking the inner product between these row vectors and the column vectors
+[48:37] and you get one scalar out of it. So all of these numbers are real numbers, right? So this is in
+[48:47] RT. So you have T real numbers and then you take a soft max over these T real numbers to turn it
+[48:54] into a probability vector.
+[48:55] So then you say, I'm going to do a softmax.
+[49:01] It's a softmax of this whole thing.
+[49:14] And now you get what?
+[49:15] You get this is a vector.
+[49:17] The dimensionality here is rt.
+[49:19] And each of these, the outcome of the softmax
+[49:23] is a sequence of numbers, right?
+[49:27] And there are t numbers, and all of these numbers
+[49:30] are non-active, and the sum of them is 1.
+[49:32] So it's a probability vector over t positions.
+[49:35] And if you see a large number, it means that, let's say,
+[49:39] suppose this number is big, it means
+[49:41] that this number is somewhat big compared to other ones.
+[49:44] It means that the q's and q's have more higher inner product.
+[49:49] And it means that you should pay more attention to k,
+[49:53] k1, right?
+[49:54] So basically, if any of these entries
+[49:55] is big, it means that intuitively, qt
+[50:01] needs to pay more attention to k1.
+[50:03] And that will be reflected by the probability vectors,
+[50:06] because the corresponding probability will also be high.
+[50:09] And so I think let's call this, I guess I have a notation here.
+[50:13] So let's call this, let's denote this to be pt1, pt2,
+[50:20] up to pt capital T.
+[50:23] So each of the Pti is non-active,
+[50:29] and the sum of the Pti over i from 1 to t is equal to 1.
+[50:33] So this is a probability vector.
+[50:36] And if any of these entries is big,
+[50:38] it means that we should pay more attention
+[50:40] to that particular position when processing the little t's query.
+[50:45] And then how does this relate to the final outcome?
+[50:49] So finally, once you have this,
+[50:52] then you say the output at t's position, which is a vector,
+[50:59] is using these probability vectors to weight the values.
+[51:05] The values is v's, which we are defining here, vt.
+[51:11] So you say it's pt1 times v1 plus pt2 times v2 plus ptt times vt.
+[51:22] So basically, if any of these probabilities is much higher,
+[51:27] then you are multiplying this high probability
+[51:31] with the corresponding value at that position.
+[51:34] So basically, you are using the V.
+[51:36] For example, if this number is very big,
+[51:38] then you are using V2 a lot in the output at time t.
+[51:48] So you determine them by multiplying the matrices.
+[51:51] and the matrices will be trained.
+[51:56] How do you attend to each other is also trained.
+[51:58] So you're only giving a template in some sense.
+[52:01] Like how, it may be that,
+[52:05] it could be that all of these are zero,
+[52:08] then you are not doing anything with it,
+[52:09] and then your new network,
+[52:10] the loss function will be not good,
+[52:12] but it's still a valid new network,
+[52:14] it's just the loss is not good.
+[52:15] So eventually you are gonna train the model to behave well,
+[52:20] So basically, the training algorithms
+[52:23] will choose the right W so that this mechanism
+[52:26] is doing the right thing.
+[52:43] So let's try to articulate.
+[52:45] I think it's a good question, but let's try to articulate
+[52:47] so that we can answer it.
+[52:49] So what's the, you are, so.
+[52:54] So I think you are asking why you need such architecture, but not just only using MLP,
+[53:21] for example, right? That's one way to rephrase the question. I think, so if you are only using MLP
+[53:29] in this way, suppose you remove all the tensions, you are only using MLP in this way, then there's
+[53:34] no interactions between different positions whatsoever. So there's no chance it's going
+[53:39] to work, right? You are just applying separate networks for each of the tokens. There's no
+[53:44] chance you can understand the dependencies, the meanings, right? Like there's no chance I can just
+[53:51] give you individual words and you can't send a sentence,
+[53:53] there's no chance, right?
+[53:54] So you do have to have a model that can read all the tokens
+[54:01] and study their kind of correlations and combinations,
+[54:05] so and so forth, right?
+[54:06] But there are other possible ways to deal with that.
+[54:10] For example, what if you use a gigantic MLP that takes in all
+[54:15] of this, maybe you'll concatenate all of them,
+[54:17] and you're taking one MLP, right?
+[54:19] So for example, you just concatenate all of these tokens, vectors, into one long vector, and you go through a network.
+[54:26] So there are several issues with that.
+[54:28] One is that you will have way too many parameters.
+[54:32] Because your sequence length may be sometimes even millions.
+[54:37] Then if you have a million by million matrices in your MLP, it's going to be way too big.
+[54:41] Right now the MLP is actually very small.
+[54:43] It only takes in a vector for one position.
+[54:46] It doesn't even depend on T.
+[54:47] And another thing is that not only the size of the MLP is big, but also the size of the MLP also changes over as you change the sequence length, which is also very undesirable.
+[54:58] Because, for example, if you tune with sequence length 1,000 and then you test with sequence length 1,001, then you have to change your parameter count, which is not good.
+[55:08] And here, if you really look into details, you will find out that the number of parameters doesn't depend on the sequence length.
+[55:17] You have this gigantic MLP that is too big to compute.
+[55:21] But you kind of know that there is some structure
+[55:25] because there are words that match other words.
+[55:28] So this is kind of trying to learn the structure
+[55:31] and make them more efficient for compute.
+[55:33] Exactly, right.
+[55:34] So you know that if you have sufficient compute,
+[55:38] probably a gigantic MLP will work.
+[55:40] If you have sufficient data so you don't overfit
+[55:42] and you have sufficient compute,
+[55:44] then there is some MLP that can actually solve this problem.
+[55:47] But that's too expensive.
+[55:49] So you need to prescribe some structure
+[55:52] so that you can reduce the complexity.
+[55:56] And this is the prescription we have.
+[55:58] But you still have to leave enough flexibilities.
+[56:01] You cannot just say, for example,
+[56:02] one way to do it is you just say less average.
+[56:05] Then there's no parameters.
+[56:06] You just prescribe too much.
+[56:07] You dictate too much.
+[56:09] Then that's not good.
+[56:10] So it's kind of like you strike a balance
+[56:12] between how much structure you should use
+[56:14] and how much flexibility you give the models to figure out.
+[56:19] Yeah.
+[56:22] Yeah, any other questions?
+[56:25] By the way, there is actually, in the history,
+[56:27] there was actually other ways to deal with this sequence.
+[56:30] For example, you can use a convolutional network on this,
+[56:33] which is kind of like MLP.
+[56:34] So you use MLP, but with a specific receptive field
+[56:39] so that each time you only see kind of like a window
+[56:42] I think there are still papers that says that that's not a terrible idea.
+[56:49] Actually, if you use a convolutional network, it actually can work to some degree.
+[56:52] It's just not as good as this one.
+[56:56] And also you can see there are also other, probably we'll talk about that later,
+[57:01] so there are other variants of tensions that does similar stuff but have better efficiency.
+[57:07] Anyway, so let's continue.
+[57:09] We are not done yet, actually.
+[57:11] this is only a so-called single head attention.
+[57:15] Actually, the real thing is a little more complicated.
+[57:19] But let's see.
+[57:21] Before I go into that, let's see.
+[57:27] So I think you can see the notation scale is very messy.
+[57:31] So let's try to simplify it a little bit
+[57:34] so that we don't have to always work with this messy notation.
+[57:38] So one typical way that people simplify this
+[57:40] is that you try to organize all the queries into a matrix.
+[57:47] Recall that each of the queries is a row vector.
+[57:49] And if you put them all in a matrix,
+[57:50] then this is a matrix of dimension t by dh.
+[57:56] And you can put all the keys into a matrix.
+[58:02] And you can put all the values in your matrix as well.
+[58:04] All right, so and then you can write this H out.
+[58:22] The output sequence factors as a kind of like, also as a matrix is, in some sense,
+[58:30] you do a softmax of the rho of this QK transpose divided by C matrix times V.
+[58:39] So here, basically this QK matrix, QK transpose matrix,
+[58:43] is the family of QI times KJ transpose divided by C.
+[58:50] So every entry is of this form, which is kind of like these guys.
+[58:56] And then if you do a rho softmax, that corresponds to this softmax.
+[58:59] and then if you multiply by v,
+[59:02] it means this linear combination.
+[59:04] I think we probably don't have enough time
+[59:07] to go into the details,
+[59:09] but you can double check.
+[59:11] It's just a very basic linear algebra.
+[59:13] It's just you are really ranging.
+[59:14] Like it's mostly just notations.
+[59:16] So this Q case divided by C matrix
+[59:18] is the inner product between the queries and keys,
+[59:21] and then you take a row-wise softmax
+[59:23] to get the probabilities.
+[59:24] So after the softmax, this matrix becomes some,
+[59:27] every row is a probability vector,
+[59:29] and then you multiply that with the V
+[59:31] to take the linear combination of Vs.
+[59:35] And there's one thing that we kind of cheat a little bit
+[59:39] here, which is that if you look at this architecture,
+[59:43] then it's not true that the T's output only depends
+[59:50] on everything before it.
+[59:52] There's no this kind of like a auto request of properties
+[59:55] yet, right, because the output at time t
+[1:00:00] depends on everything, right?
+[1:00:03] It depends on V capital T, even the last input.
+[1:00:06] V capital T is a function of the last input.
+[1:00:10] And so an output at time t depends on the input,
+[1:00:16] depends on Vt and it depends on ht in.
+[1:00:19] So basically there's no kind of like this dependency.
+[1:00:22] So then what you do is you say,
+[1:00:25] you introduce the concept of masking
+[1:00:27] to make sure that there's no,
+[1:00:31] this kind of like a wrong dependency you want.
+[1:00:34] So basically what you really want to do is that you just,
+[1:00:36] in some sense, for h little t,
+[1:00:39] you want to delete everything after time t.
+[1:00:43] So basically,
+[1:00:46] I say, before you have this,
+[1:00:48] you know, Pt vT plus Pt t vT, Pt capital T v capital T.
+[1:01:00] So basically you say these dependencies are invalid for me,
+[1:01:03] so I just don't have them.
+[1:01:04] So basically you just delete all of this.
+[1:01:07] And then you renormalize this piece
+[1:01:10] so that the sum of this piece got normalized to one.
+[1:01:13] So it's still a linear combination or convex combination
+[1:01:16] of the v even up to vT.
+[1:01:18] So that's pretty much what you do.
+[1:01:19] So you just say if the dependence is not good,
+[1:01:22] you just, in some sense, mask them out.
+[1:01:25] And mathematically, what you do,
+[1:01:27] or actually also implementation-wise,
+[1:01:29] what you do is through this masking,
+[1:01:31] which means that you add a masking here.
+[1:01:32] Maybe let's use a different color to sort of this.
+[1:01:48] So you add a mask in here, I think it's different, better color.
+[1:01:59] Okay, so you add a mask here so that you can mask out the, let me see, you can mask out half of this matrix.
+[1:02:10] So you have like a q1 k1 transpose, q1 k2 transpose, so on and so forth. And q1 k2
+[1:02:20] transpose is not valid in some sense, because you are looking, you are tending
+[1:02:23] to something you shouldn't attend, right? Q1 shouldn't be able to see k2. So
+[1:02:28] basically you add this masking matrix, what you add is that you add minus
+[1:02:33] infinity, you add minus infinity here.
+[1:02:39] And for q1 k3 transpose, you also add minus infinity,
+[1:02:45] so on and so forth.
+[1:02:47] And then in the next row, you have q2 k1 transpose,
+[1:02:51] which is good.
+[1:02:52] You have q2 k2 transpose, which is good.
+[1:02:54] And you have q2 k3 transpose, which is not good.
+[1:02:58] So you add minus infinity here, so on and so forth.
+[1:03:01] So basically, everything here will
+[1:03:03] be adding additional minus infinity.
+[1:03:06] So basically, this upper triangle part of this matrix
+[1:03:10] will be all minus infinity.
+[1:03:13] By adding minus infinity, it just
+[1:03:14] means that you turn it into minus infinity.
+[1:03:17] Any number added by minus infinity
+[1:03:19] is the minus infinity.
+[1:03:20] And then what happens is that, in other words,
+[1:03:23] it's kind of like you are just trying to add all of minus
+[1:03:28] infinity to all of this part.
+[1:03:30] And then when you turn all of this into minus infinity,
+[1:03:33] when you do the softmax, this part just doesn't help.
+[1:03:37] Doesn't change.
+[1:03:37] Doesn't, like, doesn't, by this part,
+[1:03:40] I mean everything after t, right?
+[1:03:44] So everything after little t, you
+[1:03:45] turn them into minus infinity.
+[1:03:46] And after you do the softmax, they become 0.
+[1:03:50] So because exponential to the minus infinity becomes, like,
+[1:03:54] so it becomes basically 0.
+[1:03:56] So that's why in this p, so everything after p t t,
+[1:04:04] everything after here will become 0.
+[1:04:06] And the sum of the rest will be 1.
+[1:04:09] So that's exactly how you achieve this,
+[1:04:11] because basically the linear combination
+[1:04:13] of the rest of the terms doesn't matter,
+[1:04:15] because their coefficients are 0.
+[1:04:16] Yeah, we are masking this because you shouldn't, in this autoregressive model, you don't allow
+[1:04:29] the output at time t to depend on anything that is after t. So you have to respect this kind of
+[1:04:36] like a sequential dependency. So, you know, in generation, you are not able to see the future
+[1:04:43] tokens to generate a current token. So every token can only depend on
+[1:04:48] everything before it. So that's why we have to mask it out.
+[1:04:56] Okay, we have, yeah, we are almost done there. Okay, so, okay, so this is the so
+[1:05:07] called single header tension. And we have to make it a little more complicated to
+[1:05:12] even finish the tension part. So then what we do next is that, maybe I see raise here.
+[1:05:20] So in some sense what we are doing here is that we have H1 in and HT in and we go through this
+[1:05:39] single head attention. I guess in a node I call it attention 1H, and you get this H out,
+[1:05:47] H1 out, up to HT out. That's what we defined so far. And in practice you have multiple copies of
+[1:05:59] this single head attention with different weight matrices. So you get another copy of the single
+[1:06:06] head attention.
+[1:06:08] Maybe let's call this single head attention one.
+[1:06:11] This is called single head attention two.
+[1:06:14] And they have the same input.
+[1:06:19] And then you get another copy of the output.
+[1:06:25] And here, by copy, I don't really mean literally copy,
+[1:06:27] because then it's not useful.
+[1:06:28] So the difference between this and this
+[1:06:31] is that the weight matrices are different.
+[1:06:36] So basically, this Wq, Wk, Wv for these two copies
+[1:06:42] of the tension are different.
+[1:06:43] So that's why they're not really literally copies.
+[1:06:46] They are just like you have another version of it.
+[1:06:58] Yeah, so in some sense, you should index this
+[1:07:00] by something else because the output will be different.
+[1:07:02] So maybe you should index this by,
+[1:07:07] let's say this is,
+[1:07:09] because this is the first attention you say H11 and HT1,
+[1:07:12] and this is H12, HT2.
+[1:07:15] And you also have another one,
+[1:07:17] and you get H13 up to HT3.
+[1:07:22] So when you have so many copies,
+[1:07:25] you have several sequences of vectors,
+[1:07:28] But eventually you only want one sequence of vectors.
+[1:07:30] So you have to combine them in some way.
+[1:07:32] And the way to combine them is that you concatenate
+[1:07:40] these three things.
+[1:07:43] So you concatenate h1, 1 out, h1, 2 out, h1, 1.
+[1:07:54] I think how many, each of these is called one head.
+[1:07:58] So you have let's say nH hat.
+[1:08:01] So this is attention n sub h.
+[1:08:06] So you concatenate all of these vectors,
+[1:08:09] and then you multiply that with another projection matrix,
+[1:08:14] and then this will give you the final h,
+[1:08:17] the output at one.
+[1:08:20] So that's the final output at position one.
+[1:08:24] You do the same thing for position two where you concatenate
+[1:08:27] maybe these guys, these guys,
+[1:08:32] and then you do a projection,
+[1:08:34] you get the output at position two.
+[1:08:37] So in some sense, this just gives you more power
+[1:08:39] to compute different kind of like,
+[1:08:44] kind of attention.
+[1:08:45] In some sense, I think actually in practice,
+[1:08:47] if you, I think the intuition is that
+[1:08:50] maybe each of these attention is doing,
+[1:08:52] single head attention is trying to pay
+[1:08:54] special type of like,
+[1:08:56] is doing some special type of job.
+[1:08:58] For example, maybe here is trying to find out
+[1:09:01] which entity in the past passage matters to me.
+[1:09:05] And here, this is trying to find out
+[1:09:08] what are the sentiments of the past passages
+[1:09:14] and which part of the sentiment matters to me,
+[1:09:17] so and so forth.
+[1:09:18] So each of these attention probably
+[1:09:19] per attention to different type of information.
+[1:09:22] And then eventually you aggregate the outcome
+[1:09:24] of all of this information
+[1:09:25] into one big vector and you project it into a single output.
+[1:09:35] Cool.
+[1:09:35] My input to the second attention is the output of the first one?
+[1:09:41] No, no, they are all parallel.
+[1:09:45] They are parallel and then you aggregate.
+[1:09:46] So, and all of this is in one of this.
+[1:09:50] And then, so basically in one of this you have multiple parallel heads
+[1:09:54] And then next round, you have another number of parallel has.
+[1:10:02] I think the number of has is maybe on the order of like maybe,
+[1:10:06] at most, 100, I guess.
+[1:10:10] Let me think about this.
+[1:10:11] I think something on that order, I think.
+[1:10:15] Okay.
+[1:10:15] Yeah.
+[1:10:16] It also depends on the model size, of course.
+[1:10:18] I think the biggest one, I don't know.
+[1:10:20] I don't know whether 100 is for which model size.
+[1:10:23] I think maybe for like a hundred billion paramilitar models,
+[1:10:26] we have a hundred hertz.
+[1:10:27] Yes.
+[1:10:28] Yeah.
+[1:10:29] Yeah.
+[1:10:30] Yeah.
+[1:10:31] Yeah.
+[1:10:32] Yeah.
+[1:10:34] Yeah.
+[1:10:36] Yeah.
+[1:10:38] Yeah.
+[1:10:43] Yeah.
+[1:10:52] Yeah, I think, I don't know exactly what's your proposal,
+[1:10:55] but maybe it sounds like a simplified answer,
+[1:10:59] but many of these proposals has been considered in various ways,
+[1:11:03] and some of them are for,
+[1:11:06] on most of them, for efficiency perspectives,
+[1:11:08] because eventually you can just have a,
+[1:11:10] like as we discussed,
+[1:11:11] if you really don't care about efficiency,
+[1:11:13] you can just have a generic, very gigantic network space.
+[1:11:16] So all of these kind of special structures
+[1:11:19] to try to use your parameters in the right way
+[1:11:23] so that you can use it more efficiently in some sense.
+[1:11:31] Okay, so...
+[1:11:33] And then...
+[1:11:36] Okay, so I guess let's try to...
+[1:11:38] Let's just give me two or three minutes
+[1:11:40] to talk about some very quick things.
+[1:11:44] So one thing is that actually when I draw this,
+[1:11:49] It's actually a little more complicated than just doing this.
+[1:11:52] So because there's also a residual part in this kind of how
+[1:11:57] to combine MLP with attention.
+[1:11:59] So actually, what you really do is that you say you apply.
+[1:12:07] So after you do the attention, you
+[1:12:14] do some kind of normalization here.
+[1:12:17] So there's a normalization layer.
+[1:12:20] Often this is using the RSM norm
+[1:12:22] that we briefly discussed in one of the new right-to-work
+[1:12:24] section.
+[1:12:25] And then you apply MLP, and then you add the residuals back
+[1:12:30] to this, kind of like in the residual right-to-work
+[1:12:32] that we discussed.
+[1:12:33] And then you go to the next layer.
+[1:12:35] And there are different ways to kind of like add residuals.
+[1:12:37] You can add the residuals after you do the attention
+[1:12:41] or before you do the attention.
+[1:12:42] So there's something called pre-norm and post-norm thing.
+[1:12:47] So I guess the details, you can check out the lecture notes.
+[1:12:50] So there's some kind of like orders
+[1:12:52] on how you when you apply a normalization,
+[1:12:53] the resist use, and the attention, so on and so forth.
+[1:12:56] And finally, I think one important thing,
+[1:12:59] especially for the next lecture about a system ML perspective,
+[1:13:04] is that we should try to quickly think
+[1:13:08] about the computational efficiency here,
+[1:13:11] and the memory footprint.
+[1:13:13] So how many operations we have to do,
+[1:13:15] especially as a function of t.
+[1:13:19] As a function of other things, it's actually
+[1:13:20] relatively easier because as a function
+[1:13:22] of the number of parameters, all of those
+[1:13:24] is kind of like it's all multiplicative and linear
+[1:13:26] in some sense.
+[1:13:27] The main important thing is what is the dependency on t?
+[1:13:31] And you can see that for each of the t's position,
+[1:13:34] you have to compute all of these inner products.
+[1:13:37] So for each of the position, you have to compute capital T
+[1:13:39] inner product.
+[1:13:41] And you have capital T of these positions.
+[1:13:45] So that means that you have to basically do a t-square
+[1:13:48] dependency.
+[1:13:50] So in other words, even this matrix itself
+[1:13:55] is a T by T matrix, capital T by capital T matrix.
+[1:13:58] And each of these actually requires some inner product.
+[1:14:02] So I think the dimension, if you still remember,
+[1:14:04] the qi's or the qt's are in r dh.
+[1:14:08] And you need to compute t-square of this inner product.
+[1:14:11] So basically, the number of operations
+[1:14:14] is t squared times dh.
+[1:14:16] Dependence on dh is less relevant,
+[1:14:19] less important to some degree.
+[1:14:20] The dependence on t squared is very important,
+[1:14:22] because this means that if you have capital T being a million,
+[1:14:26] it's going to take a million times squared operations,
+[1:14:29] which is prohibitive.
+[1:14:32] And this is one of the issues with the long context issues
+[1:14:35] probably I have heard of.
+[1:14:37] I think when you are using chat-GBT or cloud code,
+[1:14:39] you see the context.
+[1:14:40] And then after some point, they say,
+[1:14:42] let me compact my context.
+[1:14:43] And the reason is that you have to shrink your context.
+[1:14:45] Otherwise, your computational efficiency is too bad.
+[1:14:49] But of course, in the real production system,
+[1:14:52] it's not like all of this capital T is really.
+[1:14:54] There are other ways to reduce the dependencies.
+[1:14:57] I think in practice, I don't think necessarily
+[1:14:59] t squared is probably more closer to linear in t,
+[1:15:02] because there are other ways, variants of transformers,
+[1:15:05] that can reduce the dependency on t.
+[1:15:07] I think in the next Wednesday, we're
+[1:15:09] going to discuss a few things that
+[1:15:11] can reduce the dependency on T a little bit.
+[1:15:15] Exactly how we do it, we don't really know in some sense,
+[1:15:18] because there are a lot of open source papers
+[1:15:21] that propose different approach.
+[1:15:25] At least I don't know exactly which one is used
+[1:15:28] in open and a topic.
+[1:15:31] And another thing is that what is the memory usage here?
+[1:15:35] So the memory usage, at the first time,
+[1:15:38] you have to spend T squared memory,
+[1:15:40] because this matrix itself requires T squared memory.
+[1:15:44] But that actually can be reduced,
+[1:15:46] because you don't have to actually
+[1:15:48] compute the whole matrix one by one,
+[1:15:51] and then do the multiplication with V.
+[1:15:53] So in some sense, to some degree,
+[1:15:54] you can do some part of this matrix
+[1:15:56] and multiply with part of the V first.
+[1:15:58] And then you don't have to save that part of the matrix.
+[1:16:00] You can compute a second part.
+[1:16:02] And the idea is called flash attention,
+[1:16:05] probably you have heard of, which
+[1:16:06] is a way to reduce the memory footprint in these systems.
+[1:16:16] But some of these ideas do have a trade-off,
+[1:16:20] because when you reduce the, for example,
+[1:16:24] if you change your architecture to make the dependency on t
+[1:16:26] square better, for example, we'll discuss some of this
+[1:16:30] on Wednesday.
+[1:16:31] So if you change the architecture,
+[1:16:32] the dependency on t is better, but your architecture
+[1:16:34] is less expressive.
+[1:16:35] and then you may lose some performance to some degree.
+[1:16:39] Okay, sounds good.
+[1:16:40] Thank you.
+[1:16:41] Yeah, thanks.
+[1:16:47] So I guess, you know, I think you have, you know,
+[1:16:51] Chris has talked about a linear model,
+[1:16:52] which is kind of like you have a model
+[1:16:54] which is parametric by theta, and the input is x.
+[1:16:57] Let's just recall the notation
+[1:16:58] so that we are on the same page about notation.
+[1:17:01] I think Chris is using almost exactly the same notation.
+[1:17:04] You know, it cannot be exactly the same
+[1:17:05] because sometimes it's nonlinear model, right?
+[1:17:07] So, for linear model, we call that, you know,
+[1:17:10] if you have a linear model,
+[1:17:12] then the model is kind of like this, right?
+[1:17:13] You have theta, h, theta x,
+[1:17:15] which is equal to theta one x one plus theta two x two
+[1:17:20] up to theta d x d, where x is the input,
+[1:17:25] which is a d-dimensional vector,
+[1:17:27] and theta is the parameters,
+[1:17:28] which are also a d-dimensional vector.
+[1:17:31] And once you have nonlinear models,
+[1:17:33] what does that mean?
+[1:17:34] you know, generally nonlinear just means that
+[1:17:36] as long as this form is nonlinear,
+[1:17:38] then it's nonlinear.
+[1:17:39] And here we are mostly talking about
+[1:17:42] nonlinear in the parameters,
+[1:17:43] because if it's nonlinear in the data,
+[1:17:45] it's not nonlinear enough in some sense.
+[1:17:47] So suppose you have something like
+[1:17:49] theta one x one square plus theta two x two square,
+[1:17:54] so on and so forth, so the dxd square.
+[1:17:57] I think we didn't talk about these kind of models,
+[1:17:59] you know, because we skipped them,
+[1:18:03] in some sense in a new version,
+[1:18:04] but this is not sufficient nonlinear to be interesting
+[1:18:07] because you can just define new data,
+[1:18:09] which is the square of the old data.
+[1:18:11] So suppose you say, I'm gonna replace this by z1,
+[1:18:14] and replace this by z2,
+[1:18:16] and then it still becomes a linear model.
+[1:18:18] And that way you are not learning,
+[1:18:19] you are not trying to find out what are the,
+[1:18:22] you are trying to learn the theta i's, right?
+[1:18:24] You're gonna figure out the parameters of theta i.
+[1:18:26] You don't really have to figure out,
+[1:18:28] there's no learning on zi's, right?
+[1:18:30] So whether it's zi or xi squared,
+[1:18:32] it doesn't really matter.
+[1:18:33] Right, so that's why this is not exactly
+[1:18:35] what we're talking about,
+[1:18:35] even though some people will say
+[1:18:36] this is still a nonlinear model,
+[1:18:37] but this is not exactly what we are talking about.
+[1:18:40] We are talking about cases like you have
+[1:18:41] theta one squared, for example,
+[1:18:43] x one plus theta two maybe.
+[1:18:46] You know, I'm just giving an example,
+[1:18:47] something like this, right?
+[1:18:47] Whatever nonlinear model you can write,
+[1:18:49] as long as nonlinear is called nonlinear model.
+[1:18:52] Okay, so of course, you know,
+[1:18:54] the real model we are talking about
+[1:18:55] is not like this, this is just one example.
+[1:18:58] So the model we are gonna talk about
+[1:19:00] is neural networks,
+[1:19:01] which is more structured and more specialized way.
+[1:19:06] Anyway, so, but before talking about new networks,
+[1:19:09] let's talk about how do you learn nonlinear models,
+[1:19:12] and what's the kind of the framework.
+[1:19:15] This is in some sense mostly just recalling
+[1:19:17] what Chris was talking about,
+[1:19:19] with a little bit twist about the model.
+[1:19:21] So basically the model can be a general function,
+[1:19:23] as opposed to a linear function.
+[1:19:26] So let's just quickly recall some of this.
+[1:19:29] So let's say you have a dataset.
+[1:19:31] I think Chris probably mentions the concept of dataset,
+[1:19:34] which is a final data point with pairs of inputs and outputs.
+[1:19:40] So here, let's talk about superseterning, by the way.
+[1:19:43] You know, in other cases, you know,
+[1:19:44] we have datasets of different formats.
+[1:19:46] But here, if you have a superseterning dataset,
+[1:19:48] you have a sequence of input and output pairs.
+[1:19:51] And let's say we have N of this.
+[1:19:54] And let's say we assume Xi is in D.
+[1:19:58] And just recall that in this lecture,
+[1:20:01] in this whole course,
+[1:20:02] we are trying to use this notation
+[1:20:04] where the superscript is for the indices of the examples
+[1:20:08] and the subscript is for the dimensions, the coordinates.
+[1:20:11] So when I write x sub i,
+[1:20:13] this is the first coordinate of the vector xi,
+[1:20:16] and we have superscript is indexing one particular example.
+[1:20:20] Go ahead.
+[1:20:28] and what is the difference between the square root expression and the one-right button?
+[1:20:35] Yeah, yeah, that's great. So if you are only nonlinear in x but not nonlinear in theta,
+[1:20:42] then it means that you can replace the x by something else, right? You can replace xi,
+[1:20:47] for example, in this example, you can replace x1 squared by z1, and then you just say z
+[1:20:51] is my input now, and then I have a linear model in both z and theta. So fundamentally,
+[1:20:56] So fundamentally it's the same as linear model from a learning perspective.
+[1:21:00] But here you cannot do this.
+[1:21:02] There's no way you can easily transform it into a linear model.
+[1:21:05] Actually, there's no way, just fundamentally.
+[1:21:07] So that's why it requires different kind of like slightly different kind of techniques.
+[1:21:14] So some of the linear model techniques cannot work anymore.
+[1:21:16] That's just one example of potential nonlinear.
+[1:21:20] Yeah, yeah.
+[1:21:21] You can write, you know, yeah, yeah.
+[1:21:22] This is just the one.
+[1:21:23] You can even add more things, you can take more square roots, whatever, you can take
+[1:21:27] squares, you see some real examples.
+[1:21:30] Yeah.
+[1:21:31] In which cases?
+[1:21:36] In this case?
+[1:21:41] Yeah, like if we just had no x squared terms.
+[1:21:45] Okay.
+[1:21:46] Sorry.
+[1:21:47] So you would add on like beta by d plus one x1 instead of x1 squared.
+[1:21:53] I didn't get what he means, so you add on something here?
+[1:21:56] Yeah, just x1 instead of x1 squared.
+[1:21:59] So you add one of these two?
+[1:22:02] Yeah.
+[1:22:03] But then you change the model, right?
+[1:22:04] Suppose my model assumption is just literally this.
+[1:22:09] My argument was that you can replace x1 squared by z1 so that you maintain the model's functionality,
+[1:22:15] but you can reapply the same techniques
+[1:22:19] that is useful for linear models.
+[1:22:25] Okay, sounds good.
+[1:22:26] So anyway, so how do we,
+[1:22:30] so now let's just assume we have a general,
+[1:22:32] okay, so let's talk about the framework.
+[1:22:34] So, and you have, let's say we have a regression problem.
+[1:22:39] I guess, you know, Chris' lecture talked about regression
+[1:22:42] versus classification,
+[1:22:43] classification, and for regression problem,
+[1:22:46] let's say, one of the distinction between regression
+[1:22:52] and classification is that we have a regression problem,
+[1:22:54] the yi, the labels are real numbers, right?
+[1:22:58] These are real numbers.
+[1:23:00] And then your model, let's say, is h parametrized by theta,
+[1:23:03] which is a function that maps the input,
+[1:23:06] which is the rd to a real number r.
+[1:23:09] And you can have a cost function, or maybe loss function.
+[1:23:15] I think these days people use the word loss function
+[1:23:18] more often.
+[1:23:19] In the lecture notes we still use cost function,
+[1:23:21] but most researchers understand what you are talking about.
+[1:23:26] So this is the most likely,
+[1:23:31] of course there are also many different type of
+[1:23:32] means error functions or loss functions you can define.
+[1:23:37] By the way, error and loss and cost is the same.
+[1:23:39] Let's just use loss for all the cases.
+[1:23:44] And the loss function could be something like this.
+[1:23:47] With j, for the i-th example,
+[1:23:49] the loss function is a function of the parameter
+[1:23:51] because the data is not something you optimize for, right?
+[1:23:53] It's not a variable, it's given.
+[1:23:56] So the loss function for the j-th example is
+[1:24:01] yi minus h theta xi.
+[1:24:04] You apply the model to the data,
+[1:24:07] you get some prediction,
+[1:24:08] and you compare that with the real label,
+[1:24:10] and you take the square.
+[1:24:14] Something like this.
+[1:24:15] And then you can also have the average loss,
+[1:24:19] which is something like one over n times the sum
+[1:24:23] of all the losses.
+[1:24:27] So, and then you try to minimize this function
+[1:24:30] over the parameter theta.
+[1:24:32] So, that's for regression.
+[1:24:33] And let me give another example.
+[1:24:35] I think this is mostly just
+[1:24:37] repeating some of the stuff we have discussed.
+[1:24:41] The only thing here is just that this is a nonlinear model
+[1:24:44] as opposed to a linear model, right?
+[1:24:45] So like in this lecture, I think this is like just
+[1:24:47] theta one x one plus theta two x two so on and so forth.
+[1:24:51] And I guess for multi-class classification,
+[1:24:57] we can also talk about single class classification,
+[1:24:59] which is actually in the lecture notes.
+[1:25:01] I think I just thought given an interest of time,
+[1:25:04] let's just only talk about multi-class classification.
+[1:25:06] Basically, you just have to define the loss function
+[1:25:08] the same way as we have done for linear models,
+[1:25:12] except that you replace the models by nonlinear functions.
+[1:25:14] By the way, I think in most cases,
+[1:25:16] you don't have to think about the superscript i
+[1:25:17] because this is just indexing examples, right?
+[1:25:20] So if you remove, if you say,
+[1:25:22] I only have one example, x and y,
+[1:25:23] and x and y, then everything without a superscript
+[1:25:27] still works.
+[1:25:28] Maybe I should just write in that notation
+[1:25:30] to simplify it a little bit.
+[1:25:32] So let's say you have,
+[1:25:33] So in this case, the y, I can write y superscript i
+[1:25:38] for the i's label, or I can just use y
+[1:25:41] to indicate one label.
+[1:25:42] Let's say, suppose you have one label,
+[1:25:44] in multi-classification, you have,
+[1:25:47] it's a discrete choice of labels, right, one to k.
+[1:25:51] And here, I guess, you know,
+[1:25:54] you can say you have a model, let's use h-bar,
+[1:25:58] which is mapping the input x,
+[1:26:01] so the x is still in r-d.
+[1:26:03] Think of this as an image, think of this as some kind of labels for the image.
+[1:26:07] And then, which is matching the input from two k numbers, and these k numbers are often
+[1:26:15] called logics.
+[1:26:21] This is the same logics in the linear case.
+[1:26:26] And then you say the, which is large,
+[1:26:30] is the predicted probability of each class,
+[1:26:36] for this example x, for each class,
+[1:26:39] I say class j, is this kind of like exponential form, right?
+[1:26:46] You look at the j's, this is the j's output, right?
+[1:26:50] Index j means that this is the j's output
+[1:26:52] of this k-dimensional vector.
+[1:26:55] and then divided by the sum of the exponential
+[1:27:00] of all the, this is the so-called softmax.
+[1:27:08] So this is the so-called softmax.
+[1:27:15] Sorry.
+[1:27:18] So this is the so-called softmax function of this H.
+[1:27:22] And then, so basically you say,
+[1:27:27] so basically your model is like this, right?
+[1:27:29] So this is your model, so P of y is equal to j,
+[1:27:34] given x is this.
+[1:27:36] This is my parametrious model for the prediction,
+[1:27:41] parametrious by theta.
+[1:27:43] And then I need to compute a log likelihood,
+[1:27:44] so I'm gonna use negative log likelihood,
+[1:27:48] likelihood, which is also what we have discussed before.
+[1:27:52] By the way, here, this is also a log likelihood model
+[1:27:54] if you assume there's some Gaussian probability
+[1:27:57] distribution.
+[1:27:58] I didn't really go through that calculation.
+[1:27:59] So if you think of that your model,
+[1:28:01] your probabilistic model is something you add
+[1:28:03] a Gaussian to the h theta, and then you compute
+[1:28:05] the log likelihood under that Gaussian,
+[1:28:07] then it's the same mean squared error.
+[1:28:09] Here, I'm just going through more details.
+[1:28:11] So I defined my probability distribution.
+[1:28:14] I compute log likelihood on the data.
+[1:28:16] So this is the minus log p of y given x,
+[1:28:21] and my parameterized model,
+[1:28:23] then this is minus log of this thing.
+[1:28:32] So, oh, sorry, I think one side note here is that this is the,
+[1:28:37] so this model specifies what's the probability
+[1:28:41] for every choice of j,
+[1:28:43] but now I have a particular choice of j
+[1:28:45] which is equals to my label y.
+[1:28:47] So that's why I'm into plugging my y.
+[1:28:49] So this is exponential h theta bar x.
+[1:28:54] This is for the particular label I'm given.
+[1:28:57] The y-th index, the y-th corner of that logic vector
+[1:29:03] divided by the denominator is the same,
+[1:29:07] just the sum of the exponentials.
+[1:29:10] Oh, I think I have some typo here.
+[1:29:15] And this is just called the entropy loss.
+[1:29:27] I think if you look at the multi-class classification case,
+[1:29:30] this is the so-called cross entropy loss.
+[1:29:36] You can have many different form of it,
+[1:29:38] but this is the cross entropy loss,
+[1:29:41] where the,
+[1:29:42] you can just write this, which is a bar.
+[1:29:51] So this is the logist, this is a label,
+[1:29:52] and you can plug in cross entropy loss.
+[1:29:54] If you use PyTorch to implement it,
+[1:29:55] I think you can find a module,
+[1:29:57] which is just called cross entropy loss,
+[1:29:59] and you give it to the inputs,
+[1:30:00] and you can compute loss.
+[1:30:02] But of course, the underlying math is this.
+[1:30:06] Okay, this all sounds somewhat familiar, to some degree.
+[1:30:09] Okay, good.
+[1:30:10] Any questions?
+[1:30:12] Can you explain why it's cross-entropy ?
+[1:30:18] Is cross-entropy,
+[1:30:21] oh, so what's the second part of the question?
+[1:30:25] Like where can we say entropy ?
+[1:30:29] Yeah, I think this is the cross-entropy
+[1:30:30] between the probability distribution
+[1:30:37] defined by h theta x.
+[1:30:41] Okay, so I think, here's the thing,
+[1:30:42] So the question is why this is called cross entropy loss.
+[1:30:46] I think if you,
+[1:30:53] how do I write it in some sense?
+[1:30:56] I think if you have,
+[1:30:59] let's say this distribution, let's call it maybe p theta.
+[1:31:04] So, and I think this cross entropy loss
+[1:31:09] is actually equals to the cross entropy between the true, I guess you have to take, if you
+[1:31:23] take the expectation of this L cross entropy loss of this H bar and Y, and the expectation
+[1:31:35] over y from the true distribution, from the true label distribution, whatever you call
+[1:31:40] it. And then this is equal to a cross entropy between this distribution P theta and a true
+[1:31:50] distribution P star, which is something like you, I guess the cross entropy is just a,
+[1:31:56] it's actually the probability of one distribution times the log of the probability of the other
+[1:31:59] distribution. Yeah, I think the derivation is probably a little bit long, especially
+[1:32:05] If you're reading this language, it's cumbersome,
+[1:32:07] but this is a fundamental.
+[1:32:09] I think I should probably have it in the lecture notes.
+[1:32:11] I forgot exactly.
+[1:32:14] Any other questions?
+[1:32:19] Why, what is a one-hot vector?
+[1:32:21] Just like.
+[1:32:23] In my case, in my notation,
+[1:32:25] y is just a discrete variable.
+[1:32:28] So that's why you can see I have h theta bar theta x
+[1:32:31] indexed by y.
+[1:32:32] y is like two or three or four or k.
+[1:32:35] So, but you can also encode y as a one-hot vector,
+[1:32:39] which is the same thing, right?
+[1:32:40] So, then your math needs to be a little bit different, right?
+[1:32:42] Then this is gonna be the inner product
+[1:32:43] between this vector times the one-hot vector.
+[1:32:46] Yeah, but here I'm just using y
+[1:32:48] as really a discrete choice between one to k.
+[1:32:52] Can you think that when regression
+[1:32:54] adds to a lot of regression,
+[1:32:55] should we put the gas in distribution?
+[1:32:59] So, can you repeat the question?
+[1:33:01] Sorry.
+[1:33:01] like if regression of something is joshing, distributed, it has some sort of, like it
+[1:33:07] simplifies to-
+[1:33:08] Okay, so the question is why for the regression case, it also is not likelihood, right?
+[1:33:15] So I think the, let me try to see why I can do it on the fly, I think it should be easy.
+[1:33:20] So I think the modeling, so if you make the modeling assumption that if you assume, suppose
+[1:33:26] you assume that your model assumption is that y is generated from say h theta bar theta
+[1:33:34] x plus some Gaussian noise, but epsilon is from n zero maybe sigma squared or something
+[1:33:41] like this. Then the likelihood of y given x is, I think, 1 over, I guess this is challenging
+[1:33:53] my memory of this, something like this, exponential y minus h theta x square over two sigma square,
+[1:34:06] I guess. Something like this. And then you take the negative log likelihood. So then this is a log of
+[1:34:15] p y given x is equal to, there's some constant, you take the log, you get a constant, which doesn't
+[1:34:21] really matter, and you got the log of this, which is 1 over 2 sigma squared y minus h
+[1:34:27] theta x squared. So then it's kind of like this. The scaling doesn't really matter because
+[1:34:34] it doesn't change the optimization function fundamentally. Sounds good. Any other questions?
+[1:34:46] Okay, cool.
+[1:34:54] And in this case, here I only have one example,
+[1:34:57] eventually you're going to average over many examples.
+[1:34:59] So I guess maybe just let me write here.
+[1:35:02] So if you continue here, so eventually your loss,
+[1:35:06] your real loss is something like the final loss
+[1:35:10] is the average over all the examples.
+[1:35:13] you take the cross entropy loss
+[1:35:19] of each of these examples,
+[1:35:21] x i and y i.
+[1:35:27] And each of these functions is a function of theta,
+[1:35:28] so basically your total loss is also a function of theta.
+[1:35:32] And now the next task is to optimize
+[1:35:34] to find theta that makes the loss smaller.
+[1:35:37] The same, I think we also introduced a little bit
+[1:35:40] about gradient descent,
+[1:35:41] like a Newton method, right?
+[1:35:45] So these are all ways to optimize things.
+[1:35:47] So here you cannot use Newton method
+[1:35:49] because the function is not convex.
+[1:35:50] So that's why Newton's method is not guaranteed to work.
+[1:35:54] Actually, no methods can guarantee to work
+[1:35:56] for all non-convex functions,
+[1:35:57] but stochastic within sense seems to be a good idea.
+[1:36:00] So just to quickly recall, you can use an optimizer.
+[1:36:07] So optimization, I think one of the options
+[1:36:10] means you take gradient descent.
+[1:36:16] So let's say, suppose you have a loss function,
+[1:36:18] let's just summarize all the cases as this.
+[1:36:21] Let's just be an abstract.
+[1:36:22] So let's say each of the examples have the loss,
+[1:36:25] ji of theta, and you have an average of these loss functions.
+[1:36:29] Green gradient descent means that you just say,
+[1:36:32] I'm gonna ignore the structure here.
+[1:36:35] I just treat this as a single loss function.
+[1:36:36] I take the update, theta is updated to,
+[1:36:40] I think we use this notation to denote update,
+[1:36:43] something like eta times gradient of j of theta.
+[1:36:47] So this is gradient descent.
+[1:36:49] And how do you compute this gradient?
+[1:36:51] You compute the gradient of each of the loss,
+[1:36:53] the gradient, sorry, you compute the gradient
+[1:36:55] of each of the loss with the parameters
+[1:36:56] and you add them up.
+[1:36:58] Right, so that's gradient descent.
+[1:36:59] And for stochastic gradient descent,
+[1:37:06] So what you do is you say, your first sample,
+[1:37:12] say B, let's see, so you sample,
+[1:37:17] I guess they are, maybe let's say,
+[1:37:20] the most vanilla version of it is you sample one item,
+[1:37:23] you sample J from one to N, uniformly.
+[1:37:28] line to line, uniformly.
+[1:37:35] And then you run this, you know,
+[1:37:38] of course there's a follow loop.
+[1:37:42] And you sample, and then you say theta is updated
+[1:37:45] to theta minus eta, nabla.
+[1:37:50] The cost of the example j,
+[1:37:52] the cost of loss of example j, theta.
+[1:37:55] And the kind of the justification here is that if you think about what this is,
+[1:38:00] so the difference here is that here you compute a gradient of the average loss,
+[1:38:04] and here you only compute a gradient of one single example, the loss on one single
+[1:38:08] example. And the justification here is that you say even though this is one
+[1:38:14] example, it's not actually the loss of the whole gradient, but actually if you
+[1:38:18] look at the expectation of the per example gradient,
+[1:38:27] and your randomness comes from j, right,
+[1:38:29] which is sampled uniformly from one to n.
+[1:38:32] This is equal to the gradient of the average gradient,
+[1:38:37] the gradient of the loss function.
+[1:38:40] So in some sense, this quantity is approximation
+[1:38:44] of this quantity, and the approximation is in the sense
+[1:38:47] that this quantity in average is equal to this.
+[1:38:49] It's just that sometimes it's bias towards,
+[1:38:51] it's never a proxy, you know,
+[1:38:54] let's say suppose this quantity is in this direction,
+[1:38:56] and this quantity just, it can be any directions,
+[1:38:59] but if you average out all the possibilities,
+[1:39:01] you get the origin direction on the goal.
+[1:39:04] So in some sense you have a much larger noise, right?
+[1:39:07] So if you do greening descent,
+[1:39:09] it's kind of like, I guess maybe I'm using
+[1:39:11] two different colors.
+[1:39:17] So suppose you use gradient descent,
+[1:39:19] this is the gradient of the average loss,
+[1:39:22] and if you start casting gradient descent,
+[1:39:24] it's stochastic, you may go here, you may go here,
+[1:39:27] or you may go here,
+[1:39:28] maybe you may, sometimes you may even go
+[1:39:29] in the reverse direction,
+[1:39:30] but in average, all of these blue ones
+[1:39:32] will average out in the same direction as the black one.
+[1:39:36] And so, and then if you have a trajectory, right,
+[1:39:39] so suppose the black one goes like this,
+[1:39:44] the blue one, because it's stochastic,
+[1:39:46] you have noise, right?
+[1:39:47] So it will go look like this, right?
+[1:39:49] Maybe something like this.
+[1:39:51] Maybe like even, but in average,
+[1:39:53] it's kind of roughly tracking the gradient descent.
+[1:39:55] Of course, how much this tracks,
+[1:39:57] how much these two things tracks over time
+[1:39:59] is a very complex kind of matter.
+[1:40:02] Like it depends on how large the step size is,
+[1:40:05] you know, how, you know, kind of like,
+[1:40:07] it depends on many kind of like subtle things,
+[1:40:08] but conceptually you should expect that the blue one,
+[1:40:11] some would track the black one.
+[1:40:14] You know, the blue one in average
+[1:40:16] is exactly equal to the black one in one step.
+[1:40:18] But the error sometimes can be amplified,
+[1:40:20] sometimes the error can be shrinked.
+[1:40:22] So it depends on the situation.
+[1:40:24] Ideally, you want them to track to some degree.
+[1:40:26] Generally, you want to use stochastic reading
+[1:40:28] at this step or a non-contact set?
+[1:40:33] I think you can use reading set as well.
+[1:40:34] So, okay, but I think the question,
+[1:40:38] I think it sounds like the question is really
+[1:40:42] about why you use stochastic reading set.
+[1:40:44] In what cases you want to use stochastic reading.
+[1:40:45] That is a great question.
+[1:40:46] So why do you even consider stochastic gradient science?
+[1:40:49] The reason is that computing this gradient
+[1:40:51] is very costly each time,
+[1:40:52] because you have so many examples.
+[1:40:54] And could be, in 2015, it's kind of one million examples.
+[1:40:58] In 2026 now, I think it's kind of like,
+[1:41:02] like one trillion tokens, right?
+[1:41:03] There's no chance you can compute all the gradient.
+[1:41:07] Even computing one gradient is very costly,
+[1:41:09] let alone computing all the gradients.
+[1:41:11] So that's why you have to find an efficient way.
+[1:41:12] So that's why you want to have a sampler,
+[1:41:16] which is less costly.
+[1:41:17] And maybe just one,
+[1:41:20] so, and also another reason you can do this
+[1:41:23] is that completing the full gradient
+[1:41:25] sometimes is actually wasteful,
+[1:41:29] because maybe it's the case that
+[1:41:31] all of these individual gradients are actually,
+[1:41:33] they are correlated, they are highly correlated.
+[1:41:36] Right?
+[1:41:37] So there's no reason to complete each of them
+[1:41:39] to understand which direction to go.
+[1:41:42] So you just only need a sub, it's kind of like every example tells you to go that way,
+[1:41:47] while you have to compute all of them, you just need a subset of them.
+[1:41:51] And another thing is that even this is not entirely true, in many cases, you don't really
+[1:41:56] have to be very precise in this dynamics.
+[1:41:59] It's kind of like even if you have some mistakes, it will be corrected later.
+[1:42:05] So maybe another way to think about it is that for some cases, for example, if you have
+[1:42:10] of a convex function, right?
+[1:42:11] So, in some sense, one way to do it is that you do this, right?
+[1:42:16] But sometimes if you kind of overshoot,
+[1:42:18] or maybe you go in the wrong direction,
+[1:42:20] still eventually you're gonna go down.
+[1:42:23] How do I say this?
+[1:42:24] Like, basically, even you have some perturbations,
+[1:42:28] and this is not exactly the right example,
+[1:42:30] but even if you have some perturbations,
+[1:42:31] your dynamics, then over time,
+[1:42:33] because every time you have to share a target,
+[1:42:37] eventually those kind of perturbations
+[1:42:38] kind of washed out by the shared force in some sense.
+[1:42:43] So I just wanted to ask on a non-convex function,
+[1:42:46] I guess, like local .
+[1:42:48] And I believe that this is very interesting.
+[1:42:53] Are we still able to use stochastic ?
+[1:42:55] Yeah, I think that's a great question.
+[1:42:57] So one of the theories for why stochastic is good is that it can work better on non-convex functions.
+[1:43:04] and maybe let me first explain what you said,
+[1:43:07] but actually it's not entirely right.
+[1:43:09] So I think, so basically,
+[1:43:12] suppose you have a non-convex function in 1D,
+[1:43:15] let's say, right, so like this.
+[1:43:17] So if you start here, you keep going down,
+[1:43:21] this green design just means you go downhill in some sense,
+[1:43:23] so you go to the directions which is going downhill in the,
+[1:43:27] sometimes it's called steepest descent,
+[1:43:28] it's basically you're finding the direction
+[1:43:30] which is going downhill the fastest in some sense, right,
+[1:43:33] So you just go here and you get stuck here,
+[1:43:35] because you can never leave this place.
+[1:43:37] Here the grid is zero, the curvature is zero.
+[1:43:41] And I think what you are trying to say is
+[1:43:46] that if you do stochastic grid in sand,
+[1:43:48] because there's some noise,
+[1:43:49] maybe even though you want to go this way,
+[1:43:51] maybe the first step, because of the noise,
+[1:43:54] you go the other way and you jump to the minimal.
+[1:43:57] I think this is plausible, but generally speaking,
+[1:44:01] Of course, the theory here is very limited, but I think the community don't believe that
+[1:44:07] this is the case.
+[1:44:08] This is why stochastic consent is helping.
+[1:44:10] I don't think people believe that stochastic consent can help you to jump out of a local
+[1:44:14] minimum.
+[1:44:15] However, on the other hand, we don't even believe that there are many by local minimum.
+[1:44:21] So in one D, it's actually very easy to have local minimum, but in high dimensional cases,
+[1:44:25] it's not that trivial to have that many local minimum.
+[1:44:29] So I think at least one in actual ways,
+[1:44:31] I was involved in developing some of the theory.
+[1:44:33] Of course, nobody really knows exactly whether they are right,
+[1:44:36] but the common hypothesis or hypothesized consensus
+[1:44:41] in some sense is that there are very limited number
+[1:44:45] of bad local minimums in this high dimensional function
+[1:44:48] you're optimizing.
+[1:44:49] Maybe there's even no bad local minimum.
+[1:44:51] All the local minimum are actually global minimum.
+[1:44:53] It's kind of like if you think about it,
+[1:44:54] you are skiing in a mountain.
+[1:44:55] I think if you just randomly try to go down scales,
+[1:45:02] skiing down hills in 2D, right?
+[1:45:04] It's probably, you're probably gonna go back
+[1:45:05] to one of the parking lots,
+[1:45:06] which is one of the global minimum, right?
+[1:45:08] So like, you know, but in 2D,
+[1:45:10] I think it's a bit easier to have a local,
+[1:45:12] you know, you probably go back country
+[1:45:13] and you got stuck somewhere.
+[1:45:14] That's possible, but you know,
+[1:45:16] but you always find some river going down.
+[1:45:18] You always find some valley going down eventually, I think.
+[1:45:20] You know, not, you know, I'm just gonna give an analogy.
+[1:45:22] You know, it's not exactly sure in 2D,
+[1:45:24] but in high dimensions it's more likely to always find a way to go downhill in some sense.
+[1:45:31] Could you give some allusion to the mathematics that actually shows why, which I find it
+[1:45:38] becoming intuitive, you don't see that many local minimum high dimensions.
+[1:45:42] I just find that that's a lot of interesting.
+[1:45:45] Yeah, I think, I don't think there's a very simple way to say it.
+[1:45:49] I think it's not universally true.
+[1:45:54] So in some sense, I think maybe if I can only use one or two sentences, I think it's kind
+[1:46:00] of like just in high dimension, there's always some ways to...
+[1:46:05] Local minimum means you're hashing at that point in all directions is positive semi-definite.
+[1:46:11] That's a very hard thing to satisfy.
+[1:46:14] So you find a stationary point where the gradient is zero, and you create a hessian. The hessian
+[1:46:21] is kind of like always have some direction which is negative. And I was thinking about
+[1:46:28] how to formalize this. So for example, if you think about it, the gradient zero is already
+[1:46:32] a pretty strong constraint. Suppose you have a d-dimensional function, and you add d constraints
+[1:46:38] that each of the dimensions of the gradient is zero. That's already restricts yourself
+[1:46:43] a lot. And if you add another thing, which is the Hessian is positive semi-definite,
+[1:46:47] I think that just makes the number of points much smaller. And in some cases, you can compute. In
+[1:46:53] one of my papers, I think we tried to compute the number of local minimals by using this,
+[1:46:57] I think in differential geometry, there's something called cataracts formula. And actually,
+[1:47:01] not only my papers, but many other people's papers. So in some certain cases, you can compute
+[1:47:05] or you can count and you find out that, oh, all the local minima are actually just those,
+[1:47:09] the number of local minimum is the same as the number of global minimum.
+[1:47:12] But generally it's very hard to count.
+[1:47:18] Any other questions?
+[1:47:20] Okay, sounds great.
+[1:47:22] So going back to here, that's the algorithm people do.
+[1:47:26] Of course, practically speaking, you don't just only sample one example each time, because
+[1:47:31] sampling one example, you know, using all the examples is too inefficient because you
+[1:47:36] have to compute all the gradients.
+[1:47:38] Using one example, the downside is that it's too noisy.
+[1:47:42] So sometimes you want to have a trade-off.
+[1:47:45] You want to have a few examples so that you can be a little bit less noisy.
+[1:47:50] And another thing is that, which probably we won't go into detail here, but another
+[1:47:55] thing is that when you have one example, your GPUization is too low.
+[1:48:02] It's not always the case, but in some cases, using too few of examples make your GPUization
+[1:48:06] too low.
+[1:48:07] like 10,000 GPUs, and you just only compute one example,
+[1:48:11] one gradient each time, then most of the GPUs
+[1:48:12] are actually idle.
+[1:48:14] So that's why you need a so-called batch gradient descent.
+[1:48:17] Oh, sorry, I think it's called,
+[1:48:19] it's also still called stochastic gradient descent
+[1:48:21] with some kind of like small batches.
+[1:48:24] I think SGD just means like,
+[1:48:27] both the version with batch size one,
+[1:48:29] or a bigger batch.
+[1:48:31] So when you have a bigger batch,
+[1:48:33] you can imagine what it is.
+[1:48:34] Basically you just say, I'm gonna,
+[1:48:36] with batches.
+[1:48:40] I guess let's call it SGD.
+[1:48:42] So I think you just change the algorithm to be a sample.
+[1:48:46] Say B examples
+[1:48:50] from one to n, and then you say
+[1:48:56] theta is equal to theta
+[1:49:00] minus eta gradient.
+[1:49:06] Okay, sounds good.
+[1:49:07] So, and, okay, so this is just a general introduction to the framework for the supervised learning.
+[1:49:25] And actually some of the unsupervised learning is the same thing.
+[1:49:27] You define loss function for each example, and you average them.
+[1:49:29] The only question is when you have unsupervised learning later that we'll cover, you don't
+[1:49:34] have the y's.
+[1:49:35] But still, the framework is the same.
+[1:49:37] You define the loss functions,
+[1:49:38] but the loss functions then involve Y,
+[1:49:40] and then you have average loss functions,
+[1:49:41] and you run optimizers.
+[1:49:43] You can choose different type of optimizers.
+[1:49:48] And then, pretty much there are two questions.
+[1:49:51] So, we're gonna address.
+[1:49:53] So, the two remaining questions.
+[1:49:56] Question one is that, what is this function h theta, right?
+[1:49:59] So, we haven't, right?
+[1:50:00] So, this whole framework works for every function h theta,
+[1:50:03] And I'll say a bar, I think I use bar just because
+[1:50:07] it's a little bit different, no.
+[1:50:09] Without bar, I just want to distinguish it
+[1:50:12] from the regression case, but they mean the same thing.
+[1:50:15] And so, and the question, so question one is
+[1:50:18] how do you define each theta, and question two is
+[1:50:20] how do we compute, how to
+[1:50:25] compute the gradient, the gradient j
+[1:50:29] on each of the examples.
+[1:50:31] And once you know how to compute the gradient
+[1:50:32] for each of the examples, you can compute the gradient
+[1:50:34] for all the examples, all batched examples,
+[1:50:37] by averaging the gradient for every example.
+[1:50:39] So, and that's called, so this is called backpropagation.
+[1:50:43] The algorithm for this is called backpropagation,
+[1:50:44] or auto-differentiation, which is the topic of next lecture.
+[1:50:48] And in the rest of this lecture,
+[1:50:50] I'm gonna define a bunch of each data that people are using.
+[1:50:53] Mostly for like a more classical cases,
+[1:50:55] like vision cases, like super-sterning,
+[1:50:59] and of course for language case,
+[1:51:02] you're gonna have even more complicated
+[1:51:04] nonlinear functions like transformers.
+[1:51:07] Okay, so that's the plan.
+[1:51:12] I'm gonna start with the very basics, like New Rightworks.
+[1:51:16] So,
+[1:51:22] so we are still using these kind of housing examples.
+[1:51:25] I know that this example is probably too old,
+[1:51:27] like it's 20 years old.
+[1:51:28] So let's say, suppose you have to motivate
+[1:51:32] the introduction of nonlinear models.
+[1:51:34] Suppose you have size and,
+[1:51:36] like this is the price, right?
+[1:51:42] That's housing price prediction.
+[1:51:47] So if you look at the real data,
+[1:51:49] most likely something like this.
+[1:51:52] Maybe some, I don't know exactly what it would look like,
+[1:51:54] but at the beginning it doesn't increase that much
+[1:51:56] as the size goes up and then eventually becomes linear.
+[1:51:59] Let's say this is the case we will see in the data, right?
+[1:52:02] So if you use a linear model,
+[1:52:03] and you're gonna fit something here,
+[1:52:04] then you're not gonna be accurate enough.
+[1:52:06] So that's why you probably have to have a nonlinear model,
+[1:52:09] which is something like this.
+[1:52:11] So you want your model to be able to output a curve like this.
+[1:52:14] Of course, you don't really know which line is this.
+[1:52:16] It could be like a, you know,
+[1:52:18] a probably without seeing a data,
+[1:52:19] you can have multiple kind of curves like this,
+[1:52:21] but at least you should allow the model
+[1:52:23] to generate a curve like this,
+[1:52:24] as opposed to only generating a linear function.
+[1:52:28] So, and what this function is, right?
+[1:52:30] So this function, so, is actually of this form.
+[1:52:37] So this blue function is actually of the form,
+[1:52:40] is a max of, say, wx plus b,
+[1:52:47] which is a linear function, and zero.
+[1:52:51] I guess, you know, especially if you,
+[1:52:54] suppose this is zero, then you just,
+[1:52:56] maybe I say this is max wx plus b,
+[1:52:59] 0 plus c.
+[1:53:02] So max of wx plus b is kind of like a function like this.
+[1:53:08] And then if you, sorry, this one is like this.
+[1:53:11] And then if you plus c, you can shift it
+[1:53:14] above or below a little bit.
+[1:53:19] So basically you just cut off everything
+[1:53:20] that is below zero, which makes sense
+[1:53:22] because for housing price, it cannot be negative.
+[1:53:26] It has to be positive.
+[1:53:27] So, yeah, okay.
+[1:53:33] So, and, so this actually,
+[1:53:37] this introduces a primitive that is used very often
+[1:53:39] in deep learning these days, which is this function,
+[1:53:42] which is max of t and zero.
+[1:53:48] So, I think in mathematics people call it this,
+[1:53:51] like people write this, something like this,
+[1:53:55] but for us we just call this ReLU,
+[1:53:58] and this is the standard in machine learning.
+[1:54:02] So this function is called rectified linear units,
+[1:54:05] which is literally just this function
+[1:54:07] where you have linear functions on the positive plane,
+[1:54:10] and then zero on the other side.
+[1:54:13] So zero and then linear, and linear with slope one.
+[1:54:17] So this is a very important primitive,
+[1:54:19] and then you can write this function as,
+[1:54:22] this function can be written as ReLU of t,
+[1:54:25] maybe plus c, something like this.
+[1:54:28] Oh, sorry, ReLU of,
+[1:54:31] let's say this one will be written as ReLU
+[1:54:34] of wx plus b plus c.
+[1:54:37] So basically you introduce,
+[1:54:39] so you see if you don't have the ReLU,
+[1:54:41] then it's basically a linear function.
+[1:54:42] But if you have the ReLU,
+[1:54:43] then you just somehow change the shape a little bit.
+[1:54:46] And also this ReLU is often called activation function.
+[1:54:52] I think the reason for the word activation is because
+[1:54:55] there's some kind of connections
+[1:54:57] to biological networks.
+[1:54:59] I think in biology, like in your brain,
+[1:55:02] in our brain, the neurons,
+[1:55:05] how the neurons are fired up
+[1:55:07] is a nonlinear function of the stimulus
+[1:55:09] it receives from other neurons.
+[1:55:11] So it's not exactly this,
+[1:55:14] but it's something like this.
+[1:55:15] So when it's passing some threshold,
+[1:55:17] the neurons got fired up,
+[1:55:18] and below that threshold, the neurons just doesn't do anything.
+[1:55:24] So that's why it's called activation, right?
+[1:55:26] If it's fired up.
+[1:55:28] So, but I think in biology, you know,
+[1:55:30] I'm not an expert there, but based on my knowledge of it,
+[1:55:35] the threshold, the function is never exactly like this.
+[1:55:38] Sometimes it's sigmoid, and that's why sigmoid was used
+[1:55:42] at the very beginning of deep learning.
+[1:55:44] But then later on people realized that this is actually,
+[1:55:50] this ReLU is actually a bad idea for new artworks
+[1:55:54] for various computational reasons,
+[1:55:56] which we'll probably discuss in a bit.
+[1:55:59] Anyway, so for now, I think that's kind of like,
+[1:56:02] just remember this concept.
+[1:56:04] So actually we have already defined
+[1:56:08] a one-dimensional new artwork.
+[1:56:09] So basically this is a new artwork
+[1:56:10] with one-dimensional input and a few parameters.
+[1:56:14] So that's already a new artwork.
+[1:56:15] So then the rest of the,
+[1:56:18] for like 10, 15 minutes,
+[1:56:20] we are just gonna generalize this to multiple,
+[1:56:24] higher dimensions, you know,
+[1:56:25] and you apply this multiple times,
+[1:56:27] and that will make it a more complex new artwork.
+[1:56:30] And then we're gonna even build more on top of that.
+[1:56:33] So,
+[1:56:35] okay, so next, what do we do?
+[1:56:36] So this is only one dimensional input, right?
+[1:56:40] And so now let's try to do a higher dimensional case, right?
+[1:56:44] Suppose you have data with dimension D,
+[1:56:47] and then how do you kind of imitate this
+[1:56:49] and make it nonlinear?
+[1:56:51] So the way to do it is that you say I have x in D,
+[1:56:54] and then I have a parameter W,
+[1:56:57] which is also in dimension D.
+[1:56:59] And often this is called the weight vector,
+[1:57:03] and actually eventually it will be weight matrices,
+[1:57:05] so that's why weight and matrix are associated together.
+[1:57:09] Weight vector is a rare case.
+[1:57:11] And then you also introduce another number, B.
+[1:57:14] This is called bias.
+[1:57:17] And then you define your model like this.
+[1:57:22] Say ReLU of W transpose X plus B.
+[1:57:26] This is the inner paradox between two vectors,
+[1:57:28] and you get the scalar out of it.
+[1:57:30] And then you add another bias, which is still a scalar,
+[1:57:32] so the output of this is a scalar.
+[1:57:36] And so then basically we have like
+[1:57:38] high-dimensional inputs and one-dimensional outputs.
+[1:57:42] This is actually called a one-layered network.
+[1:57:44] So basically, you apply this value once.
+[1:57:48] So, and now,
+[1:57:52] let's try to kind of like stack multiple,
+[1:57:55] so this is one neural actually,
+[1:57:57] because you apply one activation in some sense,
+[1:57:59] it's one neural.
+[1:58:00] And then you can have multiple neurons.
+[1:58:02] So, I think one of the typical examples I used to give,
+[1:58:04] maybe this is not exactly the best example these days.
+[1:58:07] For example, let's say, suppose you think about
+[1:58:08] the housing price, right?
+[1:58:10] So it probably depends on a lot of intermediate features.
+[1:58:13] Suppose housing price depends on, for example,
+[1:58:16] maybe, okay, maybe I'm gonna give it a quick sample,
+[1:58:18] just to slow down a little bit.
+[1:58:20] Let's say, suppose you have this cases
+[1:58:22] where x1 is the size, x2 is the number of bedrooms,
+[1:58:31] and x3 is, let's say, the zip code,
+[1:58:33] and maybe x4 is, let's see, maybe the,
+[1:58:44] I don't know what x4 in my nose means.
+[1:58:47] But anyway, this is your raw input, right?
+[1:58:49] So maybe you can think of like,
+[1:58:52] there are some intermediate things
+[1:58:53] that actually matters more than this raw input.
+[1:58:57] Let's say you have intermediate
+[1:58:58] quantities that you, quantities, like for example, you say, walkability. How easy to
+[1:59:14] walk around the house? Maybe there's another one which is the school quality. So these
+[1:59:21] are in some sense variables that are not present in your original data, but they matter a lot
+[1:59:27] to the price of the house.
+[1:59:30] And each of this, maybe let's call this A1, this is A2.
+[1:59:33] Each of this is actually a function of x1 up to x4,
+[1:59:36] which can be computed as some nonlinear function.
+[1:59:39] So you can imagine that A1 is probably some kind of
+[1:59:42] like a nonlinear function of maybe value
+[1:59:47] of some of these linear combinations of this thing.
+[1:59:51] And you can imagine maybe a2 is also some nonlinear function of this, of maybe I say
+[2:00:00] theta.
+[2:00:01] I'm using notations in a pretty sloppy way just to give you an example.
+[2:00:06] You know, finally we're going to define things more formally.
+[2:00:10] And then you can say, oh, maybe my final y should be a linear combination of these two
+[2:00:13] guys.
+[2:00:14] Maybe I have another parameter, theta nine, a1 plus theta 10, a2, something like this.
+[2:00:20] So then this way you kind of stack two layers on top,
+[2:00:23] you have two neurons and you stack
+[2:00:24] another linear function on top of it.
+[2:00:26] So in some sense you are applying this recursively.
+[2:00:30] So that's kind of like the fundamental idea
+[2:00:32] of how do you kind of compose.
+[2:00:34] So basically you apply these nonlinear functions,
+[2:00:37] you apply a linear function,
+[2:00:38] you apply some nonlinear functions,
+[2:00:40] and then you get some articles,
+[2:00:41] and then you apply another linear version,
+[2:00:43] and you can probably apply another nonlinear function here,
+[2:00:46] and then you keep compose.
+[2:00:47] So that's the rough idea.
+[2:00:51] But let's try to make it a little more formal
+[2:00:54] so that it's probably more obvious.
+[2:00:59] Let's see what's the right way for me to
+[2:01:02] erase this stuff.
+[2:01:05] I think we can probably start from the left.
+[2:01:17] So one of the ways that people used to draw this kind of things, at least 10 years ago,
+[2:01:27] was that they draw this kind of like impulse like this. So suppose you have x1 up to xd,
+[2:01:34] and then you say I have some intermediate variables a1 up to ad, maybe am, and then each of the
+[2:01:41] intermediate variable depend on all of this, and they have some dependencies here. So let's
+[2:01:46] let's say AM depends on all of the input variables,
+[2:01:48] and you just draw these kind of edges,
+[2:01:50] and then you can say I have another layer
+[2:01:52] of intermediate variables,
+[2:01:54] and they connect to each other.
+[2:01:57] So these drawings are, once you know
+[2:01:58] what they are talking about, the drawings are very useful,
+[2:02:01] but when you don't really know what they are talking about,
+[2:02:04] it's kind of like confusing.
+[2:02:05] So what I really mean here is that,
+[2:02:07] you know, the way you do it is that you say first,
+[2:02:10] let's say, let's do only one layer,
+[2:02:12] maybe just to formulate.
+[2:02:13] So we have x1 up to xd, right?
+[2:02:16] So then let's have a1, the first inconvenient variable,
+[2:02:22] is defined as maybe ReLU of w,
+[2:02:28] say one x1 plus b1,
+[2:02:31] where w1 is a vector, even though I have an index one,
+[2:02:34] but it's the first vector, w1 transpose.
+[2:02:39] And x, so x is here.
+[2:02:41] X is a d-dimensional vector, W1 is a vector.
+[2:02:44] So the inner part together, you get a scalar,
+[2:02:45] and you add a scalar, B1 here.
+[2:02:48] That's how you get to A1, which is kind of like what I,
+[2:02:51] like A1.
+[2:02:53] So I use W just because I think people use W and B
+[2:02:57] to distinguish the weight matrices and the biases.
+[2:03:00] And then you have A2, which is a ReLU of
+[2:03:05] W2 transpose X plus B2,
+[2:03:09] where w2 is rd and d2 is in r.
+[2:03:14] And then you have a bunch of this,
+[2:03:15] and I say you have like up to a m.
+[2:03:20] Let me see whether m is my notation here.
+[2:03:22] It's very easy to mess up notation in this kind of cases.
+[2:03:25] Yes, a m is ReLU of wm transpose x plus bm.
+[2:03:32] And that's how you define a1 up to a m.
+[2:03:35] And each of the ai depends on all of the xis
+[2:03:37] in this particular way.
+[2:03:39] And then you can say, I'm gonna apply another,
+[2:03:42] my output will just be a linear combination
+[2:03:44] of all of these AIs.
+[2:03:46] Let's say the output is some linear combination
+[2:03:51] of the A's plus another,
+[2:03:54] plus another bias.
+[2:03:55] So here's the thing, how do I write a linear combination
+[2:03:58] of the AIs?
+[2:03:59] I can write something like say the one, A1,
+[2:04:01] so and so forth, but if I always kind of expand it,
+[2:04:04] it's too complicated.
+[2:04:05] So what I'm gonna do is I'm gonna write a vector,
+[2:04:07] Let's say W transpose A plus another B.
+[2:04:11] But you realize that when I write this,
+[2:04:13] this W needs to be distinguished from other Ws.
+[2:04:16] So, and that's why I think I'm gonna use this tool
+[2:04:23] to say that this is the W on the second layer.
+[2:04:26] In some sense, these are the Ws on the first,
+[2:04:27] so there is another.
+[2:04:30] So all of these AIs are combined to h theta x,
+[2:04:32] and that's why people write this is the W
+[2:04:34] on the second layer,
+[2:04:35] And these are the w's on the first layer.
+[2:04:38] So I'm gonna write another bracket, w1,
+[2:04:44] something like this, to distinguish the
+[2:04:49] first layer and the second layer.
+[2:04:52] So, and this w2, superscript bracket two,
+[2:04:56] is a vector of the same dimension as a,
+[2:04:59] not of the same dimension as x anymore,
+[2:05:01] because you have to compile,
+[2:05:02] you have to interpare that with a.
+[2:05:04] So this is in dimension Rm, because I have entries here,
+[2:05:09] and B is always a scalar.
+[2:05:15] So that's how you define a two-layer network.
+[2:05:17] So you have a lot of image,
+[2:05:20] and you can see this notation is kind of messy, right?
+[2:05:22] So you probably shouldn't,
+[2:05:24] when you have too many superscripts,
+[2:05:26] subscripts, at some point it's kind of too messy.
+[2:05:29] So that's why for most of the cases,
+[2:05:32] In some cases, you have to live with these notations.
+[2:05:36] So, but in most cases, you can simplify even further.
+[2:05:39] You say, actually, if I write everything
+[2:05:42] as matrices and vectors, I don't have to really think
+[2:05:44] about each of these details.
+[2:05:47] So basically, I just write A as a vector in,
+[2:05:51] this is a vector in Rn.
+[2:05:53] You can write as ReLU of a matrix W times X plus B.
+[2:05:58] and here W and B are a little bit different.
+[2:06:02] Okay, so W, I guess I need to write W1 and B1.
+[2:06:10] So this is a matrix, W1, if you want to look,
+[2:06:14] understand the correspondence between this notation
+[2:06:17] and this notation, so W1 is this matrix
+[2:06:21] of dimension M by D,
+[2:06:24] and each row is W1 transpose up to W1 transpose.
+[2:06:36] So you put all of these row vectors,
+[2:06:38] because once you transpose,
+[2:06:39] by the way, all the vectors are supposed to be column vectors
+[2:06:42] if you don't do any transpose.
+[2:06:44] If you really don't understand this,
+[2:06:45] you should try to understand,
+[2:06:47] like at least when, depending on the situations,
+[2:06:50] but in many cases it's good to keep in mind
+[2:06:53] like whether these vectors is a row vector
+[2:06:55] and column vector.
+[2:06:56] So all of these are column vectors,
+[2:06:58] and then you can transpose this into row vectors,
+[2:07:01] so these are row vectors,
+[2:07:02] and you put all of them, stack them into a matrix.
+[2:07:05] And then this B1 is just the vector of all the scalars.
+[2:07:16] But in many cases, you actually don't have to
+[2:07:18] necessarily remember this correspondence,
+[2:07:20] you just remember this, it's fine, right?
+[2:07:22] You have a vector, you multiply a matrix,
+[2:07:23] you get a vector, and then you add a vector bias,
+[2:07:25] and you take ReLU entry wise.
+[2:07:27] That's probably important.
+[2:07:28] So ReLU applied to a vector,
+[2:07:30] T is the same as you applied entry wise.
+[2:07:40] So in many cases, you just say,
+[2:07:41] oh, one matrix application, one layer,
+[2:07:44] is just a multi-pandemic matrix,
+[2:07:45] add a bias vector, and apply ReLU,
+[2:07:48] and you get a vector out of it.
+[2:07:50] So you don't have to necessarily understand
+[2:07:51] all the details.
+[2:07:52] Sometimes you do, but most cases these days you don't have to.
+[2:07:55] So, and if you count how many parameters are there,
+[2:08:03] this is m by d, this is the dimension.
+[2:08:06] So m by d, because the input dimension is d,
+[2:08:09] the output dimension is m, and you need a matrix
+[2:08:11] that turns the d-dimensional input to m-dimensional outputs.
+[2:08:14] That's why you need m times d parameters.
+[2:08:17] And then this guy has m parameters.
+[2:08:19] So the total parameters,
+[2:08:24] parameter count is mD plus m.
+[2:08:30] So d is the input dimension, m is the output dimension,
+[2:08:32] and d is the output dimension.
+[2:08:38] The b to the one, like I didn't think
+[2:08:40] in the first layer there.
+[2:08:41] This is b1, yes.
+[2:08:44] And this b1 is this b1.
+[2:08:46] Yeah, so.
+[2:08:56] Any questions?
+[2:08:58] And I think, you know, eventually, actually,
+[2:09:01] many of these details don't even matter if you don't care.
+[2:09:03] So, for example, you can even just write this.
+[2:09:07] Like,
+[2:09:08] For example, you can just say, oh, I even simplify notation here, you can say, I think
+[2:09:23] you can say, let's just say this is a matrix multiplication. So let's say you have a matrix
+[2:09:33] simplification with W and B.
+[2:09:37] So W is the weight matrices, which is this W,
+[2:09:40] and B is the
+[2:09:43] the bias, and you apply Z,
+[2:09:45] and this is just equals to WZ plus B.
+[2:09:49] And then you can say I'm gonna apply
+[2:09:54] a sigma.
+[2:09:58] Sorry, let's say sigma is,
+[2:10:01] I guess maybe I didn't,
+[2:10:02] Probably I go a little too fast, I see.
+[2:10:07] So maybe just before I talk about that,
+[2:10:12] I think I already alluded to it.
+[2:10:13] So this red look here can be also replaced
+[2:10:17] to other nonlinear activations.
+[2:10:25] So you can replace
+[2:10:32] So the ReLU with some other nonlinear activations.
+[2:10:38] And all the other activations are functions
+[2:10:41] that maps R to R.
+[2:10:43] So it's always a scalar function.
+[2:10:46] But you can apply this to vectors
+[2:10:49] by entry-wise applying it,
+[2:10:51] applying entry-wise.
+[2:10:52] And other activations could be like sigmoid.
+[2:10:58] Sigmoid looks like this.
+[2:10:59] Let me just save some time to now define the equations.
+[2:11:05] You can read the lecture notes to see the exact equations.
+[2:11:07] There are also 10H, which looks like
+[2:11:14] going through zero and like this.
+[2:11:16] So all of these activations are generally
+[2:11:19] increasing functions, but not always the case.
+[2:11:22] I think there's also Leaky ReLU.
+[2:11:24] There's a bunch of different activations functions.
+[2:11:26] For example, Leaky ReLU looks like,
+[2:11:29] None of this is actually used that much.
+[2:11:31] If you wanna see what's used in the latest network,
+[2:11:35] I think you have to check the electric nodes.
+[2:11:37] I just added a few which I don't have on my nodes.
+[2:11:40] But there's also functions like this.
+[2:11:44] Anyway, generally it's kind of like some
+[2:11:46] almost increasing functions,
+[2:11:47] and often on the left-hand side of the zero
+[2:11:51] is kind of close to zero, but not exactly right.
+[2:11:53] So for example, the one that I just draw,
+[2:11:55] this is called Jailu.
+[2:11:57] Let me know, I think the definition of it is,
+[2:12:01] the Jelo's definition is this,
+[2:12:03] just in case you care about the exact equation.
+[2:12:08] So it's not exactly nonlinear,
+[2:12:10] it just dips a little bit.
+[2:12:13] I think it doesn't go above zero, I think.
+[2:12:16] It's like this, strictly speaking.
+[2:12:18] So it dips a little bit and then it goes up.
+[2:12:20] So exactly why you use any of this
+[2:12:23] is kind of like a little kind of like a magic.
+[2:12:25] Like, I think people seem to find out
+[2:12:30] that using some kind of somewhat smooth functions
+[2:12:32] is actually useful.
+[2:12:34] So ReLU is actually not necessarily great
+[2:12:36] because it's not smooth enough.
+[2:12:38] But other than that, I don't really know exactly.
+[2:12:43] Sometimes it's just the ability to see,
+[2:12:45] sometimes it's just the trial and error.
+[2:12:47] Yeah.
+[2:12:49] So, okay, so that's the activations.
+[2:12:51] And then, so now I'm trying to
+[2:12:53] compacted, you know, I'm trying to kind of
+[2:12:57] have more and more abstract versions
+[2:12:59] so you don't have to deal with all these notations.
+[2:13:02] So then, once you have the activations,
+[2:13:04] you can define this, right?
+[2:13:07] You can, this is just the sigma of Wz plus v.
+[2:13:10] This is the abstract version of that.
+[2:13:12] And then you can compose many times.
+[2:13:13] You can say, I'm gonna apply another one,
+[2:13:15] so my model can be like, say,
+[2:13:18] apply a machine application on top of this sigma,
+[2:13:21] and then, right, so WBZ, and then I'll apply another thing,
+[2:13:28] I'll apply another thing, and so on and so forth.
+[2:13:33] And each of this is one layer.
+[2:13:38] And then if you apply a mission modification,
+[2:13:40] sigma is another layer, and then if you do another one,
+[2:13:42] it's another layer.
+[2:13:43] The number of layers is defined as,
+[2:13:45] pretty much as the number of mission modification.
+[2:13:48] Yeah, but here, one thing I'm a little scrappy about
+[2:13:50] is that I didn't really tell you
+[2:13:51] what's the parameters here in this matching application.
+[2:13:54] So technically if you want to write this formula,
+[2:13:56] you have to say, oh, this is W and B, and this is what?
+[2:13:59] Is it still using W and B or some other B?
+[2:14:03] So oftentimes use a different W and different B.
+[2:14:05] The shape is similar,
+[2:14:08] but the variables are different variables.
+[2:14:11] So then you have to introduce the bracket again.
+[2:14:14] So let's say this is the bracket one, B one,
+[2:14:17] And then here the parameters are W bracket two,
+[2:14:21] V two, so and so forth.
+[2:14:22] And then you index each of them
+[2:14:24] to fully specify the network.
+[2:14:34] Which matrix, sorry?
+[2:14:38] So this matrix?
+[2:14:39] Yeah.
+[2:14:40] Yeah, so, okay, yeah, so what these matrix are,
+[2:14:43] so the only requirement is that you need to make sure
+[2:14:45] dimensionality is compatible. So your input, wait, did I write z? Oh, yeah. So let's say
+[2:14:58] suppose your input z is, say, dimension d, then you can only apply a matrix with, so
+[2:15:07] to make w z make sense, you have to make sure w is of dimension something by d. And
+[2:15:14] And then something is what you can choose almost freely.
+[2:15:17] Of course, not all the options are the same,
+[2:15:19] eventually in terms of the results,
+[2:15:20] but for the compatibility issue perspective,
+[2:15:23] you can choose them arbitrarily.
+[2:15:25] And let's say suppose the first layer you choose,
+[2:15:28] let's say suppose you choose,
+[2:15:31] let's say you choose matrix multiplication, say,
+[2:15:36] W1,
+[2:15:38] B1,
+[2:15:41] Z plus C.
+[2:15:42] and suppose this W1 is M1 by D.
+[2:15:50] So that means that you map this D dimensional vector
+[2:15:52] to M1 dimensional vector.
+[2:15:54] So this output is gonna be M1 dimensional vector.
+[2:15:58] And then next time, okay, and if you apply a sigma,
+[2:16:01] it's still M1 dimensional vector.
+[2:16:03] And next time you apply the matrix multiplication,
+[2:16:05] you have to make sure that the input dimension
+[2:16:08] of that matrix to be compatible with M1.
+[2:16:10] So basically if you do another one,
+[2:16:13] say W2, B2, then it's required that W2
+[2:16:19] needs to be something times M1 dimension.
+[2:16:24] And something, the output dimension is still
+[2:16:26] what you can choose freely,
+[2:16:28] but the input dimension is not.
+[2:16:30] And the next, and you have to do this again and again.
+[2:16:33] So once you have multiple dimensions, then,
+[2:16:35] so basically, maybe the easy way to think about it
+[2:16:38] is that you have a matrix, right?
+[2:16:40] times, say, z plus b.
+[2:16:43] So this dimension is what I call the input dimension,
+[2:16:45] because this dimension got multiplied
+[2:16:47] with the dimension of z.
+[2:16:48] And this dimension is the output dimension.
+[2:16:50] But the output dimension becomes the input dimension
+[2:16:52] for the next round.
+[2:16:53] So that's why you need to make sure
+[2:16:54] all the dimensionalities to be compatible.
+[2:16:58] That makes sense?
+[2:16:59] And in many cases, I think, you know,
+[2:17:01] the original input dimension is something
+[2:17:06] you cannot change, right?
+[2:17:07] So that's fixed, that's based on our data.
+[2:17:10] And then afterwards, you don't change dimensions that often.
+[2:17:13] You typically use the same dimensions for quite a while,
+[2:17:16] but maybe you change it once or twice, something like that.
+[2:17:22] Okay.
+[2:17:27] And you know, just in case you read some of the old papers,
+[2:17:31] which I think even these days,
+[2:17:33] still the architecture papers sometimes draw like this.
+[2:17:35] They just draw, people go more and more abstract, right?
+[2:17:39] they say I have an input X,
+[2:17:41] and then apply a matrix modification,
+[2:17:45] and then apply another, maybe sigma,
+[2:17:47] and apply another matrix modification, so and so forth.
+[2:17:50] That's how people actually draw these networks,
+[2:17:53] without spacing all details.
+[2:17:56] And you can even merge these two together to call it MLP.
+[2:17:59] So sometimes you would just draw this, you'd have X,
+[2:18:02] and if MLP is called multi-layer perception,
+[2:18:05] often it encapsulates one or two layers of this,
+[2:18:12] a few of these components.
+[2:18:13] When people say MLP, I think sometimes
+[2:18:15] it's one matrix multiplication, one sigma,
+[2:18:18] sometimes it's two matrix multiplication,
+[2:18:20] so on and so forth.
+[2:18:22] I have a question, so do you need like the,
+[2:18:23] do the way, do the way to get to,
+[2:18:27] like if it's become the form inside,
+[2:18:29] or do you like, like,
+[2:18:31] do you have like a common strategy there, or?
+[2:18:35] I think in most cases you get smaller dimensions.
+[2:18:38] The intermediate dimensions become smaller.
+[2:18:40] And that's often because the input dimension is often very big.
+[2:18:42] For example, for language, it's kind of like your initial, the vocab is kind of like the
+[2:18:49] token.
+[2:18:50] I guess I'm jumping ahead a little bit, but your initial dimension could be like 250K
+[2:18:54] or something like that.
+[2:18:55] And then you shrink it to probably 2K and then keep using 2K.
+[2:18:58] Yeah, something like that.
+[2:18:59] And for vision, I think the same thing, because initially you have an RGB encoded kind of
+[2:19:03] like image, you have three RGB numbers,
+[2:19:07] and each is 256 by 256, or maybe,
+[2:19:10] depending on the resolution,
+[2:19:11] and you have to shrink it a little bit.
+[2:19:14] Yeah.
+[2:19:17] Okay, what else?
+[2:19:18] I think one thing is called ResNet.
+[2:19:19] I think that's still useful,
+[2:19:20] so probably I should tell you about it.
+[2:19:22] So, let me erase something here.
+[2:19:29] But eventually, you can define many components like this.
+[2:19:31] most of these components are matrix simplifications,
+[2:19:34] activations, and I'm gonna tell you a few other components
+[2:19:36] that are still largely being used in different cases.
+[2:19:43] And some of the very modern cases
+[2:19:45] in using more than components like attention
+[2:19:51] using language, I'm gonna talk about those
+[2:19:54] in large language model lectures.
+[2:19:56] So these are some, so one of the components
+[2:20:00] is called residual network,
+[2:20:03] or just residual connections,
+[2:20:06] if you think about the component.
+[2:20:09] So the residual connection is like this.
+[2:20:11] So instead of using, keep using this kind of things,
+[2:20:16] the residual connection is kind of like,
+[2:20:19] let's call it residual Z,
+[2:20:21] is this interesting thing where you have a,
+[2:20:26] two applications of this alternating between
+[2:20:30] matrix modification and activations,
+[2:20:34] and then you add your input again back to it.
+[2:20:38] So one thing that is, at least by definition,
+[2:20:42] it means that you don't change the dimension here.
+[2:20:46] Because to make this compatible, your input dimension and output dimension
+[2:20:50] are exactly the same. And of course,
+[2:20:54] these two matrix amplifications are not using the same weight matrices. I'm not just
+[2:20:58] right exactly what they are, but they are not using the same matrices.
+[2:21:01] And this is called a residual block.
+[2:21:05] And this was introduced in 2015 in this very famous residual network paper. I think the
+[2:21:18] the rationale was that if, let's say suppose, by the way, this z doesn't have to be our
+[2:21:26] original raw input. This could be one intermediate layer, and then you apply this z, you apply
+[2:21:31] this residual block, and then you can actually apply many, many residual blocks. So eventually,
+[2:21:37] this is called residual block, and eventually the residual network, the residual net looks
+[2:21:44] like with some approximation, it's kind of like you apply a lot of residual net many,
+[2:21:50] many times. And at the beginning, you need to kind of do something maybe to change the
+[2:21:55] dimension, because you cannot work with the original dimension. So you first change the
+[2:22:00] dimension to some dimension of the intermediate dimensions, and then you apply many, many
+[2:22:04] residual network. And maybe you have to apply one more at the end to change the dimension
+[2:22:08] again. But largely speaking, it's the application of many, many residual blocks, and that's
+[2:22:12] That's called residual network.
+[2:22:14] And the original motivation was that, why you apply this?
+[2:22:18] That's because suppose you believe that at some point you are already getting close to
+[2:22:23] your labels.
+[2:22:24] So suppose at some point z is already approximately equal to y, let's say.
+[2:22:29] Y is your target and z is your intermediate variables in some intermediate layers.
+[2:22:37] then you probably should model the differences explicitly,
+[2:22:42] because you're already kind of close,
+[2:22:44] you just probably should use the networks
+[2:22:45] to model the only differences.
+[2:22:48] So basically you should probably just model Z minus Y
+[2:22:50] as some residual, or maybe Y minus Z, sorry.
+[2:22:54] Say Y minus Z as some residual of Z.
+[2:22:59] And if you believe in that, sorry, not the residual of Z.
+[2:23:04] Y minus Z to be some kind of flattening right work,
+[2:23:06] something like this.
+[2:23:09] Plus y, like this.
+[2:23:11] Right, so if this is your belief,
+[2:23:13] then if you move z to the other side,
+[2:23:15] then you have y is equal to sigma m z plus z.
+[2:23:20] And you can see that this is kind of like
+[2:23:21] almost the same as here.
+[2:23:23] The only difference is that they found out
+[2:23:24] actually you probably shouldn't use one layer
+[2:23:26] to model the difference.
+[2:23:27] You should use two layers to model the difference.
+[2:23:29] So they say, oh, let's say you do two of this.
+[2:23:33] And then the same thing you just have
+[2:23:36] So this is just a story.
+[2:23:39] It's not like there's any formal proof there.
+[2:23:43] And actually, people have tried to,
+[2:23:46] 10 years ago, people have tried,
+[2:23:47] maybe seven years ago,
+[2:23:48] people have tried to see how many blocks here
+[2:23:52] you should do.
+[2:23:53] You can do two layers, three layers, L layers,
+[2:23:55] and eventually I think two or three layers are the best.
+[2:23:59] Also for reasons we don't fundamentally understand,
+[2:24:01] necessarily.
+[2:24:03] Yeah, so that's residual network.
+[2:24:05] I thought, yeah.
+[2:24:06] So, suppose this is the modeling assumption.
+[2:24:19] You model only the differences, then, so this implies this, and they are the same, right?
+[2:24:24] Which one is the hypothesis depends on what you believe in.
+[2:24:27] But somehow, if you somehow believe that, it's more beneficial to model directly the
+[2:24:33] the residual, then you do this, right?
+[2:24:36] And then you change, and you rearrange, you get this.
+[2:24:39] That's the only thing I'm saying.
+[2:24:41] Nothing profound.
+[2:24:47] And there are other kind of like explanations
+[2:24:49] for why this works, you know.
+[2:24:50] For example, some of the theorists,
+[2:24:52] they try to analyze the optimization perspective
+[2:24:55] of different modeling, right?
+[2:24:56] So basically, if you don't add z here,
+[2:24:59] versus you add z, you know, in some cases,
+[2:25:01] you can argue that adding z will make the optimization easier,
+[2:25:07] make your optimization more well-conditioned,
+[2:25:09] including some of my papers.
+[2:25:12] You know, I think there's some degree of truth there
+[2:25:14] as well, it's just that it's very hard to fundamentally,
+[2:25:17] you know, like you have many explanations for it,
+[2:25:22] it's very hard to know exactly
+[2:25:23] which one is the right explanation, yeah.
+[2:25:28] Maybe, let's see, I have seven minutes, any questions?
+[2:25:31] .
+[2:25:38] There's no, you know, I got a question, what's the intuition?
+[2:25:44] Maybe I see, so the intuition could be that, oh, maybe this is already small, then maybe
+[2:25:48] I should direct and model that, as opposed to model the original label.
+[2:25:52] So it's a simpler task.
+[2:25:53] The original label, you know, predicting an original label is very hard, but if you predict
+[2:25:58] the difference, probably it's easier.
+[2:25:59] So that's why you model easier tasks
+[2:26:01] with the two layer networks,
+[2:26:02] and that's pretty much it is.
+[2:26:05] Like there's no, nothing more formal than that.
+[2:26:11] Let's see, I have seven minutes, I think.
+[2:26:13] Let's see, should I have time to talk about two things?
+[2:26:18] Okay, so maybe let me quickly talk about layer norm,
+[2:26:25] and I can see whether I have time
+[2:26:26] to talk about the convolutional network.
+[2:26:29] So, layer norm is also something that people still use
+[2:26:34] in large language models.
+[2:26:36] So, of course, it's a slightly different form these days.
+[2:26:39] So, the original layer norm is the following.
+[2:26:43] So, basically, it's a component, right?
+[2:26:46] So, like, it's a block, so you have some input
+[2:26:47] that's called Z, and this component is trying
+[2:26:51] to normalize Z in some way.
+[2:26:53] And the way to normalize it is that you say
+[2:26:55] you first turn Z into some normalized version of Z,
+[2:26:58] which is z minus mu one over sigma one,
+[2:27:02] common z minus mu m sigma m.
+[2:27:05] Let's say z is the m-dimensional, sorry, z one.
+[2:27:08] No, my bad.
+[2:27:09] I should read the note,
+[2:27:10] I should follow the notes more closely.
+[2:27:11] I think this is of the same.
+[2:27:19] Yeah.
+[2:27:22] Maybe I should even use,
+[2:27:28] So let's say, I don't remember why I used hat,
+[2:27:35] but let's use hat.
+[2:27:37] So this is how we normalize.
+[2:27:39] Where mu hat is the empirical mean,
+[2:27:42] which is the average of all the zs.
+[2:27:47] And sigma hat is the empirical,
+[2:27:52] sigma hat squared is the empirical average
+[2:27:54] of the standard deviation.
+[2:27:58] So this will empirically normalize it to norm one, right?
+[2:28:04] So you can see it's pretty...
+[2:28:08] And then it's not done yet.
+[2:28:11] And then you turn this into,
+[2:28:14] sometimes people find out,
+[2:28:15] oh, actually mean zero and norm one
+[2:28:17] is not that great for whatever reason.
+[2:28:20] So they say, oh, let's be flexible.
+[2:28:21] Let's also add
+[2:28:23] of flexible tunable parameters, beta and gamma.
+[2:28:29] So let's turn, the next step is turn this into
+[2:28:34] beta plus gamma z1 minus mu hat, sigma hat.
+[2:28:47] Where beta is a tunable parameter,
+[2:28:50] beta is a variable that you can train,
+[2:28:51] and gamma is a variable you can change.
+[2:28:54] And so basically this make a mean beta
+[2:28:57] and a standard deviation gamma.
+[2:29:01] So that's the original layer norm.
+[2:29:03] And then later people realized,
+[2:29:05] actually you probably don't have to do this.
+[2:29:06] You just, so this is the layer norm.
+[2:29:09] And now I think there's something called RM-SAM norm,
+[2:29:12] which is even simpler.
+[2:29:14] You don't subtract the mean anymore.
+[2:29:18] You just divide by sigma.
+[2:29:20] So you just say you do z is turned into
+[2:29:25] z1 minus sigma1 sigma hat.
+[2:29:29] Say zm minus sigma hat.
+[2:29:31] And the sigma hat is also different.
+[2:29:33] Sigma hat is only the average.
+[2:29:41] You're only averaging over, you don't have to,
+[2:29:44] you don't subtract here.
+[2:29:44] So you just try to make the,
+[2:29:47] So sigma hat is something like one over m zi, sorry, zi squared.
+[2:30:04] And then you still do the beta thing, right?
+[2:30:06] Then you turn this into beta plus z1 over sigma hat.
+[2:30:17] Why this is kind of like more better or not,
+[2:30:20] I think it's mostly empirical.
+[2:30:24] So basically here, you don't really want to make it,
+[2:30:27] let me think about this.
+[2:30:28] Wait, sorry, I think you still need gamma.
+[2:30:30] Sorry, did I keep the gamma or the beta?
+[2:30:32] I keep the gamma, sorry, bye bye.
+[2:30:35] You do this.
+[2:30:36] So gamma is trainable parameter.
+[2:30:37] So basically this is saying,
+[2:30:38] I don't have to care about the shifting mean.
+[2:30:40] I don't really make it mean zero,
+[2:30:41] but I still care about normalizing it in some way.
+[2:30:44] but I still leave some degree of flexibility gamma,
+[2:30:47] which is not really normalizing.
+[2:30:48] I still allow it to be normalized to something
+[2:30:51] that I will decide later in my training.
+[2:30:54] Right, so this is kind of like the magic here.
+[2:30:56] It's not like you try to force it to normalize to one,
+[2:30:59] standard deviation,
+[2:31:00] you actually say I first normalize to one,
+[2:31:02] and then I leave a gamma parameter there
+[2:31:04] so that in the training I can normalize to anything.
+[2:31:08] And I think, let me see.
+[2:31:13] Yeah, I only have one.
+[2:31:14] So one benefit of all of this is that you make it
+[2:31:17] kind of like a scaling invariant
+[2:31:21] in terms of both the parameters and the data.
+[2:31:23] So what does that mean is that if you multiply,
+[2:31:27] so maybe let's say you call this whole thing called,
+[2:31:30] let's say z, let's just say, right,
+[2:31:35] so let's say suppose this whole operation
+[2:31:37] is called a layer norm.
+[2:31:39] So you apply z and you get a layer norm of z.
+[2:31:42] And you can find out that there's a scaling environment,
+[2:31:44] which means that if you apply a scalar,
+[2:31:48] let's say you multiply a scalar alpha to z,
+[2:31:51] and you get ln alpha z,
+[2:31:54] but ln alpha z is actually equals to ln z.
+[2:32:00] So basically, no matter how you multiply the input,
+[2:32:02] you don't really change it.
+[2:32:04] And so that's why no matter how you multiply your matrices
+[2:32:09] or you multiply your input data,
+[2:32:11] you never change the output.
+[2:32:14] Unless you change some of the parameters
+[2:32:16] like beta and gamma, which is,
+[2:32:18] in your test time, you're not supposed to change them.
+[2:32:20] So basically, this makes the model more scaling invariant.
+[2:32:24] And in some cases, it helps stabilize the model.
+[2:32:27] For example, at least intuitively,
+[2:32:31] with some degree of approximation,
+[2:32:33] there are, at least in the past,
+[2:32:35] when people tuned all of these models,
+[2:32:36] it happens that sometimes you apply
+[2:32:38] these layers many times,
+[2:32:41] and then the output becomes bigger and bigger.
+[2:32:43] And it becomes like really big,
+[2:32:46] it's like 10 to the 20 or something like that.
+[2:32:48] And then everything just blows up.
+[2:32:50] So when you normalize every time,
+[2:32:52] then you never got into this issue.
+[2:32:54] And also it makes the initialization
+[2:32:55] a little more kind of like easier
+[2:32:57] so that you don't have to, you know,
+[2:32:59] before like if you don't do something right,
+[2:33:00] then suddenly everything just blows up.
+[2:33:02] And now like the scaling doesn't really matter that much.
+[2:33:05] But there's also subtlety here because when you have,
+[2:33:08] okay, this might be a two advanced comments.
+[2:33:10] So one side effect of this is that
+[2:33:12] when the forward pass is scaling environment,
+[2:33:15] but actually the gradient is not scaling environment still.
+[2:33:17] So some of these issues got pushed into the optimization,
+[2:33:22] which is a much more complex matter.
+[2:33:25] Anyway, so I guess, let's see.
+[2:33:28] So I think the only thing I didn't cover
+[2:33:32] is the convolutional network.
+[2:33:34] I think it's in the lecture notes.
+[2:33:35] So if I spend one minute on it,
+[2:33:38] I think it just means that instead of multiplying
+[2:33:41] a full matrix, you actually multiply a topless matrix.
+[2:33:45] I'm not sure you heard of this word.
+[2:33:46] So basically it's a matrix with some structures.
+[2:33:48] We are like, so, yeah, instead of having this matrix,
+[2:33:54] convolutional network just basically means
+[2:33:55] you have a matrix that's kind of like, look like this.
+[2:33:58] The non-zeroes are only like this.
+[2:34:01] And it's actually the same set of non-zeroes.
+[2:34:02] So like you shift this vector here,
+[2:34:04] and you put it here, and you put it here,
+[2:34:06] and you put it here.
+[2:34:07] It's actually called a filter in some sense.
+[2:34:11] So this matrix, all the other parts of the matrix is zero,
+[2:34:13] and only this, what I drew here is non-zero,
+[2:34:17] and also they share the parameters.
+[2:34:18] So basically this vector is the same as this vector.
+[2:34:21] So you apply a shifting environment,
+[2:34:23] kind of like filter to the data,
+[2:34:27] and it's called convolution.
+[2:34:28] Of course, the real thing is a little bit more complicated,
+[2:34:30] because when you have 2D and so and so forth,
+[2:34:32] it becomes complicated.
+[2:34:34] But in the lecture notes, we have that.
+[2:34:36] But convolutional network is not used that much,
+[2:34:39] except for very hardcore vision cases.
+[2:34:41] Like even for vision cases, people use language models,
+[2:34:44] like transformers a lot.
+[2:34:47] So that's why it's fine to skip them.
+[2:34:50] Okay, sounds good.

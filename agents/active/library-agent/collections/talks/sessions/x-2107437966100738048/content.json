@@ -1,0 +1,456 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "no_slides": false,
+ "title": "Agentic AI: מבוא, design patterns וטיפים מעשיים לבניית agentic workflows",
+ "subtitle": "Andrew Ng על מה שמבדיל צוות שבונה agents טוב מצוות שבונה agents בינוניים: פירוק משימות, evals ו-error analysis",
+ "meta": [
+  "Andrew Ng · DeepLearning.AI (קורס Agentic AI, לפי המיתוג בשקפים) · פורסם מחדש ב-X על ידי Komal Prajapati · 2026-10-06",
+  "משך: כ-106 דקות · X",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Andrew Ng",
+ "topics": [
+  "Agentic AI",
+  "Evals",
+  "Error Analysis",
+  "Multi-Agent"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "הסרטון הוא קומפילציה של כ-106 דקות מתוך קורס Agentic AI של DeepLearning.AI. בשקפים מופיעים המיתוג של DeepLearning.AI והשם Andrew Ng, והדובר עצמו מדבר כל הזמן על \"the next video\" ועל \"module\". הוא פורסם מחדש ב-X עם כיתוב שיווקי של מי שהעלה אותו. את הכיתוב הזה לא לקחנו כמקור: כל הטענות כאן מבוססות על התמלול ועל השקפים בלבד. בתמלול יש קפיצות זמן (למשל מ-1:31 ל-4:32), ולכן חלקים מהקורס, ובעיקר המודול על tool use והחלק על \"code as plan\", חסרים בו.\n\nהטיעון המרכזי של Ng: agentic workflow הוא תהליך שבו אפליקציה מבוססת LLM מבצעת כמה צעדים כדי להשלים משימה, ולא מייצרת תשובה אחת בבת אחת. הוא מסביר למה זה משפר ביצועים יותר ממעבר לדור מודל חדש, ומציג ארבעה design patterns: reflection, tool use, planning ו-multi-agent. לטענתו, הדבר שמנבא יותר מכל הצלחה של צוות הוא תהליך פיתוח ממושמע שבנוי על evals ועל error analysis, ולא הארכיטקטורה."
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות המרכזיות, כל אחת עם הראיה והחותמת שלה, ומה לא נאמר."
+    ],
+    [
+     "2. מה זה agentic ומידת האוטונומיה: ",
+     "מאיפה בא המונח, ולמה הוא מעדיף תואר ולא הגדרה בינארית."
+    ],
+    [
+     "3. למה זה עובד ואיך מפרקים משימה: ",
+     "שלושת היתרונות, ומבחן ה-\"LLM או tool?\" לכל צעד."
+    ],
+    [
+     "4. ארבעת ה-design patterns: ",
+     "reflection, tool use, planning ו-multi-agent, ומה הרמה הנוכחית של השליטה בכל אחד."
+    ],
+    [
+     "5. Evals ו-error analysis: ",
+     "הלב של הקורס: מערך evals של 20 דוגמאות, טבלת 2×2, traces וגיליון ספירת שגיאות."
+    ],
+    [
+     "6. מודלים, עלות, latency ותהליך העבודה: ",
+     "איך משפרים רכיבים, איך מפתחים אינטואיציה למודלים, ומתי כדאי לדאוג לעלות."
+    ],
+    [
+     "7. Planning ו-multi-agent: ",
+     "תוכניות ב-JSON, ומנהל agent שמתאם צוות."
+    ],
+    [
+     "8 ו-9. מה לעשות עכשיו ומילון מונחים.",
+     ""
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך הופק אוטומטית מהתמלול ומהשקפים של ההקלטה. שמות ומונחים עלולים להיות משובשים בגלל זיהוי הדיבור (ASR), למשל \"LOM\" במקום LLM, \"Tavilli\" במקום Tavily ו-\"U.com\" במקום You.com. המקומות שבהם השם לא ודאי מסומנים בטקסט. הציטוטים מועתקים מילה במילה ונבדקו מול החותמת שלהם. שום דבר לא נוסף ממקורות חיצוניים."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "זה תוכן לימודי, לא הכרזה. אין בו מוצר, אין בו מספרי עסקים ואין בו ארכיטקטורה של מערכת production ספציפית. מה שכן יש בו: מסגרת חשיבה מסודרת שמגובה בדוגמאות קטנות וקונקרטיות, כמו research agent, עיבוד חשבוניות, מענה למייל של לקוח, הסרת PII ו-agent לחנות משקפי שמש. המסר שחוזר לאורך כל הקורס הוא שבנייה בלי ניתוח היא בזבוז זמן."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "Agentic זה תואר ולא סטטוס: ",
+     "Ng טבע את המונח כדי לעקוף את הוויכוח \"זה agent או לא\", ומודה ש-\"a bunch of marketers would get hold of this term and use it as a sticker\" [0:00]. מערכות נעות על רצף בין צעדים קבועים מראש לבין LLM שמחליט בעצמו על סדר הצעדים [10:41]."
+    ],
+    [
+     "workflow על מודל ישן מנצח החלפת דור: ",
+     "לדבריו, השיפור שמתקבל ממעבר דור מודל קטן מזה שמתקבל מהוספת agentic workflow לדור הקודם [13:46]. מספרי ה-HumanEval עצמם לא הוקראו."
+    ],
+    [
+     "פירוק משימות הוא המיומנות הבסיסית: ",
+     "לגבי כל צעד בודקים אם LLM או tool יכולים לבצע אותו. אם לא, מפרקים אותו עוד, כמו בדוגמת החיבור שעבר מצעד אחד לשלושה ואז לחמישה [19:55, 23:10]."
+    ],
+    [
+     "ארבעה design patterns: ",
+     "reflection, tool use, planning ו-multi-agent collaboration [30:58]. reflection \"isn't magic\" אבל נותן שיפור ניכר [32:32]. planning ו-multi-agent קשים יותר לשליטה [35:35, 37:10]."
+    ],
+    [
+     "evals קטנים ומהירים עדיפים על שיתוק: ",
+     "10 עד 20 דוגמאות מספיקות כדי להתחיל, ומשפרים את מערך ה-evals יחד עם המערכת [41:48, 49:31]. הוא מסווג evals לפי שני צירים: קוד מול LLM-as-judge, ו-ground truth לכל דוגמה מול בלי [49:31]."
+    ],
+    [
+     "error analysis במקום תחושת בטן: ",
+     "קוראים traces של הדוגמאות הכושלות וסופרים בגיליון איזה רכיב אשם. אחרת \"many months of work with very little progress\" [54:13, 58:52]."
+    ],
+    [
+     "מודלים גדולים מצייתים יותר להוראות: ",
+     "במשימת הסרת PII, Llama 3.1 8B פספס שם ושבר את הפורמט, ומודל חזק יותר (GPT-5 לפי השקף) הצליח [1:08:12]."
+    ],
+    [
+     "איכות קודם, עלות ו-latency אחר כך: ",
+     "מודדים זמן ועלות לכל צעד ורק אז בוחרים מה לייעל. בדוגמה: 7, 5, 3, 11 ו-18 שניות [1:12:49]."
+    ],
+    [
+     "צוותים חסרי ניסיון בונים יותר מדי ומנתחים מעט מדי: ",
+     "תהליך העבודה הנכון עובר הלוך ושוב בין בנייה לניתוח, ולא מתקדם בקו ישר [1:17:33]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "אין מספרים לגרף ה-HumanEval: ",
+     "השקף מציג את GPT-3.5 ואת GPT-4 בצירוף ארבעה patterns, אבל באודיו לא הוקראו אחוזים, ולכן הטענה \"workflow מנצח דור מודל\" נשענת על גרף שלא קראנו את ערכיו."
+    ],
+    [
+     "ספירת השגיאות נקטעת: ",
+     "מגיליון ה-error analysis נשמר בתמלול רק \"5% מהזמן\" עבור search terms. שאר האחוזים חסרים בגלל קפיצה בתמלול."
+    ],
+    [
+     "לא הומלץ על framework: ",
+     "הוא אומר שיש \"quite a lot of software frameworks\" ל-multi-agent, אבל לא נוקב בשם אף אחד מהם. הכלי היחיד שהוא מזכיר בשמו הוא AI Suite, שבו הוא עצמו משתמש."
+    ],
+    [
+     "חלקים חסרים: ",
+     "המודול על tool use והחלק על \"code as plan\" לא נכללו בקומפילציה, וגם הפתרון בפועל לבעיית ה-latency נקטע."
+    ],
+    [
+     "אין דיון על בטיחות, הרשאות או guardrails ל-agents אוטונומיים. הוא אומר רק שהם \"harder to control\".",
+     ""
+    ],
+    [
+     "הטענות בכיתוב של הפוסט ב-X, כמו \"godfather of AI\" ו-\"free course\", לא מופיעות בתמלול ולא נבדקו.",
+     ""
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. מה זה agentic ומידת האוטונומיה"
+  },
+  {
+   "kind": "image",
+   "file": "k_039.jpg",
+   "caption": "השקף Degrees of autonomy: ציר מ-Less autonomous ל-More autonomous. בקצה הפחות אוטונומי כל הצעדים קבועים מראש, כל השימוש ב-tools מקודד מראש, והאוטונומיה היא רק בטקסט שה-LLM מייצר.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Ng פותח בהשוואה: לבקש מ-LLM לכתוב חיבור זה כמו לבקש מאדם להקליד \"by writing from the first word to the last word on one go and without ever using backspace\" [1:31]. ב-agentic workflow מתכננים outline, מחפשים ברשת, כותבים טיוטה, קוראים אותה ומתקנים. ההדגמה שמלווה את הקורס היא research agent שמקבל את השאלה איך להקים חברת רקטות שתתחרה ב-SpaceX. הוא מתכנן, מחפש ברשת, מדרג ממצאים, מעביר את הטיוטה ל-editor agent ומפיק דוח markdown [4:32]. Ng מספר שבנה research agents כאלה לציות משפטי, לבריאות ולמחקר מוצר [6:05].\n\nבשאלה \"מה זה agent\" הוא מציע להפסיק להתווכח: לדבריו, הוא התחיל להשתמש במונח agentic \"if we use it as an adjective rather than a binary\" [6:05]. בקצה הפחות אוטונומי המהנדס קובע את רצף הצעדים ואת הקריאות ל-tools. בקצה האוטונומי ה-LLM מחליט מה לחפש, כמה עמודים להביא, אם להמיר PDF לטקסט ואם לחזור אחורה, ויש agents שאפילו כותבים tools חדשים. השורה התחתונה שלו: רוב הערך העסקי היום נמצא בקצה הפחות אוטונומי, והקצה האוטונומי \"less easily controllable a little bit more unpredictable\" ועדיין נמצא במחקר [10:41]."
+  },
+  {
+   "kind": "h1",
+   "text": "3. למה זה עובד ואיך מפרקים משימה"
+  },
+  {
+   "kind": "image",
+   "file": "k_043.jpg",
+   "caption": "השקף Key benefits of agentic workflows: שלושה יתרונות. ביצועים טובים בהרבה (עם תמונה מוקטנת של גרף HumanEval), מהירות גבוהה מזו של אדם בזכות parallelization, ומודולריות: אפשר להוסיף או לעדכן tools ולהחליף מודלים.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "היתרון הראשון הוא ביצועים. על גרף ה-HumanEval (שקף k_042, GPT-3.5 ו-GPT-4 מול Non-agentic, Reflection, Tool Use, Planning ו-Multiagent) הוא אומר ש-\"the improvement from one generation of model to another, which is huge, is still not as big a difference as implementing an agentic workflow on their previous generation of model\" [13:46]. היתרון השני הוא מקביליות. ה-workflow איטי יותר מבקשה אחת למודל, אבל מהיר יותר מאדם, כי אפשר להוריד תשעה עמודים במקביל במקום לקרוא אותם אחד אחרי השני. השלישי הוא מודולריות: אפשר להחליף מנוע חיפוש (הוא מונה את Google דרך Serper, את Bing, DuckDuckGo, Tavily ו-You.com, כשהשמות האחרונים משובשים ב-ASR), להוסיף מנוע חדשות, או להשתמש ב-LLM שונה לכל צעד [15:17].\n\nפירוק משימה מתחיל בגרסה הנאיבית ומעמיק לפי מה שהתוצאות מראות. דוגמה: חיבור שיצא \"disjointed\" גרם לו לפרק את צעד הכתיבה לטיוטה, ביקורת ותיקון [18:22]. דוגמה נוספת: מענה למייל של לקוח, שמתפרק לחילוץ פרטים, query למסד ההזמנות ושליחת מייל דרך API [19:55]. לגבי כל צעד הוא שואל: \"can this step be implemented with either an LLM or with one of the tools, such as an API or a function call that I have access to?\" ואם התשובה שלילית, הוא שואל איך אדם היה מבצע את הצעד ומפרק עוד [23:10]."
+  },
+  {
+   "kind": "image",
+   "file": "k_052.jpg",
+   "caption": "מייל מלקוחה שקיבלה מצנם אדום במקום בלנדר (הזמנה #8847), לצד הפירוק לשלושה צעדים: חילוץ פרטים עם LLM, איתור רשומות עם LLM ו-orders database query, וכתיבה ושליחה עם LLM ו-send email.",
+   "width": 5.6
+  },
+  {
+   "kind": "h1",
+   "text": "4. ארבעת ה-design patterns"
+  },
+  {
+   "kind": "image",
+   "file": "k_057.jpg",
+   "caption": "השקף Agentic Design Patterns: רשימה ממוספרת של Reflection, Tool use, Planning ו-Multi-agent collaboration.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Reflection: מבקשים מהמודל לבדוק קוד שהוא עצמו כתב, \"for correct and style and efficiency\", מחזירים לו את הביקורת ומקבלים גרסה 2. אם גם מריצים את הקוד ומעבירים את הודעות השגיאה, מקבלים גרסה 3. הוא מסייג: \"this design pattern isn't magic. It does not result in everything working 100% of the time\" [32:32]. אפשר גם להפריד לשני agents, כותב ו-critic. בעיניו, agent הוא בסך הכול LLM עם prompt של persona.\n\nPlanning: ה-LLM ולא המפתח קובע את רצף הצעדים. \"Agents that plan today are harder to control and somewhat more experimental, but sometimes it can give really delightful results\" [35:35]. Multi-agent: הוא מביא את ChatDev של Chen Qian ושותפיו (השם כפי שנשמע ב-ASR), שבו agents בתפקידי CEO, programmer, tester ו-designer מתפקדים כחברת תוכנה וירטואלית, ואת הדוגמה של researcher, marketer ו-editor שמפיקים ברושור. ההסתייגות שלו: \"Multi-agent workflows are more difficult to control since you don't always know ahead of time what the agents will do\". מצד שני, לדבריו מחקרים מראים שיפור במשימות כמו כתיבת ביוגרפיות ובחירת מהלכי שחמט [37:10]. המספרים עצמם מופיעים רק בשקף."
+  },
+  {
+   "kind": "image",
+   "file": "k_060.jpg",
+   "caption": "השקף Multi-agentic workflows: משמאל איור של ChatDev, ומימין טבלת Multiagent Debate (Du et al., 2023) של single agent מול multi-agent. Biographies: 66.0% מול 73.8%. MMLU: 63.9% מול 71.1%. Chess move: 29.3% מול 45.2%. המספרים נקראו מהשקף ולא נאמרו באודיו.",
+   "width": 5.6
+  },
+  {
+   "kind": "h1",
+   "text": "5. Evals ו-error analysis: הלב של הקורס"
+  },
+  {
+   "kind": "image",
+   "file": "k_066.jpg",
+   "caption": "השקף Two axes of evaluation: טבלת 2×2. ציר אחד: Evaluate with code (objective) מול LLM-as-judge (subjective). ציר שני: per example ground truth מול no per example ground truth.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "השיטה שלו: בונים מהר מערכת end-to-end \"quick and dirty\", קוראים את הפלטים, ונותנים לשגיאות שחוזרות על עצמן לקבוע מה מודדים. בדוגמת החשבוניות התגלה שהמערכת מבלבלת בין תאריכים, ולכן הוא אסף \"10 to 20 invoices and manually write down what is the due date\", ביקש מהמודל פורמט YYYY-MM-DD, חילץ אותו ב-regex והשווה ל-ground truth [41:48]. בדוגמת copy שיווקי היעד אחיד (10 מילים לכל דוגמה), ולכן לא צריך ground truth לכל דוגמה [44:52]. ב-research agent יש 3 עד 5 נקודות gold standard לכל נושא, ו-LLM-as-judge סופר כמה מהן מופיעות ומחזיר JSON עם ציון והסבר [46:23]. הארבעה משתלבים בטבלת 2×2, והטבלה מתייחסת ל-end-to-end evals.\n\nהטיפים: \"First, quick and dirty evals is fine to get started\". הוא רואה צוותים \"almost paralyzed because they think building evals is this massive multi-week effort\" [49:31]. כשה-eval לא מראה שיפור שהעין שלכם רואה, זה סימן להגדיל את המערך או לשנות את המדד. ככל שה-evals מבשילים, \"you can then shift more and more of your trust to the metric-based evals\" [51:07]. ומשם ל-error analysis: כשה-research agent מפספס נקודות מפתח, כל אחד מהרכיבים יכול להיות האשם, כלומר search terms, מנוע החיפוש, בחירת המקורות, ה-fetch או הכתיבה. ניחוש לפי תחושת בטן \"sometimes that leads to many months of work with very little progress in the overall performance of the system\" [54:13]. הפתרון: לקרוא את ה-trace, כלומר \"the overall set of outputs of all of the intermediate steps\" (פלט של צעד בודד נקרא span), ולהתמקד רק במקרים הכושלים [57:19]."
+  },
+  {
+   "kind": "image",
+   "file": "k_070.jpg",
+   "caption": "השקף Counting up the errors: גיליון שבו כל שורה היא prompt (חורים שחורים, שכירות מול קנייה בסיאטל, רובוטיקה לקטיף פירות, סוללות לרכב חשמלי) וכל עמודה היא רכיב (Search terms, Search results, Picking 5 best sources). בתאים: \"Too many blog posts, not enough papers\", \"Terms too generic\", \"Only selected US-based companies\".",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "שגיאה מוגדרת כמצב שבו צעד מפיק \"something that performs significantly worse than maybe what a human expert would have given a similar input\" [58:52]. ההגדרה הזאת חשובה, כי היא קובעת שלא מאשימים רכיב שקיבל קלט גרוע. אם תוצאות החיפוש היו בלוגים פופולריים, צעד בחירת חמשת המקורות עשה את הטוב ביותר שאפשר היה. סופרים כמה פעמים כל רכיב אשם (בתמלול נשמר רק ש-search terms אשמים ב-5% מהמקרים), ומשקיעים במקום שבו הספירה הכי גבוהה [1:02:01]."
+  },
+  {
+   "kind": "h1",
+   "text": "6. שיפור רכיבים, מודלים, עלות ותהליך העבודה"
+  },
+  {
+   "kind": "image",
+   "file": "k_078.jpg",
+   "caption": "השקף Instruction following results (GPT-5): המודל מזהה את כל ה-PII (שם מלא, מספר ביטוח לאומי וכתובת), מחזיר טקסט מצונזר, ומקבל את ההערות Followed formatting instruction ו-Identified all PII. בשקף הקודם, Llama 3.1 8B מסומן Didn't follow the instructions properly ו-Missed some PII.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "ברכיבים שאינם LLM מכווננים hyperparameters, למשל מספר תוצאות וטווח תאריכים בחיפוש, similarity threshold ו-chunk size ב-RAG, או detection threshold בזיהוי אנשים. אפשר גם להחליף ספק [1:03:34]. ברכיבי LLM מוסיפים הוראות מפורשות ו-few-shot examples, או מחליפים מודל. בדוגמת ה-PII, Llama 3.1 8B (נשמע \"OpenWay Lambda 3.1\" ב-ASR) הפר את הפורמט, פספס את השם וצנזר רק חלק מהכתובת. באודיו המודל השני מתואר רק כ-\"a more intelligent model\", והשקף מזהה אותו כ-GPT-5. המסקנה שלו: \"the larger frontier models tend to be much better at following instructions\" [1:06:38]. כדי לפתח אינטואיציה הוא ממליץ לשחק עם כל מודל חדש, להחזיק סט evals אישי ולקרוא prompts של אחרים. הוא משתמש ב-AI Suite כדי להחליף מודלים בקלות [1:11:18].\n\nבעלות וב-latency הוא מטפל רק אחרי שהאיכות טובה. הוא מספר שמוצר הצליח כל כך שהעלות הפכה לבעיה, ומוסיף: \"But that's a good problem to have.\" [1:12:49]. השיטה: מודדים זמן לכל צעד (7 שניות ל-search terms, 5 לחיפוש, 3, 11 ו-18 לכתיבת החיבור) ושוקלים parallelism, למשל ב-fetch. כך מתגלה לפעמים שרכיב מסוים לא תורם משמעותית לעלות או ל-latency [1:16:00]. בסיכום הוא מתאר תהליך שעובר הלוך ושוב בין build ל-analyze: מערכת end-to-end, קריאת traces, eval של 10 עד 20 דוגמאות, error analysis, ובסוף component-level evals [1:17:33]."
+  },
+  {
+   "kind": "quote",
+   "text": "And what I see less experienced teams often do is spend a lot of time building and probably much less time analyzing with error analysis, building evals, and so on.",
+   "by": "— Andrew Ng [1:17:33]"
+  },
+  {
+   "kind": "h1",
+   "text": "7. Planning ו-multi-agent: תוכניות ב-JSON ומנהל שמתאם צוות"
+  },
+  {
+   "kind": "image",
+   "file": "k_095.jpg",
+   "caption": "השקף Formatting plan as JSON: ה-system prompt המעודכן מבקש תוכנית ב-JSON שבה לכל צעד יש מספר, תיאור, שם tool וארגומנטים. מימין דוגמת plan: צעד 1 הוא get_item_descriptions עם query \"round sunglasses\", וצעד 2 הוא check_inventory.",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "דוגמת planning: חנות משקפי שמש עם tools כמו get_item_descriptions, check_inventory, get_item_price, process_item_return ו-process_item_sale. לשאלה \"round sunglasses in stock under $100\" ה-LLM כותב תוכנית ומבצע אותה צעד אחרי צעד, ומקבל לכל צעד את הפלט של הצעד הקודם. היתרון: \"we did not have to decide in advance\" באיזה סדר לקרוא ל-tools, ובקשה אחרת, כמו החזרת משקפיים עם מסגרת זהב, תייצר תוכנית אחרת [1:23:40]. לדבריו, planning כבר עובד היטב ב-agentic coding, ובשאר התחומים הוא עדיין ניסיוני: \"one of the challenges of planning is it makes the system sometimes a little bit harder to control\" [1:25:12]. לגבי פורמט, JSON או XML הם האפשרויות הטובות, markdown עמום יותר, ו-\"I think plain text is maybe the least reliable of these options\" [1:28:21].\n\nב-multi-agent האנלוגיה שלו היא processes ו-threads על מחשב אחד: חלוקה לתפקידים מקלה על המפתח לחשוב [1:29:55]. researcher עם web search, graphic designer עם image generation או code execution, ו-writer בלי tools, וכל אחד מהם הוא LLM עם prompt של תפקיד [1:32:57]. הוא מציג שני דפוסי תקשורת נפוצים: linear, ומנהל agent שמתכנן ומאציל, כשהמנהל הוא בעצמו \"fourth agent\" [1:37:30]. שאר הדפוסים פחות צפויים, למשל all-to-all, שבו כל הודעה נכנסת ל-context של מי שמקבל אותה: \"In practice, I find the results of all-to-all communication patterns a bit hard to predict.\" [1:42:07]. לדבריו הוא מתאים רק כשאפשר לסבול קצת כאוס ולהריץ שוב."
+  },
+  {
+   "kind": "image",
+   "file": "k_103.jpg",
+   "caption": "השקף Planning with multiple agents: system prompt של marketing manager עם צוות agents (researcher, graphic designer, writer). התוכנית: לבקש מה-researcher מחקר טרנדים, מה-graphic designer תמונות ומה-writer דוח, ואז Review report. כל שלב מועבר ל-agent המתאים.",
+   "width": 6.3
+  },
+  {
+   "kind": "h1",
+   "text": "8. מה לעשות עכשיו"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "התחילו מהקצה הפחות אוטונומי: ",
+     "workflow שבו המהנדס קובע את הצעדים מראש. שם נמצא רוב הערך, ושם הכי קל לשלוט במערכת [10:41]."
+    ],
+    [
+     "פרקו כל משימה עד שכל צעד הוא LLM או tool: ",
+     "ואם התוצאה לא טובה, פרקו שוב את הצעד החלש [23:10]."
+    ],
+    [
+     "בנו מחר eval של 10 עד 20 דוגמאות: ",
+     "בחרו את השגיאה הנפוצה ביותר שראיתם בפלטים, ושייכו אותה לרבע המתאים בטבלת ה-2×2 [41:48, 49:31]."
+    ],
+    [
+     "תעדו traces מהיום הראשון: ",
+     "בלי פלטי ביניים אי אפשר לעשות error analysis [57:19]."
+    ],
+    [
+     "החזיקו גיליון ספירת שגיאות לפי רכיב: ",
+     "אל תאשימו רכיב שקיבל קלט גרוע, והשקיעו במקום שבו הספירה הכי גבוהה [58:52]."
+    ],
+    [
+     "השתמשו ב-wrapper שמאפשר להחליף מודל בקלות: ",
+     "והשוו מודלים לכל צעד בנפרד בעזרת ה-evals [1:11:18]."
+    ],
+    [
+     "מדדו זמן ועלות לכל צעד לפני שאתם מייעלים: ",
+     "ורק אחרי שהאיכות כבר טובה [1:16:00]."
+    ],
+    [
+     "העדיפו plans ב-JSON או ב-XML על פני טקסט חופשי: ",
+     "וכשאפשר, תקשורת linear או דרך מנהל ולא all-to-all [1:28:21, 1:42:07]."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "למה זה חשוב",
+    "מה נאמר בהרצאה"
+   ],
+   "rows": [
+    [
+     "מה בדיוק הפער ב-HumanEval בין non-agentic ל-agentic?",
+     "זו הראיה המרכזית לטענה שה-workflow חשוב יותר מדור המודל",
+     "רק טענה איכותית. הגרף מוצג בלי שהמספרים מוקראים [13:46]"
+    ],
+    [
+     "מתי כדאי לעבור מ-end-to-end evals ל-component-level evals?",
+     "בניית evals לכל רכיב עולה זמן",
+     "\"when it's even more mature\", בלי סף מוגדר [1:17:33]"
+    ],
+    [
+     "איך שולטים ב-agent שמתכנן בעצמו בזמן ריצה?",
+     "מפתח לא יודע מראש איזו תוכנית תיווצר",
+     "הוכר כאתגר, ופתרון לא הוצג [1:25:12]"
+    ],
+    [
+     "באיזה framework כדאי להשתמש ל-multi-agent?",
+     "בחירת framework משפיעה על דפוסי התקשורת שאפשר לממש",
+     "\"quite a lot of software frameworks\", בלי שמות [1:42:07]"
+    ],
+    [
+     "האם LLM-as-judge אמין מספיק כדי לסמוך עליו?",
+     "ה-evals הסובייקטיביים נשענים עליו",
+     "לא נדון כיול של ה-judge מול שיפוט אנושי"
+    ],
+    [
+     "איך זה משתלב עם הרשאות ואבטחה כש-agent שולח מיילים או מבצע מכירות?",
+     "ה-tools בדוגמאות מבצעים פעולות אמיתיות",
+     "לא נדון"
+    ]
+   ],
+   "widths": [
+    2.2,
+    2.0,
+    2.4
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "9. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "Agentic workflow",
+     "תהליך שבו אפליקציה מבוססת LLM מבצעת כמה צעדים (תכנון, חיפוש, טיוטה, ביקורת) כדי להשלים משימה"
+    ],
+    [
+     "Degrees of autonomy",
+     "רצף בין מערכת שבה המהנדס קובע את הצעדים לבין מערכת שבה ה-LLM מחליט עליהם"
+    ],
+    [
+     "Task decomposition",
+     "פירוק משימה לצעדים שכל אחד מהם LLM או tool יכולים לבצע"
+    ],
+    [
+     "Reflection",
+     "המודל, או agent מבקר, בודק את הפלט ומשפר אותו לפי הביקורת או לפי הודעות שגיאה"
+    ],
+    [
+     "Tool use",
+     "מתן אפשרות ל-LLM לקרוא לפונקציות או ל-APIs, כמו חיפוש, הרצת קוד או query למסד נתונים"
+    ],
+    [
+     "Planning",
+     "ה-LLM כותב בעצמו את רצף הצעדים ואת ה-tools, ואחר כך מבצע אותם"
+    ],
+    [
+     "Multi-agent",
+     "כמה LLMs עם prompts של תפקידים שונים שמשתפים פעולה על משימה"
+    ],
+    [
+     "Communication pattern",
+     "מבנה התקשורת בין agents: linear, מנהל וצוות, או all-to-all"
+    ],
+    [
+     "Evals",
+     "מדדים אוטומטיים לאיכות המערכת על מערך דוגמאות קבוע"
+    ],
+    [
+     "End-to-end / component-level eval",
+     "מדידה של הפלט הסופי מול מדידה של רכיב בודד"
+    ],
+    [
+     "LLM-as-judge",
+     "שימוש ב-LLM אחר כדי לתת ציון לפלט סובייקטיבי"
+    ],
+    [
+     "Ground truth",
+     "התשובה הנכונה שנכתבה ידנית לכל דוגמה, למשל תאריך הפירעון"
+    ],
+    [
+     "Error analysis",
+     "בחינה של מקרים כושלים וספירה של הרכיב האשם בכל אחד מהם"
+    ],
+    [
+     "Trace / Span",
+     "כל פלטי הביניים של הרצה אחת, ופלט של צעד בודד בתוכה"
+    ],
+    [
+     "Few-shot prompting",
+     "הוספת דוגמאות של קלט ופלט רצוי ל-prompt"
+    ],
+    [
+     "RAG",
+     "Retrieval augmented generation: שליפת קטעי טקסט רלוונטיים והזנתם למודל"
+    ],
+    [
+     "Hyperparameter",
+     "פרמטר של רכיב שאפשר לכוונן, כמו chunk size או סף דמיון"
+    ],
+    [
+     "PII",
+     "מידע מזהה אישי שצריך להסיר מהנתונים"
+    ],
+    [
+     "Latency",
+     "זמן התגובה של המערכת או של צעד בודד"
+    ]
+   ],
+   "widths": [
+    1.8,
+    4.8
+   ]
+  }
+ ]
+}

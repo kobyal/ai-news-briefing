@@ -1,0 +1,524 @@
+[0:00] Welcome.
+[0:00] I'm here to talk about everyone's favorite subject,
+[0:04] vibe coding, and somewhat controversially,
+[0:07] how to vibe code in prod responsibly.
+[0:11] So let's talk about vibe coding and what this even is.
+[0:17] So first of all, I'm Eric.
+[0:18] I'm a researcher at Anthropic focused on coding agents.
+[0:23] I was the author, along with Barry Zang,
+[0:25] of Building Effective Agents, where we outlined for all of you
+[0:29] our best science and best practices for creating agents,
+[0:33] no matter what the application is.
+[0:35] This is a subject that's near and dear to my heart.
+[0:38] Last year, I actually broke my hand while biking to work
+[0:41] and was in a cast for two months,
+[0:43] and Claude wrote all of my code for those two months.
+[0:46] And so figuring out how to make this happen effectively
+[0:50] was really important to me,
+[0:51] and I was luckily able to figure that out well
+[0:53] and sort of help bring that into a lot of Anthropix,
+[0:57] other products, and in our models through my research.
+[1:00] So let's first start talking about what is Vibe coding.
+[1:05] A lot of people really conflate Vibe coding
+[1:08] with just extensive use of AI to generate your code.
+[1:12] But I think this isn't quite true.
+[1:14] A lot of people, they're using Cursor,
+[1:16] they're using Copilot.
+[1:18] It's a lot of AI, and a lot of the code
+[1:20] is coming from the AI rather than them writing itself.
+[1:24] But I think when you are still in a tight feedback
+[1:26] loop with a model like that, that isn't truly vibe coding.
+[1:31] When I say vibe coding, I think we
+[1:33] need to go to Andre Carpathie's definition,
+[1:35] where vibe coding is where you fully give in to the vibes,
+[1:39] embrace exponentials, and forget that the code even exists.
+[1:43] I think the key part here is forget the code even exists.
+[1:48] And now the reason this is important
+[1:50] is that vibe coding was when people outside of the engineering
+[1:55] industry really started getting excited about code generation.
+[1:58] Copilot and Cursor were great, but only sort of for engineers.
+[2:02] But someone that didn't know how to code,
+[2:05] suddenly with Vibe coding, they could find themselves
+[2:08] coding an entire app by themselves.
+[2:10] And this was a really exciting thing and a big unlock
+[2:13] to a lot of people.
+[2:14] Now, of course, there were a lot of downsides of this.
+[2:18] And you had people coding for the first time
+[2:20] and really without knowing what they were doing at all.
+[2:24] And you said, hey, random things are happening.
+[2:27] Maxed out usage on my API keys.
+[2:29] People are bypassing the subscription,
+[2:31] creating random shit on the DB.
+[2:34] And so this is kind of the downside of Vibe Coding,
+[2:37] of what started happening.
+[2:39] And the positive sides of Vibe Coding that you'd see
+[2:42] were all things that were really kind of low stakes.
+[2:46] It was people building video games,
+[2:48] building sort of fun side projects,
+[2:50] things where it's OK if there is a bug.
+[2:54] So why do we even care about Vibe coding
+[2:58] if it seems like something where the stakes are really high
+[3:01] if you do it for a real product,
+[3:03] and the most successful cases of it
+[3:05] are kind of these toy examples or fun things
+[3:08] where the stakes are very low?
+[3:10] And my answer for why we should care about Vibe coding
+[3:14] is because of the exponential.
+[3:17] The length of tasks that AI can do
+[3:19] is doubling every seven months.
+[3:21] right now we're at about an hour.
+[3:25] And that's fine.
+[3:26] You don't need to vibe code.
+[3:28] You can have cursor work for you.
+[3:30] You can have Claude code write a feature
+[3:32] that would take an hour.
+[3:34] And you can review all that code
+[3:36] and you can still be intimately involved
+[3:38] as the AI is writing a lot of your code.
+[3:42] But what happens next year?
+[3:43] What happens the year after that?
+[3:45] When the AI is powerful enough
+[3:47] that it can be generating an entire day's worth
+[3:50] of work for you at a time,
+[3:51] or an entire week's worth of work,
+[3:54] there is no way that we're going to be able to keep up with that
+[3:57] if we still need to move in lockstep.
+[4:01] And that means that if we want to take advantage of this exponential,
+[4:05] we are going to have to find a way to responsibly give in to this
+[4:10] and find some way to leverage this task.
+[4:13] I think my favorite analogy here is like compilers.
+[4:16] I'm sure in the early day of compilers,
+[4:19] A lot of developers really didn't trust them.
+[4:22] They might use a compiler, but they'd still read the assembly that it would output
+[4:25] to make sure it looks how they would write the assembly.
+[4:28] But that just doesn't scale.
+[4:30] At a certain point, you start needing to work on systems that are big enough
+[4:34] that you just have to trust the system.
+[4:37] The question, though, is how do you do that responsibly?
+[4:40] And I think sort of my challenge to the whole software industry over the next few years
+[4:45] is how will we Vibecode in prod and do it safely?
+[4:49] And my answer to that is that we will forget that the code exists, but not that the product exists.
+[4:56] Thinking again to that compiler analogy, we all still know that there's assembly under the hood,
+[5:01] but hopefully most of us don't need to really think about what the assembly actually is.
+[5:05] But we still are able to build good software without understanding that assembly under the hood,
+[5:11] and I think that we will get to that same level with software.
+[5:14] And one thing I really want to emphasize is that this is not a new problem.
+[5:22] How does a CTO manage an expert in a domain where the CTO is not themselves an expert?
+[5:30] How does a PM review an engineering feature when they themselves can't read all the code that went into it?
+[5:37] Or how does a CEO check the accountant's work when they or themselves are not an expert in financial accounting?
+[5:44] And these are all problems that have existed for hundreds or thousands of years,
+[5:49] and we have solutions to them.
+[5:51] A CTO can still write acceptance tests for an expert that works for them,
+[5:57] even if they don't understand the implementation under the hood.
+[5:59] They can see that these acceptance tests pass and that the work is high quality.
+[6:05] A product manager can use the product that their engineering team built
+[6:09] and make sure that it works the way they expected,
+[6:12] even if they're not writing the code.
+[6:13] And a CEO can spot check key facts that they do understand and slices of the data so that they can build confidence in the overall financial model, even though they themselves might not be an expert in how the entire thing flows.
+[6:30] And so thinking about these examples, managing implementations that you yourself don't understand is actually a problem as old as civilization.
+[6:40] and every manager in the world is actually already dealing with this.
+[6:46] Just we as software engineers are not used to this.
+[6:49] We are used to being purely individual contributors
+[6:52] where we understand the full depth down to the stack.
+[6:55] But that's something that in order to become most productive,
+[6:58] we are going to need to let go of in the way that every manager,
+[7:03] in order to be most productive, is going to need to let go of some details.
+[7:06] And just like us as software engineers, we let go of some of the details of understanding the assembly itself that's happening under the hood.
+[7:15] And the way that you do this, while still being safe and being responsible, is to find an abstraction layer that you can verify, even without knowing the implementation underneath it.
+[7:30] Now, I have one caveat to that today, which is tech debt.
+[7:34] So right now there is not a good way to measure or validate tech debt without reading the code yourself.
+[7:44] Most other systems in life, like the accountant example, the PM,
+[7:49] you have ways to verify the things you care about without knowing the implementation.
+[7:54] Tech debt, I think, is one of those rare things where there really isn't a good way to validate it
+[7:58] other than being an expert in the implementation itself.
+[8:01] So that is the one thing that right now we do not have a good way to validate.
+[8:06] However, that doesn't mean that we can't do this at all.
+[8:10] It just means we need to be very smart and targeted
+[8:13] of where we can take advantage of vibe coding.
+[8:17] My answer to this is to focus on leaf nodes in our code base.
+[8:22] And what I mean by that is parts of the code and parts of our system
+[8:26] that nothing depends on them.
+[8:29] They are kind of the end feature.
+[8:31] They're the end bell or whistle,
+[8:33] rather than things that are the branch or trunks beneath them,
+[8:37] like here in white.
+[8:38] Here the orange dots are all these leaf nodes,
+[8:41] where honestly, if you have a system like this,
+[8:44] it's kind of okay if there is tech debt in these leaf nodes
+[8:47] because nothing else depends on them.
+[8:50] They're unlikely to change.
+[8:51] They're unlikely to have further things built on them
+[8:53] versus the things that are in white here,
+[8:56] the trunks and the underlying branches of your system, that is the core architecture that we as
+[9:02] engineers still need to deeply understand, because that's what's going to change. That's what other
+[9:07] things are going to be built on. And it's very important that we protect those and make sure
+[9:12] that they stay extensible and understandable and flexible. Now, the one thing I will say here is
+[9:19] that the models are getting better all the time. And so we might get to a world where, you know,
+[9:23] This gets further and further down, where we trust the models
+[9:26] more and more to write code that is extensible
+[9:29] and doesn't have tech debt.
+[9:31] Using the Claude 4 models over the last week or two
+[9:35] within Anthropic has been a really exciting thing.
+[9:37] And I've given them much more trust than I did with 3.7.
+[9:42] So I think that this is going to change,
+[9:44] and more and more of the stack we will be able to work with
+[9:47] in this way.
+[9:48] So let's talk about how to succeed at Vibe coding.
+[9:52] And my main advice here is ask not what Claude can do for you,
+[9:57] but what you can do for Claude.
+[9:59] I think when you're vibe coding, you are basically
+[10:02] acting as a product manager for Claude.
+[10:04] So you need to think like a product manager.
+[10:06] What guidance or context would a new employee on your team
+[10:10] need to succeed at this task?
+[10:12] I think a lot of times we're too used
+[10:14] to doing a very quick back and forth chat with AI,
+[10:17] make this feature, fix this bug.
+[10:19] But a human, if it was their first day on the job
+[10:23] and you just said, hey, implement this feature,
+[10:26] there's no way that you'd expect them
+[10:27] to actually succeed at that.
+[10:29] You need to give them a tour of the code base.
+[10:30] You need to tell them what are the actual requirements
+[10:33] and specifications and constraints
+[10:36] that they need to understand.
+[10:37] And I think that as we vibe code,
+[10:39] that becomes our responsibility to feed that information
+[10:43] into Claude to make sure that it has all that same context
+[10:47] and is set up to succeed.
+[10:50] When I'm working on features with Claude,
+[10:52] I often spend 15 or 20 minutes collecting guidance
+[10:55] into a single prompt and then let Claude cook after that.
+[10:59] And that 15 or 20 minutes isn't just me writing the prompt
+[11:02] by hand.
+[11:03] This is often a separate conversation
+[11:05] where I'm talking back and forth with Claude.
+[11:08] It's exploring the code base.
+[11:09] It's looking for files.
+[11:11] We're building a plan together that
+[11:13] captures the essence of what I want, what files are going
+[11:16] need to be changed, what patterns in the code base should it follow.
+[11:20] And once I have that artifact, all that information,
+[11:23] then I give it to Claude, either in a new context or say, hey,
+[11:27] let's go execute this plan.
+[11:29] And I've typically seen, once I put that effort
+[11:31] into collecting all that information,
+[11:33] Claude has a very, very high success
+[11:35] rate of being able to complete something in a very good way.
+[11:41] And the other thing I'll say here
+[11:42] is that you need to be able to ask the right questions.
+[11:46] And despite the title of my talk, I don't think that vibe coding and prod is for everybody.
+[11:53] I don't think that people that are fully non-technical should go and try to build a business fully from scratch.
+[11:59] I think that is dangerous because they're not able to ask the right questions.
+[12:03] They're not able to be an effective product manager for Claude when they do that.
+[12:08] And so they're not going to succeed.
+[12:10] We recently merged a 22,000 line change to our production reinforcement learning code base.
+[12:16] that was written heavily by Claude.
+[12:19] So how on earth did we do this responsibly?
+[12:23] And yes, this is the actual screenshot
+[12:24] of the diff from GitHub for the PR.
+[12:28] The first thing is we asked what we could do for Claude.
+[12:32] This wasn't just a single prompt that we then merged.
+[12:35] There was still days of human work that went into this,
+[12:38] of coming up with the requirements, guiding Claude,
+[12:41] and figuring out what the system should be.
+[12:43] And we really, really embraced our roles
+[12:45] as the product manager for Claude in this feature.
+[12:50] The change was largely concentrated in leaf nodes in our code base,
+[12:54] where we knew it was okay for there to be some tech debt
+[12:58] because we didn't expect these parts of the code base
+[13:00] to need to change in the near future.
+[13:03] And the parts of it that we did think were important
+[13:05] that would need to be extensible,
+[13:06] we did heavy human review of those parts.
+[13:10] And lastly, we carefully designed stress tests for stability.
+[13:14] and we designed the whole system
+[13:18] so that it would have very easily human verifiable inputs and outputs.
+[13:24] And what that let us do, these last two pieces,
+[13:26] is it let us create these sort of verifiable checkpoints
+[13:30] so that we could make sure that this was correct
+[13:33] even without understanding or reading the full underlying implementation.
+[13:37] Our biggest concern was stability
+[13:38] and we were able to measure that even without reading the code
+[13:42] by creating these stress tests and running them for long durations.
+[13:46] And we were able to verify correctness
+[13:48] based on the input and outputs of the system
+[13:51] that we designed it to have.
+[13:53] So basically, we designed this system
+[13:55] to be understandable and verifiable
+[13:57] even without us reading all the code.
+[14:00] And so ultimately, by combining those things,
+[14:03] we were able to become just as confident in this change
+[14:06] as any other change that we made to our code base,
+[14:09] but deliver it in sort of a tiny fraction of the time and effort
+[14:12] that it would have taken to write this entire thing
+[14:15] from hand by hand and review sort of every line of it.
+[14:19] And I think one of the really exciting things about this
+[14:22] is not just that this saved us a week's worth of human time,
+[14:28] but knowing that we could do this,
+[14:30] it made us think differently about our engineering,
+[14:34] about what we could do.
+[14:35] And now suddenly, when something costs one day of time
+[14:39] instead of two weeks, you realize that you can go and make much bigger features and much bigger
+[14:46] changes. Sort of like the marginal cost of software is lower, and it lets you consume
+[14:52] and build more software. So I think that was the really exciting thing about this, is not just
+[14:57] saving the time, but now kind of feeling like, oh, things that are going to take two weeks,
+[15:03] let's just do them. It's only going to take a day. And that's kind of the exciting thing here.
+[15:08] So to leave you with the closing thoughts about how to vibe code and prod responsibly,
+[15:14] be Claude's PM.
+[15:16] Ask not what Claude can do for you, but what you can do for Claude.
+[15:20] Focus your vibe coding on the leaf nodes, not the core architecture and underlying systems,
+[15:26] so that if there is tech debt, it's contained and it's not in important areas.
+[15:31] Think about verifiability and how you can know whether this change is correct
+[15:37] without needing to go read the code yourself.
+[15:39] And finally, remember the exponential.
+[15:42] It's okay today if you don't vibe code,
+[15:45] but in a year or two,
+[15:46] it's going to be a huge, huge disadvantage
+[15:48] if you yourself are demanding
+[15:52] that you read every single line of code
+[15:54] or write every single line of code.
+[15:56] You're going to not be able to take advantage
+[15:58] of the newest wave of models
+[15:59] that are able to produce
+[16:00] very, very large chunks of work for you.
+[16:03] And you are going to become the bottleneck
+[16:04] if we don't get good at this.
+[16:06] So overall, that is Vibe coding and prod responsibly.
+[16:10] And I think this is going to become one of the biggest challenges for the software engineering industry over the next few years.
+[16:16] Thank you, and I have plenty of time for questions.
+[16:23] In the past, we spent a lot of time dealing with syntax problems or libraries or connections amongst components of the code.
+[16:31] And that was how we learned, by coding like that.
+[16:33] but how how do we learn now how do we become better vibe coaches how do we
+[16:39] know more to become better product managers of the agent yeah so the I think
+[16:46] this is a really interesting question and I think there are reasons to be very
+[16:51] worried about this and also reasons to be very optimistic about this I think
+[16:55] the reason to be worried like you mentioned is that you know we are not
+[16:58] going to be there in the struggle and the grind. I think that that is actually okay.
+[17:05] I've met, you know, some of my professors in college would say like, oh man, like,
+[17:09] coders today aren't as good because they never had to write their assembly by
+[17:13] hand. They don't really feel the pain of, you know, how to make something run
+[17:17] really fast. I think the positive side of this is that I have found that I'm
+[17:22] able to learn about things so much more quickly by using these AI tools. A lot of
+[17:28] times when I am coding with Claude, I'll be reviewing the code and I'll say, hey, Claude,
+[17:33] I've never seen this library before. Tell me about it. Like, what is it? Why did you choose it over
+[17:36] another? And having sort of that always there pair programmer, like, again, I think what's
+[17:43] going to change is that people that are lazy are not going to learn. They're just going to glide
+[17:48] by. But if you take the time and you want to learn, there's all these amazing resources. And
+[17:54] like Claude will help you understand what it vibe coded for you.
+[17:58] The other thing I will say is that for learning some of these higher level things about what makes a project go well,
+[18:04] what is a feature that gets you product market fit versus flops,
+[18:08] we're going to be able to take so many more shots on goal.
+[18:11] I feel like especially sort of like system engineers or architects,
+[18:16] it takes oftentimes like two years to make a big change in a code base
+[18:20] and really kind of come to terms with was that a good architecture decision or not.
+[18:25] And if we can collapse that time down to six months,
+[18:29] I think engineers that are investing in their own time and trying to learn,
+[18:33] they're going to be able to learn from four times as many lessons
+[18:37] in the same amount of calendar time,
+[18:38] as long as they're putting in the effort to try.
+[18:41] Going back to your pre-planning process,
+[18:44] what's the balance between giving it too much information and too little?
+[18:47] Are you giving it a full product requirement document?
+[18:49] Is there kind of a standardized template that you put together before you actually move into Vibe Coding?
+[18:54] Yeah.
+[18:55] I think it depends a lot on what you care about.
+[18:58] I would say that if it ranges.
+[19:02] For things where I don't really care how it does it, I won't talk at all about the implementation details.
+[19:09] I'll just say, these are my requirements.
+[19:11] Like, this is what I want at the end.
+[19:12] There's other times where I know the code base well, and I will go into much more depth of like,
+[19:17] hey, these are the classes you should use to implement this logic.
+[19:21] Look at this example of a similar feature.
+[19:23] I'd say it all comes down to sort of what you care about at the end of the day.
+[19:27] I would say, though, that our models do best when you don't over-constrain them.
+[19:33] So I wouldn't put too much effort into creating sort of a very rigorous format or anything.
+[19:42] I would just think about it as like a junior engineer, what you would give them in order to succeed.
+[19:47] So, sorry if I went too loud.
+[19:52] How did you balance effectiveness and cybersecurity?
+[19:58] Like, there were reports a couple months back
+[20:00] of, like, the top 10 Vibe-coded apps being super vulnerable
+[20:04] and a lot of important information was released.
+[20:08] Well, not released, but proven to be released.
+[20:10] And the person who did it wasn't even, like,
+[20:12] like a pro hacker and stuff.
+[20:14] And so there's that, how did you balance being able to keep things secure even at a leaf node level and then also being effective?
+[20:23] Because something can be effective but not secure.
+[20:26] Yeah, that's a great question.
+[20:28] And I think that all comes down to this first point here of being Claude's PM and understanding enough about the context to basically know what is dangerous, know what's safe, and know where you should be careful.
+[20:40] and I think yeah the things that get a lot of press about vibe coding are
+[20:45] people that have no business coding at all doing this and that's fine that's
+[20:48] great for games that's great for like creativity and like having people be
+[20:53] able to create but I think for production systems you need to know
+[20:57] enough about like what questions to ask to guide Claude in the right direction
+[21:01] and for our internal case of this this example it was something that's fully
+[21:06] offline. And so we knew there weren't any, like, there were, we were very, very confident that
+[21:11] there was, like, no security problems that could happen into this. In our case, it's, like, run in
+[21:16] something that's fully offline. So this is more about people you're mentioning as, like, have no
+[21:24] business. And maybe I shouldn't have said it like that. No business vibe coding in production for an
+[21:30] important system. I will say that.
+[21:33] But if we look at the numbers, right, less than
+[21:36] 0.5% of the world's population
+[21:39] are software developers. And software
+[21:43] is an amazing way to scale ideas.
+[21:46] So how do you think the products need to change
+[21:49] to make it easier
+[21:52] for people to write code and build software
+[21:55] while also avoiding some of the things that we run
+[21:59] and do with people leaking API keys and things like that?
+[22:01] That's a really great question.
+[22:03] And I would be super excited to see more products and frameworks emerge
+[22:07] that are kind of like provably correct.
+[22:10] And maybe what I mean by that is I'm sure people could build some backend systems
+[22:14] that the important auth parts, the payment parts are built for you,
+[22:18] and all you have to do is sort of fill in the UI layer.
+[22:23] And, you know, you can vibe code that,
+[22:25] and it basically gives you some nice fill-in-the-blank sandboxes
+[22:29] where to put your code.
+[22:31] I feel like there's tons of things like that that could exist.
+[22:35] And maybe the simplest example is Claude Artifacts,
+[22:38] where Claude can help you write code that gets hosted right there
+[22:44] in Claude AI to display.
+[22:46] And of course, that is safe because it is very limited.
+[22:49] There is no auth. There is no payments.
+[22:51] It's front-end only.
+[22:52] but maybe that's a good product idea
+[22:55] that someone should do here
+[22:56] is build some way to make
+[22:57] a provably correct hosting system
+[22:59] that can have a back end
+[23:01] that you know is safe
+[23:03] no matter what shenanigans happens on the front end.
+[23:05] But yeah, I hope people build good tools
+[23:07] that are complements to Vibe Coding.
+[23:09] Eric.
+[23:10] Hi.
+[23:11] So for test-driven development,
+[23:13] do you have any tips?
+[23:15] Because I often see that Cloud
+[23:16] just spits out the entire implementation
+[23:18] and then writes test cases.
+[23:20] Sometimes they fail.
+[23:22] and then I just want, you know, I'm trying to prompt it to write the test cases first,
+[23:27] but I also don't want to, like, you know, verify them by myself
+[23:30] because I haven't seen implementation yet.
+[23:32] So do you have an iteratable approach that, you know, have you ever tried it for, yeah, test-driven development?
+[23:38] Yeah, yeah, I definitely, test-driven development is very, very useful in Vibe coding.
+[23:43] As long as you can understand what the test cases are, even without that,
+[23:48] it helps Claude sort of be a little bit more self-consistent,
+[23:50] self-consistent, even if you yourself don't look at the tests. But a lot of times, I'd say it's
+[23:56] easy for Claude to go down a rabbit hole of writing tests that are like too implementation
+[24:00] specific. When I'm trying to do this, a lot of times I will encourage, I will give Claude examples
+[24:08] of like, hey, just write three end-to-end tests and, you know, do the happy path and error case
+[24:15] and this other error case.
+[24:17] And I'm kind of like very prescriptive about that.
+[24:20] I want the test to be like general and end to end.
+[24:23] And I think that helps make sure it's something that I can understand.
+[24:28] And it's something that Claude can do without getting too in the weeds.
+[24:33] I'll also say a lot of times when I'm vibe coding,
+[24:37] the only part of the code, or at least the first part of the code
+[24:40] that I'll read is the tests to make sure that, you know,
+[24:43] if I agree with the tests and the tests pass,
+[24:46] then I feel pretty good about the code.
+[24:48] That works best if you can encourage Claude
+[24:50] to write sort of very minimalist end-to-end tests.
+[24:53] Thank you for the very fascinating talk.
+[24:55] I also appreciate that you've done
+[24:57] what a lot of people haven't done
+[24:59] and tried to interpret one of the more peculiar lines
+[25:02] in Carpathia's original post, embrace exponentials.
+[25:06] So I wonder if I could pin you down a little more
+[25:08] and say, how would I know if I've embraced the exponentials?
+[25:12] what precisely means following that advice?
+[25:17] And to maybe put it down a little more
+[25:19] in what I think it intends to mean,
+[25:20] it sort of maybe alludes to this,
+[25:22] the models will get better.
+[25:26] Do you think there's some legitimacy in saying
+[25:28] just the fact that the models will get better
+[25:31] doesn't mean they'll get better
+[25:32] at every conceivable dimension we might be imagining
+[25:35] we hope they'll be in?
+[25:37] So yeah, how do I embrace an exponential, sir?
+[25:41] Yeah, absolutely.
+[25:41] So I think you got close with the quote of keep assuming the models are going to get better.
+[25:48] But it's a step beyond that.
+[25:50] The idea of the exponential is not just that they're going to keep getting better,
+[25:54] but they're going to get better faster than we can possibly imagine.
+[26:00] And that's kind of like when you can kind of see the shape of the dots here.
+[26:04] It's not just that it's getting steadily better.
+[26:06] It's that it's getting better and then it goes wild.
+[26:08] I think the other funny quote I heard from this, this was, I think, in Dario and Mike
+[26:14] Krieger's talk is, machines of loving grace is not science fiction.
+[26:18] It's a product roadmap.
+[26:19] Even though it sounds like something that's very far out, like, when you are on an exponential,
+[26:24] things get wild very, very fast and faster than you expect.
+[26:29] And I think, you know, if you talk to someone that was doing computers in the 90s, it's
+[26:33] like, okay, great.
+[26:34] We have a couple kilobytes of RAM.
+[26:36] We have a couple more kilobytes of RAM.
+[26:38] But if you fast forward to where we are now, it's like we have terabytes and it's like
+[26:42] It's not just that it got twice as good. It's that things got millions of times better and
+[26:48] That's what happens with exponentials over a course of 20 years
+[26:51] So we shouldn't think about 20 years from now is like what happens if these models are twice as good
+[26:57] We should think about what happens if these models are a million times smarter and faster than they are today
+[27:01] Which is wild like I we can't even think about what that means in the same way that someone working on computers in the 90s
+[27:07] I don't think they could think about what would happen to society if a computer was a million times faster than what they were working with.
+[27:15] But that's what happened.
+[27:16] And so that's what we mean by the exponential, is it's going to go bonkers.
+[27:20] All right.
+[27:21] Yes.
+[27:21] I got a couple.
+[27:23] Well, I got one question, but it's kind of two parts.
+[27:27] The first part, when it comes to via coding, I have, like, two different workflows.
+[27:30] I have one where I'm in my terminal, and then I have one when I'm in VS Code or cursor.
+[27:37] Which workflow do you use?
+[27:40] And if you're using Cloud Code in a terminal, how often do you compact?
+[27:46] Because what I find is my functions will get a new name as the longer I vibe code.
+[27:53] Or, you know, just things kind of go off the rails the longer I go.
+[27:57] And if I compact, it still happens.
+[27:59] If I create, like, a document to kind of guide it, I still have to, you know, get it back on track.
+[28:04] Yeah, great question.
+[28:06] I do both.
+[28:07] I often code with clawed code open in my terminal in VS Code.
+[28:12] And I'd say that clawed code is doing most of the editing,
+[28:16] and I'm kind of reviewing the code as I go in VS Code,
+[28:21] which is not true vibe coding in the sense here.
+[28:24] Or maybe I'm reviewing just the tests from it.
+[28:27] I like to compact or just start a new session
+[28:30] kind of whenever I get clawed to a good stopping point
+[28:34] where it kind of feels like,
+[28:35] okay, as a human programmer, when would I kind of stop and take a break and maybe go get lunch and then come back?
+[28:43] If I feel like I'm at that kind of stage, that's a good time to compact.
+[28:47] So maybe I'll start off with having Claude find all the relevant files and make a plan.
+[28:52] And then I'll say, okay, write all this into a document and then I'll compact.
+[28:57] And that gets rid of 100k tokens that it took to create that plan and find all these files
+[29:02] and boils it down to a few thousand tokens.
+[29:05] Hey, so one question is following up his previous question, which is, have you used
+[29:15] other tools along with Cloud Code to increase your speed a little bit more, like running
+[29:20] multiple Cloud Codes together, using Git Work Trees, and then sort of merging a few things
+[29:25] or stack PRs or something like that?
+[29:27] Is that something that you personally follow or would advise to?
+[29:31] question is how do you like how do you very structurally and like in a very
+[29:37] nice engineering like like way approach a part of the code base that you're not
+[29:43] very familiar with but you want to like ship a PR in it really fast and you want
+[29:48] to do it in a really nice way and not wipe coded so yeah like what are the
+[29:53] what are your ways of like using cloud code to do help do both these things yep
+[29:57] Yeah, so I definitely use Claude code as well as Cursor.
+[30:01] And I'd say typically I'll start things with Claude code
+[30:06] and then I'll use Cursor to fix things up.
+[30:08] Or if I have very specific changes,
+[30:11] if I know exactly the change that I want to do to this file,
+[30:14] I'll just do it myself with Cursor
+[30:16] and sort of target the exact lines that I know need to change.
+[30:19] The second part of your question was,
+[30:23] oh yeah, like how to get spun up on a new part of the code base.
+[30:27] Before I start trying to write the feature, I use Claude code to help me explore the code base.
+[30:34] So I might say, tell me where in this code base off happens, or where in this code base something happens.
+[30:41] Tell me similar features to this, and have it tell me the file names, have it tell me the classes that I should look at.
+[30:48] And then kind of use that to try to build up a mental picture to make sure that I can do this and not vibe code.
+[30:54] vibe code, make sure I can still get a good sense of what's
+[30:57] happening.
+[30:58] And then I go work on the feature with Claude.
+[31:00] Thank you so much.
+[31:01] I'll be around and can Miller answer other questions.

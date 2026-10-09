@@ -1,0 +1,372 @@
+[0:00] Thank you for coming.
+[0:02] You've almost made it to the end of Code with Claude.
+[0:05] Thank you so much for your hard work in pushing through this.
+[0:09] And this session is going to be well worth your effort.
+[0:12] Because in this session, we're going to talk about not just building agents,
+[0:16] but how you deploy agents that are secure, reliable, performant,
+[0:21] and most importantly, cost effective.
+[0:24] So you can actually do that at scale.
+[0:26] I know many of you have started building agents already.
+[0:32] A few of you maybe have agents in production, but only a very few are really happy with the performance, reliability, and cost effectiveness of their agents.
+[0:43] So this talk is really going to drill into that, and that will make it well worth your time.
+[0:50] So let's drill in.
+[0:51] And first, before we talk about any of the other techniques and tools that we'll cover today, I want to talk about prompt caching.
+[1:01] This is the single most important takeaway of the talk is around how you do prompt caching.
+[1:08] You see, in long-running agentic applications, there are many tool calls, many user turns, and the transcripts get very long.
+[1:19] And each request to the API then repeats these long segments of prompt.
+[1:26] And if we have to recompute those segments every single time, it's expensive and slow.
+[1:34] So we offer prompt caching, which lets us pre-compute the shared part of the context.
+[1:41] We store those in an intermediate value.
+[1:44] We call those KV values.
+[1:46] but we store those pre-computed parts of the prompt up on our servers.
+[1:53] And then the next request that comes in,
+[1:55] we just have to do the small delta from the previous request.
+[1:59] And that saves a lot of compute.
+[2:02] And we pass that savings on to you.
+[2:04] So the most important benefit of prompt caching, it's at a 90% discount.
+[2:09] So you pay only 10% of the cost when you use prompt caching.
+[2:16] In addition, you get faster response times, and your rate limits aren't affected by prompt caching.
+[2:24] For any tokens that are cached, we don't count against that for rate limits in the API.
+[2:32] And we've got some customers that have done a very good job in prompt caching.
+[2:36] If you look at Perplexity, Cursor, Replit, all of these customers have spent significant engineering effort
+[2:43] to bring their cache hit rate up very high.
+[2:47] In fact, if these customers didn't have such a high cache hit rate,
+[2:51] we couldn't even serve their workload
+[2:54] because there's just not enough compute without prompt caching.
+[2:57] So it's very important.
+[3:00] But the good news for you is you can get similarly high cache hit rates
+[3:04] with much less amount of effort.
+[3:07] There's two techniques for that.
+[3:09] One I'm showing you on the slide here
+[3:11] is if you go into our developer console, our cloud console,
+[3:17] you can see this new dashboard that reports on your cash hit rate.
+[3:22] The agent I'm showing here has only a 56% cash hit rate,
+[3:27] so it's got some room for improvement.
+[3:30] I invite you to, as soon as you get home,
+[3:33] go and check out what your agent's cash hit rate is.
+[3:37] If it's not up in the 80s,
+[3:39] then I would suggest that's the first thing to go work on.
+[3:42] Because many long-running agents, you can get the cache hit rate that high.
+[3:47] The second big tip I'll give you to get your cache hit rate up
+[3:52] is to use our Claude API skill.
+[3:56] So it's a new skill.
+[3:57] It's installed by default with Claude code.
+[4:00] So if you have access to Claude code,
+[4:02] or if you have another development tool,
+[4:04] you can use it because it's just a skill.
+[4:06] but it knows very well how to do prompt caching.
+[4:10] So if you just go into Cloud Code,
+[4:11] open your project up and say,
+[4:13] improve my cache hit rate,
+[4:15] it will start working with you to modify the prompt,
+[4:19] add the cache control headers and whatnot
+[4:21] in order to get your cache hit rate up this high.
+[4:26] Okay, in order to see what this looks like,
+[4:29] I'd like to invite Rod out.
+[4:31] Rod has worked on a demo.
+[4:32] So Rod, would you like to come out?
+[4:43] Yes, Rod's actually one of the lead engineers on the API team.
+[4:47] So if you've built something with the API, you're probably running his code.
+[4:51] So let's switch over to the demo machine and see what Rod's got for us.
+[4:56] So what we're building here is a dashboard for a CEO.
+[5:01] A CEO has a set of objectives.
+[5:03] And what we've done is we've written an agent that goes out and, wait a second, Rod, is this the right UI?
+[5:11] Well, we're Code with Claude Tokyo, and you bring this, like, 90s-looking SharePoint UI.
+[5:18] I don't know.
+[5:19] I think we can do better.
+[5:20] You think we can do better?
+[5:21] Let's see if we can do better.
+[5:23] Rod, do you have Claude code on that machine?
+[5:25] Okay, Rod's got Claude code.
+[5:26] Rod, see if you can give us a better theme.
+[5:28] And let's think about what might be more appropriate for this audience in Tokyo.
+[5:34] Yeah, that's exactly right.
+[5:37] Remember, this is the end of the day.
+[5:39] We need to keep this exciting.
+[5:42] So, yeah.
+[5:43] Okay, Rod's going to make a superhero theme demo.
+[5:47] I think that's much more appropriate.
+[5:49] So, again, we're using Cloud Code, modifying the source of our demo locally.
+[5:55] And we're going to flip back over.
+[5:56] Ah, much better, huh?
+[5:57] Okay, so we're no longer the CEO of some boring corporation.
+[6:03] This is now the dashboard for the CEO of HeroCorp.
+[6:07] And what HeroCorp does is it rents out superheroes to defend your city, to defeat villains, and to show up at kids' birthday parties, whatever is necessary.
+[6:19] But we still have a set of objectives, and we're reporting on the status of those objectives by scouring all the data that this corporation has.
+[6:29] So we have a bunch of tools that bring in that data.
+[6:32] In fact, just to get a sense for what this site looks like, Rod actually put in a nice developer console.
+[6:39] So let's see the developer view of this site.
+[6:41] You want to pull that out?
+[6:42] Here's our dev view here.
+[6:44] And you can see we've got a couple of tools there.
+[6:47] the Outlook search. We'll get into this later. And you can see how Rod is invested in prompt
+[6:55] caching. And wait, Rod, it's a 0% cache hit rate. Dude, we talked about doing prompt. I gave the
+[7:01] whole thing on prompt caching being so important. 0%. Okay, Rod, maybe you can implement prompt
+[7:08] caching real quick. So Rod's going to go into Cloud Code and implement prompt caching for us.
+[7:15] and what we should see is once we get prompt caching implemented,
+[7:21] we're going to reload that site,
+[7:23] and we should see that cache hit rate go up.
+[7:26] Yeah, so you see initially it did a couple of cache writes,
+[7:29] and now it's doing some cache hits.
+[7:32] So with one little change, we got up to 58% cache hit rate.
+[7:38] I invite you to look at this over the course of the demo
+[7:41] as we add more functionality to it,
+[7:45] you'll see that cash hit rate goes up even further.
+[7:49] Okay, yeah, so this demo is looking pretty good here.
+[7:53] We've got the objective one.
+[7:55] Let's just scroll down and show.
+[7:56] There's actually four other objectives.
+[7:59] So this first objective is about retaining top talent.
+[8:03] Objective two here, let's see what objective two is.
+[8:07] Wait, we didn't even load objective two.
+[8:10] It says we've run out of context and we didn't even get to objective two.
+[8:17] You can see the context window indicator here.
+[8:20] I gave you a million token context.
+[8:23] We only got to one of the four objectives with a million tokens.
+[8:27] I think we can do better.
+[8:30] You know what I think we need?
+[8:32] We need a little context engineering.
+[8:34] So let's switch back to the slides and let me talk about context engineering for a minute.
+[8:39] Okay, context engineering is the discipline of deciding what belongs in Claude's context.
+[8:49] And it really is an engineering technique, as we'll talk about, because you want enough in Claude's context for Claude to make good, reasoned decisions.
+[8:58] But you don't want so much that's distracting and expensive and slow.
+[9:04] So you want to be thoughtful.
+[9:05] You want to know and understand exactly what is in the context.
+[9:10] Today I'm going to talk about three different ways, tools that you have in order to be able to manage the context and agents that you build.
+[9:19] The first is tool search tool, and that's going to keep all the tool, a bunch of tool definitions out of your context.
+[9:27] The second is programmatic tool calling, and that's going to keep a bunch of the tool results out of your context.
+[9:35] And then finally, I'll talk about compaction.
+[9:38] So let's drill in.
+[9:40] So with tool search tool, the key problem it solves is that many agents have 10, 20, 100 tools in order to do their jobs.
+[9:52] And we want agents to have a lot of tools.
+[9:55] We want our agents to be general purpose and productive.
+[9:58] We want to decompose things in rational ways with tools.
+[10:01] So it's not crazy to have 100 plus tools.
+[10:04] What's crazy is to put 100 plus tools in the context because as you see in the without line at the top, if you have 100 tools, you're going to consume most of your context with just tool definitions, leaving only a little bit for the actual running of the agents.
+[10:22] And that's not very wise because most of the trajectories, most of the runs of your agent may only use 10% of those tools, yet you've loaded them all into context.
+[10:32] You paid for that in terms of cost.
+[10:36] You paid for it in terms of latency.
+[10:39] So tool search tool, on the other hand, if you look at the bottom, what we've done is we just loaded one tool, the tool search tool.
+[10:47] And then when the model decides it needs a tool, it first asks the tool search tool, hey, do you have a tool for this?
+[10:54] And then the tool search tool searches over its inventory of tools and picks the right one for that query.
+[11:02] and loads that into context.
+[11:05] And so consequently, what you see here is you get much more agentic space.
+[11:11] You're able to use the context much more efficiently
+[11:14] because you only load exactly the tools you need for any given run.
+[11:21] So you can have a lot of tools available and only use the ones you need.
+[11:25] And customers like Lovable have really seen some benefits from this.
+[11:30] just with this change alone, they reduced their token usage by 10%. So imagine, basically,
+[11:36] they got a 10% savings right off the top. But not only that, actually much more important
+[11:43] to Lovable was that the performance, the intelligence was better for everybody. Because
+[11:52] when the model gets so much into context, sometimes the judgment isn't quite as good.
+[11:57] And so by reducing what goes into context, the model itself performed better.
+[12:05] Okay, that's tool search tool.
+[12:06] Let's switch and talk about programmatic tool calling.
+[12:10] And I'll say I had a lot of fun with Fable building out these animated diagrams,
+[12:16] so I hope you appreciate all the tokens I wasted to do that.
+[12:20] So with programmatic tool calling, the goal here is to get the intermediate tool results out of the context.
+[12:29] You see, many tools, you actually want to design the tools so that they return lots of data.
+[12:36] Because you want the model to have whatever context it might need.
+[12:40] So you want the tools to return a lot of data.
+[12:43] But if you have a tool like, say, the Outlook tool we saw earlier, and it returns 100 emails, well, that's going to eat up a lot of your context when maybe you only needed the header of one of the emails.
+[12:57] Or if you have an HTML page, maybe you only needed a small div tag out of it, but you loaded all of that into context.
+[13:07] So what we did to solve this is actually just lean on the fact that our models are actually
+[13:15] very good at writing code.
+[13:17] So rather than just using a tool call, what we do is we do the tool call, we get the full
+[13:24] results out of the tool call, and then the model is able to inspect that schema, and
+[13:30] then it's able to write code against the schema of whatever that arbitrary block of
+[13:37] data is. So in real time, it can write code and then pull out just the bits of information, say
+[13:44] 5%, 2% of that data, pull out just what it needs and put that result into context.
+[13:53] And this, for any tools that return lots and lots of data, this is a great benefit.
+[13:58] it. And customers like Quora have seen big benefits from this. For Quora's agent, they do a
+[14:07] lot of HTML. They pull a lot of HTML in, and they were pulling full HTML pages in when they only
+[14:13] needed just a little bit of the page. And when they moved to this, it really helped their agent
+[14:18] perform so much better. Okay, that's programmatic tool calling. Next up is compaction. So even if
+[14:27] you do a great job on tool search tool and programmatic tool calling, you may still run
+[14:35] out of context because they do still have context. So if you have an agent that is very
+[14:44] ambitious, that needs to run for hours or even days, then you want to do something like compaction.
+[14:52] And what compaction does is it lets you as the developer set a threshold. You can say,
+[14:56] I want to use only 400 or 500K of my 1 million token context window.
+[15:05] I want to use only some part of it.
+[15:08] And then when the context gets up to that point, gets close to that point,
+[15:13] what we'll do is we'll pause execution of the agent.
+[15:17] We take another model, have it summarize the entire transcript,
+[15:22] strip out all the things that are just not needed anymore.
+[15:24] All these intermediate tool results and tool calls and whatever, they're not needed.
+[15:31] Like the decision that needed them was already made.
+[15:36] So you don't need to keep them for historic reasons.
+[15:39] Then we just clear all of that out of the context and just put a small, tight summary of what happened so far.
+[15:45] And then we restart the agent and just picks up exactly where it left off.
+[15:49] And because we have worked on making that summary a really good summary, then the agent has enough context to just pick it up and keep going so it feels very seamless to developers.
+[16:02] And we saw companies like Hex pick this up.
+[16:05] It turns out Hex had already implemented a version of this, so they were able to remove 300 lines of code and just not have that maintenance burden.
+[16:14] Much better to have Rod have the maintenance burden than you.
+[16:17] Okay, so that's compaction.
+[16:20] So we talked about these three things.
+[16:22] I think we should take a look at them live and see if they can improve our HeroCorp app.
+[16:27] So let's switch back to the demo.
+[16:30] Okay, when last we left HeroCorp, remember we consumed a million token of context with just one of our four objectives.
+[16:42] So we want to see if we can actually make this load using this.
+[16:48] So, Rod, let's just go ahead, go into Cloud Code, and let's just enable all of these.
+[16:52] We're going to enable tool search tool, programmatic tool calling, and compaction all in one go.
+[16:59] Get all these strategies configured.
+[17:03] So, okay, so we have all these going.
+[17:06] Now if we switch over and reload this, notice a lot more things are happening now.
+[17:10] You see the context window is going up, the activity stream.
+[17:15] You're seeing lots of tool calls because we're filling in every one of those objectives.
+[17:20] So really, with just a small bit of additional engineering, we get so much more value out of this.
+[17:28] So yeah, we got all the objectives loaded, and we ended up with a much smaller context.
+[17:34] So let's walk through these one at a time and just make sure we really get each one.
+[17:41] So let's start with Tool Search Tool at the very top.
+[17:45] The first thing that happened was the model decided to call it Tool Search Tool.
+[17:51] And it looked for the query you see is a hero retention metrics.
+[17:55] And Tool Search Tool said, oh, I have a tool like that.
+[17:58] Here's the schema for it.
+[18:01] And it's called hero retention metrics with the underscores.
+[18:04] You see it where it says name there.
+[18:06] So let's now scroll and see the model actually call that tool.
+[18:11] So if we scroll down just a little bit, yeah, you see it right there.
+[18:13] The model actually called that tool and then got its result.
+[18:17] So, again, we didn't have to load all these 100-plus tools up front.
+[18:21] We could just load one at a time.
+[18:23] Okay, next up we have a programmatic tool calling.
+[18:29] So this one's interesting.
+[18:30] We have this Gong Customer Digest.
+[18:32] I don't know if you know Gong.
+[18:33] it's meeting transcribed. So it returns this entire transcription of a meeting, which is nice
+[18:40] to have, but really we only wanted the sentiment of this meeting. And so rather than just that
+[18:46] whole transcript, if we look at the code executing, the programmatic tool calling one,
+[18:53] you see that it actually wrote this code. It used code executor to write this code.
+[18:58] And you can see there's calls to all of those methods.
+[19:02] All those tools are there.
+[19:04] And then it pulls the JSON out and prints only a little bit of the JSON,
+[19:09] only the smallest piece that we actually needed for this run to happen.
+[19:14] And that saves a lot of context.
+[19:18] Okay, and then finally we talked about compaction.
+[19:22] So you can see here, here's compaction.
+[19:24] It fired.
+[19:25] We dropped 9K, brought it back down to 10K, and then you can see the summary that was done.
+[19:33] We're being clear with the model, the agent that's picking this up.
+[19:37] Here's the objective.
+[19:38] Here's the data we already gathered.
+[19:40] Here's what you need to do next.
+[19:41] So it's a really tight summary.
+[19:44] So actually, why don't we run it one more time and just look at that context window line
+[19:48] and see if you can see it grow a little bit at a time because we're using context engineering.
+[19:53] And then we set that threshold at 400K.
+[19:56] So as it gets close to 400K, you'll see compaction happen,
+[20:01] and the context goes way down and then starts building again.
+[20:05] So let's see if we can see where that happens, if the demo gods are with us.
+[20:13] Did I miss it?
+[20:13] Did it happen?
+[20:14] It already happened.
+[20:15] I missed it.
+[20:15] Hopefully you caught it, but I missed it.
+[20:17] Okay, beautiful.
+[20:18] Okay, we saw all our things.
+[20:20] Let's switch back.
+[20:21] Oh, yeah, one thing, though, nobody has really commented on this, but, I mean, I'm not from Japan, but I think 1,600 yen is a lot for one request.
+[20:32] Is that right?
+[20:33] Is that a lot of money?
+[20:34] That's a lot of money for one request?
+[20:36] Yeah, I think we can do better than that.
+[20:38] So let's switch back to slides and talk about how we can optimize that a little bit.
+[20:44] So the way we're going to optimize this is to talk about the advisor strategy.
+[20:49] Really, the insight from advisor strategy is not going to be new to you if you've ever worked with a development team.
+[20:55] You know that you can make a junior engineer on your team more productive just by giving them access to a senior engineer.
+[21:03] If you just let a senior engineer review their code, let the junior engineer ask the senior engineer a couple of questions every day,
+[21:11] that junior engineer will get way better, and it will cost the senior engineer just a little bit to do that.
+[21:17] The same thing is true with models.
+[21:20] You can take a small, inexpensive model and make it way better by giving it a tool to let it talk to a bigger model.
+[21:31] So if you have a model like a Sonnet or a Haiku, you can make those models way smarter by giving them an advisor that's Opus or we launched Fable today.
+[21:44] So you could use Fable for that as well.
+[21:46] And I heard some murmurings about the cost of Fable being 2x what Opus is.
+[21:53] This is a great way you can get some of the reasoning capabilities of Fable for a fraction of the cost.
+[22:00] Because it turns out Haiku and Sonnet are so good at writing code.
+[22:04] They're so good at doing tool calling.
+[22:06] The thing they're not as good at is really deep insightful reasoning.
+[22:10] So why not let Haiku and Sonnet do what they're good at for less money
+[22:14] and then only use models like Opus and Fable where you really need that differentiated reasoning.
+[22:24] And we see customers like Bolt doing that.
+[22:26] So let's switch back over to the demo and take a look at how that plays out.
+[22:32] So you can see, if you scroll up to the top of the activity stream, you see we're in the debug view.
+[22:39] and we'll see the model that we're using right now is Opus 4.8.
+[22:46] So if you go into Claude Code and we'll switch on the advisor mode.
+[22:53] So now we could do something.
+[22:54] We could just change it to Sonnet and that would be cheaper, right?
+[22:57] But the problem is this is a dashboard for our CEO making business decisions.
+[23:01] We can't afford to be wrong, right?
+[23:03] So we need to be inexpensive and we need to be right.
+[23:08] Both are important.
+[23:10] So now we switched it.
+[23:12] And show the line again.
+[23:13] I probably missed it at the top.
+[23:15] It's in the activity stream.
+[23:17] It's, well, okay, yeah, let's look at this.
+[23:20] So now what we're doing is we're using Sonnet to call all these tools Sonnet's calling.
+[23:27] And what happened is Sonnet is calling the advisor periodically through this.
+[23:32] And this particular example that Rod found for us,
+[23:36] Sonnet called the advisor running Opus,
+[23:40] and Opus actually disagreed with the decision that Sonnet had made.
+[23:44] Sonnet had said, yeah, this Metropolis deal, green check.
+[23:48] It's on track.
+[23:50] Opus looked over the transcripts and actually caught a problem.
+[23:55] Oh, Sonnet, you missed this one case.
+[23:58] Turns out, buried at the bottom of a gong transcript,
+[24:01] The mayor of Metropolis said he really wanted cryothane to come to the opening,
+[24:11] and that got missed by the account team.
+[24:14] And so it's actually red.
+[24:16] So if we look at the deal, you see that it's red.
+[24:19] There's a red item there.
+[24:22] And that's thanks to, yeah, we can find it.
+[24:26] That is thanks to the Opus Advisor.
+[24:31] So we didn't just save, we saved money.
+[24:34] That's great.
+[24:35] We saved money, but we also kept this level of higher level reasoning.
+[24:40] And so if we go ahead and click that, then boom, the CEO has now rescheduled Cliofane
+[24:47] and we're going to make it, we're going to close this deal.
+[24:50] Okay, so I think what Rod was able to show us in this demo is with Advisor,
+[24:59] we can use more inexpensive models
+[25:04] and use more expensive models only where they're needed.
+[25:07] Three different context management,
+[25:10] context engineering techniques, and prompt caching.
+[25:13] So thanks a lot, Rod.
+[25:14] I appreciate it.
+[25:15] Okay, back to slides.
+[25:17] Okay, let's just wrap up.
+[25:19] Yeah, we talked about prompt caching.
+[25:21] You should be at 80% if you're building an agent,
+[25:24] so definitely check that out.
+[25:26] We talked about tool search tool
+[25:28] where you can keep that from filling up your context,
+[25:32] programmatic tool calling to keep the tool results out,
+[25:35] and then compaction.
+[25:37] And finally, we talked about Advisor,
+[25:39] where you can use more inexpensive models
+[25:42] and get the same level of reasoning.
+[25:44] But the cloud platform is evolving very fast,
+[25:48] and it's a great way to stay up on the latest capabilities.
+[25:52] This is just what we launched in 2026.
+[25:55] I can't believe how many items are on this slide.
+[25:58] Just in the interest of time, I'll just call out a couple.
+[26:02] I'm a real big fan of the Workload Identity Federation, or WIF.
+[26:07] What WIF does is it removes the need for an API key.
+[26:11] So I know a lot of customers maybe check in API keys into source code,
+[26:17] leave them lying around.
+[26:18] They could be a leak risk.
+[26:19] If somebody gets your API key, they can query on your behalf.
+[26:23] with WIF, that's eliminated.
+[26:29] And then the other thing I'll mention is just today,
+[26:32] we launched the Fable model.
+[26:35] And it's a mythos class model,
+[26:37] so we had to put additional safety classifiers on it.
+[26:40] And that means the block rate's a little bit higher
+[26:42] on that model than on other models.
+[26:45] And so we launched a fallback feature.
+[26:46] So now on the Messages API,
+[26:49] you can just list a few other models.
+[26:51] You can say, oh, if Fable can't handle it for whatever reason because of classifier fires,
+[26:57] then the request will just automatically fall back.
+[27:00] And that makes it have a more reliable, robust experience.
+[27:04] So that's just two of all the many things that we've launched, and we're only halfway through the year.
+[27:11] So with that, I will thank you very much, and enjoy the rest of the conference.

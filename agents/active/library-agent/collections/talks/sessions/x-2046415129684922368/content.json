@@ -1,0 +1,444 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "title": "Vibe coding בפרודקשן — איך עושים את זה באחריות",
+ "subtitle": "חוקר מ-Anthropic מסביר איך מוותרים על קריאת הקוד בלי לוותר על השליטה במוצר: מגבילים את ה-vibe coding ל-leaf nodes, בונים בדיקות אימות, ומשמשים כ-PM של Claude",
+ "meta": [
+  "Erik Schluntz (Anthropic) · אירוע Code w/ Claude (לפי שקופית הפתיחה) · הועלה מחדש ב-X על ידי Himanshu Kumar ב-21.4.2026, תאריך ההרצאה המקורית לא מצוין",
+  "משך: כ-31 דקות · X",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Erik Schluntz",
+ "topics": [
+  "Vibe coding",
+  "Claude Code",
+  "AI-assisted engineering",
+  "Verification"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זו הרצאה של כ-15 דקות ואחריה כ-15 דקות של שאלות מהקהל, בשם \"Vibe coding in prod\", מאירוע Code w/ Claude של Anthropic. הדובר מציג את עצמו כ-Eric, חוקר ב-Anthropic שעוסק ב-coding agents ושותף לכתיבת Building Effective Agents. השקופית הראשונה מזהה אותו כ-Erik Schluntz. הכיתוב של הפוסט ב-X, שלפיו הדובר הוא \"Head of Claude Code\" ש\"הוציא 49 פיצ'רים ביומיים\", לא מופיע בשום מקום בהרצאה. מה שהוא כן מספר: כשהיד שלו הייתה בגבס במשך חודשיים, Claude כתב את כל הקוד שלו.\n\nהטענה המרכזית: בגלל הקצב האקספוננציאלי שבו המודלים משתפרים, מהנדסים יצטרכו להפסיק לקרוא כל שורת קוד, כמו שהפסקנו לקרוא את ה-assembly שהקומפיילר מייצר. איך עושים את זה באחריות? שוכחים שהקוד קיים, אבל לא שוכחים שהמוצר קיים. מוצאים שכבת הפשטה שאפשר לאמת בלי להכיר את המימוש, מגבילים את ה-vibe coding ל-leaf nodes שאף רכיב לא תלוי בהם, ומשקיעים בהכנת context ל-Claude כמו PM שמכין מסמך לעובד חדש. ההוכחה שהוא מביא: PR של כ-22 אלף שורות שנכתב ברובו על ידי Claude ומוזג ל-codebase של RL בפרודקשן."
+  },
+  {
+   "kind": "image",
+   "file": "k_001.jpg",
+   "caption": "שקופית הפתיחה: \"Vibe coding in prod\" עם הלוגו Code w/ Claude והשם Erik Schluntz מ-Anthropic",
+   "width": 5.6
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות המרכזיות עם חותמות זמן, ומה לא נאמר בהרצאה."
+    ],
+    [
+     "2. מהו vibe coding ולמה זה חשוב: ",
+     "ההגדרה של Karpathy, הדוגמאות שהשתבשו, והגרף של METR."
+    ],
+    [
+     "3. לשכוח את הקוד, לא את המוצר: ",
+     "האנלוגיות למנהלים, שכבת ההפשטה שאפשר לאמת, וההסתייגות לגבי tech debt ו-leaf nodes."
+    ],
+    [
+     "4. להיות ה-PM של Claude: ",
+     "איך נראה תהליך התכנון של 15 עד 20 דקות לפני ההרצה, ולמי הגישה הזו לא מתאימה."
+    ],
+    [
+     "5. Case study: ",
+     "ה-PR של 22 אלף שורות ל-codebase של RL, ואיך הצוות וידא שהוא תקין."
+    ],
+    [
+     "6. סיכום ההרצאה ו-Q&A: ",
+     "ארבעת העקרונות, ותשובות על למידה, אבטחה, TDD, compact ו-Cursor."
+    ],
+    [
+     "7. מה עושים מחר: ",
+     "צעדים מעשיים וטבלת שאלות פתוחות."
+    ],
+    [
+     "8. מילון מונחים: ",
+     "המונחים באנגלית שמופיעים במסמך."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך הזה הופק אוטומטית מהתמלול ומהשקופיות של ההקלטה. ייתכן ששמות ומונחים שובשו בתמלול האוטומטי (ASR). למשל, \"Barry Zang\" הוא כנראה Barry Zhang, ו-\"Andre Carpathie\" הוא Andrej Karpathy כפי שמופיע בשקופית. הציטוטים מועתקים מילה במילה מהתמלול ונבדקו מול חותמת הזמן שלהם. לא נוסף מידע ממקורות חיצוניים, וגם הכיתוב של הפוסט ב-X לא שימש כמקור."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "ההרצאה היא בעיקרה טיעון שיטתי: vibe coding הוא כבר לא רק צעצוע לפרויקטים צדדיים. בקרוב זו תהיה מיומנות הכרחית, כי המודלים יספקו יחידות עבודה גדולות מכדי שאדם יוכל לקרוא אותן שורה אחרי שורה. הדובר לא מציע לוותר על בקרה. הוא מציע להעביר אותה מקריאת הקוד לאימות של התנהגות המוצר, ולתחום את הסיכון לחלקים במערכת שאף רכיב לא תלוי בהם."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "Vibe coding זה לא \"להשתמש הרבה ב-AI\": ",
+     "מי שעובד עם Cursor או Copilot בלולאת משוב צפופה לא עושה vibe coding. לפי ההגדרה של Karpathy, המהות היא \"forget that the code even exists\" [0:00, 1:31]."
+    ],
+    [
+     "הסיבה לטפל בזה עכשיו היא הקצב האקספוננציאלי: ",
+     "\"The length of tasks that AI can do is doubling every seven months\". כרגע מדובר בערך בשעה של עבודה, ובעוד שנה-שנתיים זה יגיע ליום או לשבוע [3:03]."
+    ],
+    [
+     "העיקרון המנחה: ",
+     "\"we will forget that the code exists, but not that the product exists\". צריך שכבת הפשטה שאפשר לאמת, כמו CTO שכותב acceptance tests או PM שמשתמש במוצר [4:34, 6:09]."
+    ],
+    [
+     "ההסתייגות היא tech debt: ",
+     "היום אין דרך למדוד tech debt בלי לקרוא את הקוד, ולכן ה-vibe coding מוגבל ל-leaf nodes. הליבה הארכיטקטונית נשארת באחריות של מהנדסים [6:09, 7:44]."
+    ],
+    [
+     "להיות ה-PM של Claude: ",
+     "הדובר משקיע 15 עד 20 דקות בשיחה נפרדת עם Claude כדי לחקור את הקוד ולבנות תוכנית, ורק אחר כך מריץ אותה. לדבריו, אחוז ההצלחה אז \"very, very high\" [10:50]."
+    ],
+    [
+     "זה לא מתאים לכולם: ",
+     "\"I don't think that vibe coding and prod is for everybody\". מי שאין לו רקע טכני לא יודע לשאול את השאלות הנכונות [10:50]."
+    ],
+    [
+     "Case study: ",
+     "PR של ‎+22,160 שורות ל-codebase של RL בפרודקשן. הושקעו ימים של עבודה אנושית, השינויים התרכזו ב-leaf nodes, נבנו stress tests, וה-inputs וה-outputs תוכננו כך שאדם יוכל לבדוק אותם. התוצאה: יום עבודה במקום שבועיים [12:23, 13:55]."
+    ],
+    [
+     "טיפים מעשיים מה-Q&A: ",
+     "לבקש שלושה end-to-end tests ולקרוא קודם את הבדיקות [23:05, 24:37]. לעשות compact כשמגיעים לנקודת עצירה טבעית [27:40]. להתחיל עם Claude Code ולסיים תיקונים נקודתיים ב-Cursor [29:15]."
+    ],
+    [
+     "אבטחה: ",
+     "התשובה שלו היא שמי שמכיר את ה-context יודע מה מסוכן. במקרה הפנימי שהציג, המערכת הייתה \"fully offline\" [20:00]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "הכיתוב ב-X לא נתמך בהרצאה: ",
+     "אין בה \"Head of Claude Code\", אין \"49 פיצ'רים ביומיים\" ואין \"לא כתב קוד ביד כבר חודשים\". הדובר מציג את עצמו כחוקר ב-Anthropic."
+    ],
+    [
+     "אין מספרים על התהליך: ",
+     "\"very, very high success rate\" נאמר בלי נתון. לא נאמר כמה מתוך 22 אלף השורות עבר review אנושי, ואין פרטים על ה-stress tests עצמם."
+    ],
+    [
+     "חוסר עקביות קטן בהערכת החיסכון: ",
+     "הדובר אומר גם \"saved us a week's worth of human time\" וגם \"one day of time instead of two weeks\" [13:55]."
+    ],
+    [
+     "אין פתרון ל-tech debt: ",
+     "הוא מודה שאין כיום דרך לאמת tech debt בלי לקרוא את הקוד, ולא מציע כלי או מדד."
+    ],
+    [
+     "שאלה שלא נענתה: ",
+     "על הרצה של כמה Claude Code במקביל, Git worktrees ו-stacked PRs הוא לא ענה בכלל. הוא ענה רק על Cursor ועל היכרות עם codebase חדש [29:15]."
+    ],
+    [
+     "אין מתכון אבטחה כללי: ",
+     "דוגמת האבטחה שלו נשענת על כך שהמערכת offline, וזה לא מתאים לרוב מוצרי הפרודקשן."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. מהו vibe coding ולמה זה חשוב"
+  },
+  {
+   "kind": "image",
+   "file": "k_007.jpg",
+   "caption": "השקופית \"What is Vibe Coding?\" עם הציוץ של Andrej Karpathy: \"fully give in to the vibes, embrace exponentials, and forget that the code even exists\"",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Schluntz מתחיל בהבחנה בין שימוש אינטנסיבי ב-AI לבין vibe coding. מי שעובד עם Cursor או Copilot ומקבל ממנו רוב הקוד, אבל נשאר בלולאת משוב צפופה, לא עושה לדבריו vibe coding. החלק שחשוב בהגדרה של Karpathy הוא \"forget the code even exists\" [1:31]. בגלל זה vibe coding הלהיב גם אנשים שלא מגיעים מהנדסה, שפתאום יכלו לבנות אפליקציה שלמה לבד.\n\nבשקופיות מופיעים גם הצד השלילי וגם הצד החיובי. מצד אחד, ציוץ של מפתח שבנה SaaS עם Cursor ונפרץ, והתמלול מתאר את מה שקרה: \"maxed out usage on my API keys\", עקיפה של המנוי ויצירת רשומות אקראיות ב-DB [1:31]. מצד שני, ההצלחות היו בעיקר בתחומים שבהם הסיכון נמוך, כמו המשחק שנבנה ב-vibe coding ומכניס 52,000 דולר בחודש לפי השקופית. השאלה שהוא מעלה: למה בכלל להתעסק בזה אם ההצלחות הן צעצועים? התשובה שלו היא הקצב האקספוננציאלי. כשמודל יספק שבוע עבודה בבת אחת, \"there is no way that we're going to be able to keep up with that if we still need to move in lockstep\" [3:03]. הוא משווה את זה לקומפיילרים: בהתחלה מפתחים קראו את ה-assembly שהקומפיילר הוציא, ובשלב מסוים זה פשוט הפסיק להיות אפשרי."
+  },
+  {
+   "kind": "image",
+   "file": "k_014.jpg",
+   "caption": "גרף של METR: \"The length of tasks AIs can do is doubling every 7 months\". אורך המשימה בהצלחה של 50%, לפי תאריך שחרור המודל, מ-GPT-2 ועד Sonnet 3.7 שמגיע לכשעה",
+   "width": 6.3
+  },
+  {
+   "kind": "quote",
+   "text": "The length of tasks that AI can do is doubling every seven months. right now we're at about an hour.",
+   "by": "— Erik Schluntz [3:03]"
+  },
+  {
+   "kind": "h1",
+   "text": "3. לשכוח את הקוד, לא את המוצר"
+  },
+  {
+   "kind": "image",
+   "file": "k_019.jpg",
+   "caption": "השקופית \"This is not a new problem\" עם שלוש שאלות: איך CTO מנהל מומחה (acceptance tests), איך PM בודק פיצ'ר הנדסי (משתמש במוצר), ואיך CEO בודק את רואה החשבון (בדיקה מדגמית של עובדות)",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "התשובה שלו לשאלה \"how will we Vibe Code in prod\" היא \"we will forget that the code exists, but not that the product exists\" [4:34]. הוא מדגיש שזו לא בעיה חדשה. CTO כותב acceptance tests למומחה שעובד אצלו גם בלי להבין את המימוש. PM משתמש במוצר כדי לוודא שהוא מתנהג כמו שציפה. CEO בודק מדגמית את העובדות שהוא כן מבין, וכך בונה אמון במודל הפיננסי כולו. בלשונו, \"managing implementations that you yourself don't understand is actually a problem as old as civilization\" [6:09]. כל מנהל כבר מתמודד עם זה, ומהנדסי תוכנה פשוט רגילים להבין את כל ה-stack עד הסוף. המסקנה המעשית, שמופיעה גם בשקופית: \"Find an abstraction layer you can verify\"."
+  },
+  {
+   "kind": "image",
+   "file": "k_030.jpg",
+   "caption": "השקופית \"Caveat: Tech Debt\": עץ שבו הענפים והגזע לבנים והעלים (leaf nodes) כתומים. הנקודות: Extensibility cannot be verified, Focus on Leaf Nodes, Core Architecture must still be understood, But the models are getting better all the time",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "ההסתייגות היחידה שלו היא tech debt: \"right now there is not a good way to measure or validate tech debt without reading the code yourself\" [6:09]. לכן הוא מציע להגביל את ה-vibe coding ל-leaf nodes, כלומר לחלקים במערכת שאף רכיב לא תלוי בהם, הפיצ'רים שבקצה. אם יש בהם tech debt, הנזק מוגבל, כי לא סביר שהם ישתנו או שייבנו עליהם דברים נוספים. הענפים והגזע הם הארכיטקטורה שמהנדסים עדיין צריכים להבין לעומק ולשמור עליה גמישה וניתנת להרחבה [7:44]. לדבריו הגבול הזה זז: בשבוע-שבועיים האחרונים בתוך Anthropic, עם מודלי Claude 4, הוא נתן להם הרבה יותר אמון ממה שנתן ל-3.7 [9:19]."
+  },
+  {
+   "kind": "h1",
+   "text": "4. להיות ה-PM של Claude"
+  },
+  {
+   "kind": "image",
+   "file": "k_032.jpg",
+   "caption": "השקופית \"How to succeed at Vibe Coding\": \"Think like a PM: What guidance or context would a new employee need?\" לצד מם \"Ask not what Claude can do for you, but what you can do for Claude\"",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "העצה המרכזית שלו: \"ask not what Claude can do for you, but what you can do for Claude\" [9:19]. מי שעושה vibe coding משמש בפועל כ-PM של Claude, ולכן צריך לשאול איזה context עובד חדש היה צריך כדי להצליח: סיור ב-codebase, דרישות, אילוצים. אף אחד לא מצפה שעובד ביום הראשון שלו יממש פיצ'ר על סמך משפט אחד, וככה גם לא כדאי לעבוד עם Claude.\n\nבפועל, 15 עד 20 הדקות האלה הן לא כתיבה ידנית של prompt. זו שיחה נפרדת עם Claude, שבה הוא חוקר את הקוד, מאתר את הקבצים הרלוונטיים, ושניהם בונים יחד תוכנית: מה הוא רוצה, אילו קבצים ישתנו ואילו דפוסים צריך לשמור. את התוצר הזה הוא מעביר ל-context חדש, או פשוט אומר \"let's go execute this plan\" [10:50]. כמה פירוט לתת? זה תלוי במה שחשוב לו. כשהמימוש לא משנה לו, הוא מתאר רק דרישות. כשהוא מכיר את הקוד, הוא מציין מחלקות ומפנה לפיצ'ר דומה. הוא מזהיר ש-\"our models do best when you don't over-constrain them\" ולא ממליץ על תבנית PRD נוקשה [18:29]. ויש גבול ברור: אנשים בלי רקע טכני לא צריכים לבנות עסק מאפס בדרך הזו, כי הם לא יודעים לשאול את השאלות הנכונות [10:50]."
+  },
+  {
+   "kind": "quote",
+   "text": "When I'm working on features with Claude, I often spend 15 or 20 minutes collecting guidance into a single prompt and then let Claude cook after that.",
+   "by": "— Erik Schluntz [10:50]"
+  },
+  {
+   "kind": "h1",
+   "text": "5. Case study: PR של 22 אלף שורות ל-codebase של RL"
+  },
+  {
+   "kind": "image",
+   "file": "k_036.jpg",
+   "caption": "השקופית \"Case Study: We merged a 22k line change to our RL codebase, written heavily by Claude\" עם ה-diff מ-GitHub: ‎+22,160 −0",
+   "width": 5.6
+  },
+  {
+   "kind": "image",
+   "file": "k_041.jpg",
+   "caption": "השקופית \"How did we do this? (responsibly)\": ימים של קוד והכוונה אנושיים, ריכוז השינוי ב-leaf nodes עם קצת review אנושי, ו-stress tests שתוכננו בקפידה",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "\"We recently merged a 22,000 line change to our production reinforcement learning code base\" [10:50]. לדבריו, ה-screenshot הוא ה-diff האמיתי מ-GitHub. הוא מפרט ארבעה דברים שאפשרו את זה. ראשון, \"There was still days of human work that went into this\": הגדרת דרישות, הכוונה של Claude ותכנון המערכת [12:23]. שני, השינוי התרכז ב-leaf nodes, והחלקים שצריכים להישאר ניתנים להרחבה עברו review אנושי כבד. שלישי, נבנו stress tests ליציבות שרצו לאורך זמן, כי יציבות הייתה הדאגה הגדולה ביותר. רביעי, המערכת תוכננה מראש עם inputs ו-outputs שאדם יכול לבדוק בקלות, כך שאפשר היה לאמת שהיא נכונה בלי לקרוא את כל המימוש.\n\nבשקופית הבאה (k_043) מופיעה השורה התחתונה: \"we were just as confident in this change as any other, and delivered it with a fraction of the time and effort\". לדבריו, הרווח החשוב יותר הוא שינוי באופן החשיבה. כשהעלות השולית של תוכנה יורדת, משימות של שבועיים הופכות למשהו שאפשר פשוט לעשות. שימו לב: הוא גם מזכיר שהמערכת הזו \"fully offline\" [20:00], וזה חלק מהסיבה שהסיכון היה נמוך."
+  },
+  {
+   "kind": "quote",
+   "text": "And now suddenly, when something costs one day of time instead of two weeks, you realize that you can go and make much bigger features and much bigger changes.",
+   "by": "— Erik Schluntz [13:55]"
+  },
+  {
+   "kind": "h1",
+   "text": "6. סיכום ההרצאה ו-Q&A"
+  },
+  {
+   "kind": "image",
+   "file": "k_047.jpg",
+   "caption": "השקופית \"Closing thoughts\" עם ארבעה עקרונות: Be Claude's PM, Leaf Nodes not Architecture, Verifiability, Remember the Exponential",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "ארבעת העקרונות שבהם הוא סוגר: להיות ה-PM של Claude, לעשות vibe coding ב-leaf nodes ולא בארכיטקטורה, לחשוב איך לאמת שהשינוי נכון בלי לקרוא את הקוד, ולזכור את הקצב האקספוננציאלי. היום עוד אפשר לא לעשות vibe coding, אבל בעוד שנה-שנתיים מי שמתעקש לקרוא או לכתוב כל שורה יישאר מאחור: \"you are going to become the bottleneck if we don't get good at this\" [15:26]. אחרי זה הגיעו כ-15 דקות של שאלות, ובהן הפרטים המעשיים ביותר בהרצאה."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "איך לומדים בלי להתאמץ על syntax: ",
+     "לדבריו אפשר ללמוד מהר יותר, למשל לשאול את Claude למה בחר בספרייה מסוימת. \"people that are lazy are not going to learn\". מחזור של החלטה ארכיטקטונית יכול להתקצר משנתיים לחצי שנה, כלומר פי ארבעה יותר לקחים באותו זמן [16:58, 18:29]."
+    ],
+    [
+     "אבטחה: ",
+     "מי שמבין את ה-context יודע מה מסוכן. המקרה הפנימי היה offline. הוא היה רוצה לראות frameworks \"provably correct\", שבהם auth ותשלומים כבר בנויים ורק ה-UI נכתב ב-vibe coding, כמו Claude Artifacts שמוגבל ל-front-end [20:00, 21:33]."
+    ],
+    [
+     "TDD: ",
+     "Claude נוטה לכתוב בדיקות שתלויות מדי במימוש. הוא מבקש במפורש \"just write three end-to-end tests\": happy path ושני מקרי שגיאה. לפעמים הבדיקות הן החלק הראשון, או היחיד, שהוא קורא [23:05, 24:37]."
+    ],
+    [
+     "Embrace exponentials: ",
+     "הכוונה היא לא רק שהמודלים ישתפרו, אלא שהם ישתפרו מהר יותר ממה שאנחנו מסוגלים לדמיין. הוא מצטט את \"machines of loving grace is not science fiction. It's a product roadmap\" מהשיחה של Dario ו-Mike Krieger [26:08]."
+    ],
+    [
+     "Compact: ",
+     "הוא עושה compact או פותח session חדש בנקודת עצירה טבעית, כמו שמתכנת יוצא להפסקת צהריים. קודם הוא מבקש מ-Claude לכתוב את התוכנית למסמך, ואז \"gets rid of 100k tokens\" ונשארים כמה אלפי tokens [27:40]."
+    ],
+    [
+     "Claude Code מול Cursor: ",
+     "\"I'll start things with Claude code and then I'll use Cursor to fix things up\". בקוד שהוא לא מכיר, הוא קודם מבקש מ-Claude Code להראות לו איפה דברים קורים ואילו מחלקות לבדוק, כדי לבנות לעצמו תמונה בראש [29:15, 30:48]."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "7. מה עושים מחר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "למפות את ה-codebase: ",
+     "לסמן אילו רכיבים הם leaf nodes שאפשר לבנות ב-vibe coding, ואילו הם גזע שדורש review מלא."
+    ],
+    [
+     "להכניס שלב תכנון נפרד: ",
+     "להקדיש 15 עד 20 דקות לחקירה עם Claude ולתוכנית כתובה, ורק אז להריץ ב-context חדש."
+    ],
+    [
+     "לתכנן מראש איך יאומת השינוי: ",
+     "inputs ו-outputs שאדם יכול לבדוק, ו-stress tests ליציבות, עוד לפני שמבקשים מ-Claude לכתוב קוד."
+    ],
+    [
+     "לבקש בדיקות מינימליסטיות: ",
+     "שלושה end-to-end tests ולקרוא אותם ראשונים. אם הבדיקות נראות נכונות ועוברות, זו נקודת אמון טובה."
+    ],
+    [
+     "לנהל את ה-context: ",
+     "לעשות compact בנקודות עצירה טבעיות, אחרי שהתוכנית נשמרה במסמך."
+    ],
+    [
+     "לא לעשות vibe coding במקומות רגישים: ",
+     "auth, תשלומים ורכיבים שחשופים לאינטרנט, אלא אם יש מישהו שיודע לשאול את שאלות האבטחה הנכונות."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "מה נאמר בהרצאה"
+   ],
+   "rows": [
+    [
+     "איך מודדים tech debt בקוד שאף אחד לא קרא?",
+     "לא נאמר. הדובר מודה שאין כרגע דרך לעשות את זה."
+    ],
+    [
+     "מה היה היחס בין review אנושי לקוד שלא נבדק ב-PR של 22 אלף השורות?",
+     "נאמר רק \"heavy human review\" על החלקים שצריכים להרחבה. אין מספרים."
+    ],
+    [
+     "האם הגישה מתאימה גם למערכות online שחשופות למשתמשים?",
+     "הדוגמה הייתה offline. לגבי השאר נאמר רק שצריך להבין את ה-context."
+    ],
+    [
+     "איך עובדים עם כמה agents במקביל, worktrees ו-stacked PRs?",
+     "השאלה נשאלה ולא נענתה [29:15]."
+    ],
+    [
+     "איפה עובר הגבול בין leaf node לגזע כשהמודלים משתפרים?",
+     "הגבול זז עם Claude 4, אבל לא הוצג קריטריון [9:19]."
+    ]
+   ],
+   "widths": [
+    3.0,
+    3.2
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "8. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "Vibe coding",
+     "פיתוח שבו נותנים למודל לכתוב את הקוד ו\"שוכחים שהקוד קיים\", לפי ההגדרה של Karpathy"
+    ],
+    [
+     "Leaf nodes",
+     "רכיבים בקצה המערכת שאף רכיב אחר לא תלוי בהם"
+    ],
+    [
+     "Core architecture",
+     "הגזע והענפים של המערכת, שרכיבים אחרים נבנים עליהם"
+    ],
+    [
+     "Tech debt",
+     "חוב טכני: קוד שקשה להרחיב או לתחזק"
+    ],
+    [
+     "Acceptance tests",
+     "בדיקות קבלה שבודקות התנהגות בלי להכיר את המימוש"
+    ],
+    [
+     "End-to-end tests",
+     "בדיקות שבודקות תרחיש שלם מהקלט ועד הפלט"
+    ],
+    [
+     "TDD",
+     "פיתוח שמתחיל מכתיבת הבדיקות"
+    ],
+    [
+     "Stress tests",
+     "בדיקות עומס ויציבות שרצות לאורך זמן"
+    ],
+    [
+     "Compact",
+     "דחיסה של היסטוריית השיחה ב-Claude Code לכמה אלפי tokens"
+    ],
+    [
+     "Context",
+     "כל המידע שהמודל מקבל לפני שהוא מבצע משימה"
+    ],
+    [
+     "RL",
+     "Reinforcement learning, למידת חיזוק"
+    ],
+    [
+     "PR / diff",
+     "בקשת מיזוג ב-GitHub וההבדלים בקוד שהיא מכילה"
+    ],
+    [
+     "METR",
+     "הגוף שפרסם את הגרף על אורך המשימות שמודלים מסוגלים לבצע (לפי השקופית)"
+    ],
+    [
+     "Claude Artifacts",
+     "קוד front-end ש-Claude כותב ומוצג ישירות בתוך Claude AI"
+    ],
+    [
+     "Git worktrees",
+     "כמה תיקיות עבודה של אותו repository, מאפשרות לעבוד בכמה ענפים במקביל"
+    ]
+   ],
+   "widths": [
+    1.6,
+    4.6
+   ]
+  }
+ ]
+}

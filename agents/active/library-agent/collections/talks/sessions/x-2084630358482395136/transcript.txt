@@ -1,0 +1,715 @@
+[0:00] Today I'm joined by Colin Jarvis, head of Forward Deployed Engineering at OpenAI.
+[0:04] Colin, thanks for doing it.
+[0:05] Yeah, thanks for having me.
+[0:06] I'm so thrilled to be doing this with you.
+[0:08] You are actually somebody, I was talking to you a little bit.
+[0:10] You joined in November 2022, the month of ChadGPT.
+[0:14] Back in the day.
+[0:15] Back in the day.
+[0:16] I think OpenAI was like less than 200 people back in the day.
+[0:18] Yeah, something like that.
+[0:19] Yeah, I think I was like one of two or three people in Europe.
+[0:22] Wow.
+[0:22] When I started.
+[0:23] Wow, wow.
+[0:24] Well, I'm so thrilled to do this, you know, for a couple of reasons.
+[0:27] One, I started my own career as a Forward Deployed Engineer.
+[0:30] at Palantra about a decade ago.
+[0:31] Super cool.
+[0:32] And second, there's this whole narrative out there
+[0:34] about AI being a bubble, the MIT study,
+[0:37] that 95% of enterprise deployments don't work.
+[0:40] You are the 5% making them work.
+[0:43] That is certainly what we say in AI.
+[0:45] Yeah, yeah, definitely.
+[0:46] Yeah, yeah.
+[0:47] We've been working with enterprises for a while.
+[0:49] So maybe it starts from the start,
+[0:52] the origin story of forward deployed engineering at OpenAI.
+[0:54] How did you guys come up with this?
+[0:56] What was the motivation?
+[0:58] Take us back.
+[0:58] Totally.
+[0:59] Yeah, definitely. And like when it started in 2022, I think there was like, it was like, you know,
+[1:03] ChatDT came out, there was tons of hype and people were really excited, but it was also like
+[1:07] kind of hard to get value from the models at that point. Like people, I think copywriting was like
+[1:11] the big use case. I was like, you could like, you'd write papers kind of with it. And I think
+[1:16] like what we were excited about with Forward to Flight Engineering is like over those couple of
+[1:21] years following ChatDT, we were able to get customers in production, but it was pretty
+[1:25] inconsistent and it took a ton of time every time and the thing that was like consistently successful
+[1:31] in getting those folks to production was just sort of embedding with them understanding their domain
+[1:36] really deeply and like sitting with the users on the ground and getting them to properly like adopt
+[1:41] the technology and i think um we sort of found like our our like our previous hands-off like
+[1:46] technical support model was just not reliably getting these folks to production and that kind
+[1:50] of led to us deciding to set up a forward deployed model so that we could i guess repeatedly get
+[1:55] these enterprises to production.
+[1:56] Makes a ton of sense.
+[1:58] And maybe double-clicking,
+[2:00] what does forward-deployed engineering actually do?
+[2:02] It would maybe help if I'll kind of ground this
+[2:05] in an example.
+[2:07] So one of the customer examples
+[2:09] that led us to want to set up a forward-deployed practice
+[2:12] was Morgan Stanley, who we deployed in 2023.
+[2:16] They were, in fact, our first enterprise customer
+[2:18] to deploy with GBD-4.
+[2:20] And the use case for them
+[2:22] was that they wanted to take their wealth management practice
+[2:25] and this is kind of a consistent feature that we see with people who are successful deploying
+[2:29] gen AI is like they don't do like a kind of edge case like over to the side of the company they
+[2:34] pick something with genuinely high stakes in this case Morgan Stanley wealth management is like
+[2:37] they're they're kind of one of the biggest parts of their business and uh what we were trying to
+[2:42] do was put like the their research in the hands of all of the wealth of all the wealth advisors
+[2:47] so all of them would kind of I guess have like more more easy access and be able to give like
+[2:52] more actionable insights to their customers.
+[2:55] And so what we did was, I guess the problems to be solved were twofold.
+[2:59] At that stage, like RAG was not a thing yet.
+[3:01] It was kind of like, we have a bunch of research reports.
+[3:03] We need to get those in the hands of the wealth advisors, and we need them to trust them.
+[3:07] So what we did was we embedded with Morgan Stanley.
+[3:10] We worked with our engineers.
+[3:11] We first of all did a bunch of retrieval tuning to get to the point where we could kind of
+[3:14] trust the outputs of the research reports.
+[3:17] And then we ran a bunch of pilots, getting the wealth advisors to kind of label data
+[3:22] and eventually got them to the point where they kind of trusted the insights
+[3:26] and started actually like using them to give to their customers.
+[3:28] And I think that's like the kind of key thing with them is like the main technical hurdle
+[3:32] was probably solved within like six to eight weeks.
+[3:35] But it took a further like four months of like doing pilots, collecting evals,
+[3:40] and iterating to get to the point where the advisors actually trusted it
+[3:43] to kind of put it in to like actually use it in anger.
+[3:46] But the outcome was really good.
+[3:48] Like I think in the end about like 98% of them adopted it.
+[3:51] it resulted in like a 3x increase in the amount of like usage of their research reports.
+[3:55] So like, wow, six months to effectively build trust.
+[3:59] Yeah.
+[4:00] But the original product was working within a couple of weeks, as you said.
+[4:02] Yeah.
+[4:03] Yeah.
+[4:03] I'd say like probably like within like six to eight weeks, we had the pipeline, we had
+[4:07] some guardrails, we had like, you know, we had the retreat, we tuned the search enough
+[4:11] that we got getting decent results.
+[4:12] But it's kind of like, it's almost like how good is good enough for production with these
+[4:16] enterprises?
+[4:17] And especially Morgan Stanley working in a regulated environment.
+[4:20] And like, there's a very high, I guess, need for accuracy, but also this is a probabilistic technology.
+[4:25] Like you do just have to like build the right kind of framework.
+[4:28] And then also just like get the users to kind of trust it and give them the tools to verify it where they don't.
+[4:33] Yeah.
+[4:33] So that was 2023.
+[4:35] Fast forward to today, two and a half, three years in, forward deployed engineering is a hot topic.
+[4:41] Probably the hardest job to hire for their startups across the spectrum from AI native startups like Sierra
+[4:47] to infrastructure businesses like Base 10
+[4:50] to even business and financial services like Ramp.
+[4:54] They have forward deployed engineering teams,
+[4:56] really wide range.
+[4:57] It means a lot of different things to different people,
+[4:59] different use cases.
+[5:01] But maybe we can start with a use case
+[5:03] where forward deployed engineering
+[5:05] has been particularly useful.
+[5:07] Take us deep on an example or two
+[5:11] where you've moved the needle
+[5:12] and delivered tangible ROI.
+[5:14] Totally.
+[5:15] Yeah, happy to take you through.
+[5:16] So probably like one of our biggest projects right now is with a semiconductor company in Europe.
+[5:22] And what we're doing there is like, I guess, like going back to the theme with Morgan Stanley, it's like you've got to pick a big kind of problem to solve.
+[5:29] And in this case, they basically said, like, look across our entire value chain.
+[5:33] We want you to just like effectively take the biggest areas of like waste in that chain and then make them more efficient with AI.
+[5:41] And like they basically left it fully open with us as to what we could do.
+[5:44] And we basically embedded on site, spent like a couple of weeks just like understanding their business in a lot of detail.
+[5:50] And looking across their value chain, there's like the design process, the verification process, and the like measuring performance once you've actually shipped these chip designs.
+[5:58] And the one that we really dove on was verification, which is like, again, I guess like the thing the engineers don't like doing, but probably they have to spend like 70, 80% of their time.
+[6:07] Like, you know, just like fixing bugs, like maintaining compatibility with old versions of chips, all this kind of stuff.
+[6:13] So what we did was we delivered like 10 different FDE use cases across their value chain with the aim of eventually delivering like, I guess, I think the total figure that we're aiming for is like a 50% efficiency saving and what the and the engineers time.
+[6:29] And currently where we're sitting is about 20 to 30% for the first couple of divisions that we rolled out with.
+[6:34] And like, if I give you an example of some of the things we do, like one of them is that they have so many tests to run on these chips that they have to like schedule a bunch of them and run them overnight, every night.
+[6:45] And when they come in in the morning, every engineer sort of has like something between like a few hundred bugs, which have been just not coming to these tests.
+[6:52] And they're just sitting like looking at them like, oh, my God.
+[6:55] I have so much stuff to do.
+[6:56] And already I just have to like start debugging and work from almost nothing.
+[7:00] So what we did was we actually took codecs to start with, and then we started to build on codecs to sort of tailor it for their domain.
+[7:08] And what we did was start off where the model would just take the bug, go and do a bunch of investigation, and then write a ticket for the engineer to say, this is probably what's wrong.
+[7:18] And when we got to the point where they trusted the results, we then started to actually have the model go and actually try and fix it and then raise a PR.
+[7:25] And when we did that, we discovered actually we need to give the model an execution environment so it can test its code.
+[7:31] And it's sort of this iterative process where we started off with just like, this is a painful thing.
+[7:36] Let's just help it be advisory.
+[7:38] What we ended up with was this what we call the debug investigation and triage agent,
+[7:42] which basically goes in and tries to fix a significant proportion of these bugs.
+[7:47] When the engineer comes in the morning, our vision, hopefully by mid-next year,
+[7:53] is that the engineer will come in and most of them will be fixed.
+[7:55] Yeah, hardest ones will be clearly documented.
+[7:57] They'll be able to just go and do them.
+[7:59] And like the impact of the engineers,
+[8:00] sometimes it would take them like four to six weeks
+[8:02] to actually get through these
+[8:03] because they'd be trying to do their work
+[8:04] while going and like, you know,
+[8:06] swivel desking between fixing bugs,
+[8:08] going and writing new code.
+[8:09] And now what we're hoping is we can get them
+[8:11] to a world where they're just like
+[8:12] constantly just writing new codes
+[8:14] and the model is like doing a lot of the supporting.
+[8:16] Bug fixing.
+[8:17] Yeah.
+[8:17] This is it.
+[8:18] Wow.
+[8:19] This is an interesting tango with the model
+[8:21] and your team.
+[8:23] Yeah.
+[8:23] Where does the model and your team take over?
+[8:27] And is that line moving over time?
+[8:30] This is a great question.
+[8:31] Like, I think ideally you would just go in and you would just say, like, hey, here are the tools.
+[8:35] Like, here are the tools I have as an engineer.
+[8:37] And here's the problem and just go fix it.
+[8:39] And I think that's maybe a world we eventually get to.
+[8:42] I think what we find is, like, the first thing we did was fork codecs and add a whole bunch of telemetry
+[8:47] so that we could build, like, really detailed evals.
+[8:49] We could be like, okay, if I as an engineer was going to fix this thing, there's a detailed trajectory I would follow of like, you know, maybe 20 different actions where I'm checking different like logs and saying like whether or not there's a problem.
+[9:01] And our first step is kind of like figuring out, okay, making like a set of five with the experts from the customer and making this like this labeled set and then starting to work from there.
+[9:11] because I kind of feel like taking a step back,
+[9:14] it's like even if you do have this perfect future
+[9:15] where the AI is able to go away
+[9:18] and do these things autonomously,
+[9:19] you're going to want some sort of ability
+[9:21] to check its work.
+[9:23] And so we build this, I guess,
+[9:24] this kind of eval framework outside of a starting point.
+[9:27] We call it eval-driven development
+[9:29] where effectively a bit of LLM written code
+[9:32] is not done until you have a set of evals
+[9:34] that verify the efficacy.
+[9:36] And that's sort of where we start with this.
+[9:38] So I think coming back to your original question,
+[9:40] It's like if the models get better, hopefully we just run that eval set.
+[9:43] It works out of the bars.
+[9:44] In practice, the FDs then have to add a whole bunch of scaffolding around that to then make sure like, okay, these bits need to be deterministic.
+[9:52] These bits, we actually have a different simulator.
+[9:54] We're just going to execute as a tool and get the results.
+[9:56] So it's generally like a bit of a kind of like a bit of a mix of the two.
+[10:01] Super helpful.
+[10:02] So that's your coordination with the model side.
+[10:04] And then I'll ask you another one on the product side.
+[10:06] You know, the big pushback and, you know, sorry to use the C word is that FDs are just consultants.
+[10:13] Yeah.
+[10:14] But is it true that you guys are actually building products?
+[10:17] Yeah.
+[10:18] And if so, where does that line, where's the line between products that are reusable for other customers and custom work or consulting work that you might do for one customer?
+[10:27] Even in that, like, brief example there, there's sort of an element of product where, like, we're kind of figuring out, okay, is this eventually going to be a PR back to codex?
+[10:35] Yeah.
+[10:35] to just make it better at doing these enterprise use cases?
+[10:38] Is there a different product,
+[10:39] which is different from Codex,
+[10:40] which can solve this problem?
+[10:42] But I think maybe a better example is comes from,
+[10:45] it actually comes from all the way back in 2023,
+[10:47] which was another one of our customers was Klarna.
+[10:50] And I worked with them.
+[10:51] Of course, you're a very vocal customer.
+[10:53] Yeah, exactly.
+[10:54] And I worked with them for a while to do a bunch of things,
+[10:57] but the first thing we shared with them
+[10:58] was this customer service application.
+[10:59] Right.
+[11:00] And what we found was effectively,
+[11:02] customer service was very hard to scale.
+[11:04] If you're manually writing a prompt for every single policy and you've got 400 policies, this is not a scalable method of approaching this.
+[11:14] So we worked out a way of parameterizing the instructions and tools and then wrapping each intent with a set of evals so that we could scale from, say, 20 policies all the way up to 400 policies or more.
+[11:26] And this method worked pretty well at Klarna.
+[11:29] What we then decided was actually we were going to like kind of commodity.
+[11:33] We were going to take this and boil it into like an open source framework that we use internally, which we called Swarm.
+[11:38] And we eventually open sourced that.
+[11:40] And the market reaction was actually like fairly good.
+[11:42] And in parallel with that, what we did was we started an engagement with T-Mobile, which was, I would say, like even more complex, like maybe 10x more complex in terms of like volume and the number of policies and the complexity of policies as Clark.
+[11:54] But what we found was that this framework actually worked pretty well there with a few extensions.
+[12:00] And so what we did was we then worked with our product team and we were kind of like, hey, look, we've got some production customers.
+[12:05] It's like these primitives are working.
+[12:07] This swarm thing is actually getting a lot of stars on GitHub, which is actually has quite a lot of influence internally.
+[12:13] And we eventually decided to work with product to stand up a team to build what became the agent SDKs.
+[12:19] And I think recently you might have seen that we released AgentKit, which is kind of a visual builder type thing.
+[12:26] But that is actually just like a continuation of that story that started in 2023, which is like, let's make a way to parametrize instructions and tools.
+[12:34] Let's make a framework, which then makes it much simpler to roll out.
+[12:37] And now let's make it easier to adopt that framework through something like AgentKit.
+[12:41] Wow.
+[12:41] And that all sort of came, I guess, originally from that was a solution architect engagement, but very much an FDE style of delivery.
+[12:47] and today the FDs all use it as like a standard tool in their toolbox.
+[12:51] Wow. So what started with Klarna grew with T-Mobile, now AgentKit.
+[12:58] That's fascinating. So a real product that's actually out there,
+[13:02] built by the forward-deployed engineering team.
+[13:03] Exactly.
+[13:04] You know, my former boss, Shams Shankar, used to say at Palantir,
+[13:07] you know, the job of a forward-deployed engineer is to eat pain and excrete product.
+[13:11] Sounds like you've successfully excreted some product here.
+[13:14] We'll eat a lot of pain.
+[13:16] That's right.
+[13:16] That's right.
+[13:17] That's right. Well, maybe, you know, this is actually a great example. So while you were ingesting all that pain, maybe tell us a little bit about the before and after of, you know, if I was on the other side, a customer or an enterprise that had the good fortune of working with you.
+[13:33] Yeah.
+[13:33] What does my before and after look like? How am I different before you showed up and after your engagement?
+[13:40] I'd say there's kind of two things. There's like there's the problem we're solving.
+[13:46] So there's going to be a whole bunch of demonstrable ROI.
+[13:49] You're going to have a piece of software, which you didn't have before.
+[13:51] It's going to solve your problem.
+[13:56] Generally, we work with customers where we'll either have a set of engineers on the other side that we're going to head over to,
+[14:02] or we work alongside maybe a partner who's going to then take that forward and operate it.
+[14:07] Because we see our FDE team very much as a zero-to-one team.
+[14:10] We're going to come in, break the back of the difficult, novel problems that are at the root of what you want to do.
+[14:15] but then we want to move on to kind of the next problem
+[14:17] and we don't want to sort of be there in the long term.
+[14:20] So that's generally the model.
+[14:22] I think like apart from the software and the ROI
+[14:25] that they're kind of getting out of that software,
+[14:27] there's also like a bit of like an understanding
+[14:29] of like the FBE sort of ethos
+[14:31] and like the way that we deliver,
+[14:32] which is they should know like the way you develop with LLMs
+[14:36] is like you orchestrate whatever you're like,
+[14:38] whatever your end-to-end workflow is,
+[14:41] you wrap evals around it,
+[14:43] You put guardrails to protect the things that you can't really control that are going to happen at runtime.
+[14:48] And then you basically just build up an eval set and then test the consistency of this application.
+[14:54] And you learn how to make applications you can trust.
+[14:57] What we hope is that you don't really need the FDs to come back once we've solved this initial problem.
+[15:04] Although in practice, what we've seen with some of the bigger ones is actually those building blocks.
+[15:08] Like for the semiconductor example I mentioned earlier, those building blocks start to actually become an application in their own right.
+[15:14] And maybe we start to actually just keep building on top of the foundations.
+[15:17] But the preferred method is that we find a hard problem, we solve a hard problem, and then we extract the learnings and we move on to the next customer.
+[15:26] Fascinating. Fascinating.
+[15:27] Is there a product that you can show us that you've left behind?
+[15:32] Yeah, definitely.
+[15:32] Yeah, but I've actually got one here that we did for a customer in the manufacturing sector in APAC.
+[15:39] Let's see it.
+[15:40] Yeah, let's do it.
+[15:41] Happy to see it.
+[15:41] Nothing better than a live demo.
+[15:43] Yeah, yeah, for sure.
+[15:44] Let's take you through.
+[15:46] Cool.
+[15:47] So this dashboard here, just to explain what you're looking for.
+[15:50] So this was for a customer in APAC who worked in the automotive industry.
+[15:54] And this is kind of a toy version of what we produced for them.
+[15:59] But their problem was that they had an extremely complex supply chain.
+[16:04] So if anything happened that was going to affect the supply of parts, they would need to communicate through all these different teams in terms of the manufacturing division, then the logistics team in terms of how they were going to get those parts and then move them to the factories where they were actually going to build everything.
+[16:22] So there was like, I guess the coordination of this was all done manually by like teams sort of calling each other on the phone.
+[16:29] And what we tried to do with them was build like a data layer to start with that kind of that create like we didn't move the data,
+[16:36] but we just created a couple of a couple of APIs so that we could then put an LLM in as an orchestrator that could then like effectively query that data
+[16:44] and start to produce like an initial stab and the insights that would have taken you, you know, hours or days of wrangling of these other teams.
+[16:52] And so like the use case I'm going to go with here is that we have a customer who has just heard that there's a 25% tariff on goods coming from China to South Korea.
+[17:03] And normally this would require like coordination across these teams.
+[17:06] They would have to figure out which parts it affects, how that affects their supply chain.
+[17:10] And then they would have to run a bunch of simulations to figure out like what is the right way to reroute our supply chain to get around this problem.
+[17:16] And in this case, what we're going to do is use an LLM to deal with this problem.
+[17:21] And the problem with this is that there's a huge number of variables.
+[17:24] And as we're familiar with LLMs, it's a probabilistic technology.
+[17:29] There's a lot of like, if you give it full openness to just do whatever it wants,
+[17:33] then we're probably not going to trust the results.
+[17:35] So we're also going to build in some deterministic guardrails so that we can verify that whatever plan the model is coming up with,
+[17:41] we can always verify deterministically and make sure the numbers add up before we actually go and make any genuine business decisions.
+[17:48] So what we created for them was this off-spew here.
+[17:52] So whichever plan we're going to make with our supply chain,
+[17:55] there's a bunch of deterministic constraints that are going to be tested here.
+[18:00] Like, for example, we always need minimum two suppliers for tires.
+[18:03] We're not going to get stuck in this perspective.
+[18:07] A few on lead time, a few on whichever suppliers we're using,
+[18:11] we need to have all materials covered, all these sorts of things.
+[18:14] These are things that you want to be done like 100% of the time.
+[18:18] You don't want to trust the LLM to enforce those rules.
+[18:20] You want to do those deterministically.
+[18:22] That's kind of like, I guess, a consistent feature of how we approach things in the FDE team is always trading off.
+[18:29] Like whenever you can use determinism, do it.
+[18:32] And then use LLMs for what they're best at, which is like using this probabilistic approach where there's some kind of like nuance required as to what you need to do.
+[18:41] So let's play out this scenario.
+[18:44] So I'm going to put in what's the impact of a 25% tariff from China to South Korea.
+[18:50] And there's a couple of controls we built in here because the customer was quite conservative and did not trust LLMs very much when we started.
+[18:57] So we added in a step where it would always explain its reasoning to start with.
+[19:01] Again, these are fairly basic, but I'm just showing you all the different layers that we provide.
+[19:05] And we also provided a bunch of widgets so that it could display things clearly.
+[19:11] Like, for example, here's the tariff, here's the impact on the different parts.
+[19:17] We also, often folks would still not trust it.
+[19:21] So we also added other kind of deterministic checks, like it could just expose tables that you could check its work if you wanted.
+[19:28] So in this case, if I want to check that those values that it applied for the tariffs are correct, I could pop up this detailed modal.
+[19:36] You can see here that indeed all of the parts that originate from China now have a tariff applied to them of the percentage that I asked.
+[19:45] So you can also, if we want to look at like a map, we'll show you, okay, the tariffs are hitting this back drain.
+[19:50] That's producing these parts, whatever this is.
+[19:53] Cool.
+[19:54] So this is like the first part is just like this like business intelligence previously required a bunch of like different BI teams to go in, write SQL queries.
+[20:02] Now we've got a model just doing all this and kind of like democratizing access to those.
+[20:05] But the real value is that then you have to do a bunch of complex simulations to be like, right, what is the right combination of factories that is going to minimize my lead time, minimize my cost, balance off all these trade-offs?
+[20:19] And equally, that is something that you don't want to ask an LLM to do just like out of the blue.
+[20:24] But what we did was we gave it access to a simulator where it could basically play with the parameters that an educated business user would play with.
+[20:33] And then we would get it to use those to kind of to basically run a bunch of simulations and then decide what the best one is.
+[20:39] And in this case, I'll just I'll like set it off here because it'll it'll it'll execute a few.
+[20:44] So it'll actually take a couple of seconds.
+[20:46] This is like kind of, again, a toy example.
+[20:49] So it's going to do five different optimization runs.
+[20:51] But in practice, this is actually another area where we've seen folks recently use like agentic sort of approaches pretty successfully is effectively getting them to run like, you know, hundreds or thousands of simulations offline.
+[21:03] And then come back to you with like a well-documented approach as to why this is like the right set of tradeoffs.
+[21:09] So once this is done, it's going to come back with a little table here just showing like of those five runs, here's the tradeoffs.
+[21:16] here's the best one based on what you asked me to do and then we'll pick one we'll ship that and
+[21:21] then we're kind of good to go fascinating yeah oh here we go yeah there they are so we can see the
+[21:27] different costs and lead times that we've that we've come back with and uh the model suggesting
+[21:32] one so again i'm just gonna i'm just gonna accept uh plan is final and you can see here as well the
+[21:38] new plan that's come back we can see that it's it's past our deterministic checks and we're like
+[21:42] we're comfortable. We can also see that the tariff has been applied here so we can confirm that.
+[21:47] And we can also use the map to just like visually see that actually there's like,
+[21:51] actually there's a difference. So we're now using a Taiwanese factory where previously a bunch of
+[21:55] things were coming from China. So that's just a quick demo of like one of the things that we
+[22:01] built for a customer. Again, we've like, we've, we've kind of simplified a lot of the details to
+[22:05] make this kind of easily consumable for this. But each of the like aspects under here are things
+[22:10] that we've genuinely delivered for folks
+[22:13] like both in the manufacturing industry
+[22:14] and in others.
+[22:16] And yeah, maybe that's just,
+[22:19] I hope that's illustrative
+[22:20] of the sort of thing they're building.
+[22:22] Yeah.
+[22:22] Well, that's a very involved engagement,
+[22:25] clearly with this one partner.
+[22:27] And, you know, the median public software company
+[22:30] earns maybe hundreds of thousands of dollars
+[22:34] per customer.
+[22:35] Poundstress, probably the highest end of that,
+[22:37] earns about five, six million dollars
+[22:38] median ACV per customer.
+[22:40] This feels very involved.
+[22:42] So what is the median size of the prize for your team to get involved?
+[22:47] I can't imagine that being a low number.
+[22:48] This is an interesting one.
+[22:50] I think at OpenAI, we definitely don't see the FDE function being a function that is going to be like a cast of thousands.
+[22:56] We definitely want to be very focused, focusing on problems that we think are likely to be generalizable and turn into platform in future or are going to push our research in a new direction.
+[23:09] So I think we aim at problems that are fairly high value.
+[23:12] So generally, we'll aim at problems that are going to be saving customers or generating customers to the tune of, like, you know, tens of millions, sometimes the low billions in terms of value.
+[23:21] So that we can ensure that, like, if we're going to solve this, it's going to have, like, a big kind of economic impact at the end.
+[23:28] This is the SWOT team.
+[23:29] Yeah.
+[23:30] Well, yeah.
+[23:31] Yeah.
+[23:31] In a way of saying it.
+[23:33] How big is the forward-deployed engineering team at OpenAI?
+[23:36] Yeah, so when we started at the start of the year, it was just myself and my colleague Arno in Paris.
+[23:41] Yeah, we did our first engagement with John Deere with just the two of us and primarily him and
+[23:48] then we're now we're now
+[23:51] 39 and we're gonna be 52 by the end of the year.
+[23:54] 252 in a year. Yeah, so it's been it's been it's been a it's been a quick a meteoric rise for the head for the team.
+[24:01] Yeah, let's go. Wow, you guys are going fast.
+[24:03] Yeah. There's a lot of, this explains it. I mean, there's not a lot, there's not a lot of FDs out there. There's a lot of our, you know, I see founders and CEOs and, you know, honestly, customers wanting to build forward deployed engineering motion. They're trying to understand, hey, what are the economics of it? How do I, what is the right set of my customers where I should deploy forward deployed engineers?
+[24:26] You know, what advice would you have for startup founders and CEOs in the age of AI of like where or how and where to deploy FTEs?
+[24:36] The first thing is to be very clear as to like what your FTE team is going to accomplish.
+[24:41] Like, are you going to be determined?
+[24:43] Are you going to be relying on the services revenue as like a key revenue stream?
+[24:46] because that is, I think, a very different motion than what we're trying to do here,
+[24:50] which is like we're almost like betting on the on the increase in revenue that we're going to get from like successful product bets
+[24:57] that are going to come out of these FDE engagements. And I think that's probably the key thing.
+[25:01] I think people try and do both. And then inevitably, I think like from working in consulting in the past,
+[25:06] like I always saw a failure mode in those consulting firms where they had a vision of like,
+[25:10] we're eventually going to be a product company. But unfortunately, the like short term,
+[25:14] the short-term lure of services revenue
+[25:17] just starts to drag everyone in that direction.
+[25:19] And then suddenly you kind of lose like the strategic view.
+[25:21] I think at OpenAI, we're sort of lucky
+[25:24] because we're at our heart.
+[25:25] We're a research company
+[25:26] and then we became a product company.
+[25:28] And those two, like that allows us to be strategic
+[25:31] in terms of prioritizing those customers.
+[25:33] So I think coming back to your question
+[25:35] of like what the advice would be,
+[25:36] it would be like be very clear
+[25:38] as to like what the purpose of this FDE team is
+[25:40] and then fully like push it towards that
+[25:42] and be prepared to say no at some very difficult times,
+[25:46] like when somebody's going to offer you a lot of money
+[25:48] to do something that's not strategic,
+[25:50] and you have to sort of hold firm with that.
+[25:53] And the thing that you've got to hold firm with specifically
+[25:55] is that you've got to produce a product or a platform at the end of it.
+[25:59] Yeah.
+[26:00] That's right.
+[26:01] Yeah, and I think that is where at OpenAI,
+[26:03] it's sort of like there's a bit of a trade-off there.
+[26:06] I'll sort of break my own rule a little bit there
+[26:08] because there's kind of like there's two things.
+[26:09] It's like there's sometimes very economically valuable problems.
+[26:13] We're not sure if that's going to lead to platform, but we're kind of like, you know what?
+[26:16] That's like such a valuable problem that we're pretty sure there's at least some research learnings here that like if the model were better at this sort of problem solving, like that would be a net good for OpenAI.
+[26:26] So let's prioritize that customer.
+[26:28] And we actually sort of split our capacity in the team by those two levers.
+[26:31] So some of them we have like definite product hypotheses and we're like looking for like the perfect design partner, the perfect person to build a customer service thing or the perfect person to build a like a clinical trial, like sort of doc authoring solution with.
+[26:45] Whereas on the other hand, we also have just like sort of industries which have interesting problems like semiconductors or maybe life sciences.
+[26:53] And for those, we're more just kind of looking for the right partners who have these big problems that they want to solve.
+[26:58] And we split the team according to those two axes.
+[27:00] yeah fascinating and just to follow up so what is the so as you are creating all this product for
+[27:08] these customers will open ai release these products for other long tail customers where
+[27:13] maybe your team's not involved should expect to see like an open ai product and customer service
+[27:17] or or life sciences and and semiconductors and so on without giving away too many details i think
+[27:23] it's like i think it's an option that we're kind of open to like we're looking for like additional
+[27:28] like monetization options in the future.
+[27:30] And I think that what I definitely would say
+[27:34] is like the FDE team is like, is a zero to one team.
+[27:37] Like the way that I would almost see it
+[27:38] is like on this product side,
+[27:40] we want to prove the product hypothesis.
+[27:42] We then want to do it maybe two or three more times.
+[27:44] So if the first thing was maybe like 20% reusable,
+[27:47] the next two get us to maybe 50% reusable.
+[27:49] And then we almost want to like push it
+[27:51] into the scaled part of the business
+[27:53] and try and do this thing
+[27:55] like a whole bunch of times across the market.
+[27:57] So that is definitely a motion that we want to build with this team.
+[28:01] Although I would say like to contextualize, we're like very much at the start of that journey.
+[28:05] We have a bunch of hypotheses.
+[28:06] We're like trying to figure out where our bets are going to go.
+[28:09] And that's kind of where we're at right now.
+[28:12] That's on the like product bet side.
+[28:14] If I go back to this like more researchy bets of like trying to solve these big industry problems,
+[28:18] I'd say we're considering on that front how we would do this.
+[28:22] but I'd say we're less likely to like go into a vertical and have like a vertical specific product
+[28:27] that we support as like as something through the FDE team.
+[28:30] But we do hope that by solving these very valuable problems,
+[28:36] some kind of like horizontal platform that is useful might like fall out of them.
+[28:40] So we're like we're open to that to that option.
+[28:43] But I think it's more on this like product side that we're looking for the reusability.
+[28:46] Super helpful. So zero to one, maybe another one to two to get it up to like 50 percent, 60 percent is good.
+[28:52] and then spread it out to the rest of the world.
+[28:54] Yes, exactly.
+[28:55] That makes sense.
+[28:57] Maybe one question on what not to do.
+[29:00] You've seen this enough times
+[29:01] where I'm sure you've seen a good set of examples
+[29:03] where it did not lead to a product
+[29:05] or did not lead to learnings.
+[29:07] Was there a common thread across those experiences
+[29:09] of like, hey, these are things to not do
+[29:13] in forward deployed engineering?
+[29:15] This is why, I mean,
+[29:15] we've made plenty of mistakes over the last year,
+[29:17] but I think one of the biggest ones
+[29:19] is probably generalizing too early.
+[29:21] like I think there's been some cases whereas OpenAI like because we have ChatGPT there's like
+[29:25] some functions where you just look at them as like a feature in ChatGPT you're like that would make a
+[29:29] great generalizable solution for enterprises and you kind of like go looking for looking for a
+[29:34] problem for them and what we found in a lot of cases is like we're kind of we then don't do the
+[29:40] zero to one we're just trying to like deploy this generalized thing and it just like doesn't really
+[29:43] work like I feel like generally in the LLM ecosystem there's too many like high concept
+[29:48] solutions out there that don't really have like a clear problem that they solve. Whereas
+[29:51] conversely, whenever we've just gone super deep on the customer's problem and just being like,
+[29:56] we're just going to solve this problem, almost every time there's been some kind of generalizable
+[30:00] thing that's popped at the end. So I think definitely generalizing too early is like the
+[30:06] kind of, I guess, the biggest mistake that we've made and then learned from this year.
+[30:11] Right. I can't remember, I think it was Paul Graham who said that,
+[30:13] don't worry about scaling too early.
+[30:17] You'll fix a specific problem.
+[30:19] Yeah, I think doing what doesn't scale
+[30:21] is like one of like the sort of like
+[30:22] the watchwords of the team, I think.
+[30:24] So yeah, how we try to approach things.
+[30:26] That makes sense.
+[30:28] I have a set of rapid fire questions for you.
+[30:31] We'll launch into them.
+[30:32] My favorite one, which is the long short game,
+[30:34] which we love at Ultimiter.
+[30:36] Pick an idea, a startup, a business
+[30:38] that you think is going to benefit
+[30:40] and is underappreciated.
+[30:42] Yeah.
+[30:42] And the same thing on the other side,
+[30:44] an idea or a business that you think is more sizzled on stake.
+[30:47] This is a fun one.
+[30:48] So I've got to, I think, starting off with the things I'm long on.
+[30:51] Yeah.
+[30:52] So if I look at, like, where we spend, like,
+[30:54] almost the majority of our time in FTE getting things to production,
+[30:58] it is, like, creating the translation layer between the data,
+[31:02] like the raw data,
+[31:03] and then kind of injecting the business logic in some way
+[31:07] so that the LLMs can make effective use of that data.
+[31:10] And like people like often just start with MCP and they just stick the MCP connectors.
+[31:14] But yeah, exactly.
+[31:15] Exactly.
+[31:16] Well, exactly.
+[31:17] But I think there's almost like, I think the thing that we've had to repeatedly do is sort of build almost like a sort of light, like logic layer in between the two that the model then uses to make best use.
+[31:28] It's like, you know, when would I like take the start, the data warehouse and mix it with like the contents of SharePoint to answer this complex question.
+[31:36] and that is, I think, the companies that are in this sort of space
+[31:41] that are like almost, it's like the metadata translation layer,
+[31:44] which interestingly is actually sort of like, you know, an old school concept.
+[31:47] It's like you think of the tools like Calibra and stuff
+[31:49] where you're just like you're documenting metadata,
+[31:51] but actually now that it's like LLM is making use of it,
+[31:54] this kind of thing is actually fairly useful.
+[31:56] And so that's actually, it's like, I think the people who can solve that problem,
+[32:00] I'm like fairly long on those folks.
+[32:03] there. This is not too different from how, you know, where we place a lot of value at Palantra,
+[32:07] like the ontology there is where most of the secret sauce is. Yeah. And interestingly, I mean,
+[32:12] like the problem is definitely not new. It's like the classic problem of like, do we move the data
+[32:15] to somewhere where it's easy to use? Or do we like build some kind of layer and use it where it is?
+[32:20] And that has not changed. I think the thing that has changed is that now you have, instead of
+[32:24] people having to like write queries, exactly. Yeah. LMS can do it for you. So this is, this is
+[32:29] sort of, and like that means like,
+[32:31] do you have to move the data at all?
+[32:32] Like these are the kind of decisions.
+[32:34] I don't know if we have like a final answer there,
+[32:36] but I think that's like a really interesting space
+[32:38] because it would just save so much time
+[32:41] in these FDE type deployments
+[32:42] and also just like democratize access
+[32:45] to the data a lot better.
+[32:46] What do we think?
+[32:47] Yeah. Great point.
+[32:48] Short.
+[32:49] Yeah, so what am I short on?
+[32:50] So this, and I'll caveat this by saying that I'm biased
+[32:53] because I'm thinking about like,
+[32:55] I primarily work with enterprises
+[32:56] And I think the businesses that I'm short on are the ones that if you look across the whole, like, what are the steps to get an LN application to production?
+[33:06] It's like I've got to orchestrate it.
+[33:07] I've got to put tracing in.
+[33:09] I've got to label those things, build evals.
+[33:11] And then I need to, like, stick some guardrails in.
+[33:13] Like, these are the kind of rough components.
+[33:15] The companies that do only one part of that chain are the ones that I don't see getting, like, broad adoption at a lot of these enterprises.
+[33:24] and the reason for that, I think, is like the enterprise,
+[33:27] like it is difficult enough just to like,
+[33:29] just to get an LM application,
+[33:31] assuming everything was the same tool,
+[33:32] getting that to production is hard.
+[33:34] Wiring up all these tools
+[33:35] and then dealing with all the integration problems as well
+[33:38] is like, is just a bridge too far
+[33:40] for a lot of the enterprises
+[33:41] and they really want like kind of like one throat
+[33:43] to choke with this problem.
+[33:44] So these are the, these are the sorts of businesses
+[33:46] that I think I'm like more short on.
+[33:48] Right, makes sense.
+[33:50] Favorite underrated AI tool on ChatGPT?
+[33:53] Yeah, underrated AI too.
+[33:55] So definitely like the one, this one's not underrated.
+[33:58] I think people like this one, but Codex is definitely the one.
+[34:00] But the first time that I just turned it on and then I went into four hours of meetings
+[34:06] and came back and something was done, I was like, oh, this is like magic.
+[34:09] But I would say the underrated one is the OpenAI Playground.
+[34:14] What is that?
+[34:16] So it's in platform.openai.com.
+[34:18] And it's basically, it's as simple as if somebody did.
+[34:21] Is this the thing that pre-chat GPT?
+[34:22] This is where you could chat with like the DaVinci.
+[34:24] Yeah, yeah, yeah.
+[34:24] But it's still there.
+[34:26] It's still there.
+[34:27] Yeah, yeah, yeah.
+[34:27] And there's actually like, there's a new version.
+[34:29] There's like a voice playground that you can use for the real-time API.
+[34:31] And just in terms of like, it's basically like you could just,
+[34:35] somebody just stuck like a nice UI over like the API basically.
+[34:38] And you could just interact with the API.
+[34:40] But the amount of like demos I've done with that that like blow people away,
+[34:43] like it's actually such a powerful tool for just being like,
+[34:46] is this use case even possible?
+[34:48] And you can validate it in the playground.
+[34:49] you know, like, like I'll give one example of like, I was trying to figure out whether this
+[34:53] browser automation use case would, would, would work. And I just like screenshotted the webpage,
+[34:58] stuck it in the, in the playground, started hitting it and was like, if it can, I with an
+[35:02] N of 10, like make this work. And if it's like seven or eight times, then like, maybe this is
+[35:06] going to work in production. It's like, it's just such a simple tool. And I think, I think
+[35:10] underrated for like, just validating, like just doing that quick, like sense check people when
+[35:14] you're trying to validate the use case. I'm glad you reminded me of it. That's actually where I had
+[35:18] my aha moment. Before
+[35:20] ChatGPT, I was out playing with
+[35:22] DaVinci03.
+[35:24] I remember chatting
+[35:26] with them on Playground. I was like, wow.
+[35:28] Chat happened. I was like, well,
+[35:30] I told you.
+[35:32] Totally.
+[35:33] I mean, it's an underrated tool.
+[35:36] Yeah, for sure.
+[35:38] A lot has happened since
+[35:39] you joined, since Chat happened.
+[35:43] What's your favorite
+[35:44] highlight of your time at OpenAI
+[35:46] and maybe a lowlight of your time at OpenAI?
+[35:48] Yeah, I mean, my favorite one are like probably the more like, actually the thing that I joined OpenAI for was like when DALI 2 came out.
+[35:54] And I was just like, like, I'm like, you know, I'm like a creative person.
+[35:57] Or I like, I try to be creative.
+[35:59] Like I like, like tattoos and stuff.
+[36:00] Like it's like, like it's lots of fun.
+[36:02] But like, but I'm like not artistic at all.
+[36:04] And I was like, oh, this is super cool.
+[36:06] I can like express myself.
+[36:07] And so we got a chance to do an engagement with Coca-Cola where we did this create real magic campaign where like they were like the first partners to get to use DALI 3.
+[36:17] before it even came out and we had to make like a version of Dali 3 and we got to like generate
+[36:22] all this like and it was like the process of tuning this that it made like perfect Christmas
+[36:27] imagery with Coca-Cola was like such a sort of like I mean it's like it's like sort of like just
+[36:32] like fun use case but I just thought like that is um it was sort of like coming full circle from
+[36:36] like that brought me in and then I got to actually ship it to all these people around the world who
+[36:40] were like using using Jedi for cool stuff like I I really like that one it was like it was not the
+[36:45] hardest use case but it was also um i mean there were genuine risks like people could have jail
+[36:49] broken it caused lots of problems with the model so i mean it was also satisfying to ship it but
+[36:54] really just like uh just sort of like a fun use case and like a nice consolidation of like wow
+[36:58] look how far we've come you know it was like uh from pre-chat dbt all the way to dolly 3 there's
+[37:02] that one and uh what was the other question yeah yeah the low light so um good question so
+[37:09] I think at OpenAI we go through this
+[37:12] like you know B2C
+[37:14] B2B sort of like ebb and flow
+[37:16] and like given that
+[37:18] I've always been on the B2B side I think
+[37:20] there's been times and I think it was maybe
+[37:22] like from the first dev day like
+[37:24] we released the assistance API and stuff and
+[37:26] then there was maybe a period until the dev days of the
+[37:28] next year where just it felt like the
+[37:30] company's focus was so much on the
+[37:32] B2C side and I
+[37:34] talked about open sourcing Swarm like
+[37:36] one of the reasons we open source Swarm is there was just like
+[37:38] not a lot of interest in like this sort of framework, which is like, it was viewed as
+[37:43] more for like a B2B audience. So I'd say that was maybe like my least favorite time. And I felt like
+[37:48] in that time we shipped like, you know, we shipped Morton Stanley, we shipped Klarna,
+[37:52] like all these super cool, like enterprise use cases. But it was just, you know, there just like
+[37:58] wasn't the investment from the from the business. And we kind of felt like we were we were like,
+[38:02] our words were falling on deaf ears until suddenly, you know, towards the end of 2024,
+[38:06] suddenly the pendulum swung again and then it was time to go all in on b2b and ironically that
+[38:11] was when the fd business case got approved and then it was like right let's go you know and uh
+[38:16] yeah it's been good since then that's awesome well you know as you said exactly you know chat gpt was
+[38:21] a big story of 23 a big part of 24 agents yeah the year of agents what is 2026 going to be the year
+[38:27] of what's the next big yeah wave you think what are we going to be talking about next year yeah
+[38:32] Yeah, that is a great question. So I can kind of only guess here, but I feel like when people are talking about this year is the year of agents, but I feel even now with agents, it's like there's still a lot of work to get those things to production.
+[38:48] And I feel like if you were to take a step back from agents and fine tuning and all these techniques, what you really want is this LLM application that you just turn it on and it just sort of learns from your behavior and then it just sort of works.
+[39:00] and I wonder whether 2086 is actually going to be the year
+[39:04] where we actually go back to like fine-tuning models
+[39:06] where it's like, you know,
+[39:08] we now just like have these agent networks,
+[39:10] we orchestrate them,
+[39:11] but now we finally have all the plumbing
+[39:13] to like make the training data,
+[39:15] label it really quickly,
+[39:16] build a training set,
+[39:17] fine-tune a model for specifically this agentic use case
+[39:20] and then suddenly it's like,
+[39:21] it just works beautifully.
+[39:22] I feel like we're like,
+[39:23] like the building blocks have been getting built
+[39:25] this whole time.
+[39:26] That's why people can now use agents
+[39:27] like before they just,
+[39:28] they couldn't even think of doing complex things now they can and i just wonder whether that's
+[39:32] going to be like sort of the next frontier where like agents aren't just being used they're actually
+[39:36] being used for very specialist domains where you do need to tune them to be good at like chip design
+[39:41] or drug discovery or something we actually we get to that point where it's like we actually
+[39:45] go back to fine-tuning models now that we have all of like the all the plumbing and stuff i uh
+[39:50] yeah so it's maybe like the year of optimization or something or maybe the year of like one click
+[39:54] to production, you know, who knows?
+[39:56] Yeah, that's such a good, that's a good framing.
+[39:59] I was thinking wearables, hardware.
+[40:01] Possible, possible.
+[40:03] The state of hardware leaves so much to be desired.
+[40:06] It does, it does, yeah.
+[40:08] But, well, this was a lot of fun.
+[40:10] Colin, thank you so much.
+[40:11] Thanks for telling us all about forward deployed engineering.
+[40:14] Cool, no, thanks for having me.
+[40:15] Awesome.

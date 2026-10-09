@@ -1,0 +1,468 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "no_slides": true,
+ "title": "Boris מ-Claude Code על הבמה של @Scale: קוד בטלפון, loops, ו-ROI במקום חיסכון בטוקנים",
+ "subtitle": "שיחה של 39 דקות על איך Anthropic עובדת עם Claude Code, Cowork ו-workflows, ולמה צוואר הבקבוק כבר לא נמצא בכתיבת הקוד",
+ "meta": [
+  "Boris (Claude Code, Anthropic) בשיחה עם מנחה מ-Meta · כנס @Scale של Meta (לפי הרקע על הבמה; שם האירוע המדויק לא זוהה) · הסרטון הועלה מחדש ב-X ע״י Raytar · 21.06.2026",
+  "משך: כ-39 דקות · X",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Boris (Claude Code, Anthropic; likely Boris Cherny), unnamed Meta host",
+ "topics": [
+  "Claude Code",
+  "Agentic loops",
+  "AI ROI",
+  "Developer productivity"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זו שיחת fireside על במת @Scale. מצד אחד Boris, שעובד על Claude Code ב-Anthropic. מצד שני מנחה מ-Meta שעבד איתו בעבר על Threads, ושמו לא נאמר בהקלטה. השם המלא Boris Cherny מופיע רק בכיתוב של מי שהעלה מחדש את הסרטון ל-X. בהקלטה עצמה הוא מוצג רק כ-Boris, ״working on Cloud Code״. אין בשיחה שקפים: היא בנויה משאלות של המנחה ומשאלות מהקהל שקיבלו הכי הרבה הצבעות.\n\nהטענה המרכזית של Boris היא שבמקומות שאימצו את הכלים עד הסוף, כתיבת הקוד כבר הפסיקה להיות צוואר הבקבוק. מה שנשאר הוא לרדוף אחרי צוואר הבקבוק הבא: code review, אבטחה, CI, תחזוקה, ובסוף ייצור רעיונות. לכן הוא ממליץ למדוד ROI ולא עלות, להשתמש במודל הכי חזק שיש, ולעבור מפרומפט בודד ל-loops ול-workflows שמפעילים agents אחרים."
+  },
+  {
+   "kind": "image",
+   "file": "k_002.jpg",
+   "caption": "הבמה ב-@Scale: המנחה מ-Meta (משמאל) ו-Boris (מימין). לשיחה לא היו שקפים",
+   "width": 5.6
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות המרכזיות עם חותמות זמן, ומה לא נאמר."
+    ],
+    [
+     "2. המספרים ו-ROI: ",
+     "הנתונים האישיים של Boris, ואיך לפרוס טוקנים בארגון."
+    ],
+    [
+     "3. Loops: ",
+     "שלב ההפשטה הבא אחרי agents."
+    ],
+    [
+     "4. Cowork: ",
+     "Claude Code למי שאינו מהנדס, ושתי דוגמאות אוטומציה."
+    ],
+    [
+     "5. Fable ובחירת מודל: ",
+     "הקפיצה ביכולות, ולמה הוא משתמש במודל היקר לכל דבר."
+    ],
+    [
+     "6. צווארי בקבוק: ",
+     "Code Review, אבטחה, CI, workflows ותחזוקה."
+    ],
+    [
+     "7. גבולות המודל ומניעת עצלות: ",
+     "auto mode ו-output styles."
+    ],
+    [
+     "8–9. פעולות ומילון: ",
+     "מה לעשות מחר בבוקר, ומונחים."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך הופק אוטומטית מהתמלול של ההקלטה ומהפריימים שחולצו ממנה. התמלול נעשה ב-ASR, ולכן שמות ומונחים עלולים להשתבש. Claude מופיע לרוב כ-cloud או quad, ושם המודל Fable מובא כפי שנשמע ואולי שובש. הציטוטים מועתקים מילה במילה מהתמלול ונבדקו מול חותמת הזמן שלהם. לא נוסף שום מידע ממקורות חיצוניים. הכיתוב של הריפוסט ב-X לא שימש מקור לעובדות."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "Boris מציג עבודה שבה כל הקוד נכתב על ידי Claude Code, רובו מהטלפון, וחלק הולך וגדל ממנו על ידי loops שרצים בלי מעורבות שלו. מכאן הוא גוזר עקרונות לארגונים: לתת טוקנים לכולם, למדוד תשואה ולא עלות, ולטפל כל פעם בצוואר הבקבוק הבא בשרשרת שבין רעיון לייצור."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "100% מהקוד שלו נכתב ע״י Claude Code: ",
+     "מאז Opus 4.5 (נובמבר אשתקד). השנה: 1.7 אלף PRs, 400 אלף שורות שנוספו, 250 אלף שנמחקו, ו-8 מיליארד טוקנים מאז מרץ. רוב הקידוד שלו נעשה היום מהטלפון [0:00]."
+    ],
+    [
+     "ROI במקום עלות: ",
+     "לתת טוקנים לכולם, כולל PMs, מעצבים, data scientists וגם הנהלת חשבונות, ולשלוט בעלויות רק אחרי שמזהים use case שתפס [1:32–3:07]."
+    ],
+    [
+     "פי 8 בקוד לכל מהנדס: ",
+     "זו העלייה ב-Anthropic מתחילת השנה, לעומת שיפור של 2–3% בשנה שנחשב פעם טוב ב-DevInfra [4:38]."
+    ],
+    [
+     "Loops הם שלב ההפשטה הבא: ",
+     "קוד הוא statement, agent הוא function, ו-loop הוא higher-order function. אצלו כ-30% מהקוד ביום ממוצע נכתב ב-loops [7:45–9:17]."
+    ],
+    [
+     "Cowork הוא Claude Code למי שאינו מהנדס: ",
+     "אותו Agent SDK, עם VM, בידוד והגנה מפני prompt injection. הוא משתמש בו ל-standup אוטומטי ולהזמנת טיסות ומלונות [10:48–13:50]."
+    ],
+    [
+     "Fable לכל המשימות: ",
+     "לדבריו הקפיצה מ-Opus 4.8 ל-Fable גדולה לפחות כמו הקפיצה ל-Opus 4.5. הוא ״נגמרו לו הבעיות הקשות״ ומשתמש במודל היקר לכל דבר [15:23–18:24]."
+    ],
+    [
+     "Code Review ו-Security כמוצרים: ",
+     "Code Review תופס לדבריו 98–99% מהבאגים לפני שאדם רואה את ה-PR, ו-Claude Security תופס בעיות שגם pen testers פספסו [24:29–26:00]."
+    ],
+    [
+     "Dynamic workflows: ",
+     "פרומפט של משפט אחד הריץ אלפי sub-agents במשך כמה שעות, והפיק ארבעה PRs שקיצרו את זמן ה-CI בכ-50% [26:00–27:30]."
+    ],
+    [
+     "Auto mode נגד prompt fatigue: ",
+     "כל בקשת הרשאה מנותבת למודל שמחליט. לדבריו זה בטוח יותר מאישור ידני, ומאפשר להריץ agents במשך שעות וימים [35:12–36:43]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "אין נתוני עלות: ",
+     "לא נאמר כמה עלו 8 מיליארד הטוקנים, וגם לא כמה עולה Code Review, למרות שהוא ״הרבה יותר יקר״ ממוצרים אחרים."
+    ],
+    [
+     "המדד ״פי 8 בקוד לכל מהנדס״ לא הוגדר: ",
+     "לא ברור אם הכוונה לשורות, ל-PRs או לשינויים שהגיעו לייצור. Boris עצמו אומר שמדידת return היא ״where it gets kind of hard״."
+    ],
+    [
+     "98–99% מהבאגים בלי מתודולוגיה: ",
+     "לא הוסבר איך המספר נמדד ומול איזה baseline."
+    ],
+    [
+     "Fable: ",
+     "לא הוסבר מה המודל, למה הגישה אליו נעצרה (״a misunderstanding״), ומתי היא תחזור."
+    ],
+    [
+     "שיתוף פעולה: ",
+     "לשאלה שקיבלה הכי הרבה הצבעות, על עבודה משותפת ב-Claude Code, התשובה הייתה ״we have a bunch of stuff on the fire״ ו-MCP ל-Slack בינתיים."
+    ],
+    [
+     "אין נתונים על איכות ו-regressions: ",
+     "לא נאמר דבר על תקלות בייצור, על rollbacks, או על מה שבור כשכל הקוד נכתב ב-AI."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. המספרים של Boris ואיך חושבים על ROI"
+  },
+  {
+   "kind": "body",
+   "text": "השיחה נפתחת בנתונים אישיים: 1.7 אלף PRs, 400 אלף שורות שנוספו ו-250 אלף שנמחקו. בשנה שעברה הוא מחק יותר ממה שהוסיף. מאז מרץ הוא צרך 8 מיליארד טוקנים, ונתונים מוקדמים יותר נמחקו בגלל מדיניות retention. לדבריו רוב הקידוד נעשה היום מהטלפון, משהו שהוא עצמו לא היה מנבא לפני חצי שנה.\n\nהמנחה מזכיר ארגונים כמו Uber שמגבילים תקציב חודשי, למשל 1,500 דולר למהנדס. Boris מבחין בין חברות שחושבות על עלות לבין חברות שחושבות על ROI, וטוען שרק השנייה נכונה. הנימוק שלו הוא שרעיונות טובים מגיעים לעיתים קרובות ממקומות לא צפויים, ״an accountant somewhere in the corner of the org״. לכן צריך לתת טוקנים לכולם, ליצור ביטחון לנסות דברים, ולשלוט בעלויות בשלב מאוחר יותר. כלי השליטה שהוא מונה: מגבלות עלות per seat, advisor models, החלפת מודל או effort level לכל הארגון, ותקציבים לפי מחלקה ולפי RBAC."
+  },
+  {
+   "kind": "quote",
+   "text": "Once you find these internal use cases that work, then you want to control the costs. And you wanna do that on the back end, not on the front end.",
+   "by": "— Boris [3:07]"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "שלב 1: ",
+     "להגיע למצב שבו 100% מהקוד נכתב ע״י Claude."
+    ],
+    [
+     "שלב 2: ",
+     "למדוד בכמה מואץ הקוד לכל מהנדס. ב-Anthropic: ״an 8x increase in code per engineer since the beginning of this year״ [4:38]."
+    ],
+    [
+     "שלב 3: ",
+     "לטפל בצווארי הבקבוק שלפני הקוד, כלומר רעיונות (עוד PMs וחוקרי משתמשים), ובאלה שאחריו, כלומר GTM ושיווק."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "3. Loops: שלב ההפשטה הבא"
+  },
+  {
+   "kind": "body",
+   "text": "שאלה מ-Threads, מעמית לשעבר בשם Peter: האם loops הם hype או משהו אמיתי? Boris מתאר סולם הפשטה. לפני שנתיים כתבנו קוד ביד, אחר כך agents כתבו את הקוד, ועכשיו agents נותנים פרומפטים ל-agents. במונחי תכנות: source code הוא statement, agent הוא function, ו-loop הוא higher-order function. לדבריו loops נמצאים היום בערך במקום שבו agents היו לפני שנה וחצי.\n\nהדוגמאות שלו: במקום לעשות code review ביד, או לבקש מ-agent לעשות אותו, יש agent שרץ ב-loop ועושה את כל ה-reviews. דוגמה נוספת היא agent שקורא כל חמש עד עשר דקות פידבק ב-Threads ופותח PRs עם התיקונים. המנחה מוסיף שעדיין האדם נמצא בכל שלב בתהליך, ושהמפתח הוא לבנות loop אוטומטי."
+  },
+  {
+   "kind": "quote",
+   "text": "And so for me personally, maybe at this point, like 30% of my code is written by loops on an average day. If I try really hard, I can get to like 100% for some days. But it doesn't totally click yet.",
+   "by": "— Boris [9:17]"
+  },
+  {
+   "kind": "h1",
+   "text": "4. Cowork: Claude Code למי שאינו מהנדס"
+  },
+  {
+   "kind": "body",
+   "text": "Cowork נמצא באותה אפליקציית Claude Desktop שבה נמצאים chat ו-Claude Code, ועובד על Mac ועל Windows. מתחת למכסה המנוע זה אותו Claude Agent SDK, אבל עם הרבה יותר guardrails: VM שלם, בידוד, hooks למערכת ההפעלה שמונעים מחיקות בטעות, והגנה מפני prompt injection.\n\nהשימוש הראשון שהוא מתאר הוא ניהול פרויקט. ה-standup היומי הוחלף ב-Cowork שפותח spreadsheet של ה-workstreams בדפדפן, שולח ב-Slack הודעה לכל מהנדס עם בקשה לסטטוס (לעיתים קרובות ה-Claude של המהנדס הוא שעונה), וממלא את הטבלה. כל מה שצריך לזה הוא Cowork ותוסף Claude ל-Chrome. השימוש השני הוא נסיעות. משימה מתוזמנת עוברת כל יום על המייל ועל האירועים שאישר ב-Google Calendar, ואם אירוע מתקיים מחוץ לסן פרנסיסקו היא מזמינה טיסות ומלונות לפי ההעדפות שלו. כך הוזמנו לו נסיעות רב-שלביות ל-Code with Claude בטוקיו, בלונדון ובברלין, ״after I confirmed״."
+  },
+  {
+   "kind": "h1",
+   "text": "5. Fable ובחירת מודל: ״Fable for everything״"
+  },
+  {
+   "kind": "body",
+   "text": "המנחה מציין שהקהל קיבל גישה ל-Fable רק לשלושה ימים בערך. Boris עונה ״from our point of view, it's a misunderstanding״ ושהם עובדים על החזרת הגישה. Fable הוא שם המודל כפי שנשמע בתמלול, ואי אפשר לאמת אותו מתוך ההקלטה. לדבריו הקפיצה מ-Opus 4.8 ל-Fable גדולה לפחות כמו הקפיצה של Opus 4.5 בנובמבר, הרגע שבו הוא מחק את ה-IDE שלו. הוא מתאר את המודל כבעל ניואנס ״similar to like my smartest coworkers״. לטענתו הוא שואל ״למה״ שלוש פעמים בניתוח נתונים, רודף אחרי השערות ב-debugging, ופותר כמעט כל בעיה ב-one-shot.\n\nלפי Boris, ב-Anthropic כולה 80–90% מהקוד נכתב ע״י Claude Code, ובצוותים רבים הנתון הוא 100%. Claude Code ו-Cowork עצמם נכתבים כולם ע״י Claude Code מאז Opus 4.5. על עלויות הוא אומר שגם ל-Anthropic יש opportunity cost: ״every token we use is a token we do not give to a customer״ [16:54]. אפשר לחסוך בערך 50% עם advisor model, או עם Opus כברירת מחדל שקורא ל-Fable רק כשצריך. אבל הפוטנציאל בצד ה-return הוא לדבריו 1,000% ויותר."
+  },
+  {
+   "kind": "quote",
+   "text": "And so what I would think about is just use the most expensive model and focus on how do I get more out of it? How do I increase the return? Do not focus on cost cutting.",
+   "by": "— Boris [18:24]"
+  },
+  {
+   "kind": "h1",
+   "text": "6. רודפים אחרי צוואר הבקבוק הבא"
+  },
+  {
+   "kind": "body",
+   "text": "Boris מתאר את המסלול מקוד לייצור ומשם למדד עסקי, ואת השרשרת של צווארי הבקבוק ש-Anthropic פתרה באותו מסלול, כל פעם בכלי פנימי שהפך למוצר. על שיתוף פעולה, השאלה שקיבלה הכי הרבה הצבעות, לא ניתנה תשובה של ממש: המלצה לחבר את Claude Code ב-MCP ל-Slack, Teams או GChat עד שיצא משהו. על התפקיד של המהנדס הוא אומר שקידוד תמיד היה רק חלק קטן מהזמן. היום הוא ״purely bottlenecked on how fast I can prompt״, רוב הפרומפטים שלו קוליים, וצוואר הבקבוק האמיתי הוא רעיונות טובים [22:58]."
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "צוואר בקבוק",
+    "הפתרון ב-Anthropic",
+    "מה נטען"
+   ],
+   "rows": [
+    [
+     "כתיבת קוד",
+     "Claude Code",
+     "100% מהקוד מאז Opus 4.5 [16:54]"
+    ],
+    [
+     "Code review",
+     "Claude Code Review (פנימי, זמין ללקוחות)",
+     "יקר יותר כי צורך הרבה טוקנים. תופס 98–99% מהבאגים, ולכן ה-reviewer שואל רק אם ה-PR צריך להתקיים [24:29]"
+    ],
+    [
+     "אבטחה",
+     "Claude Security",
+     "סורק את כל ה-codebases פעם בשבוע ומתקן לבד. עם Opus 4.8 תופס בעיות שגם pen testers פספסו [26:00]"
+    ],
+    [
+     "מהירות CI",
+     "Dynamic workflow",
+     "פרומפט אחד, כמה מיליוני טוקנים, כמה שעות, ארבעה PRs, ירידה של כ-50% [26:00–27:30]"
+    ],
+    [
+     "תחזוקה",
+     "Loops",
+     "שיפור ארכיטקטורה, טיפול ב-flaky tests, מחיקת טסטים חסרי ערך, איחוד הפשטות כפולות [30:35]"
+    ],
+    [
+     "רעיונות",
+     "עדיין פתוח",
+     "Boris עדיין מייצר רעיונות מוצר טובים יותר מ-Fable [33:39]"
+    ]
+   ],
+   "widths": [
+    1.3,
+    2.2,
+    3.5
+   ]
+  },
+  {
+   "kind": "h2",
+   "text": "Workflows, test-time compute ותחזוקה"
+  },
+  {
+   "kind": "body",
+   "text": "Dynamic workflow הוא פיצ׳ר ש-Anthropic השיקה ״a few weeks ago״. Claude כותב תוכנית קטנה שרצה ב-VM ומתזמרת עשרות, מאות או אלפי sub-agents. Boris ממקם את זה בתוך scaling laws: מעבר לשלושת הגורמים הקלאסיים (נתונים, גודל הרשת, compute באימון) נוסף גורם רביעי, test-time compute. הדרך הראשונה להגדיל אותו היא effort settings (low, medium, high, extra high, max), והשנייה היא workflows. בתחזוקה הוא מריץ loops שפותחים PRs, ובודק רק את ה-PRs ולא את מה שה-loop עשה בדרך. כשהתוצאה לא מספיק טובה, ההמלצה שלו פשוטה."
+  },
+  {
+   "kind": "quote",
+   "text": "And if the result isn't good, all you have to do is say, you know, look for opportunities to improve the quality of the code base, and then just add the magic words, use a workflow.",
+   "by": "— Boris [30:35]"
+  },
+  {
+   "kind": "h1",
+   "text": "7. גבולות המודל, auto mode ו-output styles"
+  },
+  {
+   "kind": "body",
+   "text": "איפה Fable עדיין חלש? לדברי Boris, ב-product sense וב-distributed system design: אילו שירותים צריך, איך הנתונים זורמים, load factors. מנגד, ״Its code is now better than the code I would have written״, וגם עיצוב ה-front-end שלו טוב משלו. הוא לא רוצה לתת תחזית, אבל מעריך שעד סוף השנה המודל יהיה ״quite good״ גם בתכנון מערכות [33:39].\n\nהשאלה האחרונה: איך מונעים ממהנדסים להתעצל ולקבל כל מה ש-Claude מוציא? החלק הראשון של התשובה הוא auto mode. אנשי האבטחה ב-Anthropic שמו לב שה-human in the loop פוגע באבטחה, כי אנשים מאשרים בלי לקרוא. בעקבות זה כל בקשת הרשאה מנותבת למודל שמחליט לפי ההקשר של השיחה. לדבריו רוב המשתמשים כבר עובדים כך. הוא טוען שהמודלים כמעט לא פגיעים ל-prompt injection: ״the success rate at 100 attempts is like around 1%״ לפי ה-system cards, ובנוסף רץ classifier ייעודי [36:43]. החלק השני הוא output styles. כל מהנדס חדש בצוות מקבל הוראה להשתמש בסגנון exploratory, שמסביר ארכיטקטורה ושפה בכל שינוי. לאנשים שאינם מתכנתים יש סגנון learning, שמלמד צעד אחר צעד במקום לבצע את השינוי בעצמו."
+  },
+  {
+   "kind": "quote",
+   "text": "The goal of that human in the loop was to improve security. But actually what's happening is that it is hurting security because people are just like, they have this prompt fatigue.",
+   "by": "— Boris [35:12]"
+  },
+  {
+   "kind": "h1",
+   "text": "8. מה עושים עם זה"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "לפרוס לפני שחוסכים: ",
+     "לתת גישה גם למי שאינו מהנדס, להגדיר במפורש שמותר לנסות ולטעות, ולהגביל עלויות ב-backend רק אחרי שמזהים use case כבד."
+    ],
+    [
+     "למדוד return ולא רק את אחוז הקוד שנכתב ב-AI: ",
+     "קוד לכל מהנדס, ואחר כך הזמן מרעיון לייצור."
+    ],
+    [
+     "להפעיל auto mode: ",
+     "מי שעדיין מאשר כל פקודה ביד כנראה חשוף ל-prompt fatigue."
+    ],
+    [
+     "להתחיל עם loop אחד לתחזוקה: ",
+     "flaky tests או הפשטות כפולות, כשהבקרה האנושית היא בדיקה של ה-PR שנפתח."
+    ],
+    [
+     "לנסות use a workflow: ",
+     "על משימה רחבה ומדידה כמו זמני CI, לפי הדוגמה שלו מ-[26:00]."
+    ],
+    [
+     "לקבוע output style exploratory למצטרפים חדשים: ",
+     "דרך /config, או לבקש מ-Claude להגדיר אותו."
+    ],
+    [
+     "בינתיים, MCP לכלי ה-chat: ",
+     "זו ההמלצה הזמנית לשיתוף פעולה בצוות, עד שיצא פתרון מובנה."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "למה זה חשוב"
+   ],
+   "rows": [
+    [
+     "כמה עולה בפועל ״Fable for everything״ לעומת advisor model?",
+     "ההמלצה לא להתמקד בחיסכון נשענת על תשואה של 1,000% ויותר שלא נמדדה בשיחה."
+    ],
+    [
+     "איך נמדד ״פי 8 בקוד לכל מהנדס״?",
+     "יותר שורות קוד לא אומר בהכרח יותר ערך עסקי."
+    ],
+    [
+     "על מה מבוסס ״98–99% מהבאגים״ ב-Code Review?",
+     "זה קובע אם אפשר באמת לוותר על חיפוש באגים ב-review אנושי."
+    ],
+    [
+     "מה קורה כש-loop פותח PR שגוי שאושר?",
+     "לא נאמר דבר על rollbacks ותקלות בייצור."
+    ],
+    [
+     "מה המצב של Fable ומתי הגישה תחזור?",
+     "רוב הטענות על הקפיצה ביכולות נשענות עליו."
+    ],
+    [
+     "מה יהיה פתרון שיתוף הפעולה ב-Claude Code?",
+     "זו הייתה השאלה שקיבלה הכי הרבה הצבעות בקהל, והיא נשארה בלי תשובה."
+    ]
+   ],
+   "widths": [
+    3.0,
+    4.0
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "9. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "Loop / Routine",
+     "agent שרץ שוב ושוב בלוח זמנים או ברצף ומבצע משימה (review, תיקוני פידבק, תחזוקה) בלי פרומפט ידני כל פעם"
+    ],
+    [
+     "Cowork",
+     "גרסה של Claude Code לאנשים שאינם מהנדסים בתוך Claude Desktop, עם VM ו-guardrails"
+    ],
+    [
+     "Agent SDK",
+     "הספרייה ש-Claude Code ו-Cowork בנויים עליה, זמינה גם למפתחים"
+    ],
+    [
+     "Advisor model",
+     "מודל זול שמבצע את העבודה וקורא למודל חזק רק כשצריך"
+    ],
+    [
+     "Effort level",
+     "הגדרה שקובעת כמה טוקנים המודל מייצר (low עד max)"
+    ],
+    [
+     "RBAC",
+     "הרשאות לפי תפקיד, וכאן גם תקציבים לפי תפקיד"
+    ],
+    [
+     "Dynamic workflow",
+     "תוכנית ש-Claude כותב ומריץ ב-VM כדי לתזמר הרבה sub-agents"
+    ],
+    [
+     "Test-time compute",
+     "כמות החישוב (הטוקנים) שהמודל משקיע בזמן ריצה כדי להגיע לתוצאה טובה יותר"
+    ],
+    [
+     "Scaling laws",
+     "הקשר בין נתונים, גודל הרשת ו-compute לבין היכולת של המודל"
+    ],
+    [
+     "Auto mode",
+     "מצב הרשאות שבו מודל מחליט על כל בקשת הרשאה במקום המשתמש"
+    ],
+    [
+     "Prompt fatigue",
+     "שחיקה שגורמת לאשר בקשות הרשאה בלי לקרוא אותן"
+    ],
+    [
+     "Prompt injection",
+     "הוראות זדוניות שמוסתרות בתוכן שהמודל קורא"
+    ],
+    [
+     "Output style",
+     "הגדרה ב-Claude Code שקובעת את אופן ההסבר (exploratory, learning)"
+    ],
+    [
+     "MCP",
+     "פרוטוקול לחיבור Claude Code לכלים חיצוניים כמו Slack"
+    ],
+    [
+     "Red teaming / Pen testing",
+     "תקיפה מבוקרת של מערכת כדי למצוא בה פרצות"
+    ],
+    [
+     "One-shot",
+     "פתרון בעיה בניסיון הראשון, בלי סבבי תיקון"
+    ],
+    [
+     "GTM",
+     "Go-to-market: הדרך שבה מוצר מגיע לשוק"
+    ]
+   ],
+   "widths": [
+    1.6,
+    5.0
+   ]
+  }
+ ]
+}

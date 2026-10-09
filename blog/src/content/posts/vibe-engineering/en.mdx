@@ -1,0 +1,148 @@
+---
+title: "Vibe engineering in six steps: the model writes, you decide"
+description: "Vibe engineering in practice: a spec with open decisions, AGENTS.md, plan mode, a hook that enforces tests, and a diff review. Six steps, files to copy."
+lang: en
+key: vibe-engineering
+term: "vibe engineering"
+kind: fieldnotes
+pubDate: 2026-10-09
+tags: ["vibe-engineering", "vibe-coding", "claude-code", "coding-agents", "workflow"]
+hook: "claim"
+cover: photo
+tldr: ["Write an AGENTS.md with test commands and a clear Definition of done.", "Add a PostToolUse hook that exits with code 2 when tests fail.", "Read the diff, not the summary the agent writes at the end."]
+hero: /posts/vibe-engineering/hero-en.jpg
+diagram: /posts/vibe-engineering/diagram.svg
+sources:
+  - { title: "We're Not Vibe Engineering", url: "https://jonathannen.com/not-vibe-engineering", date: "2026-03-24" }
+  - { title: "Vibe Coding vs. Vibe Engineering", url: "https://mfbt.ai/blog/vibe-coding-vs-vibe-engineering", date: "2026-02-20" }
+  - { title: "Path to Vibe Engineering", url: "https://leandronsp.com/articles/path-to-vibe-engineering", date: "2026-05-02" }
+  - { title: "What Is Vibe Engineering? The Future of AI-Driven Software Development", url: "https://www.udacity.com/video/what-is-vibe-engineering", date: "" }
+  - { title: "A Practical Guide to Vibe Engineering", url: "https://pub.towardsai.net/a-practical-guide-to-vibe-engineering-fd0d36f153cf", date: "" }
+  - { title: "AI-assisted coding → Vibe Engineering ← Vibe Coding - Kaushik Gopal's Website", url: "https://kau.sh/blog/vibe-eng", date: "" }
+opinion: "To us, vibe engineering is a good name for an old thing: spec, tests and review, with a model in the loop. A name isn't a method, but it gives a team a way to say \"this isn't vibe coding\" without a ten-minute explanation, and that's worth something. Our test is Monday: if you have a hook that fails with exit 2 and an AGENTS.md with a Definition of done, you're doing it. If all you have is a $100 subscription and an internal slide deck, you're not. And when a term gets a Udacity video before it gets one serious article, we turn the excitement down half a tone and look at what people actually run."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+The difference between vibe coding and vibe engineering isn't who writes the code. In both, the model writes it.
+
+Kaushik Gopal put this in a two-row table. Row one: who generates the code. Row two: who owns the design and the quality bar. In vibe coding, the model is the answer to both. In vibe engineering, the model still generates, but the design stays with you. That's the whole difference, and it's also the whole job.
+
+Some background. Andrej Karpathy coined vibe coding in a February 2025 tweet: give in to the vibes and "forget that the code even exists." In October 2025, Simon Willison proposed vibe engineering as the other side: experienced engineers who work with agents and stay accountable for what ships. The name stuck. By 2026 there are posts about it from every direction, plus a Udacity video.
+
+So what does it mean on a Monday? The common mistake is to buy tools and wait for results. At mfbt, every engineer got a $100/month Claude Code subscription. Months later, big features still took weeks. The seniors flew, the juniors saved a bit of time here and there, and that was it. Their explanation: seniors made product and architecture calls as they worked. Juniors froze at every gap in the spec and waited for an answer on Slack.
+
+In short, the tool wasn't the problem. The process was missing. Here's the process I use in Claude Code, in six steps. In Codex and OpenCode it's almost the same.
+
+## 01 · A spec that flags what isn't decided yet
+
+Before you open a terminal, write a short spec. Not a twenty-page document: the goal, what's out of scope, and how you know you're done. Above all, a section for open decisions.
+
+This is the direct fix for mfbt's problem. The agent will find gaps in the spec during planning. That's a given. The question is whether the gap lands on a junior who freezes, or whether the default and the person who signs off are already written down.
+
+What to do: a file `specs/<feature>.md` with three headings — `Goal`, `Done when`, `Open decisions`. Next to each open decision, write a default and a person's name. For example: `pagination: cursor (default), ask Dana if offset is needed`.
+
+What you'll see: your first spec will come out with 2–3 open decisions you didn't know existed. Good. You found them before the code, not on Slack afterwards.
+
+<figure><img src="/posts/vibe-engineering/src2.jpg" alt="$100 a month per engineer didn't buy a process: seniors flew, juniors froze at gaps in the spec (credit: mfbt.ai)" loading="lazy" /><figcaption>$100 a month per engineer didn't buy a process: seniors flew, juniors froze at gaps in the spec (credit: mfbt.ai)</figcaption></figure>
+
+## 02 · AGENTS.md: what the agent needs every session
+
+Every session starts from zero. Whatever isn't written down, the agent will guess. So put an `AGENTS.md` file at the repo root. Codex and OpenCode read it on their own. Claude Code reads `CLAUDE.md`, so put one line in it: `@AGENTS.md`.
+
+What goes in: commands, a Definition of done, what not to touch, and what to do when the spec is unclear. What stays out: sermons. "Write clean code" helps no one. A command does.
+
+```md title="AGENTS.md"
+# Rules for coding agents
+
+<figure><img src="/posts/vibe-engineering/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## Commands
+- Install: npm ci
+- Typecheck: npm run typecheck
+- Tests: npm test
+- Lint: npm run lint -- --fix
+
+## Definition of done
+- Typecheck, tests and lint pass locally. Paste the last 5 lines of test output.
+- No new dependency without asking.
+- Diff under ~300 lines. If bigger, stop and propose a split.
+
+## Don't touch without asking
+- migrations/
+- src/shared/types.ts (other modules depend on these shapes)
+
+## When the spec is unclear
+- Open decision with no default: stop and ask.
+- Open decision with a default: use it, list it in the PR description.
+```
+
+The `types.ts` line isn't there by accident. It comes from the story in the next step.
+
+## 03 · A written plan before a single line of code
+
+Kamen Zhekov wrote about this in January 2026. He asked OpenCode for a feature in Puppypal, an app he's building to train his puppy. The agent made about a dozen changes and announced it was done. It wasn't. It also broke other features, because it changed data structures that other parts of the code relied on. Zhekov ran `git reset` and started over, this time with a process.
+
+> The difference is usually not the model, but rather whether I treated it like a slot machine or like a fellow engineer.
+> — Kamen Zhekov, A Practical Guide to Vibe Engineering
+
+What to do: in Claude Code, enter plan mode with Shift+Tab twice. The agent reads code and doesn't touch it. Ask for a plan that lists the files that will change, and who else uses each type that changes shape. Read it, fix it, and only then approve.
+
+What you'll see: the first plan almost always touches more files than you expected. This is the cheapest moment to catch that. A minute of reading instead of an evening of debugging.
+
+## 04 · The agent doesn't decide when it's done
+
+An agent's "done" isn't a fact, it's a guess. Whatever can be checked in code gets checked in code. Don't ask the model to remember.
+
+In Claude Code you do this with a `PostToolUse` hook, which runs after every edit. If typecheck or tests fail, the hook exits with code 2 and stderr goes back to the model. It sees the error and fixes it before it ever reaches you.
+
+```json title=".claude/settings.json"
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run -s typecheck 1>&2 && npm test -s 1>&2 || exit 2",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+What you'll see: at first it slows you down. Every edit waits for tests. If your suite takes more than 30 seconds, run only the tests for the package that changed, or the session drowns in waiting. In Codex and OpenCode you put the same rule in AGENTS.md, but it's weaker there: there it's a request, here it's enforcement.
+
+> **My take:** If I had to pick one step out of the six, it's this one. You can write a bad spec and approve a plan without reading it, but a failing typecheck doesn't argue with you.
+
+<figure><img src="/posts/vibe-engineering/v2-svg-en.jpg" alt="The agent doesn't declare itself done: exit code 2 sends the error back to it, and only a green edit reaches a commit and your eyes (Claude Code hooks)" loading="lazy" /><figcaption>The agent doesn't declare itself done: exit code 2 sends the error back to it, and only a green edit reaches a commit and your eyes (Claude Code hooks)</figcaption></figure>
+
+## 05 · A branch per task, and resets without sentiment
+
+Commit after every step that passes the hook. That way Zhekov's `git reset` costs a minute, not a day.
+
+What to do: `git switch -c agent/search-pagination` at the start of a task. `git diff --stat main` before review, and if it's over 300 lines, stop and split. If something goes sideways, `git reset --hard` to the last green commit, only on the agent's branch.
+
+One more rule: if the agent fails twice at the same thing, don't try a third time in the same conversation. Reset, update the spec with what you learned, and start a new conversation. A long conversation costs more per message and answers worse.
+
+What you'll see: lots of small commits with agent-written messages. That's fine. Squash on merge.
+
+## 06 · Read the diff, not the summary
+
+The summary the agent writes at the end is marketing. The diff is what happened. This is where the design stays yours, and it's exactly the second row in Gopal's table.
+
+What to do: go through the diff with the same questions every time. Did it add an abstraction I didn't ask for? Do the names match the rest of the code? Did any type change shape? Before you dig in, you can run a second model as a reviewer with the spec in hand: "What in Done when isn't covered by tests?" It doesn't replace you. It filters.
+
+Leandro (leandronsp) wrote in May 2026 that this isn't about speed, it's about confidence. I agree. These steps won't make you faster on day one. But you'll merge without worrying.
+
+<figure><img src="/posts/vibe-engineering/src6.jpg" alt="The same model writes the code in both cases. Vibe engineering starts when the design comes back to you (credit: Kaushik Gopal)" loading="lazy" /><figcaption>The same model writes the code in both cases. Vibe engineering starts when the design comes back to you (credit: Kaushik Gopal)</figcaption></figure>
+
+## What to take away
+
+- Every spec comes with an `Open decisions` section, with a default and a name next to each decision.
+- `AGENTS.md` at the root of every repo: commands, Definition of done, and what not to touch.
+- Tests and typecheck run from a hook, not from the model's memory.
+- If you don't read the diff, you're vibe coding, even if you did everything else.

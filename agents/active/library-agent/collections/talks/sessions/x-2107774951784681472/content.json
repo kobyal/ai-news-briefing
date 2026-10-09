@@ -1,0 +1,459 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "title": "איך לבנות אמון ב-agents: מ-micromanagement ל-PRs שנמזגים לבד",
+ "subtitle": "Lauren Tan על verification, על skills ו-evals, על cloud agents ועל ארכיטקטורה שנבנתה כדי ש-agents יכתבו אותה",
+ "meta": [
+  "Lauren Tan, ומנחה שנשמע כ-Colin (השם לא ודאי) · המקור המקורי לא זוהה (שיתוף מחדש ב-X של החשבון Ricker; על המסך באנר SpaceX) · פורסם ב-7.10.2026",
+  "משך: כ-40 דקות · X",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Lauren Tan, Colin (uncertain)",
+ "topics": [
+  "Coding agents",
+  "Verification & evals",
+  "Agent-friendly architecture",
+  "Cloud agents"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זו הקלטה של שיחה על הבמה עם Lauren Tan, ומנחה שואל שאלות מהקהל ומהצ׳אט. הכיתוב על המסך מציג אותה כ-Software engineer ב-SpaceXAI. בשיחה עצמה היא מספרת שהצטרפה ל-Cursor לפני חמישה חודשים, ושהיא עובדת על Agents Window ועל GrokBot. היא לא מסבירה את הפער בין שתי הזהויות האלה. ההקלטה נקטעת באמצע משפט בסביבות 40:10, ו-30 השניות הראשונות נראות כמו קטע מהרצאה אחרת (הכרזה על Babel plugin ו-ESLint plugin) שלא קשור לנושא.\n\nהטענה המרכזית: מה שחוסם את השימוש ב-agents לכתיבת קוד הוא אמון, לא היכולת של המודל. Tan מתארת עקומת אמון שהיא עצמה טיפסה עליה. בתחתית היא עקבה אחרי כל פלט של agent אחד. היום agents ממזגים בשבילה PRs לבד, והיא סוקרת אותם אחרי שכבר נכנסו ל-main. לדבריה הגיעה לשם בשלושה צעדים: verification שמאפשר ל-agent להריץ את האפליקציה באמת, skills ו-evals שמלמדים אותו לעבוד כמו מהנדס, וארכיטקטורה עם CI מחמיר שמונעת ממנו לקחת קיצורי דרך."
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות המרכזיות עם חותמות זמן, ומה לא נאמר."
+    ],
+    [
+     "2. עקומת האמון: ",
+     "המודל המנטלי של השיחה ומספרי ה-PRs."
+    ],
+    [
+     "3. Verification: ",
+     "ה-skill שנקרא control-glass ומסמך ה-feature map."
+    ],
+    [
+     "4. PStack, skills ו-evals: ",
+     "איך בונים skills ואיך בודקים אותם."
+    ],
+    [
+     "5. מהמקומי לענן: ",
+     "ה-agent שנקרא Benny ומשל המטבח."
+    ],
+    [
+     "6. ארכיטקטורה ידידותית ל-agents: ",
+     "greenfield מול brownfield, הארכיטקטורה Dune וחוקי ה-CI."
+    ],
+    [
+     "7. מה עושים עכשיו: ",
+     "צעדים מעשיים וטבלת שאלות פתוחות."
+    ],
+    [
+     "8. מילון מונחים: ",
+     "המונחים באנגלית שמופיעים במסמך."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך נוצר אוטומטית מהתמלול של ההקלטה ומהשקפים שנראים בה. שמות ומונחים עלולים להשתבש בתמלול האוטומטי: GrokBot מופיע בתמלול גם כ-Rockbot, Grokwa ו-Grofbot, ו-PStack מופיע גם כ-PSAC ו-PSTAC. כל ציטוט מועתק מילה במילה ונבדק מול חותמת הזמן שלו. לא הוסף שום מידע ממקורות חיצוניים. הכיתוב של השיתוף ב-X מדבר על 15 agents, על Chief of Staff, על שלושה מנהלים ועל 1% מהמשתמשים. שום דבר מזה לא נאמר בהקלטה, ולכן הוא לא מופיע כאן."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "Tan משווה את העבודה עם agents לניהול צוות. אם אתה לא סומך על הצוות, אתה עושה micromanagement, וזה לא מתרחב. כל ההרצאה עוסקת בשאלה איך מגדילים את האמון באופן שאפשר למדוד ולשחזר, ולא איך כותבים prompts טובים יותר."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "האמון הוא מה שמגביל, לא המודל: ",
+     "אי אפשר להריץ מאה agents כשאתה לא סומך אפילו על אחד [1:30]. העקומה ששרטטה מתארת את המעבר מ-in the loop על כל פלט ל-auto-merge [3:01]."
+    ],
+    [
+     "לטענתה, הפרודוקטיביות קפצה: ",
+     "אלף PRs בחודש שעבר, וכמעט 800 עד ה-12 בחודש הנוכחי [4:34]. היא עצמה מודה שמוצדק לשאול כמה מהקוד הזה טוב."
+    ],
+    [
+     "Verification היא המיומנות הכי חשובה: ",
+     "ה-agent צריך להריץ את הקוד, לצלם traces ו-heap snapshots ולפתוח סימולטור. זה לא מבטיח קוד טוב, אבל מבטיח קוד נכון [4:34–6:07]."
+    ],
+    [
+     "ה-feature map הוא מה שעשה את ההבדל: ",
+     "ה-skill של control-glass לא הועיל עד שנוסף לו מסמך שמסביר איך מגיעים לכל פיצ׳ר: נתיב מהצד של המשתמש, קיצורי מקלדת ו-selectors ל-CDP [9:15–12:24]."
+    ],
+    [
+     "Skill הוא קובץ markdown שנכתב מתוך כשל: ",
+     "בכל פעם שראתה agent נכשל באותה צורה, היא כתבה skill. כך נבנה PStack בהדרגה [13:56–15:27]."
+    ],
+    [
+     "Evals הם unit tests ל-skills: ",
+     "sub-agents שלא יודעים שבודקים אותם, judge ממודל אחר, ו-/loop עד ציון 10 מתוך 10 [16:57–21:33]."
+    ],
+    [
+     "Cloud agents מקפיצים את כל הצוות: ",
+     "Benny לוקח דיווחי באגים מ-Slack, משחזר אותם על מחשב בענן, ומדווח למשל שהבאג כבר תוקן ב-main [24:37]."
+    ],
+    [
+     "Greenfield הוא הסיכון הכי גדול: ",
+     "אפליקציה שנכתבה ב-vibe coding צומחת ל-organic architecture שאף אחד לא שולט בה. היא העבירה את GrokBot ל-refactor של יותר מ-600 PRs [32:27–33:58]."
+    ],
+    [
+     "CI מחמיר מאוד: ",
+     "useEffect אסור, הערות בקוד אסורות, ו-\"כל מה שה-agents גרועים בו\" אסור. ה-agents סופגים את המטרד שבזה [37:04–38:38]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "אין מדד איכות: ",
+     "יש מספרי PRs, אבל אין שיעור revert, באגים ב-production או רגרסיות. היא עצמה אומרת שצריך לשאול את השאלה הזאת."
+    ],
+    [
+     "אין עלויות: ",
+     "היא מזהירה ש-agents רבים מדי זה \"extremely expensive\", ולא נותנת אף מספר של tokens או של כסף."
+    ],
+    [
+     "אין גודל PR ממוצע: ",
+     "היא נותנת טווח של 50 עד כאלף שורות ואומרת במפורש שהיא לא יודעת מה הממוצע [35:32]."
+    ],
+    [
+     "אין פירוט מלא של ה-CI: ",
+     "ההקלטה נקטעת בדיוק כשהיא מתחילה לתאר בדיקות ביצועים ב-Agents Window."
+    ],
+    [
+     "הזהות לא מוסברת: ",
+     "הכיתוב על המסך אומר SpaceXAI והדוברת אומרת Cursor. וגם הטענות בכיתוב של השיתוף ב-X על מבנה של 15 agents לא נשמעות בהקלטה."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. עקומת האמון: מ-micromanagement ל-auto-merge"
+  },
+  {
+   "kind": "image",
+   "file": "k_003.jpg",
+   "caption": "גרף שצויר ביד: trust כפונקציה של הזמן, עקומה שעולה ומתיישרת. לצידו רשימה: verification, high quality skills, refactoring/rewriting, agent-friendly",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Tan מציגה את הגרף ואומרת שהוא \"לא מדעי\". בתחתית העקומה המפתח יושב ומפעיל prompts, קורא כל פלט, ולא יכול לעבוד במקביל: \"You can't go to a hundred agents, like spawn a hundred agents when you don't even trust the output of one agent\" [1:30]. בחמשת החודשים האחרונים היא טיפסה למעלה, ועכשיו היא בנקודה ש-\"I actually have my agents now auto-merging PRs for me which is like a wild thing to say\" [3:01]. באותו בוקר היא מצאה כ-20 PRs שכבר נכנסו, וסקרה אותם ישירות על main.\n\nבגרף התרומות שלה ב-Cursor, החודש הראשון היה חלש כי עוד למדה את ה-code base. אחר כך: \"last month I shipped a thousand PRs, which is ridiculous\", ועד ה-12 בחודש הנוכחי \"almost 800 PRs landed\" [4:34]. לפי הטענה שלה, צורת הגרף משקפת את עקומת האמון."
+  },
+  {
+   "kind": "image",
+   "file": "k_039.jpg",
+   "caption": "השקף \"how do i trust my agents more?\": verification, high quality skills שמלמדים agents לעבוד כמו מהנדסי תוכנה אמיתיים (למשל pstack), refactoring/rewriting של הארכיטקטורה כדי שתהיה agent friendly (greenfield vs brownfield), והערה בצד: evals!",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "זה השקף שמארגן את כל ההרצאה, ושלושת הסעיפים בו הם שלושת הפרקים הבאים. המנחה מסכם באמצע השיחה [26:13] והיא מאשרת: קודם בונים verification מקומי, אחר כך מתרחבים לענן עם agents שמגיבים לאותות בעצמם, ורק בסוף מגיעים ל-auto-merge. \"I think there's really no shortcut for going from here to there\" [27:47]."
+  },
+  {
+   "kind": "h1",
+   "text": "3. Verification: ה-skill שנקרא control-glass וה-feature map"
+  },
+  {
+   "kind": "image",
+   "file": "k_012.jpg",
+   "caption": "קובץ ה-SKILL.md של Control Glass via Playwright: מפעילים dev build של Cursor דרך CDP, בודקים את ה-DOM, מצלמים מסך, לוחצים ומקלידים, קוראים את ה-accessibility tree, מריצים JS ומאטים CPU ורשת. בהמשך יש הוראות לבחירת flow (main checkout או worktree)",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "ההגדרה שלה ל-verification: היכולת של ה-agent \"to actually run the code or take CPU traces or heap snapshots or you know open an iOS simulator\", כלומר להפעיל את המערכת בדיוק כמו שהמשתמש מפעיל אותה [4:34]. \"It doesn't guarantee your agent writes good code, but it allows them to at least write correct code\" [6:07].\n\nהדוגמה מהשבוע הראשון שלה ב-Cursor: היא הייתה אמורה להצטרף לצוות Cloud agents, אבל בגלל הניסיון שלה ב-React העבירו אותה ל-Agents Window, שהיה אמור לצאת בעוד שבוע. היא פתחה Chrome DevTools, צילמה traces ושלחה אותם ל-agent, וה-agent קבע בביטחון מה הבעיה ורוב הזמן טעה. \"you are the verifier right you you're the bottleneck\" [7:41]. לכן אחד ה-skills הראשונים שבנתה היה control-glass. Glass הוא השם הפנימי של Agents Window. לדבריה הקוד עצמו פשוט, ו-agent יכול לכתוב אותו בשבילכם, דרך Chrome DevTools Protocol לאפליקציות Electron ו-web, או דרך הכלים של Apple לסימולטור iOS [9:15]."
+  },
+  {
+   "kind": "image",
+   "file": "k_015.jpg",
+   "caption": "ה-README של ה-feature map, עם הסעיפים Baseline preconditions (מצב ה-dev build, התחברות, sidebar) ו-Driving conventions (העדפה ל-ARIA labels ול-data-* attributes כ-selectors)",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "הבעיה הייתה שגם אחרי שה-agent ידע להריץ את האפליקציה, הוא לא ידע מה יש בה. בדיווח כמו \"ה-sidebar השמאלי מגמגם\" הוא הסתובב בקוד בלי כיוון. הפתרון היה קובץ שהיא קוראת לו feature map: לכל פיצ׳ר יש בו הסבר מה הוא, איך מגיעים אליו מנקודת המבט של המשתמש, אילו קיצורי מקלדת יש לו, ואילו DOM attributes משמשים לבחירה דרך CDP [12:24]. ב-Cursor יש ערוץ Slack של משוב שרבים מהדיווחים בו גרועים, \"a screenshot... and then someone just says, question mark, question mark, question mark\" [10:50]. עם feature map ה-agent מצליח לקשר גם דיווח כזה לפיצ׳ר מסוים. ב-PStack יש skill בשם create verification שסורק את הקוד ובונה feature map ראשוני, ו-skill בשם maintain verification שמעדכן אותו."
+  },
+  {
+   "kind": "h1",
+   "text": "4. PStack, skills ו-evals"
+  },
+  {
+   "kind": "body",
+   "text": "PStack (P זה potato) נקרא כך כמחווה ל-GStack, ה-plugin של Gary Tan מ-Y Combinator. לדבריה אין ביניהם קשר משפחתי, והאיות Gary הוא כפי שנשמע בתמלול. היא לא תכננה לבנות אותו. הוא נבנה skill אחרי skill, מתוך כשלים שראתה. דוגמה: כשה-agent הכריז בביטחון על סיבה לבאג, היא בדקה את ה-tool calls וגילתה שהוא בכלל לא קרא את הקוד הרלוונטי. האנלוגיה שלה היא מהנדס מצוין שהצטרף לפני חמש שניות ואין לו שום הקשר עסקי. איך מלמדים אותו? \"through a skill a skill being just you know it's just markdown right\" [15:27]. היא מסבירה את זה דרך הרעיון של latent space: טוקנים איכותיים בתחילת ההקשר מושכים את המודל לדפוסים חכמים יותר.\n\nאיך שומרים על skills כשהמוצר משתנה? בעזרת evals. \"it's like a unit test for an agent\" [16:57]. ב-PStack, תחת Potato Mode, יש eval playbook."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "Coordinator ו-rubric: ",
+     "agent ראשי מנסח rubric של ההתנהגות שה-skill אמור לייצר, ומפעיל sub-agents [18:30]."
+    ],
+    [
+     "Sub-agents שלא יודעים שבודקים אותם: ",
+     "לכל sub-agent יש תיקייה עם שם שנבחר בכוונה, כי \"agents can actually tell and when they do they change their behavior\" [18:30]."
+    ],
+    [
+     "מטריצה של מודלים: ",
+     "Cursor תומך במודלים רבים, אז אפשר להריץ את אותו eval על כל המודלים שמשתמשים בהם."
+    ],
+    [
+     "Judge ממודל אחר: ",
+     "מודל נוסף בודק את הציון של ה-coordinator כדי לנטרל הטיה [20:01]."
+    ],
+    [
+     "Hill climbing: ",
+     "מריצים /loop ב-Cursor: \"keep looping on this eval, right, until everything is 10 out of 10\" [21:33]. כך היא שיפרה גם את control-glass עצמו."
+    ],
+    [
+     "צריך טעם, לא רק framework: ",
+     "לדבריה תחזוקת skills \"is actually pretty hard\". צריך להיות backseat driver: לקרוא tool calls ו-thinking blocks ולחפש איפה ה-agent נכשל [20:01]."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "5. מהמקומי לענן: Benny והמטבח"
+  },
+  {
+   "kind": "image",
+   "file": "k_042.jpg",
+   "caption": "השקף \"building your michelin kitchen / software factory\" (המילים software factory מחוקות): cloud agents, automations and Agent SDK, ומתחת חלון של thread ב-Slack בערוץ glass-oncall-assistant",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "לשאלת המנחה היא ממליצה להתחיל מקומית, כי שם רואים איך ה-agent מפעיל את האפליקציה [23:03]. היא עצמה כבר עובדת כמעט רק עם cloud agents. היתרון לדבריה: השקעה ב-control skills \"actually levels up your whole team uh and even your whole company\" [24:37]. האנלוגיה שלה היא מסעדה: \"You're the head chef. You're not cooking all the food yourself anymore\" [21:33]. התפקיד של המהנדס הוא לעצב את המטבח ולחלק משימות."
+  },
+  {
+   "kind": "image",
+   "file": "k_048.jpg",
+   "caption": "Thread ב-Slack: ה-agent Benny מדווח \"Reproduced but already fixed on main\", עם צילום מסך של השחזור ופירוט הצעדים",
+   "width": 5.6
+  },
+  {
+   "kind": "quote",
+   "text": "you can see that the Benny actually reproduced the bug, but it's already fixed on main. So it actually confirms that we fixed this problem already, and all I need to do is just release another build of Cursor.",
+   "by": "— Lauren Tan [24:37]"
+  },
+  {
+   "kind": "h1",
+   "text": "6. ארכיטקטורה ידידותית ל-agents: Dune ו-CI מחמיר"
+  },
+  {
+   "kind": "body",
+   "text": "החלק השלישי הוא rewrite, נושא שנוי במחלוקת. היא טוענת ש-\"a lot of big tech company problems are now everybody's problems\" [29:23]. ב-Meta היו עשרות אלפי מהנדסים, ואיכות הקוד לא תמיד הייתה גבוהה: \"before AI sloth we had human sloth\" [30:55]. כנראה התכוונה ל-slop. ה-infra של חברות גדולות, עם frameworks, guardrails והרשאות מוגבלות, נבנה עבור המהנדס הכי חלש בצוות, ולכן אפליקציות brownfield כאלה כבר מתאימות ל-agents. greenfield, לעומת זאת, \"are, like, the biggest risk, in my opinion, and also the greatest opportunity\" [30:55].\n\nGrokBot, שלדבריה הושק \"אתמול\", מאפשר ליצור agents עם זהות משלהם ולתזמר אותם. הוא נכתב ב-vibe coding: \"Humans were not reading the code at all\" [32:27]. בלי guardrails, ה-agents פותרים כל משימה בדרך הכי נוחה, וה-code base יוצא משליטה. לזה היא קוראת organic architecture. התגובה שלה הייתה refactor של \"over 600 PRs\" לארכיטקטורה חדשה בשם Dune [33:58]. היא מתארת אותה כך: \"like Next.js for Electron apps, and it's designed for agents to write\" [38:38]."
+  },
+  {
+   "kind": "image",
+   "file": "k_064.jpg",
+   "caption": "המסמך Agent-friendly architecture של Dune: ה-agent מגיע עם prompt צר ומעט קבצים. בסעיף Contract: agents מעתיקים את הדפוס הקרוב, עורכים את הקובץ שכבר פתוח ובוחרים את הדרך הקצרה ביותר שמתקמפלת, ולכן הארכיטקטורה מוגדרת בחמישה כללים (הראשון: הדרך המקובלת דורשת פחות החלטות מקיצור דרך)",
+   "width": 6.3
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "useEffect אסור: ",
+     "\"So in Dune and in Grofbot, we've banned UseEffect\". ה-CI נכשל אם משתמשים בו [37:04]."
+    ],
+    [
+     "הערות בקוד אסורות: ",
+     "לדבריה ב-99% מהמקרים agents כותבים הערות היסטוריות שלא רלוונטיות לקוד, כמו \"Lauren said you should never do this\" [38:38]."
+    ],
+    [
+     "כלל אצבע: ",
+     "\"like the agents are bad at we ban\" [38:38]. כתוצאה מזה \"it's actually very annoying to write code\", \"but like agents absorb all of that annoyance\" [33:58]."
+    ],
+    [
+     "PRs קטנים ואטומיים: ",
+     "אין תקרה, והגודל נע בין 50 לכאלף שורות. היא מבקשת מה-agents לפצל את העבודה, כי \"the Git history is a very rich source of context\" [37:04], וכך קל יותר לעשות revert."
+    ],
+    [
+     "התמורה: ",
+     "\"I really don't look at the code anymore\" [33:58]. לדבריה גם מעצבים, מנהלי מוצר ואנשי GTM יכולים להוסיף פיצ׳רים בלי שהיא תחשוש מרגרסיית ביצועים."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "7. מה עושים עכשיו"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "בנו verification skill לפני כל דבר אחר: ",
+     "אחד שמאפשר ל-agent להריץ את האפליקציה שלכם (CDP, Playwright, סימולטור), לצלם traces ולבדוק את התוצאה."
+    ],
+    [
+     "כתבו feature map: ",
+     "לכל פיצ׳ר: איך מגיעים אליו מצד המשתמש, אילו קיצורים יש לו ואילו selectors. אפשר לתת ל-agent לכתוב את הטיוטה הראשונה ולעדכן אותה באופן קבוע."
+    ],
+    [
+     "הפכו כל כשל חוזר ל-skill: ",
+     "קראו tool calls ו-thinking blocks, זהו דפוסים כמו \"ניחש בלי לקרוא את הקוד\", וכתבו markdown שמונע אותם."
+    ],
+    [
+     "בדקו skills עם evals: ",
+     "rubric, sub-agents שלא יודעים שבודקים אותם, judge ממודל אחר, והרצה על המודלים שאתם משתמשים בהם."
+    ],
+    [
+     "אל תדלגו שלבים בעקומה: ",
+     "קודם אמון מקומי, אחר כך cloud agents ואוטומציות. רק בסוף auto-merge. אחרת \"you're just gonna waste a lot of tokens\" [26:13]."
+    ],
+    [
+     "קודדו את הסטנדרטים שלכם ב-CI: ",
+     "אסרו את מה שה-agents עושים רע, ובקשו מהם PRs קטנים ואטומיים."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "למה היא חשובה"
+   ],
+   "rows": [
+    [
+     "מה איכות אלף ה-PRs בחודש: שיעור revert ובאגים ב-production?",
+     "בלי זה אי אפשר להעריך אם האמון מוצדק או שזה רק velocity."
+    ],
+    [
+     "כמה עולה הרצה של evals עם /loop עד 10/10 ושל Benny בענן?",
+     "היא עצמה מזהירה מעלות, ולא נותנת אף מספר."
+    ],
+    [
+     "האם יש ראיה שה-sub-agents באמת לא מזהים שבודקים אותם?",
+     "על זה נשען התוקף של כל ה-evals."
+    ],
+    [
+     "מי סוקר את מה שנכנס ל-main ב-auto-merge, ומה קורה כשמשהו נשבר?",
+     "היא סוקרת אחרי שהקוד כבר נכנס. לא נאמר מה קורה כשמשהו נשבר."
+    ],
+    [
+     "אילו עוד כללים יש ב-CI של Dune, ומהם חמשת הכללים בשקף?",
+     "ההקלטה נקטעת לפני שזה מוסבר, והשקף נראה רק חלקית."
+    ],
+    [
+     "מה הקשר בין Cursor, SpaceXAI ו-GrokBot?",
+     "ההקשר הארגוני לא ברור, ולכן גם לא ברור אם הלקחים מתאימים לארגונים אחרים."
+    ]
+   ],
+   "widths": [
+    3.0,
+    3.0
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "8. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "Agent",
+     "מודל שפה שמבצע משימות בעצמו בעזרת כלים, כאן בעיקר כתיבת קוד"
+    ],
+    [
+     "Verification",
+     "היכולת של ה-agent להריץ את הקוד באמת ולבדוק שהוא עובד"
+    ],
+    [
+     "Skill",
+     "קובץ markdown עם הוראות ושיטות עבודה שה-agent טוען כשהוא צריך אותו"
+    ],
+    [
+     "Feature map",
+     "מסמך שמתאר כל פיצ׳ר באפליקציה ואיך מגיעים אליו: נתיב משתמש, קיצורים ו-selectors"
+    ],
+    [
+     "CDP",
+     "Chrome DevTools Protocol, ממשק לשליטה תכנותית בדפדפן ובאפליקציות Electron"
+    ],
+    [
+     "Eval",
+     "בדיקה אוטומטית שמודדת אם skill מייצר את ההתנהגות הרצויה, מעין unit test ל-agent"
+    ],
+    [
+     "Judge agent",
+     "agent ממודל אחר שבודק את הציונים כדי לנטרל הטיה"
+    ],
+    [
+     "Hill climbing",
+     "שיפור איטרטיבי בלולאה עד שה-eval מגיע לציון היעד"
+    ],
+    [
+     "Cloud agents",
+     "agents שרצים על מחשב בענן ולא על המחשב של המפתח"
+    ],
+    [
+     "Auto-merge",
+     "מיזוג PR ל-main בלי סקירה אנושית לפני המיזוג"
+    ],
+    [
+     "Greenfield / Brownfield",
+     "פרויקט חדש מאפס, לעומת code base קיים עם תשתית ומוסכמות"
+    ],
+    [
+     "Guardrails",
+     "מגבלות טכניות (בדיקות CI, הרשאות) שמונעות נזק"
+    ],
+    [
+     "Vibe coding",
+     "כתיבת קוד מהירה עם AI בלי שבני אדם קוראים אותו"
+    ],
+    [
+     "Organic architecture",
+     "ארכיטקטורה שצמחה בלי תכנון, מקיצורי הדרך של ה-agents"
+    ],
+    [
+     "useEffect",
+     "Hook ב-React שנחשב מקור נפוץ לבאגים, ונאסר ב-Dune"
+    ],
+    [
+     "Latent space",
+     "מרחב הייצוגים של המודל. טוקנים איכותיים מושכים אותו לאזור חכם יותר"
+    ],
+    [
+     "Worktree",
+     "עותק עבודה נפרד של git repo, שמאפשר להריץ כמה agents במקביל"
+    ]
+   ],
+   "widths": [
+    1.6,
+    4.4
+   ]
+  }
+ ]
+}

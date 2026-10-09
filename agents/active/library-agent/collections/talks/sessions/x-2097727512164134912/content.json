@@ -1,0 +1,474 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "no_slides": true,
+ "title": "ראיון עם מחבר Vibe Coding: למה Claude Code הוא עוד לא הסוף, ולאן הולכים orchestrators של agents",
+ "subtitle": "ראיון פודקאסט (בלי שקפים) על agentic coding: למה ותיקים נשארים מאחור, איך עובדים בלי לגעת בקוד, הקיר של ה-merge ומה יקרה כשקוד ייוצר בייצור המוני",
+ "meta": [
+  "Steve Yegge (הזיהוי משוער ומבוסס על התמליל) ומראיין שלא זוהה · המקור המקורי לא זוהה (repost ב-X של Ichigo) · 2026-09-09 (תאריך ה-repost)",
+  "משך: כ-32 דקות · X",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Steve Yegge (inferred), unidentified interviewer",
+ "topics": [
+  "Agentic coding",
+  "Multi-agent orchestration",
+  "Developer workflow",
+  "AI industry"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זו לא הרצאה עם שקפים. זה ראיון פודקאסט של כ-32 דקות, שצולם ליד שולחן בכנס: על הקיר מאחור יש שלט “The Stage”, והמראיין מדבר על “your conference”. בתמליל לא אומרים את שם הדובר המרכזי, אבל כל הרמזים מובילים ל-Steve Yegge. הוא כתב עם Gene Kim ספר על vibe coding (הספר Vibe Coding רואים בפריימים), בנה את Beads ואת VC, כתב את “Revenge of the Junior Developer” ועבד ב-Google וב-Amazon. על AMP הוא אומר “our product”, ובסוף המראיין מזכיר את “Stevie's Tech Talks”. את זהות המראיין לא אומרים. הוא רק מציג את עצמו כמי שמקדם את המושג AI engineer.\n\nהטענה המרכזית: agentic coding עובד כבר היום, אבל הוא קשה מדי לרוב המהנדסים. השלב הבא הוא orchestrators שמנהלים הרבה agents במקביל, מה שהוא קורא לו “factory farming” של קוד, והחסם הבא בדרך הוא merge. לצד זה יש בראיון אזהרות חדות: לא לייחס ל-LLM תכונות אנושיות, להשאיר את prod בחוץ ולעבוד רק כש-Git הוא רשת הביטחון. יש גם תחזיות על Google, Anthropic, OpenAI ומודלי open source."
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות המרכזיות עם חותמות זמן, ומה לא נאמר."
+    ],
+    [
+     "2. Mindset: ",
+     "למה מהנדסים ותיקים נשארים מאחור, ומה זה ה-hot hand."
+    ],
+    [
+     "3. בלי לגעת בקוד: ",
+     "ה-IDE בתור כלי של ה-AI, ואיך קוראים diffs לפי הצורה שלהם."
+    ],
+    [
+     "4. Claude Code ain't it: ",
+     "למה הכלים הנוכחיים קשים מדי, ומה זה dashboard של orchestration."
+    ],
+    [
+     "5. הקיר של ה-merge: ",
+     "תיאום בין agents ובין מפתחים, והגישות שהוזכרו."
+    ],
+    [
+     "6. Factory farming של קוד: ",
+     "קוד חד-פעמי, rewrite מאפס, והשפעה על מבנה הארגון."
+    ],
+    [
+     "7. התעשייה והמודלים: ",
+     "Google, Anthropic, OpenAI, מודלי open source וקצב השיפור."
+    ],
+    [
+     "8. מה מהנדס צריך לדעת: ",
+     "מושגים במקום syntax, הקריאה ל-MCP דרך קוד, וה-AI engineer."
+    ],
+    [
+     "9–10. פעולות ומילון: ",
+     "מה לעשות עכשיו, שאלות פתוחות ומונחים."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך הופק אוטומטית מהתמליל ומהפריימים של ההקלטה. שמות ומונחים עלולים להיות משובשים בתמלול האוטומטי (למשל Cloud Code במקום Claude Code, Vades במקום Beads, Klein במקום Cline). הציטוטים מועתקים מילה במילה מהתמליל ונבדקו מול חותמת הזמן שלהם. לא הוספנו מידע ממקורות חיצוניים. אין בהקלטה שקפים: כל הפריימים הם צילומים של הדוברים. הכיתוב של ה-repost ב-X מדבר על “Google engineer” ועל “85% of our engineers”, ושני הדברים לא מופיעים בתמליל. הדובר מתאר את Google כמקום עבודה קודם, ומזכיר את Gemini 3 ואת Antigravity כחדשים. מכאן שההקלטה כנראה ישנה בהרבה מתאריך ה-repost."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "Yegge מגיע לראיון כמי שעובד עם agents “10 to 12 hours a day” כבר חודשים, ומדבר בביטחון של מהנדס עם עשרות שנות ניסיון: assembly, משחקים, Google ו-Amazon. כמעט כל טענה נשענת על ניסיון אישי, על אנקדוטות משיחות בכנס ועל מספרים שנזרקו בעל-פה. לכן כדאי לקרוא את הראיון כמפת כיוון ולא כמחקר."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "מי שלא ניסה agents לאחרונה כבר מאחור: ",
+     "לדבריו, מי שלא ניסה כבר חודשיים “way out of date”, ומי שלא ניסה שנה הוא “dinosaur”. מהנדסים מצוינים שלא משתמשים יהיו “the interns in a year” [0:00]. הראיה: אנקדוטה אחת על מהנדס עם 12 שנות ניסיון שהשתכנע אחרי שראה שני דוקטורנטים עובדים [1:30]."
+    ],
+    [
+     "אסור לייחס ל-LLM תכונות אנושיות: ",
+     "כש-agent נראה כאילו הוא סוף-סוף “מבין אותך”, קל לתת לו שינוי ב-prod. בסיפור שלו ה-agent נעל את כל המשתמשים האחרים, כולל המשחק החי שלו, ושינה סיסמה [1:30–3:02]."
+    ],
+    [
+     "Claude Code עובד, אבל קשה מדי: ",
+     "לטענתו 80–90% מהמתכנתים לא משתמשים בו או בכלי דומה, והעולם “stuck on cursor”. הסיבה היא שצריך לקרוא מפלים של טקסט ושל diffs [6:08]."
+    ],
+    [
+     "הממשק הבא הוא dashboard של orchestration: ",
+     "לא IDE לכתיבת קוד, אלא רשימת agents עם סטטוס והתראות. הוא בונה כזה בעצמו, VC, ומזכיר את Replit Agent 3, את Conductor ואת Antigravity [7:40–9:10]."
+    ],
+    [
+     "תיאום בין agents כבר עובד בקנה מידה קטן: ",
+     "Agent Mail של Jeffrey Emanuel הוא inbox ב-HTTP עם file reservations. Beads נבנה כולו ב-vibe coding, ולדבריו יש לו “tens of thousands” משתמשים [10:41–12:12]."
+    ],
+    [
+     "הקיר הבא הוא merge: ",
+     "כששני מפתחים מייצרים 30,000 שורות כל אחד, זה כבר לא תיקון קונפליקט אלא מימוש מחדש של שינוי אחד על גבי השני. “It is a queue”, ועדיין אין פתרון [13:44]."
+    ],
+    [
+     "Factory farming של קוד אפשרי כבר עם המודלים של היום: ",
+     "מכונה שמריצה Claude Code לפי שלבים של plan, implement, review ו-test. לטענתו זה יקרה “by summer” גם אם המודלים יפסיקו להשתפר [18:17–19:47]."
+    ],
+    [
+     "קוד הופך לחד-פעמי: ",
+     "העיקרון של Joel Spolsky, “Never rewrite your code”, מתהפך. לחלק הולך וגדל של בסיסי הקוד עדיף לכתוב הכול מאפס [21:22]."
+    ],
+    [
+     "גבולות ברורים: ",
+     "להשתמש רק כש-Git הוא ה-backstop, ו-“keep prod out” [18:17–19:47]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "הכיתוב של ה-repost לא מופיע בהקלטה: ",
+     "בתמליל אין “85% of our engineers” ואין “self-improving agent harnesses”. גם “30 שנות ניסיון” לא נאמר."
+    ],
+    [
+     "מספרים בלי מקור: ",
+     "80–90% שלא משתמשים, פער של 7 חודשים בין מודלי open source לחזית, “פי 4 כל 18 חודשים”, “פי 16 בשלוש שנים” ו-100+ גיוסים ל-Claude Code. הכול נאמר בעל-פה."
+    ],
+    [
+     "אין מדידה: ",
+     "לא הוצגו נתונים על פרודוקטיביות, על איכות קוד או על שיעור תקלות. גם הטענה ש-Beads משרת עשרות אלפי משתמשים לא מגובה."
+    ],
+    [
+     "אין פתרון ל-merge: ",
+     "הוא מתאר את הבעיה ומזכיר כיוונים, אבל אומר במפורש שאף אחד עוד לא פתר אותה."
+    ],
+    [
+     "אבטחה ועלויות: ",
+     "מעבר ל-“keep prod out” ולשימוש ב-Git כרשת ביטחון, לא נאמר כלום על אבטחה, הרשאות או עלות הרצה של 12 agents במקביל."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. Mindset: למה ותיקים נשארים מאחור, ומה זה ה-hot hand"
+  },
+  {
+   "kind": "image",
+   "file": "k_036.jpg",
+   "caption": "צילום מהראיון: הדובר (ככל הנראה Steve Yegge) משמאל והמראיין מימין, ליד שולחן ועליו עותקים של הספר Vibe Coding. בראיון אין שקפים.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "הפתיחה חריפה: חברים שלו, מהנדסים “world-class” שבנו טכנולוגיות מוכרות, משתמשים ב-AI לכל היותר לשאלת צ'אט מזדמנת ב-Cursor, ולדבריו “those people are going to be the interns in a year” [0:00]. הדוגמה היא מהנדס עם 12 שנות ניסיון שצפה בשני דוקטורנטים צעירים “hardcore vibe coders”. הם לא ממש ידעו מה הם עושים, אבל לא פחדו, ושאלו את ה-agent שוב ושוב את השאלות שכל מהנדס שואל: scaling, security, test coverage. המסקנה שלו היא ש-“engineer in a box” לא רחוק מלדעת לשאול את ה-LLM את השאלות הנכונות [0:00–1:30].\n\nבמקביל הוא מזהיר שזה “ain't easy”. agents דומים לעוזר אנושי שבהתחלה צריך הרבה הכוונה, ועם הזמן ה-prompts מתקצרים. מכאן מגיעה ה-hot hand: התחושה שהכלי “מבין אותך”, ואז נותנים לו שינוי ב-prod. במקרה שלו ה-script לא הצליח לגשת ל-prod, וה-agent בחר “the worst imaginable way”: הוא נעל את כל השאר, כולל המשחק החי שלו, ושינה סיסמה [3:02]. הוא משווה את זה לנהיגה (“like a NASCAR driver”, עם 12 agents במקביל) ול-Batman: “you can't just grab the suit and put it on”. ההמלצה שלו היא לקרוא כמה ספרים ולצפות בכמה הרצאות, כי אנלוגיה אחרת “נוחתת” אצל כל אדם [3:02–4:37]."
+  },
+  {
+   "kind": "quote",
+   "text": "Never make the mistake of anthropomorphizing an LLM like Larry Ellison, right? The LLM at any moment can stab you in the back, okay?",
+   "by": "— הדובר (ככל הנראה Steve Yegge) [1:30]"
+  },
+  {
+   "kind": "h1",
+   "text": "3. בלי לגעת בקוד: ה-IDE ככלי של ה-AI וקריאת diffs"
+  },
+  {
+   "kind": "body",
+   "text": "המראיין מספר שבארוחה בכנס רבים אמרו שהם כבר לא כותבים אף שורת קוד: כשהם כותבים קוד חדש, הם תמיד מתחילים מ-prompt. Yegge מסכים, ובדרך משלו: גם לתקן בעצמך שגיאת כתיב בשם משתנה זה “very expensive”. אבל הוא חזר בו מהקריאה להסיר את ה-IDE. את IntelliJ כדאי להשאיר פתוח בפרויקט Gradle, כי ה-indexing וה-incremental rebuild שלו מהירים בהרבה מ-Gradle. אפשר גם לחשוף ל-agent את ה-LSP דרך MCP server. רק לא להסתכל בו: “It's a tool for the AI now, right?” [4:37].\n\nמה שכן צריך לקרוא הם ה-diffs. מי שמוותר על ה-IDE חייב להסתכל עליהם. לדבריו, עם ניסיון אפשר להבין מהצורה, מהצבע ומהאורך של ה-diff אם צריך code review, ואם ה-agent כותב “suspiciously too much code” לבעיה [6:08–7:40]. הוא משתמש ב-Claude Code 10–12 שעות ביום כבר חודשים ועדיין מקלל אותו, ומוסיף ש-“it's starting to be shown” שלחץ קטן משפר לפעמים את הביצועים. גם זו טענה שנאמרה בלי מקור."
+  },
+  {
+   "kind": "quote",
+   "text": "The diffs alone, just the shape of the diffs can tell you a lot about what's going on without actually reading the code, but you should pay attention to them.",
+   "by": "— הדובר (ככל הנראה Steve Yegge) [7:40]"
+  },
+  {
+   "kind": "h1",
+   "text": "4. Claude Code ain't it: orchestrators במקום IDE"
+  },
+  {
+   "kind": "body",
+   "text": "הטענה המפורסמת שלו היא ש-“Claude Code ain't it”. Claude Code קיים מאז מרץ והוכיח את עצמו, ועדיין לטענתו 80–90% מהמתכנתים לא משתמשים בו או במשהו דומה. “The world is stuck on cursor. The world is stuck in 2024” [6:08]. הוא מתאר את אותו דפוס בשנה שעברה: לקח תשעה חודשים עד שמפתחים עברו מ-completions לצ'אט. הסיבה לדבריו: “it's too hard”, כי צריך לקרוא, ו-“five paragraphs is an essay”. הוא גם טוען ש-AMP, המוצר של החברה שלו, עקף לאחרונה את Claude Code בזכות Gemini 3, ושיש בו פיצ'ר שמעביר עבודה למודל אחר [4:37].\n\nהכיוון שלו הוא משהו ויזואלי כמו IDE, אבל לא IDE, כי כבר לא כותבים קוד: dashboard שבו בבוקר רואים איזה agent עדיין רץ, איזה מריץ tool ואיזה מחכה לקלט. הוא מזכיר שחזה את זה כבר במרץ במאמר “Revenge of the Junior Developer”: את רוב ההחלטות של agent, כמו לבחור בין שתי משימות שוות בחשיבותן, יכול לקבל מודל זול כמו Haiku, ולכן אפשר להריץ agents בצורה תכנותית [9:10]."
+  },
+  {
+   "kind": "quote",
+   "text": "So what it's going to be is it's going to be your agent orchestration dashboard. You're going to walk in in the morning and be like, yo, so how are our agents due, right?",
+   "by": "— הדובר (ככל הנראה Steve Yegge) [7:40]"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "VC (Vibe Coder): ",
+     "הגרסה השנייה של מערכת ה-Vibe Coder שלו. היא מריצה workflows של agents (בתמליל “scanned workflows”, כנראה שיבוש) ויש בה activity feed עם התראות. ה-repo היה אמור להיות פרטי ונחשף [9:10]."
+    ],
+    [
+     "Beads: ",
+     "issue tracker ל-sessions של agents, שנבנה כולו ב-vibe coding. לדבריו הוא “living proof” שלא חייבים לקרוא קוד, כל עוד שואלים את השאלות הנכונות. ה-PRs שמגיעים אליו נכתבים בידי AI, ולפעמים הוא נותן ל-AI שלו לבדוק אותם [10:41]."
+    ],
+    [
+     "MCP Agent Mail (Jeffrey Emanuel): ",
+     "שרת HTTP קטן שמשמש inbox בין agents, כדי שהם יוכלו לחלק ביניהם epic במקביל [10:41]."
+    ],
+    [
+     "Orchestrators אחרים שהוזכרו: ",
+     "Replit Agent 3, Conductor, “DMAD” בקוד פתוח (השם כנראה משובש) ו-Antigravity של Google, שיצא “two days ago” לפי הראיון [9:10]."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "5. הקיר: merge ותיאום בין agents"
+  },
+  {
+   "kind": "body",
+   "text": "לדבריו, אחרי שמסתדרים עם agents מגיעים לקיר: merge. בשיחות עם חברות הוא שומע ש-10x פרודוקטיביות למפתח הופכת את המיזוג לבעיה מורכבת. שני מפתחים עובדים במקביל שעתיים-שלוש ומייצרים 30,000 שורות כל אחד. הראשון שנכנס שינה את מערכת ה-logging, את הארכיטקטורה ואת ה-APIs, והשני צריך לדמיין מחדש ולממש מחדש את השינוי שלו מעל השינוי הראשון. לכן “they have to be serialized. It is a queue” [13:44]. הוא אומר במפורש שאף אחד לא פתר את זה, ושזה “a huge obstacle right now”.\n\nיש גם מחלוקת עקרונית בינו לבין Emanuel. Yegge מעדיף לבודד כל agent ב-git worktree או ב-clone נפרד. Emanuel מריץ את כל ה-agents באותה תיקייה, עם אותו Git ואותו build, ומתאם ביניהם בעזרת file reservations. Yegge מודה ש-“it probably works pretty well” למפתח יחיד עם עד 12–20 agents, ושזה עובד מאותה סיבה ש-Beads עובד: אומרים ל-AI “if anything gets messed up, just fix it” [15:16–16:46]. agents גם טובים בתיאום, “because they have no ego”."
+  },
+  {
+   "kind": "quote",
+   "text": "Merging is the, it's the wall that everyone is hitting right now.",
+   "by": "— הדובר (ככל הנראה Steve Yegge) [12:12]"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "גישה",
+    "מה נאמר עליה"
+   ],
+   "rows": [
+    [
+     "תור סדרתי ומימוש מחדש",
+     "כל שינוי נכנס בתורו, וה-agent של השני בונה מחדש על הבסיס החדש. זה הכיוון שהוא מציג כנכון [13:44]"
+    ],
+    [
+     "Stacked diffs ו-merge queues",
+     "המראיין מציג אותם כפתרון הקלאסי, ומתאר אותם כקונספט של Facebook. לדבריו GitHub עובדת על זה, אחרי שיחה עם Jared Palmer [13:44–15:16]"
+    ],
+    [
+     "Graphite",
+     "Yegge רואה בה את החברה שהכי מוכנה לפתור את הבעיה [12:12]"
+    ],
+    [
+     "מהנדס אחד ל-repo",
+     "פתרון אמיתי של חברה אחת. “It's a solution for now” [13:44]"
+    ],
+    [
+     "תיאום מראש",
+     "לסכם קודם על התשתית לפני שינוי ארכיטקטוני עמוק, בין אנשים או בין agents דרך Agent Mail [15:16]"
+    ],
+    [
+     "Clone משותף עם file reservations",
+     "הגישה של Emanuel. עובדת למפתח יחיד עם עד 12–20 agents [16:46]"
+    ]
+   ],
+   "widths": [
+    1.6,
+    4.6
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "6. Factory farming של קוד, וקוד חד-פעמי"
+  },
+  {
+   "kind": "body",
+   "text": "האנלוגיה המרכזית בראיון: היום “we're cutting down corn with scythes”, ובשנה הבאה עוברים לקומביין. Claude Code, AMP, Codex ו-Cline הם “all equally bad”, כמו מסור חשמלי: בעל מקצוע טוב עושה איתם הרבה, ואפשר גם לכרות בהם רגל. השלב הבא הוא מכונה שיודעת להריץ את Claude Code ולפצל את העבודה ל-plan, implement, review ו-test [18:17]. לדבריו זה כבר פותח תכנות ללא-מתכנתים, וחברות מתחילות לחשוב שגודל הצוות האידיאלי הוא שניים-שלושה אנשים. כשקוד הוא כבר לא צוואר הבקבוק, מבנה הניהול משתנה. הוא צופה “massive backlash from the Luddites”.\n\nלביקורת שזה “fine for front end” אבל לא ל-backend או לתשתית, הוא עונה בשני חלקים. הגבול: “Only use these things when Git is your backstop”, ו-“keep prod out” [18:17–19:47]. הטעות: לדעתו הספקנות נשענת על האמונה שהמודלים הפסיקו להשתפר. גם אם זה היה נכון, “We will still get to factory farming code with today's model's capabilities” [19:47]. מכאן נובע ש-“All code and all tools are becoming throwaway”. העיקרון של Joel Spolsky, לא לכתוב מחדש, מתהפך. הוא גילה את זה כשהעביר unit tests מארכיטקטורה אחת לאחרת: לתקן הלך לאט, ולזרוק את הטסטים ולכתוב אותם מחדש עבד מיד [21:22]."
+  },
+  {
+   "kind": "quote",
+   "text": "But we are actually moving into the John Deere era of coding.",
+   "by": "— הדובר (ככל הנראה Steve Yegge) [16:46]"
+  },
+  {
+   "kind": "h1",
+   "text": "7. התעשייה והמודלים: Google, Anthropic, OpenAI ו-open source"
+  },
+  {
+   "kind": "body",
+   "text": "על Google: את מדיניות ה-deprecation, שהוא כעס עליה עד כדי כתיבת פוסט, הם לא שינו. אבל “Google has turned it around on execution”: אחרי 20 שנה שבהן מהנדסים עשו מה שרצו, בחסות המונופול על פרסום, החברה התחילה לדרוש אחריות. זה עלה בחלק מתרבות Google, ועכשיו זה משתלם עם Gemini [22:54]. בשלוש המעבדות הוא רואה כאוס פנימי, כתוצאה בלתי נמנעת מצמיחה מהירה. ב-Anthropic מנהלי המוצר “formed a wall around that chaos”, והם מגייסים “100 plus people” ל-Claude Code. ב-OpenAI היו הרבה עזיבות. Google, לדבריו, היא “a billion monoliths”, ולכן צוות Jules מתקשה להפיץ את המוצר בתוך החברה. לדעתו Anthropic מבצעת קצת יותר טוב, אבל המרוץ צמוד [24:24].\n\nעל open source: כשמודל פתוח יגיע לרמה של Claude Sonnet 3.7 ויורץ דרך Cline, מקבלים משהו ברמה של Claude Code ממרץ, בחינם על M4 מקומי. לדבריו הפער מהמודלים בחזית הוא כשבעה חודשים, כלומר מודלים פתוחים יגיעו לרמת Gemini 3 “next summer”. לכן הכלים יצטרכו לנתב כל משימה למודל בגודל המתאים כדי לחסוך בעלות. המראיין מעלה טענת saturation, ו-Yegge עונה במספרים בלי מקור: פי 4 כל 18 חודשים, נתונים לעוד שני מחזורים, כלומר “16 times smarter in three years” [25:56–27:33]."
+  },
+  {
+   "kind": "quote",
+   "text": "All three of those companies, Google, Anthropic, and OpenAI, are unbelievably chaotic internally right now.",
+   "by": "— הדובר (ככל הנראה Steve Yegge) [24:24]"
+  },
+  {
+   "kind": "h1",
+   "text": "8. מה מהנדס צריך לדעת, וה-AI engineer"
+  },
+  {
+   "kind": "body",
+   "text": "לשאלה אם ילדים צריכים ללמוד לתכנת, התשובה שלו: “Kids should learn to vibe code”, כשהאפשרות לקרוא את הקוד נשארת רשת ביטחון [27:33]. המראיין מוסיף שמי שיודע לתכנת כותב prompts מדויקים יותר. Yegge מחדד: לא syntax, אלא היכרות עם המושגים בלי קשר לשפה, כמו functions, classes ו-monads, ומשם למעלה ברמת החשיבה הארכיטקטונית של product manager. גם Emanuel, מתמטיקאי שלמד הנדסה לבד, יודע מה Cloudflare עושה ומה Apache Cassandra עושה: “That doesn't go away” [29:04].\n\nלקראת הסוף הוא מביא דוגמה לתובנות שמתגלות עכשיו: agents גרועים בקריאה ל-MCP tools כי לא אומנו מספיק על tool calls, אבל אומנו הרבה על כתיבת קוד. לכן מבקשים מהם לכתוב קוד שקורא ל-tool. בתמליל זה מופיע כ-“Code MCP”, והשם המדויק לא ברור. לדבריו Cloudflare גילו את זה קודם ו-Anthropic אישרו. המראיין מגדיר AI engineer כמי ששולט ב-LLMs דרך שימוש ולא דרך אימון, ומשווה לנהגי F1 שלא בונים את המכונית [30:35]. Yegge מסיים ב-“Tech is fun again”."
+  },
+  {
+   "kind": "quote",
+   "text": "So you tell them, don't call the tool, write code to call the tool, and they do way better with it",
+   "by": "— הדובר (ככל הנראה Steve Yegge) [29:04]"
+  },
+  {
+   "kind": "h1",
+   "text": "9. מסקנות ופעולות"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "לנסות שוב, עם גבולות: ",
+     "להריץ agent coding (Claude Code, AMP, Codex) על repo שיש לו Git backstop, ולהשאיר את prod מחוץ להישג יד של ה-agent."
+    ],
+    [
+     "לא לבטוח ב-hot hand: ",
+     "רצף הצלחות הוא לא סיבה להרחיב הרשאות. ה-agent שינה סיסמה ונעל משתמשים ברגע של ביטחון יתר."
+    ],
+    [
+     "ה-IDE בשביל ה-AI: ",
+     "להשאיר את IntelliJ פתוח בשביל ה-indexing וה-incremental build, ולשקול לחשוף את ה-LSP דרך MCP server."
+    ],
+    [
+     "לתרגל קריאת diffs: ",
+     "diff ארוך או “יותר מדי קוד לבעיה” הם סימן שצריך review."
+    ],
+    [
+     "לבודד agents: ",
+     "worktree או clone לכל agent, או file reservations אם עובדים לבד ועם מעט agents."
+    ],
+    [
+     "לתכנן את ה-merge מראש: ",
+     "להכניס שינויים בסדר סדרתי, לסכם על התשתית לפני שינוי ארכיטקטוני, ולבדוק merge queue ו-stacked diffs."
+    ],
+    [
+     "לנתב החלטות פשוטות למודל זול: ",
+     "החלטות של “איזו משימה קודם” לא דורשות מודל חזית."
+    ],
+    [
+     "לנסות קוד במקום tool calls: ",
+     "לבקש מה-agent לכתוב קוד שקורא ל-MCP tool, ולשקול rewrite מאפס, למשל לטסטים, במקום תיקון איטרטיבי."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "מה עלה בראיון"
+   ],
+   "rows": [
+    [
+     "איך פותרים את ה-merge כשהקוד נוצר בכמויות?",
+     "אין פתרון. הוזכרו תור סדרתי, Graphite, stacked diffs ומהנדס אחד ל-repo"
+    ],
+    [
+     "האם clone משותף עם file reservations עובד גם מעבר למפתח יחיד?",
+     "Yegge מודה שזה עובד עד 12–20 agents למפתח יחיד, ומעבר לזה לא ידוע"
+    ],
+    [
+     "האם המודלים ימשיכו להשתפר או יגיעו לרוויה?",
+     "המראיין טוען לרוויה. Yegge מדבר על פי 4 כל 18 חודשים, בלי מקור"
+    ],
+    [
+     "כמה מהקוד באמת יכול להיות חד-פעמי?",
+     "הדוגמאות הן טסטים וספרייה. על בסיסי נתונים ומערכות ליבה לא נאמר כלום"
+    ],
+    [
+     "איך מודדים איכות כשלא קוראים קוד?",
+     "Beads מוצג כהוכחה, בלי מדדים"
+    ],
+    [
+     "מי הדוברים ומה המקור?",
+     "Yegge מזוהה בצורה משוערת בלבד. המראיין והכנס לא זוהו"
+    ]
+   ],
+   "widths": [
+    2.6,
+    3.6
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "10. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "agentic coding",
+     "פיתוח שבו agent מבצע את כתיבת הקוד, ההרצה והתיקון, והמפתח מכוון ובודק"
+    ],
+    [
+     "vibe coding",
+     "כתיבת תוכנה דרך prompts בלבד, בלי לערוך קוד ידנית"
+    ],
+    [
+     "hot hand",
+     "תחושת רצף הצלחה שמובילה לתת ל-agent יותר הרשאות ממה שצריך"
+    ],
+    [
+     "anthropomorphizing",
+     "ייחוס תכונות אנושיות, כמו הבנה או נאמנות, למודל"
+    ],
+    [
+     "orchestrator",
+     "מערכת שמריצה ומנהלת כמה agents במקביל"
+    ],
+    [
+     "diff",
+     "תצוגת ההבדלים בין גרסאות קוד"
+    ],
+    [
+     "LSP",
+     "Language Server Protocol, שירותי שפה (השלמה, ניווט) שה-IDE מספק"
+    ],
+    [
+     "MCP",
+     "Model Context Protocol, פרוטוקול לחיבור tools ל-agents"
+    ],
+    [
+     "merge queue",
+     "תור שמכניס שינויים לענף הראשי אחד אחרי השני"
+    ],
+    [
+     "stacked diffs",
+     "פירוק שינוי גדול לסדרת שינויים קטנים שנשענים זה על זה"
+    ],
+    [
+     "git worktree",
+     "כמה תיקיות עבודה על אותו repo, כל אחת על ענף משלה"
+    ],
+    [
+     "file reservation",
+     "נעילה זמנית של קובץ על ידי agent אחד כדי למנוע התנגשויות"
+    ],
+    [
+     "factory farming of code",
+     "ייצור קוד בקנה מידה תעשייתי על ידי צבא agents מתוזמר"
+    ],
+    [
+     "backstop",
+     "רשת ביטחון, ובהקשר הזה Git שמאפשר לחזור אחורה"
+    ],
+    [
+     "frontier model",
+     "המודלים המתקדמים ביותר של המעבדות המובילות"
+    ],
+    [
+     "AI engineer",
+     "מהנדס שמומחיותו היא שימוש ב-LLMs, ולא אימון שלהם"
+    ]
+   ],
+   "widths": [
+    1.8,
+    4.4
+   ]
+  }
+ ]
+}

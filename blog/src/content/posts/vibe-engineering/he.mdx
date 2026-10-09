@@ -1,0 +1,148 @@
+---
+title: "Vibe engineering בשישה צעדים: המודל כותב, אתם מחליטים"
+description: "Vibe engineering בפועל: spec עם החלטות פתוחות, AGENTS.md, plan mode, hook שאוכף tests ו-review של ה-diff. שישה צעדים עם קבצים להעתקה."
+lang: he
+key: vibe-engineering
+term: "vibe engineering"
+kind: fieldnotes
+pubDate: 2026-10-09
+tags: ["vibe-engineering", "vibe-coding", "claude-code", "coding-agents", "workflow"]
+hook: "claim"
+cover: photo
+tldr: ["כתבו AGENTS.md עם פקודות tests ו-Definition of done ברורה.", "הוסיפו PostToolUse hook שיוצא עם exit 2 כשה-tests נופלים.", "קראו את ה-diff, לא את הסיכום שה-agent כותב בסוף."]
+hero: /posts/vibe-engineering/hero.jpg
+diagram: /posts/vibe-engineering/diagram.svg
+sources:
+  - { title: "We're Not Vibe Engineering", url: "https://jonathannen.com/not-vibe-engineering", date: "2026-03-24" }
+  - { title: "Vibe Coding vs. Vibe Engineering", url: "https://mfbt.ai/blog/vibe-coding-vs-vibe-engineering", date: "2026-02-20" }
+  - { title: "Path to Vibe Engineering", url: "https://leandronsp.com/articles/path-to-vibe-engineering", date: "2026-05-02" }
+  - { title: "What Is Vibe Engineering? The Future of AI-Driven Software Development", url: "https://www.udacity.com/video/what-is-vibe-engineering", date: "" }
+  - { title: "A Practical Guide to Vibe Engineering", url: "https://pub.towardsai.net/a-practical-guide-to-vibe-engineering-fd0d36f153cf", date: "" }
+  - { title: "AI-assisted coding → Vibe Engineering ← Vibe Coding - Kaushik Gopal's Website", url: "https://kau.sh/blog/vibe-eng", date: "" }
+opinion: "בעינינו vibe engineering זה שם טוב לדבר ישן: spec, tests ו-review, עם מודל בתוך הלולאה. שם הוא לא שיטה, אבל הוא נותן לצוות דרך להגיד \"זה לא vibe coding\" בלי להסביר עשר דקות, וזה שווה משהו. המבחן שלנו הוא יום שני: אם יש לכם hook שנופל ב-exit 2 ו-AGENTS.md עם Definition of done, אתם עושים את זה. אם יש לכם רק מנוי של $100 ומצגת פנימית, לא. וכשמונח מגיע לסרטון של Udacity לפני שיש עליו מאמר רציני אחד, אנחנו מורידים את ההתלהבות חצי טון ומסתכלים על מה שאנשים מריצים בפועל."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+ההבדל בין vibe coding ל-vibe engineering הוא לא מי כותב את הקוד. בשניהם המודל כותב.
+
+קאושיק גופאל שם את זה בטבלה של שתי שורות. שורה אחת: מי מייצר את הקוד. שורה שנייה: מי מחזיק את ה-design ואת ה-quality bar. ב-vibe coding התשובה לשתיהן היא המודל. ב-vibe engineering המודל עדיין מייצר, אבל ה-design נשאר אצלכם. זה כל ההבדל, וזו גם כל העבודה.
+
+קצת רקע. אנדריי קרפתי טבע את vibe coding בציוץ מפברואר 2025: להיכנע לווייב ו"לשכוח שהקוד בכלל קיים". סיימון וויליסון הציע באוקטובר 2025 את vibe engineering בתור הצד השני: מהנדסים מנוסים שעובדים עם agents ונשארים אחראים על מה שיוצא. השם נדבק, וב-2026 כבר יש עליו פוסטים מכל כיוון, וגם סרטון של Udacity.
+
+אז מה זה אומר בפועל, ביום שני? הטעות הנפוצה היא לקנות כלים ולחכות לתוצאה. ב-mfbt קנו לכל המהנדסים מנוי Claude Code של $100 לחודש. אחרי כמה חודשים פיצ'רים גדולים עדיין לקחו שבועות. הסניורים טסו, הג'וניורים חסכו קצת זמן פה ושם, וזהו. ההסבר שלהם: הסניורים קיבלו החלטות מוצר ו-architecture תוך כדי עבודה, והג'וניורים קפאו מול כל חור ב-spec וחיכו לתשובה בסלאק.
+
+בקיצור, הכלי לא היה הבעיה. חסר תהליך. הנה התהליך שאני עובד איתו בקלוד קוד, בשישה צעדים. ב-Codex וב-OpenCode זה כמעט אותו דבר.
+
+## 01 · spec שמסמן מה עוד לא הוחלט
+
+לפני שפותחים טרמינל, כותבים spec קצר. לא מסמך של עשרים עמודים: מה המטרה, מה מחוץ ל-scope, ואיך יודעים שסיימנו. ובעיקר סעיף של החלטות פתוחות.
+
+זה התיקון הישיר לבעיה של mfbt. ה-agent ימצא חורים ב-spec בשלב ה-planning, זה בטוח. השאלה היא אם החור נופל על ג'וניור שקופא, או שכבר כתוב מה ברירת המחדל ומי מאשר.
+
+מה עושים: קובץ `specs/<feature>.md` עם שלוש כותרות — `Goal`, `Done when`, `Open decisions`. ליד כל החלטה פתוחה כותבים ברירת מחדל ושם של בן אדם. למשל: `pagination: cursor (default), ask Dana if offset is needed`.
+
+מה רואים: ה-spec הראשון שלכם ייצא עם 2–3 החלטות פתוחות שלא ידעתם שקיימות. יפה. מצאתם אותן לפני הקוד, לא בסלאק אחרי.
+
+<figure><img src="/posts/vibe-engineering/src2.jpg" alt="$100 לחודש למהנדס לא קנו תהליך: הסניורים טסו והג'וניורים קפאו מול חורים ב-spec (credit: mfbt.ai)" loading="lazy" /><figcaption>$100 לחודש למהנדס לא קנו תהליך: הסניורים טסו והג'וניורים קפאו מול חורים ב-spec (credit: mfbt.ai)</figcaption></figure>
+
+## 02 · AGENTS.md: מה ה-agent צריך לדעת בכל session
+
+כל session מתחיל מאפס. מה שלא כתוב, ה-agent ינחש. אז שמים בשורש ה-repo קובץ `AGENTS.md`. Codex ו-OpenCode קוראים אותו לבד. קלוד קוד קורא `CLAUDE.md`, אז שמים בו שורה אחת: `@AGENTS.md`.
+
+מה נכנס: פקודות, Definition of done, איפה לא נוגעים, ומה עושים כשה-spec לא ברור. מה לא נכנס: הטפות. "כתוב קוד נקי" לא עוזר לאף אחד. פקודה עוזרת.
+
+```md title="AGENTS.md"
+# Rules for coding agents
+
+<figure><img src="/posts/vibe-engineering/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+## Commands
+- Install: npm ci
+- Typecheck: npm run typecheck
+- Tests: npm test
+- Lint: npm run lint -- --fix
+
+## Definition of done
+- Typecheck, tests and lint pass locally. Paste the last 5 lines of test output.
+- No new dependency without asking.
+- Diff under ~300 lines. If bigger, stop and propose a split.
+
+## Don't touch without asking
+- migrations/
+- src/shared/types.ts (other modules depend on these shapes)
+
+## When the spec is unclear
+- Open decision with no default: stop and ask.
+- Open decision with a default: use it, list it in the PR description.
+```
+
+השורה על `types.ts` היא לא סתם. היא באה מהסיפור של הצעד הבא.
+
+## 03 · תוכנית בכתב לפני שורת קוד אחת
+
+קאמן ז'קוב כתב על זה בינואר 2026. הוא ביקש מ-OpenCode פיצ'ר ל-Puppypal, אפליקציה שהוא בונה לאילוף הגור שלו. ה-agent עשה בערך תריסר שינויים והודיע שסיים. בפועל הוא לא סיים, וגם שבר פיצ'רים אחרים, כי שינה data structures שחלקים אחרים בקוד השתמשו בהם. ז'קוב עשה `git reset` והתחיל מחדש, הפעם עם תהליך.
+
+> The difference is usually not the model, but rather whether I treated it like a slot machine or like a fellow engineer.
+> — Kamen Zhekov, A Practical Guide to Vibe Engineering
+
+מה עושים: בקלוד קוד נכנסים ל-plan mode עם Shift+Tab פעמיים. ה-agent קורא קוד ולא נוגע בו. מבקשים שהתוכנית תכלול רשימת קבצים שישתנו, וגם מי עוד משתמש בכל טיפוס שמשנה צורה. קוראים, מתקנים, ורק אז מאשרים.
+
+מה רואים: התוכנית הראשונה כמעט תמיד נוגעת ביותר קבצים ממה שציפיתם. זה הרגע הכי זול לתפוס את זה. דקה של קריאה, במקום ערב של debug.
+
+## 04 · ה-agent לא מחליט מתי הוא סיים
+
+"סיימתי" של agent זה לא נתון, זה ניחוש. מה שאפשר לבדוק בקוד, בודקים בקוד. לא מבקשים מהמודל לזכור.
+
+בקלוד קוד עושים את זה עם hook מסוג `PostToolUse`, שרץ אחרי כל עריכה. אם typecheck או tests נופלים, ה-hook יוצא עם קוד 2, וה-stderr חוזר למודל. הוא רואה את השגיאה ומתקן לפני שזה בכלל מגיע אליכם.
+
+```json title=".claude/settings.json"
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run -s typecheck 1>&2 && npm test -s 1>&2 || exit 2",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+מה רואים: בהתחלה זה מאט. כל עריכה מחכה ל-tests. אם ה-suite לוקח יותר מ-30 שניות, תריצו רק את ה-tests של החבילה שהשתנתה, אחרת ה-session מתברבר בהמתנות. ב-Codex וב-OpenCode שמים את אותו כלל ב-AGENTS.md, אבל שם זה חלש יותר: שם זו בקשה, פה זו אכיפה.
+
+> **הדעה שלי:** אם הייתי צריך לבחור צעד אחד מתוך השישה, זה הוא. spec אפשר לכתוב רע ותוכנית אפשר לאשר בלי לקרוא, אבל typecheck שנופל לא מתווכח איתכם.
+
+<figure><img src="/posts/vibe-engineering/v2-svg-he.jpg" alt="ה-agent לא מכריז שסיים: קוד 2 מחזיר את השגיאה אליו, ורק עריכה ירוקה מגיעה ל-commit ולעיניים שלכם (Claude Code hooks)" loading="lazy" /><figcaption>ה-agent לא מכריז שסיים: קוד 2 מחזיר את השגיאה אליו, ורק עריכה ירוקה מגיעה ל-commit ולעיניים שלכם (Claude Code hooks)</figcaption></figure>
+
+## 05 · branch לכל משימה, ו-reset בלי רגשות
+
+commit אחרי כל צעד שעבר את ה-hook. ככה ה-`git reset` של ז'קוב עולה דקה ולא יום.
+
+מה עושים: `git switch -c agent/search-pagination` בתחילת משימה. `git diff --stat main` לפני review, ואם יש שם יותר מ-300 שורות, עוצרים ומפצלים. ואם משהו התברבר, `git reset --hard` ל-commit הירוק האחרון, רק על ה-branch של ה-agent.
+
+עוד כלל: אם ה-agent נכשל פעמיים על אותו דבר, לא מנסים פעם שלישית באותה שיחה. reset, מעדכנים את ה-spec במה שלמדתם, ופותחים שיחה חדשה. שיחה ארוכה עולה יותר בכל הודעה וגם עונה פחות טוב.
+
+מה רואים: הרבה commits קטנים עם הודעות של ה-agent. זה בסדר. עושים squash ב-merge.
+
+## 06 · קוראים את ה-diff, לא את הסיכום
+
+הסיכום שה-agent כותב בסוף הוא שיווק. ה-diff הוא מה שקרה. פה ה-design נשאר שלכם, וזו בדיוק השורה השנייה בטבלה של גופאל.
+
+מה עושים: עוברים על ה-diff עם אותן שאלות כל פעם. נוצרה abstraction שלא ביקשתי? השמות מתאימים לשאר הקוד? יש טיפוס ששינה צורה? לפני שאתם נכנסים, אפשר להריץ מודל שני כ-reviewer עם ה-spec ביד: "מה מתוך Done when לא מכוסה ב-tests?". הוא לא מחליף אתכם, הוא מסנן.
+
+ליאנדרו (leandronsp) כתב במאי 2026 שזה לא עניין של מהירות, אלא של ביטחון. אני מסכים. הצעדים האלה לא יהפכו אתכם למהירים יותר כבר ביום הראשון. אבל תעשו merge בלי לחשוש.
+
+<figure><img src="/posts/vibe-engineering/src6.jpg" alt="אותו מודל כותב את הקוד בשני המקרים, ו-vibe engineering מתחיל כשה-design חוזר אליכם (credit: Kaushik Gopal)" loading="lazy" /><figcaption>אותו מודל כותב את הקוד בשני המקרים, ו-vibe engineering מתחיל כשה-design חוזר אליכם (credit: Kaushik Gopal)</figcaption></figure>
+
+## מה לקחת
+
+- כל spec מגיע עם סעיף `Open decisions`, וליד כל החלטה ברירת מחדל ושם.
+- `AGENTS.md` בשורש כל repo: פקודות, Definition of done, ומה אסור לגעת בו.
+- tests ו-typecheck רצים מ-hook, לא מהזיכרון של המודל.
+- מי שלא קורא את ה-diff עושה vibe coding, גם אם עשה את כל השאר.

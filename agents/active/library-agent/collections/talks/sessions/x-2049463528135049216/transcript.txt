@@ -1,0 +1,585 @@
+[0:00] Let's get started. Welcome everyone to Cloud Code Best Practices. In this talk, I'm going to talk
+[0:08] about kind of what Cloud Code is at a high level. Then we'll peer under the hood a little bit to
+[0:14] kind of understand how Cloud Code works. And then knowing that, because it's useful to kind of know
+[0:19] how your tools work, we're going to talk about good use cases for Cloud Code and also best
+[0:24] practices we've figured out both internally and from our users for getting the most out of this
+[0:31] tool. But before I get started, I'd like to introduce myself real quick and talk about how
+[0:36] I ended up on the stage. So my name's Cal, and I joined Anthropic about a year and a half ago
+[0:41] to help start up a team we call Applied AI. And it's the Applied AI's kind of mission,
+[0:48] our team's mission, is to help our customers and partners build great products and features on top
+[0:53] of Claude. So what that really means is I spend a lot of my day prompting Claude to get the absolute
+[1:00] best outputs out of these models. That said, I also love to code, and I'm definitely one of those
+[1:05] coders that starts a lot of projects, has some crazy idea, and that just never finishes them.
+[1:11] So I have this graveyard of just like code that I started, never really finished, but I'm always
+[1:16] spinning new things up. And late last year, I was in Slack, and I was hearing about this new tool
+[1:21] that a few people are using.
+[1:22] They're saying it was really cool.
+[1:24] And so on a Friday night,
+[1:25] I downloaded the tool that would become Cloud Code
+[1:27] and I threw it at this kind of new note-taking app
+[1:30] that I wanted to build.
+[1:32] And like that whole weekend,
+[1:33] just kind of totally changed the way that I code
+[1:36] and think about software engineering.
+[1:38] I was carrying around my laptop with me all weekend.
+[1:40] I was super addicted to just watching Cloud Code work
+[1:43] and I would press enter
+[1:45] and I'd switch over to my browser and refresh
+[1:47] and I watched this huge, powerful application
+[1:50] come together in front of my eyes.
+[1:52] And I got way farther into this thing
+[1:54] than I ever would have on my own.
+[1:56] And it just blew my mind.
+[1:58] And while I was doing this, I was a little worried.
+[2:00] I was like, you know, I kind of know how these things work.
+[2:03] So I'm like, man, I'm using a lot of tokens.
+[2:05] I hope I don't get in trouble or anyone notices.
+[2:07] I'm not really contributing to Anthropic code.
+[2:10] But what I didn't know is that the Cloud Code team
+[2:13] had built this internal leaderboard,
+[2:16] tracking how much all the Anthropic employees were using this.
+[2:19] And over the weekend, I had shot to the top.
+[2:22] And so through that, I got to meet Boris and Kat
+[2:24] and some of the early Cloud Code team.
+[2:26] And I was able to start talking to them and say,
+[2:29] hey, I love this tool.
+[2:30] I also know a lot about prompting.
+[2:32] Can I help you all out?
+[2:34] And so through that, I got involved.
+[2:36] And now I'm one of the core contributors on the team.
+[2:39] And I do a lot of, I work a lot on the prompting,
+[2:42] the system prompts, how the tools work,
+[2:44] the tool descriptions and tool results,
+[2:46] as well as I work on how we evaluate this tool.
+[2:49] So when we think about changing the prompts,
+[2:51] how do we know we made things better or the same
+[2:54] and we didn't totally ruin Cloud Code?
+[2:57] So with that said, let's kind of dive in.
+[3:00] So here's my current mental model of Cloud Code
+[3:02] and how I describe it to people when people ask me.
+[3:07] Cloud Code is like that coworker
+[3:09] that does everything on the terminal.
+[3:12] It's the sort of person that just never touches the GUI.
+[3:14] They're a whiz.
+[3:15] I think of when I was a junior engineer,
+[3:18] I had this mentor, and I would walk over his desk,
+[3:20] and I would say, hey, Tony, can you help me with this bug?
+[3:23] And he would whip it over his terminal,
+[3:25] and he'd be doing all these crazy bash commands
+[3:28] and changing things around at Vim.
+[3:29] And I'd always walk away thinking, wow, that was crazy.
+[3:32] I should learn how to do that.
+[3:34] I never did.
+[3:35] But having Cloud Code on your computer
+[3:38] is kind of like having Tony next to you all the time.
+[3:41] So how does Cloud Code kind of work under the hood?
+[3:49] At Anthropic, we try to always do what we call the simple thing that works.
+[3:55] And what that means for Cloud Code is it's what we would consider a very pure agent.
+[4:01] And Anthropic, when we talk about agents, what we really mean is some instructions,
+[4:07] some powerful tools, and you let the model just run in a loop
+[4:11] until it decides it's done.
+[4:13] And that's really what Cloud Code is.
+[4:15] So it's tools, powerful tools, and the tools
+[4:18] that someone that was really good at a terminal
+[4:21] would be able to use, tools to create and edit files
+[4:24] to use the terminal.
+[4:25] And then you can also do things like pull in other things
+[4:27] with MCP.
+[4:29] Now, on top of that, there's how Cloud understands the code
+[4:34] base.
+[4:35] And if you're going to build a coding agent or a coding tool
+[4:38] a year ago, you'd probably have ideas like, well, OK,
+[4:42] I'm going to get this user message
+[4:44] about something about this code base,
+[4:46] and I'll need to figure out which files are relevant.
+[4:48] So maybe I'll index the whole code base and embed it
+[4:51] and do this fancy, like, kind of rag retrieval thing.
+[4:55] That is not how Cloud Code works.
+[4:56] We don't do any sort of indexing.
+[4:58] Instead, Cloud kind of explores and understands
+[5:02] a code base how you, if you were new to a team
+[5:05] and new to a code base, would explore a code base.
+[5:07] And that is through a Gentic search.
+[5:10] It's the same sort of search tools you or I would use,
+[5:12] things like Glob and Grep and Find.
+[5:15] And it can work its way through a code base
+[5:17] and understand what's going on.
+[5:19] And when we talk about a Gentic search,
+[5:21] that really means the model can go do some searches.
+[5:24] And then it can look at the results and say,
+[5:26] hmm, maybe I need to figure out a few more things.
+[5:28] I'm going to go do some more searching and then come back.
+[5:32] And then on top of these primitives, on top of this agent,
+[5:35] we have a few things.
+[5:36] We have a very nice light UI layer where
+[5:39] you're going to watch Cloud Code work.
+[5:41] You see all the text fly by.
+[5:43] And we have this nice permission system
+[5:45] that allows the agent to work and allows and kind of forces
+[5:49] the human to butt in when the agent is doing something
+[5:51] dangerous.
+[5:53] And then on top of that, we also care a lot
+[5:54] about security in this tool.
+[5:56] And so because Cloud Code is just
+[5:58] such a lightweight kind of layer on top of the model,
+[6:03] and the fact that our model is available not just
+[6:05] behind Anthropic APIs, but also with our cloud providers,
+[6:08] AWS and GCP, it's very easy and native
+[6:12] to point Cloud Code at one of these other services
+[6:15] if you feel more comfortable consuming Cloud that way.
+[6:20] Now, a lot of people ask me, hey, Kel,
+[6:23] what can I use Cloud Code for?
+[6:25] Like, what is it good at?
+[6:26] Where is it interesting?
+[6:27] And the reality is, it's kind of great at everything.
+[6:32] So let's start with discovery.
+[6:35] Oftentimes in your career, you will
+[6:38] be dropped into a new code base, whether that
+[6:40] means you're switching teams, you're switching companies,
+[6:43] I don't know, you're starting to work
+[6:44] on some sort of open source project.
+[6:46] And probably when you're first getting started
+[6:48] and getting familiar, not very productive,
+[6:50] because you're just trying to figure out where things
+[6:52] are in the code base, what patterns the team is using,
+[6:54] things like that.
+[6:56] And Claude code can kind of help supercharge
+[6:58] that onboarding process.
+[7:00] You can ask Claude, hey, where is this feature implemented?
+[7:04] Or since it's great at the terminal,
+[7:05] you can say, hey, look at this file,
+[7:07] and look at the git history, and just kind of tell me
+[7:09] a story about how this code has changed
+[7:11] over the past couple of weeks.
+[7:15] One thing you can use Claude code for,
+[7:16] and I think this is underrated, is instead of just diving in
+[7:20] and starting to work, you can use Claude code as a thought
+[7:22] partner.
+[7:23] So oftentimes, when I'm working with Claude,
+[7:25] and I want to implement a feature,
+[7:27] or we're going to change something up,
+[7:28] I'll open up Claude and I'll say, hey Claude,
+[7:31] you know, I'm thinking about implementing this feature.
+[7:33] Can you just kind of like search around and kind of figure out
+[7:36] how we would do it and maybe report back with like two
+[7:38] or three different options?
+[7:40] Don't start working.
+[7:41] Don't start writing any files yet.
+[7:44] And Claude will go off and use those agentic search capabilities
+[7:47] and come back with a few ideas.
+[7:49] And then I can work with Claude to kind of validate things.
+[7:52] And then we can jump into the project.
+[7:55] Of course, Cloud Code is great at building and writing code.
+[7:58] And I would say this on two different fronts.
+[8:01] One, it can do the zero to one sort of stuff.
+[8:03] You drop it in an empty directory,
+[8:05] and you say, hey, build me an app, build me a game.
+[8:07] That demos very well.
+[8:09] It's very fun to do.
+[8:10] It's very gratifying.
+[8:12] Of course, in reality, what really matters
+[8:14] is Cloud Code good working in existing code bases.
+[8:17] And this is primarily what we focus on.
+[8:22] and the Cloud Code team, we have in our code base
+[8:25] abnormally high, I would say, unit test coverage.
+[8:29] And that's because Cloud Code makes it so easy and just
+[8:33] straightforward to add unit tests.
+[8:36] So we have great code coverage.
+[8:37] And then the other thing we have in Cloud Code,
+[8:39] in our own code base, is we have great commits and PR messages.
+[8:42] Because when we finish working, we'll just say, hey,
+[8:44] Cloud, write the commit for me.
+[8:45] Write the PR message for me.
+[8:48] We also see great opportunities to use Cloud Code
+[8:52] in kind of the deployments and in other parts
+[8:56] of the lifecycle.
+[8:57] And this is a few other people have talked about this,
+[8:59] but this is using the Cloud Code SDK.
+[9:02] So using it headlessly, using it programmatically,
+[9:05] being able to sprinkle in a coding agent anywhere.
+[9:11] And so that's things like sprinkling it into CI, CD,
+[9:13] to use it in GitHub, for instance,
+[9:15] to help people programmatically.
+[9:19] And then finally, it's great with support and scale.
+[9:22] It can help you debug errors faster.
+[9:25] One thing that we saw when we started giving Cloud Code
+[9:28] to customers and talking to them about it,
+[9:30] we didn't totally predict this.
+[9:31] It was a lot of customers or potential customers
+[9:33] said, hey, we've been putting off this large code-based
+[9:37] migration.
+[9:38] People that are on old versions of Java
+[9:40] trying to get to a new one, or a team that's on PHP
+[9:44] and they're trying to get to React or Angular.
+[9:46] We've talked to multiple teams like this.
+[9:48] And having a tool like Cloud Code makes projects like that
+[9:52] a little more digestible when you go to your team and you say,
+[9:54] hey, we're going to spend a month refactoring or rewriting
+[9:57] large parts of the code base.
+[10:01] And then on top of that, and this kind of matters
+[10:03] across all these, is once again, remember,
+[10:06] Cloud is great at the terminal.
+[10:08] And that means it's going to be great at all
+[10:10] those different CLI tools, things like Git, Docker, BigQuery,
+[10:13] things like that.
+[10:15] I never have to worry about, oh, I'm going to get myself,
+[10:17] how do I get myself out of this sticky rebase?
+[10:20] I'll just fire up Claude code and tell it the situation
+[10:23] and be like, hey, can you fix this for me?
+[10:25] It's incredible.
+[10:27] Now let's talk about best practices.
+[10:31] And the first one is not going to be a surprise,
+[10:34] but the first one is use Claude.md files.
+[10:38] So remember that Claude code, like I said, is an agent,
+[10:41] and it has some tools.
+[10:43] It has some lightweight instructions in the prompt,
+[10:45] but it doesn't really have memory.
+[10:47] And so the main way we share state across sessions
+[10:52] or across our team when we fire up Cloud Code
+[10:54] in the same code base over and over again
+[10:57] is this Cloud.md file.
+[10:59] So when we start Cloud, what happens
+[11:01] is if there's this Cloud.md file in the working directory,
+[11:04] it's just plopped into context.
+[11:06] It's plopped into the prompt.
+[11:07] And basically what it says is, hey, Cloud, by the way,
+[11:10] these are important instructions the developer
+[11:12] left for you, be sure to pay close attention to this.
+[11:16] And there's various places you can put the Cloud.nmd file.
+[11:18] You can put it in a project and check it in
+[11:21] so all your teammates share it.
+[11:22] You could put one in your home directory
+[11:24] if there's things you just want Cloud to always know about,
+[11:26] regardless of what you're working on.
+[11:29] And the things you put in here are things like, hey, by the way,
+[11:32] maybe this is how you run the unit tests.
+[11:34] Or just so you know, to make your searching and life easier,
+[11:38] here's just an overview of how this project is laid out,
+[11:42] where the tests live, what different modules are,
+[11:44] things like that.
+[11:45] Or here's our style guide, all sorts of things
+[11:48] like that to just make Claude's life a bit easier.
+[11:51] And you can build these things up over time.
+[11:56] The other thing you can do, which is important,
+[11:57] is permission management.
+[11:59] When you're running Claude code, there's
+[12:01] all sorts of different kind of permission things flying by.
+[12:04] Kind of out of the box, what happens when you start our tool
+[12:07] is for read actions.
+[12:09] If Claude is searching or reading,
+[12:11] We just let it go.
+[12:13] But once it starts writing or running bash commands
+[12:16] or doing things that could change stuff on your machine,
+[12:19] potentially, that's when we kick in this UI
+[12:22] and it says something like, yes, yes, always allow this,
+[12:26] or no, I want to do something else.
+[12:30] And using that permission management and being smart about
+[12:33] it can help you work faster.
+[12:35] So there's something called auto accept mode,
+[12:37] where if you're working with Cloud Code and you press Shift
+[12:39] tab, Claude will just start working.
+[12:42] There's things you can do, like you can configure Claude
+[12:45] in the settings where specific commands, like on Bash,
+[12:48] like if you just are tired of saying, yes, run NPM run test,
+[12:53] you can just always approve that.
+[12:55] So fiddling with your permission management
+[12:57] is a great way to speed up your workflow.
+[13:00] Integration setup.
+[13:02] So one thing that is going to help you
+[13:04] get the most out of Claude code is remember
+[13:06] that it's great at the terminal.
+[13:08] And if there's applications that you use which
+[13:11] have kind of a way to access them through CLI,
+[13:13] and GitHub is a great example of that,
+[13:15] they have a powerful tool called GH,
+[13:18] you can basically give more work to Cloud Code.
+[13:21] And you can do that either by just installing more CLI tools
+[13:25] or you can attach more MCP servers.
+[13:29] I would say just through experience
+[13:31] that if you're using something like a CLI tool that's
+[13:35] well-known and well-documented, and you're
+[13:37] trying to choose between the CLI tool
+[13:39] and just installing it on your machine
+[13:41] and grabbing an MCP server, I would recommend using
+[13:44] the CLI tool.
+[13:46] And then also, if you internally have your own tools,
+[13:51] at Anthropic we have something called
+[13:52] Koo that does a whole bunch of stuff for us.
+[13:54] You can also tell Claude about that.
+[13:56] And that's the sort of thing you'd put in Claude.md.
+[14:00] And then context management.
+[14:02] So remember that Claude is an agent.
+[14:05] And what it does, it calls these tools.
+[14:09] And the context builds up and up over time.
+[14:11] And at least for Anthropic, our models
+[14:13] have a context window of 200,000 tokens.
+[14:15] And you can max this thing out.
+[14:17] So you kind of have two options when
+[14:19] you're in a long session with Claude,
+[14:21] and you're working, and you're going back and forth.
+[14:24] You'll see in the bottom right, you'll
+[14:25] start to get this little warning that'll say, hey,
+[14:27] you're starting to fill up the context window.
+[14:29] And kind of depending on what's going on,
+[14:31] you have two options.
+[14:32] You can run slash clear and just start over.
+[14:34] and that clears everything out except for, for instance,
+[14:37] Claude.md.
+[14:39] Or you can run slash compact.
+[14:41] And what will happen is basically
+[14:42] it's like a user message is inserted.
+[14:45] And it just says something like, hey, I need to go summarize
+[14:48] everything we've been up to.
+[14:50] I'm going to give this to another developer,
+[14:51] and they're going to pick up where I left off.
+[14:54] And then that summary is what kind of seeds the next session.
+[14:56] And you can go from there.
+[14:57] We spend a lot of time tuning this kind of compact
+[15:00] functionality so that as you max out the context window
+[15:03] and then run compact, you can start back over and keep going.
+[15:09] Efficient workflows.
+[15:10] What can you do with Cloud Code?
+[15:12] And how do you get the most out of it?
+[15:13] So using planning and to-dos.
+[15:15] I talked a little bit about this before.
+[15:17] But one of the best things you can do
+[15:19] is when you open up Cloud Code, instead of saying, hey,
+[15:21] I need you to fix this bug, you can say, hey, I have this bug.
+[15:26] Can you search around, figure out what's causing it,
+[15:28] and just tell me a plan how we're going to fix it?
+[15:30] And this can save you a lot of time,
+[15:32] because you can verify.
+[15:34] You can read Claude's plan, and you can verify
+[15:36] what it's going to do.
+[15:37] And then the other thing that we have
+[15:39] is we have this to-do list feature.
+[15:41] So often when Claude's working on a big task,
+[15:44] it'll create a to-do list.
+[15:46] And if you're kind of paying attention,
+[15:48] you can kind of watch this to-do list.
+[15:50] And if you see anything kind of weirder in there
+[15:52] or something that doesn't make sense,
+[15:53] that's when you can press escape and say, hey, Claude,
+[15:55] let's change the to-do list.
+[15:57] I think you're on the wrong path.
+[15:59] Smart vibe coding.
+[16:00] So it's very tempting and it's very powerful
+[16:03] to just let Cloud work and press Enter
+[16:05] and see what happens at the end.
+[16:07] I think there's a few things that can help make this better.
+[16:09] And there's, I think, a talk later today
+[16:11] about just this for 30 minutes.
+[16:14] But doing things like having test-driven development,
+[16:17] having Cloud make small changes, run the tests,
+[16:19] make sure they pass, always having
+[16:22] Cloud do things like check the TypeScript and the linting,
+[16:25] and then commit regularly so that if it's
+[16:27] kind of going off the rails, you can always fall back
+[16:29] and try again.
+[16:31] You can use screenshots to guide and debug.
+[16:34] So Claude is built on top of our models, which
+[16:36] are multimodal.
+[16:38] You can always just grab a screenshot, paste it in.
+[16:40] Or if you have a file somewhere that's an image,
+[16:42] you can just say, hey, Claude, look at this mock.png,
+[16:46] and then build the website for me, or whatever.
+[16:50] And then advanced techniques.
+[16:51] So as you're getting used to using Claude,
+[16:54] what are some things you can think
+[16:55] about to kind of push things to the next level?
+[16:58] And one of the things we see, both internally and with
+[17:01] customers, is when you've started to use this tool
+[17:04] for a while, it's going to be very tempting to use multiple
+[17:07] clods at once.
+[17:09] And so I know people at Anthropic and a few customers
+[17:11] that run four clods at the same time.
+[17:13] There's various ways to do this.
+[17:16] You can have it in Tmux or just different tabs,
+[17:19] all sorts of crazy things.
+[17:20] So I would challenge you to try getting multiple clods running
+[17:24] at once and kind of be orchestrating all these things.
+[17:26] It's quite fun.
+[17:27] I can only do two, but I know people that do four.
+[17:31] Use escape.
+[17:32] So escape is your best friend.
+[17:35] While Claude is working, you can kind of keep an eye
+[17:38] on what it's up to, and you can press escape to stop it
+[17:41] and interject and say, hey, I think
+[17:43] you're going on the wrong path, or I
+[17:44] want you to do something else.
+[17:46] Knowing when the right time to press escape
+[17:48] is versus just letting Claude figure it out
+[17:50] is key to getting the most out of the tool.
+[17:53] And there's a hidden feature.
+[17:54] Not too many people know about it.
+[17:56] But if you press escape twice, you can actually
+[17:58] jump back in your conversation.
+[18:00] You can go back and you can kind of reset.
+[18:04] Tool expansion and MCP.
+[18:06] So this is taking it to the next level.
+[18:07] If you feel like with Bash and with the tools that Claude has
+[18:11] that it still can't do something,
+[18:13] this is when you should start looking at MCP servers.
+[18:17] And then headless automation.
+[18:18] I think this is a thing we're most excited about.
+[18:20] But also, we are still trying to wrap our heads around
+[18:23] internally, which is how can we use Claude programmatically.
+[18:28] We have that in GitHub Actions.
+[18:29] We want to figure out other creative places
+[18:32] we can start using it.
+[18:33] I would challenge you all to do the same.
+[18:38] So with that said, I'm going to jump over to my computer,
+[18:42] because there's one other best practice, which
+[18:45] is it's always good to stay on top of everything that's new.
+[18:49] So we're shipping super fast.
+[18:51] I'm just going to go over a few things
+[18:53] that are new as of today.
+[18:56] One thing is when you're in Cloud now and you fire it up,
+[18:59] you can do slash model.
+[19:00] You can see what model you're running on.
+[19:02] I'm on default, which happens to be Sonnet.
+[19:04] We can jump over to Opus.
+[19:06] You can do the same thing in slash config.
+[19:09] Switch it here.
+[19:13] So that's new.
+[19:13] Make sure you're running the model that works for you.
+[19:16] There's another thing that's new about these models, which
+[19:19] You can say something like, can you figure out what's in this project?
+[19:25] And for a while, we've had this think hard or extended thinking.
+[19:31] Now, this is great, but with our past models, we wouldn't let our model think between tool calls.
+[19:37] And that's probably when the thinking matters most.
+[19:39] So starting with Cloud4, our models now think between tool calls.
+[19:44] And we can watch this happen.
+[19:45] So we have Cloud in this project.
+[19:46] There's a few different files in here.
+[19:48] and I'm just going to tell it to think hard and figure out
+[19:51] what's in this project.
+[19:52] And we can watch Claude start to work.
+[19:54] And so the way you know you triggered thinking
+[19:57] is you'll see kind of this lighter gray text.
+[19:59] And then it'll call some file.
+[20:01] It'll call some tools.
+[20:02] It'll read some stuff.
+[20:03] And then we see some more thinking.
+[20:05] And this is awesome.
+[20:08] So I encourage you, when you're working on tasks and solving
+[20:10] bugs, throw a think hard in there.
+[20:14] And then the other thing, and you know what?
+[20:17] we'll just throw it up real quick, is I have this in VS Code.
+[20:21] But of course, this is in JetBrains as well.
+[20:23] But we have these new great integrations with VS Code
+[20:27] and JetBrains.
+[20:29] We can do things like Claude's going to know what file I'm in.
+[20:32] What file am I in?
+[20:36] That is not what I meant to say, but Claude's
+[20:38] going to figure it out.
+[20:40] And you can do things like this.
+[20:47] So these are the sort of things I would encourage you to stay on top of.
+[20:56] We have a public kind of GitHub project called Cloud Code under Anthropic.
+[21:02] You can post issues there, but we also post our changelog there.
+[21:05] And so I check this once a week and make sure that I'm on top of all the new stuff we're
+[21:09] shipping because even I can't keep up with it.
+[21:12] So with that said, we have like four minutes left.
+[21:15] I'm happy to answer questions about anything
+[21:17] Cloud code related.
+[21:18] We have it here.
+[21:19] I can live demo some stuff if you're interested.
+[21:23] Let's do a few.
+[21:24] Let's do him first, and then you.
+[21:27] Thanks, real quick.
+[21:28] This might be obvious, but multiple Cloud.md files
+[21:32] in a project?
+[21:34] I presume that's possible, and it just figures it out, or no?
+[21:37] So there's a few options.
+[21:39] Of course, in the same directory, you couldn't.
+[21:45] but you could have one here and one in a subdirectory.
+[21:51] And I think we changed this so that all the subdirectory ones
+[21:54] aren't read in because like Anthropic,
+[21:56] we have a monorepo and people would open it at the top
+[21:59] and blow up their context with all the CloudMDs.
+[22:02] So we encourage Cloud when it's searching around
+[22:05] and it discovers Cloud.MD files in child directories
+[22:10] that are relevant to be sure to read them.
+[22:12] But by default, it just reads the cloud.md file
+[22:15] in the current working directory when you fire it up.
+[22:18] And then also you can set one in your home directory.
+[22:21] There are things you can do, though.
+[22:23] We have this new thing.
+[22:25] Like in your cloud.md, you can start referencing other files.
+[22:29] So you could, for instance, do something
+[22:32] like this with an at sign.
+[22:35] If you have other cloud.md files that you just kind of know
+[22:37] you always want to read in, to do something like that.
+[22:42] Hi, OK.
+[22:44] I have not had luck getting Claude to respect my Claude MD.
+[22:49] There's one thing particular where I'll ask it to refactor
+[22:52] something, and then it will leave inline comments explaining
+[22:55] the what of it is, and it's something that's extremely
+[22:59] obvious.
+[23:00] And so I'll tell it, go and remove any inline comments
+[23:03] that describe the what of what's happening,
+[23:05] and then it will remove it, and then immediately do it again
+[23:07] in the same path.
+[23:08] So do you have any strategies for dealing with that?
+[23:10] So there's kind of two things that fix that.
+[23:13] So that was actually kind of a model problem.
+[23:15] There's nothing in the prompt.
+[23:16] We have actually a lot in the prompts for 3.7 that said,
+[23:20] whoa, do not leave comments.
+[23:21] And despite that, the model just loves to leave comments.
+[23:24] So it doesn't surprise me that your Cloud.MD didn't help
+[23:27] much either.
+[23:28] I did a lot of work to try to tamp it down from what
+[23:31] happens out of the box.
+[23:33] So we mostly fixed that in Cloud 4.
+[23:37] Now there might be some new weird behavior quirks.
+[23:40] But the other thing we made better in Cloud 4
+[23:41] is it's just better at following instructions.
+[23:44] And we've gotten a lot of feedback from early testers
+[23:47] that all of a sudden, whoa, my Cloud.md is being followed way
+[23:51] more closely.
+[23:52] And it might be a good chance to go look in your Cloud.md
+[23:55] and decide, do I still need this stuff?
+[23:57] Maybe I can take some of it out.
+[23:59] Maybe I need to add a few new things.
+[24:01] So moving over to the new models might be a good time
+[24:03] to take another look at what's in there
+[24:05] and see what you need and what maybe can go.
+[24:09] For the record, I'm trying to think of something
+[24:11] that you might not have thought of.
+[24:13] We're doing multi-agent execution and parallelization.
+[24:17] Can you make it so that for four agents, say,
+[24:19] agents two and three use the context from agent one?
+[24:22] Maybe agent four uses the context from agent two
+[24:25] at a certain point?
+[24:26] Yeah.
+[24:27] Yeah, et cetera.
+[24:28] That's interesting.
+[24:29] We're trying to, so kind of like I said at the beginning,
+[24:33] we're trying to do the simple thing that works,
+[24:34] which is just one agent that's great at coding
+[24:37] and does everything.
+[24:39] I think we want to figure that out.
+[24:40] Probably what's going to happen is if you wanted to do that,
+[24:44] you would ask all your agents to probably write to a shared markdown file
+[24:48] or something like that so they can all check in and communicate.
+[24:52] Sometimes I'll be working with Claude and I'll just say,
+[24:56] hey, I need you to write some stuff in Ticket.md for another developer.
+[25:00] And then I'll fire up another Claude code and I'll be like,
+[25:02] hey, read Ticket.md.
+[25:04] Another developer left this note for you.
+[25:06] This is what you're going to work on.
+[25:08] So I would think about trying to write that state to a file
+[25:11] and then just kind of like count on the model's ability
+[25:14] to just like read files and make sense of them.
+[25:17] It's probably the best you can do today.
+[25:19] And maybe we'll figure out clever ways
+[25:22] to expose that in the product as something more native.
+[25:27] Cool.
+[25:29] All right.
+[25:31] And with that said, I have some rare Claude Code stickers
+[25:35] that I found in my backpack.
+[25:36] So come find me.
+[25:37] I'll be hanging out over there or something.
+[25:39] I'm happy to share them.
+[25:40] Thank you.

@@ -1,0 +1,437 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "title": "איך להוציא את המקסימום מ-Claude Code: לאן הולכים ה-tokens",
+ "subtitle": "webinar של Anthropic שמסביר איך session ב-Claude Code צורך tokens ‏(input, output, cache), אילו הרגלים חוסכים, ואילו levers יש ל-admin של צוות",
+ "meta": [
+  "Lydia Hallie (לפי הכיתוב על המסך, השם לא נאמר בהקלטה) · Claude Code workshop של Anthropic, ‏\"Maximizing the value of Claude Code\" (שותף מחדש ב-X בחשבון Kshitij Mishra) · ספטמבר 2026",
+  "משך: כ-27 דקות · X",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Lydia Hallie",
+ "topics": [
+  "Claude Code",
+  "Token economics",
+  "Prompt caching",
+  "Team admin"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זה webinar של Anthropic בשם \"Maximizing the value of Claude Code\" (לפי השקופית, ספטמבר 2026). מציגה אותו מהנדסת מ-Anthropic. לפי הכיתוב על המסך שמה Lydia Hallie, אבל השם לא נאמר בהקלטה עצמה. הנושא הוא איך Claude Code מוציא tokens בפועל: מה נשלח למודל בכל בקשה, למה output יקר מ-input ולמה cache זול מאוד, מה שובר את ה-prompt cache, ואילו הגדרות עומדות לרשות מי שמגדיר את הכלי לצוות שלם.\n\nהטענה המרכזית: יעילות היא לא שימוש בפחות tokens. המטרה היא שה-tokens שכן משלמים עליהם ילכו למשימה שביקשת. ההרצאה מתחילה מהמנגנון ולא מ-checklist, כי לדבריה checklist מתיישן ברגע ש-Anthropic משחררים משהו חדש. הערה חשובה: הכיתוב של הפוסט ב-X (\"99% משתמשים ב-Claude Code כמו Google\", \"100+ agents בלולאה\", Chief agent ו-PM agents) לא מופיע בהקלטה בכלל. ההרצאה לא עוסקת ב-swarms של agents."
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות המרכזיות עם timestamps, ומה לא נאמר."
+    ],
+    [
+     "2. המנגנון: ",
+     "מה נשלח בכל בקשה, שלושת סוגי ה-tokens ומחירון המודלים."
+    ],
+    [
+     "3. מה בשליטתך בתוך session: ",
+     "בחירת מודל, context רזה ו-effort."
+    ],
+    [
+     "4. ה-cache: ",
+     "prefix, ‏TTL, מה שובר אותו, ו-subagents."
+    ],
+    [
+     "5. ה-levers לצוות: ",
+     "managed settings, ‏analytics, ‏OpenTelemetry ומגבלות הוצאה."
+    ],
+    [
+     "6–7. פעולות, שאלות פתוחות ומילון מונחים.",
+     ""
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך נוצר אוטומטית מהתמלול של ההקלטה ומהשקופיות שלה. שמות ומונחים עלולים להשתבש בתמלול האוטומטי (ASR). למשל Claude מתומלל לפעמים כ-cloud ו-cache כ-cash. בכל מקום שבו השקופית והאודיו לא מסכימים, הלכנו לפי השקופית. הציטוטים מועתקים מילה במילה מהתמלול ונבדקו מול ה-timestamp שלהם. לא נוסף שום מידע ממקורות חיצוניים."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "ההרצאה בנויה כמודל מנטלי אחד. כל prompt הופך לכמה בקשות. כל בקשה נושאת את כל השיחה עד אותו רגע. ה-cache הופך את ההיסטוריה הזאת לזולה, אבל רק כל עוד תחילת הבקשה (ה-prefix) לא משתנה וממשיכים לעבוד לפני שה-cache פג. כל ההמלצות נגזרות מהמודל הזה, וגם ה-levers ל-admin הם אותן החלטות, רק מוגדרות פעם אחת לכל הצוות."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "tokens הם היחידה בכל שיטת חיוב: ",
+     "ב-API ובספקי cloud משלמים לפי token, ובמנויי Pro/Max/Team/Enterprise חלונות ה-5 שעות והחלון השבועי נמדדים גם הם ב-tokens. לדבריה, בעידן ה-agents \"we're paying for the work itself\" [0:00]."
+    ],
+    [
+     "זה אף פעם לא רק ה-prompt: ",
+     "כל בקשה כוללת system prompt, הגדרות tools, ‏CLAUDE.md, שמות ותיאורים של skills ו-MCP, ורק בסוף את ההודעה שלך. כל tool call מוסיף סבב, וה-context window גדל בכל סבב [3:07]."
+    ],
+    [
+     "output הוא הכי יקר, cache הוא הכי זול: ",
+     "את ה-input המודל מעבד בבת אחת, אבל output נוצר token אחרי token, עם מעבר מלא על כל ה-context לכל token. קריאה מה-cache עולה בערך 0.1x ממחיר input [4:39–6:10]."
+    ],
+    [
+     "המודל הוא מכפיל של כל השאר: ",
+     "מודל גדול עושה יותר חישוב לכל token, ב-input וב-output. \"Don't run the biggest model on a task that just doesn't need it.\" [7:43]"
+    ],
+    [
+     "context רזה חוסך סבבים: ",
+     "אפשר לציין קובץ ב-@ בתוך ה-prompt, להעביר הוראות ספציפיות ממשימה מ-CLAUDE.md ל-skills, לכבות שרתי MCP שלא בשימוש, ולהריץ test runner במצב שקט [9:14–12:21]."
+    ],
+    [
+     "session ארוך עולה כפול: ",
+     "בדוגמה שלה, שלוש משימות ב-session אחד צרכו פי שניים tokens מאותן שלוש משימות עם /clear ביניהן [13:54]."
+    ],
+    [
+     "החלפת מודל או effort באמצע שוברת את ה-cache: ",
+     "שינוי של token אחד ב-prefix גורם לכך שכל מה שאחריו מחויב במחיר מלא. Fable 5.1 הוא החריג היחיד לגבי שינוי effort [15:28–17:01]."
+    ],
+    [
+     "ה-cache פג: ",
+     "כשעה במנוי, בתוך מגבלות השימוש של המנוי, וכחמש דקות ב-API או בספק cloud ול-subagents. כתיבה ל-cache של שעה עולה יותר, אז החלון הארוך משתלם רק למי שעוזב את ה-session ואחר כך חוזר אליו [17:01]."
+    ],
+    [
+     "ל-admin יש אותם levers, מוגדרים פעם אחת: ",
+     "דרך managed settings קובעים מודל ברירת מחדל, effort, ‏TTL ושרתי MCP מותרים. דרך OpenTelemetry רואים את שיעור קריאות ה-cache לכל משתמש. הוצאה גבוהה מיוחסת בדרך כלל למודל הגדול שנשאר ברירת מחדל [21:42–23:15]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "אין agents ואין swarms: ",
+     "הכיתוב של הפוסט ב-X על \"100+ agents\", ‏Chief agent ו-PM agents לא מופיע בהקלטה. זו הרצאה על חשבונאות tokens, לא על orchestration."
+    ],
+    [
+     "אין מספרי חיסכון מצטברים: ",
+     "מלבד \"פי שניים\" בדוגמת שלוש המשימות, לא הוצג נתון על כמה חוסך כל צעד בפרויקט אמיתי."
+    ],
+    [
+     "המחירון מופיע רק בשקופית: ",
+     "המחירים לכל מודל לא הוקראו, והמרצה עצמה אומרת שמחירים ופיצ'רים ימשיכו להשתנות."
+    ],
+    [
+     "אין ספים מומלצים: ",
+     "מה נחשב \"גבוה\" בשיעור ה-cache או בצריכה לכל session. בצילום ה-/usage בשקופית מופיע 94%, אבל זה לא הוגדר כיעד."
+    ],
+    [
+     "אין התייחסות לאיכות: ",
+     "הטענה ש-effort בינוני על Fable 5.1 \"excellent\" לא נתמכה בנתוני benchmark."
+    ],
+    [
+     "ה-Q&A לא נכלל: ",
+     "ההקלטה נקטעת בסוף ההרצאה, לפני השאלות."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. המנגנון: מה באמת נשלח למודל"
+  },
+  {
+   "kind": "image",
+   "file": "k_007.jpg",
+   "caption": "\"It's never just the prompt\": מבנה הבקשה. system prompt ו-built-in tools, ‏CLAUDE.md, שמות של skills ושל MCP tools, ובסוף ההודעה \"fix the failing test in utils.test.ts\". הכל נטען בתחילת ה-session.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "הדוגמה המלווה את ההרצאה: test שנכשל, וה-prompt הוא \"fix the failing test in utils.test.ts\". ‏Claude Code לא שולח רק את המשפט הזה. הוא שולח bundle שלם שכולל system prompt, הגדרות של tools ‏(read, edit, bash), סביבת עבודה (תיקייה נוכחית ומצב git), ‏CLAUDE.md, ותיאורים קצרים של skills ושל שרתי MCP. המודל מקבל רק שם של קובץ, ולכן התשובה הראשונה שלו היא tool call ‏(Read utils.test.ts) ולא תיקון. ה-harness מבצע את הקריאה ומחזיר את התוצאה, וכך הלאה. לפי השקופיות, prompt אחד הפך לחמש בקשות: ‏Read, ‏Read, ‏Edit, ‏Bash ‏(npm test), ותשובה סופית. ה-context גדל בכל בקשה. כלשונה, \"it's never just the prompt\" [3:07], ולכן הפס של ה-context window הוא לדבריה הנושא של כל ההרצאה."
+  },
+  {
+   "kind": "image",
+   "file": "k_018.jpg",
+   "caption": "שקופית \"The pricing page\": מחיר למיליון tokens בדולרים. Haiku 4.5: ‏$1 input, ‏$0.10 cached, ‏$5 output. ‏Sonnet 5: ‏$2 / $0.20 / $10. ‏Opus 5: ‏$5 / $0.50 / $25. ‏Fable 5.1: ‏$10 / $0.25 / $50 (כפי שנקרא מהשקופית).",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "יש שלושה סוגי tokens, והמחירון בנוי בדיוק לפיהם. Input הוא כל מה שנשלח. Output הוא כל מה שהמודל מחזיר, כולל tool calls, ‏edits ו-thinking, לא רק הסיכום בסוף. Cached הוא החלק של הבקשה שזהה לבקשה הקודמת. ההסבר למחירים: את ה-input המודל מעבד במעבר אחד, ו-GPU מצטיינים בזה. כל token של output דורש מעבר מלא על כל ה-context. הדוגמה שלה היא const x = 1: מעבר שלם רק כדי לייצר const, ועוד מעבר בשביל x, וכן הלאה. לכן output הוא הסוג היקר ביותר. בטבלה הכפולה של השקופיות מופיעים גם חלונות השימוש (5 שעות ושבועי) של מנויי Pro, ‏Max, ‏Team ו-Enterprise, שגם הם נספרים ב-tokens."
+  },
+  {
+   "kind": "image",
+   "file": "k_022.jpg",
+   "caption": "Prompt caching: ה-prefix הזהה לבקשה הקודמת נקרא מה-cache בשבריר מהמחיר. Cache read 0.1x ממחיר input. ‏Cache write לחמש דקות 1.25x. ‏Cache write לשעה 2x.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "ה-cache הוא לדבריה ה-lever הגדול ביותר. בכל סבב רק מוסיפים לסוף הבקשה, והשרת שומר את ה-state הפנימי שבנה בפעם הקודמת ומחשב רק מהנקודה שבה הבקשה משתנה. החלק הזהה בהתחלה נקרא prefix. חלק חדש משלם מחיר מלא פעם אחת, ומהבקשה הבאה הוא כבר בתוך ה-prefix. נכנס הרבה ויוצא מעט, ורוב מה שנכנס נמצא ב-cache: \"In a healthy session, most of your input is the cheap cached kind.\" [6:10]. אפשר לבדוק את זה ב-/usage. בצילום המסך בשקופית, שורת ה-Prompt cache מראה 94% מה-input tokens שנקראו מה-cache, במצב warm עם TTL של 5 דקות."
+  },
+  {
+   "kind": "h1",
+   "text": "3. מה בשליטתך בתוך session: מודל, context, effort"
+  },
+  {
+   "kind": "image",
+   "file": "k_028.jpg",
+   "caption": "\"A smaller model is not a worse model\": ‏Haiku כעוזר מהיר (משימות מצומצמות, subagents), ‏Sonnet כ-generalist (עריכות מדויקות, שינויים מכניים, קוד שכבר ב-context), ‏Opus כמומחה (באגים עדינים, שטח לא מוכר), ‏Fable כ-specialist (בעיות שאף אחד עוד לא ראה).",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "השקופית \"Four things to optimize\" מסדרת את ההמשך: tokens שנכנסים, tokens שיוצאים, כמה מהם ב-cache, ואיזה מודל. המודל בא ראשון כי הוא מכפיל את כל השאר: מודל גדול עושה יותר חישוב על כל token, ב-input וב-output. \"a smaller model is not a worse model\" [7:43]. ל-generalist work ‏Sonnet מספיק, ובמחיר נמוך בהרבה ל-token. ‏Opus שווה את התוספת כשיש באג עדין או שטח לא מוכר. ולגבי Fable, בלשונה \"Fable is the specialist who's seen the problems no one else has\" [7:43]."
+  },
+  {
+   "kind": "image",
+   "file": "k_031.jpg",
+   "caption": "\"CLAUDE.md is for what every task needs\": דוגמת CLAUDE.md שבה יש מתכון של database migrations. (1) הוראה ספציפית למשימה תעבור ל-skill. (2) בדיקה אם ההוראה עדיין נחוצה, בעזרת /claude-api prompt-audit.",
+   "width": 5.6
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "@-mention לקובץ: ",
+     "כשכותבים \"@utils.test.ts\" ב-prompt, ‏Claude Code מכניס את תוכן הקובץ עוד לפני הבקשה, וה-Read הראשון לא קורה. לפי השקופית זו בקשה אחת במקום שתיים [9:14]."
+    ],
+    [
+     "/context בתחילת session: ",
+     "מראה כמה tokens תופס כל רכיב: system prompt, ‏tools, ‏CLAUDE.md, ‏skills ו-MCP. ההמלצה היא להריץ אותו לפני שמתחילים."
+    ],
+    [
+     "CLAUDE.md רק למה שכל משימה צריכה: ",
+     "\"don't keep anything in here that doesn't serve every task\" [9:14]. הוראות כמו database migrations עוברות ל-skill, שנטען רק כשהמודל מחליט שהוא נחוץ ועד אז נשלחים רק השם והתיאור שלו."
+    ],
+    [
+     "לבדוק אם ההוראות עדיין נחוצות: ",
+     "מודלים חדשים לא צריכים חלק מההוראות של לפני שלושה חודשים. היא מזכירה skill שבודק את ההוראות ומציע diff. בתמלול השם יצא \"Cloud API Prompt Audit\", ובשקופית מופיע /claude-api prompt-au... (השם המלא לא ודאי)."
+    ],
+    [
+     "MCP: ",
+     "הגדרות tools נטענות היום on demand, ולכן שרת idle זול, אבל לא חינם. אפשר לכבות שרתים ב-/mcp, או להשתמש ב-CLI כמו gh, ‏aws או gcloud, שלא טוען כלום מראש."
+    ],
+    [
+     "פלט פקודות נשאר בשיחה: ",
+     "פלט גדול מאוד נכתב לקובץ ובשיחה נשאר רק preview. אבל test runner שמדפיס 400 שורות יכול להישאר מתחת לסף, ואז כל השורות נכנסות לכל בקשה שאחריו. הפתרון: לכתוב ב-CLAUDE.md את הפקודה בגרסה השקטה, למשל npx vitest run <file> --reporter=dot, או להריץ אותה ב-subagent [12:21]."
+    ],
+    [
+     "effort: ",
+     "קובע כמה ביסודיות המודל עובד לפני שהוא מכריז שסיים. הרמות: low, ‏medium, ‏high, ‏xhigh, ‏max. ‏effort גבוה מייצר יותר output וכתוצאה מזה גם יותר input. לדבריה, medium על Fable 5.1 \"excellent\". כלל אצבע: \"did it not know enough or did it not try hard enough?\" [13:54]. אם חסר ידע, מחליפים מודל. אם דילג על קובץ או לא הריץ tests, מעלים effort."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "4. ה-cache: ‏prefix, ‏TTL, ומה שובר אותו"
+  },
+  {
+   "kind": "image",
+   "file": "k_037.jpg",
+   "caption": "\"Three tasks, two ways\": בשורה העליונה /clear בין משימות, וכל משימה מתחילה קטנה. בשורה התחתונה session אחד ארוך, שבו משימה 3 עדיין נושאת את משימות 1 ו-2.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "\"The model only ever adds to your context. It never removes anything.\" [13:54]. גם כשרוב ה-context ב-cache, זה עדיין לא אפס, ובדוגמה שלה \"the bottom session uses twice the amount of tokens as a top session\" [13:54]. יש שלושה כלים: ‏/compact מחליף את השיחה בסיכום, ואפשר לרמוז לו מה חשוב לשמור. ‏/rewind מוחק את הסבבים האחרונים. ‏/clear פותח שיחה חדשה. אם ייתכן שתרצה לחזור לשיחה הקודמת, תן לה שם קודם ב-rename, ואז resume יחזיר אותה.\n\nהמחיר של כל זה: השרת משתמש מחדש רק בחלק שזהה לבקשה הקודמת, החל מה-token הראשון. \"But the moment that one token is different, everything after that point is new to the server and gets processed at full price.\" [15:28]. ‏compact ו-clear משנים את ה-prefix בהכרח. אחרי compact זה סיכום קצר, אז המחיר בדרך כלל סביר. החלפת מודל באמצע ה-session מאפסת את ה-cache, כי ה-cache הוא ה-state הפנימי של המודל הספציפי. גם שינוי effort מאפס אותו ברוב המודלים, כי ההגדרה יושבת בתחילת הבקשה. החריג הוא Fable 5.1. ‏Claude Code מבקש אישור לפני /model או /effort כשה-cache עדיין warm. לעומת זאת, עריכת קבצים ושינוי permission mode לא נוגעים בבקשה. ‏CLAUDE.md נקרא פעם אחת בתחילת ה-session, ולכן עריכה שלו באמצע תשפיע רק ב-session הבא או אחרי /clear."
+  },
+  {
+   "kind": "image",
+   "file": "k_042.jpg",
+   "caption": "\"What else changes the prefix mid-session\": ‏/model (למודל אחר יש cache משלו, הכל נקרא מחדש), ‏/effort (ההגדרה בתחילת הבקשה, ברוב המודלים חוץ מ-Fable 5.1), ומה שמותר לשנות: עריכת קבצים, permission mode ועריכת CLAUDE.md.",
+   "width": 5.6
+  },
+  {
+   "kind": "image",
+   "file": "k_043.jpg",
+   "caption": "\"The cache expires\": במנוי, בתוך מגבלות השימוש, כשעה. ב-API או בספק cloud כ-5 דקות. ל-subagents 5 דקות. כל פגיעה ב-cache מאפסת את הטיימר. ההגדרות promptCacheTtl ו-subagentPromptCacheTtl, וכתיבה ל-cache של שעה מחויבת ב-2x.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "מה עושים בפועל, לפי השקופית \"In practice\": בוחרים מודל ו-effort בתחילת ה-session או מיד אחרי /clear. אם צריך להחליף באמצע משימה, עושים compact קודם ורק אז מחליפים, וכך המודל החדש קורא רק סיכום. עושים compact לפני שקמים מהמחשב, כל עוד ה-cache warm, כי compact קורא את כל השיחה פעם נוספת: \"try to compact or change before you step away, not when you come back.\" [18:33]. ‏resume למחרת שולח את כל השיחה מחדש במחיר input מלא, ולכן כדאי compact לפני שהולכים. ה-TTL הארוך משתלם רק למי שבאמת קם לפגישה או לארוחה וחוזר לאותו session. מי שעובד ברצף משלם עליו סתם.\n\nSubagents: הם רצים ב-context נפרד, עם system prompt קטן, ‏CLAUDE.md והמשימה, ומחזירים לשיחה הראשית רק את המסקנה. במחיר אין חיסכון ישיר: \"a subagent isn't free\" [20:08]. יש לו input, ‏output ו-cache משלו עם חלון של 5 דקות, והעלות הכוללת של המשימה יכולה אפילו להיות קצת יותר גבוהה. הרווח הוא שהשיחה הראשית נשארת קטנה, וכל סבב אחר כך זול יותר. ל-subagent אפשר לקבוע מודל משלו, למשל Haiku או Sonnet לחיפוש, ו-effort משלו."
+  },
+  {
+   "kind": "h1",
+   "text": "5. ה-levers לצוות: managed settings ו-observability"
+  },
+  {
+   "kind": "image",
+   "file": "k_048.jpg",
+   "caption": "Managed settings מ-admin console: קובץ אחד שכל התקנה טוענת ב-startup, ומשתמשים לא יכולים לדרוס אותו. בדוגמה: model \"sonnet\", ‏availableModels, ‏effortLevel \"medium\", ‏maxEffortLevel \"high\", ‏promptCacheTtl \"1h\", ‏allowedMcpServers, ו-env עם CLAUDE_CODE_ENABLE_TELEMETRY.",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "מי שמגדיר את Claude Code לצוות מקבל את אותם levers, פעם אחת לכולם, דרך managed settings. אפשר לקבוע את מודל ברירת המחדל ואילו מודלים מותרים בכלל. לדבריה זה ה-lever החזק ביותר: \"when a team's spend is unexpectedly high, this usually traces back to just the biggest model, just being left on as a default.\" [21:42]. אפשר לקבוע effort התחלתי (משתמש עדיין יכול להעלות אותו למשימה מסוימת), וב-Enterprise גם תקרת effort לכל מודל. אפשר לקבוע TTL ל-cache לצוותים שעובדים דרך API או cloud, רשימת שרתי MCP מותרים, ו-CLAUDE.md ארגוני שמגיע לכל מכונה.\n\nיש גם כלים לראות מה קורה בפועל. ב-console יש analytics של אימוץ ודוח הוצאה לפי משתמש ולפי מודל, כשהוצאה דרך usage credits מופעלת. ‏OpenTelemetry מופעל בשני משתני סביבה באותו קובץ, ומדווח input, ‏output, ‏cache reads ו-cache writes לכל אדם. שיעור cache נמוך אצל משתמש מעיד שהוא שובר את ה-cache, כנראה בהחלפת מודל או effort. קו של input לכל session אמור לעלות במהלך משימה ולרדת אחרי clear. \"If it only ever climbs, then someone is just living in one endless session\" [23:15]. לבסוף, מגבלות: חלונות ה-5 שעות והשבועי של ה-seat הם התקרה. אפשר להפעיל usage credits עם spend limit לארגון, לקבוצה או לאדם, ו-autoContinueAtUsageLimit קובע אם session שנעצר במגבלה ימשיך לבד כשהחלון מתאפס. זה חשוב לריצות ארוכות בלי השגחה."
+  },
+  {
+   "kind": "image",
+   "file": "k_050.jpg",
+   "caption": "OpenTelemetry: המשתנים CLAUDE_CODE_ENABLE_TELEMETRY, ‏OTEL_METRICS_EXPORTER=\"otlp\" ו-OTEL_EXPORTER_OTLP_ENDPOINT, ושלושה גרפים: cache reads כשיעור מה-input לכל משתמש, input לכל בקשה לאורך session, ועלות לפי מודל לכל משתמש.",
+   "width": 6.3
+  },
+  {
+   "kind": "h1",
+   "text": "6. מה לעשות מחר"
+  },
+  {
+   "kind": "image",
+   "file": "k_054.jpg",
+   "caption": "\"Three things to take home\": ‏(1) להחליט בהתחלה ולא לגעת (model, ‏effort, שרתי MCP). ‏(2) להיות מכוון לגבי מה נכנס (@ לקבצים, ‏CLAUDE.md רזה, ‏skills, פלט שקט, subagents לחיפושים רועשים). ‏(3) לא לתת ל-session לרוץ לנצח (/clear למשימה חדשה, ‏/compact לפני הפסקה).",
+   "width": 5.6
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "היום, ב-session שלך: ",
+     "להריץ /context ב-session חדש ו-/usage ב-session פעיל, ולבדוק ששיעור ה-cache גבוה."
+    ],
+    [
+     "לנקות את CLAUDE.md: ",
+     "להעביר הוראות שרלוונטיות רק למשימות מסוימות ל-skills, ולמחוק הוראות שמודלים חדשים כבר לא צריכים."
+    ],
+    [
+     "להוסיף ל-CLAUDE.md את הפקודות השקטות: ",
+     "שתיים-שלוש הפקודות שמריצים כל יום, כתובות בדיוק כמו שמריצים אותן, עם reporter שמדפיס רק כשלונות. אחרי commit זה תקף לכל הצוות."
+    ],
+    [
+     "לבחור מודל ו-effort בתחילת ה-session: ",
+     "Sonnet ו-medium כנקודת פתיחה. להחליף רק אחרי compact או clear."
+    ],
+    [
+     "הרגלי הפסקה: ",
+     "compact לפני פגישה או לפני סוף היום, לא אחריהם. ‏rename ואז clear כשעוברים נושא."
+    ],
+    [
+     "ל-admin: ",
+     "לבדוק מה מודל ברירת המחדל ב-managed settings, להפעיל OpenTelemetry, ולעקוב אחרי שיעור ה-cache וצורת הקו של input לכל session."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "למה זה חשוב"
+   ],
+   "rows": [
+    [
+     "כמה חוסכים בפועל @-mention, פלט שקט ו-CLAUDE.md רזה בפרויקט אמיתי?",
+     "הוצגה רק דוגמת \"פי שניים\" של clear. אין נתון שמאפשר לתעדף."
+    ],
+    [
+     "מה נחשב שיעור cache \"בריא\"?",
+     "94% מופיע רק בצילום מסך. אין סף שאפשר להגדיר עליו התראה ב-OpenTelemetry."
+    ],
+    [
+     "למה Fable 5.1 לא שובר cache בשינוי effort, והאם זה יחול על מודלים נוספים?",
+     "זה משנה את ההמלצה \"לא לגעת ב-effort באמצע\"."
+    ],
+    [
+     "מתי TTL של שעה משתלם, בהינתן cache write של 2x מול 1.25x?",
+     "נדרש חישוב break-even לפי דפוס העבודה של הצוות."
+    ],
+    [
+     "האם effort medium באמת לא פוגע באיכות במשימות מורכבות?",
+     "הטענה נאמרה בלי benchmark."
+    ]
+   ],
+   "widths": [
+    3.2,
+    3.0
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "7. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "token",
+     "יחידת טקסט קטנה, בערך בגודל מילה. היחידה שלפיה מחויבים ונמדדות המגבלות."
+    ],
+    [
+     "context window",
+     "כל מה שהמודל רואה בבקשה אחת. גדל בכל tool call."
+    ],
+    [
+     "input / output / cached tokens",
+     "מה שנשלח למודל, מה שהמודל מייצר (כולל tool calls ו-thinking), והחלק שנקרא מה-cache במחיר מופחת."
+    ],
+    [
+     "prompt cache / prefix",
+     "שמירת ה-state של החלק הזהה בתחילת הבקשה. שינוי של token אחד בו מבטל את כל מה שאחריו."
+    ],
+    [
+     "TTL",
+     "כמה זמן ה-cache נשמר. כשעה במנוי, כחמש דקות ב-API ול-subagents."
+    ],
+    [
+     "harness",
+     "Claude Code עצמו, שמבצע את ה-tool calls שהמודל מבקש."
+    ],
+    [
+     "effort",
+     "כמה ביסודיות המודל עובד לפני שהוא מסיים: low, ‏medium, ‏high, ‏xhigh, ‏max."
+    ],
+    [
+     "CLAUDE.md",
+     "קובץ הוראות שנשלח בכל בקשה. נקרא פעם אחת בתחילת session."
+    ],
+    [
+     "skill",
+     "הוראות שנטענות רק כשהמודל מחליט שהן נחוצות. עד אז נשלחים רק השם והתיאור."
+    ],
+    [
+     "MCP server",
+     "שרת שחושף tools למודל. גם כש-idle הוא עולה מעט tokens."
+    ],
+    [
+     "subagent",
+     "agent שרץ ב-context נפרד ומחזיר לשיחה הראשית רק מסקנה."
+    ],
+    [
+     "/compact, /rewind, /clear",
+     "סיכום השיחה, מחיקת הסבבים האחרונים, ופתיחת שיחה חדשה."
+    ],
+    [
+     "managed settings",
+     "קובץ הגדרות ארגוני מה-admin console שמשתמשים לא יכולים לדרוס."
+    ],
+    [
+     "OpenTelemetry",
+     "תקן לייצוא metrics. משמש לדיווח צריכת tokens לפי משתמש."
+    ],
+    [
+     "usage credits / spend limit",
+     "הוצאה מעבר לחלון של ה-seat, עם תקרה לארגון, לקבוצה או לאדם."
+    ]
+   ],
+   "widths": [
+    1.8,
+    4.4
+   ]
+  }
+ ]
+}

@@ -1,0 +1,426 @@
+[0:00] Let's talk about loops.
+[0:01] I think we've all been building loops lately.
+[0:03] And I realized recently, I think we're all doing it wrong.
+[0:07] Loops are really powerful, don't get me wrong.
+[0:09] But so much of the discourse around them
+[0:11] is hype driven and just really not helpful, right?
+[0:15] We, I think we have this idea, just kind of as an industry
+[0:18] somehow, that we can like pipe a prompt and a loop
+[0:21] to a coding agent and that we can build software this way,
+[0:24] right?
+[0:25] Maybe we're investing a lot of time in verifiers.
+[0:29] Maybe you have six different code review agents.
+[0:31] But at the end of the day, if we're doing this,
+[0:34] we're still building 40,000 line PRs that just nobody wants to read, right?
+[0:39] And this isn't a throw shade to Jeff Huntley, right?
+[0:42] This is, Ralph is an innovative, it's a sharp tool
+[0:46] that works very well for certain types of problems.
+[0:49] It works very well if you're not building on a team.
+[0:52] And it works very well if you're not working on critical systems.
+[0:54] But most of us are working on teams and we don't fit in that box.
+[1:00] So today I want to talk about how to build loops that work in large complex code bases.
+[1:05] For systems that have real customers, real users, real regulatory obligations and service level agreements.
+[1:11] And everything else that keeps us from shipping YOLO 40,000 line PRs straight to production.
+[1:17] In other words, I want to talk about how to build loops for the real world.
+[1:20] If you're not aware, this post actually dates back to July.
+[1:25] It went viral this past January, which is when a lot of us,
+[1:28] I think, started building loops.
+[1:30] And of course, much more recently, I'm sure you all are
+[1:32] going to see this slide a lot this week, but Peter Steinberger
+[1:35] said that we shouldn't be prompting coding agents anymore,
+[1:38] right?
+[1:39] We should just be designing loops that prompt our agents.
+[1:41] Of course, Open Clause notoriously built on loops.
+[1:44] Loops build the code, loops review the code, they merge
+[1:47] and release the code, they find and fix the bugs,
+[1:50] There's even loops for finding and fixing bugs
+[1:52] in the loops that are merging the things, right?
+[1:56] It's loops all the way down.
+[1:58] It's Boris Turney, also, the creator of Cloud Code,
+[2:02] recently said that this is his entire job
+[2:04] as an engineer now, is just writing loops to prompt Cloud.
+[2:08] And eventually, we might not even need loops, right?
+[2:11] We're just gonna have like swarms of agents
+[2:13] designing loops to prompt agents building swarms
+[2:17] for loops and like, I don't know,
+[2:19] Somewhere we're writing production code, I assume.
+[2:23] And in fact, all of our loops that we're building
+[2:26] are producing so much code
+[2:27] that we can't possibly read all of it, right?
+[2:30] So we might as well just not read any of it, right?
+[2:32] We're investing in verification and in code review,
+[2:35] but all this code is read-only.
+[2:37] This is the thesis of a conference
+[2:38] that was here in town last month.
+[2:41] So a lot of smart people at the Frontier Labs
+[2:43] think that this is the future of software development,
+[2:45] and if you're doing this, you're moving 10x faster,
+[2:49] and everybody else is getting left behind.
+[2:53] Now, it's not clear how well this works yet.
+[2:57] Took six months to fix the Cloud Code terminal flicker.
+[2:59] The OpenCode team wrote a renderer
+[3:01] in a fraction of that time.
+[3:03] And OpenClaw, of course, also notoriously
+[3:05] has stability issues.
+[3:08] What is abundantly clear, however,
+[3:10] is that this shit is really expensive
+[3:13] if you don't work at a frontier lab
+[3:14] and have an unlimited token budget.
+[3:17] And all this code that we're writing
+[3:19] is actually really expensive, right?
+[3:21] Matt Pocock talked about this recently.
+[3:23] Bad code is much more expensive in the age of agents
+[3:27] than it has ever been at any point in the past.
+[3:30] So today I want to talk about what I think works
+[3:33] in the real world and what we've started doing
+[3:35] at HumanLayer, which, to be clear,
+[3:37] is still building loops, right?
+[3:39] I think loops are super powerful,
+[3:40] but we can design loops and still read the code.
+[3:44] In fact, we can design loops that make it easier
+[3:46] to read the code because the loops are making the code better.
+[3:49] We can solve hard problems in complex code bases with loops,
+[3:52] and we can build our software factory incrementally.
+[3:55] But to do this is gonna take some real engineering, y'all.
+[3:59] So let's talk about control theory.
+[4:02] Control theory is all about how we drive a dynamic system,
+[4:05] which would be your code base,
+[4:06] towards some desired stable or optimal end state, right?
+[4:10] You have a sensor that measures
+[4:12] the current state of the world.
+[4:14] You have your set point, right?
+[4:15] the desired state of the world,
+[4:17] and the difference between those two things
+[4:19] is your measured error.
+[4:20] You have a controller that reads that measured error
+[4:23] and turns it into a control signal
+[4:25] about an incremental change to apply to the system.
+[4:28] We have an actuator that applies that change to the system,
+[4:31] which is undergoing disturbances in the meantime.
+[4:34] And then we re-measure, re-compute our measured error,
+[4:37] and we're back where we started.
+[4:40] Now, this sounds really complicated, and it can be.
+[4:42] I have a twin brother, actually,
+[4:44] who's an aerospace engineer.
+[4:45] This is how they keep fighter jets
+[4:46] from falling out of the sky.
+[4:48] But it's probably a little bit simpler
+[4:51] than most of y'all think.
+[4:52] Does anyone have one of these?
+[4:55] A thermostat uses a control loop, right?
+[4:59] For any of our European friends in the audience,
+[5:01] it's part of something we have here in the States.
+[5:04] It's called air conditioning.
+[5:07] And most of us probably actually use control loops
+[5:11] on a daily basis, right?
+[5:13] Kubernetes auto scaling systems are built on control loops.
+[5:17] Infrastructure as code uses a desired state, current state,
+[5:21] iterative change like control loop pattern.
+[5:24] Postgres' auto vacuum and React's virtual DOM
+[5:28] both use or approximate control loops.
+[5:30] Control loops are ideal when we have a system
+[5:32] that we want to change, a problem we can measure,
+[5:35] and a way to get feedback on the result of that change.
+[5:38] Like good software engineers have always been taught to do,
+[5:42] Control loops change the system incrementally
+[5:44] instead of just trying to get straight to the end state
+[5:47] immediately all at once and risk blowing everything up.
+[5:50] They help us to avoid oversteering
+[5:52] and destabilizing the system and it minimizes risk.
+[5:56] So control loops are the opposite
+[5:58] of what I'm gonna call a blind Ralph loop.
+[6:01] They're how we avoid PRs that look like this
+[6:03] because nobody wants to review this, right?
+[6:06] Which is not to say that all Ralph loops are blind loops.
+[6:09] The best Ralphs are actually applying control theory.
+[6:11] I know Jeff Huntley is out in the hall somewhere
+[6:13] wandering around, if you go talk to him,
+[6:15] he's gonna tell you the same thing, right?
+[6:17] That RALF is a teaching device,
+[6:20] and I think some of us read it a little too literally,
+[6:23] but this is how we should have always been building loops.
+[6:26] But the other issue with RALF loops,
+[6:27] they're not incremental, right?
+[6:29] It's just a bash loop.
+[6:31] So we have to build agentic control loops.
+[6:33] And to do that, we start by defining a set point,
+[6:36] which is the desired end state of our code base
+[6:38] with respect to some property of it.
+[6:41] And we had a sensor.
+[6:42] There's a lot of ways to build a sensor.
+[6:43] It can be strictly deterministic.
+[6:45] Your ESLint rules, your AST grep, your pack work.
+[6:49] Or it can be non-deterministic.
+[6:52] You can have an agent and a skill
+[6:54] and a bunch of natural language rules.
+[6:56] And you could also just have a pipeline,
+[6:58] like a combination of the two.
+[7:00] So how do we build a gentic compo-
+[7:02] Whoops.
+[7:03] There we go.
+[7:04] Now, this is all theory, right?
+[7:06] Practically speaking, and because we're using agents,
+[7:09] we can blur the lines a little bit
+[7:10] between system components.
+[7:12] So AidenBuy's React Doctor, for example, is fantastic.
+[7:15] It is a great way to catch all of the React slot
+[7:20] that Claude snuck into your codebase last week,
+[7:22] but it's a hybrid sensor and controller.
+[7:25] It tells you what are all the problems with your React code,
+[7:28] and also, by the way, what are the top three things
+[7:30] you should fix, and how do you fix them.
+[7:32] Similarly, our controller and actuator
+[7:34] might actually just be a single agent
+[7:36] deciding on an incremental change to make,
+[7:39] and then applying it in the same context window.
+[7:41] But I want to zoom in on the controller a little bit,
+[7:44] because without one, or without a well-tuned one,
+[7:46] we might make too large of a change all at once,
+[7:49] or we might make the wrong change entirely.
+[7:52] And if you put that in a loop,
+[7:53] you're in trouble pretty quickly.
+[7:56] So we can use control loops to root out bad patterns
+[7:58] and to clean up our code,
+[7:59] but we can actually use them for all sorts of things, right?
+[8:02] We could make sure that our API is compliant
+[8:04] with someone else's open API spec.
+[8:06] We can make sure that our MCP server is compliant
+[8:09] with whatever version of the MCP specification
+[8:13] that we're currently on, haven't checked.
+[8:16] You could mirror a project from Python into TypeScript
+[8:19] or vice versa.
+[8:21] You could even maintain your Vite-based slop fork
+[8:24] of Next.js against the upstream.
+[8:27] The key questions are, can we find something we can measure,
+[8:30] can we apply changes incrementally,
+[8:32] and can we get feedback on the quality of those changes?
+[8:35] To illustrate that, I'm gonna walk through a control loop
+[8:38] that we use internally at human layer.
+[8:40] For our loop, we are incrementally migrating
+[8:42] our RPC API to effect.
+[8:45] We adopted it for some of our race-prone code.
+[8:46] We like it, so we're adopting it
+[8:48] across the rest of our code base.
+[8:49] If you've never seen effects code before,
+[8:51] the code on the right is just the kind of trivial procedure
+[8:54] on the left rewritten in effect.
+[8:56] The syntax is really weird.
+[8:57] We're psychos, we really like it.
+[8:58] It's not for everybody, that's okay.
+[9:01] This isn't a talk about effect, so we'll keep moving.
+[9:03] Ooh, clicker's not working.
+[9:06] Cool.
+[9:07] So step one, we have to build our sensor
+[9:10] to find unmigrated procedures.
+[9:12] We can have an agent do this,
+[9:14] or we could use grep or rip grep,
+[9:16] but instead we're gonna use ast grep,
+[9:18] because it's really powerful,
+[9:19] it's a great tool to have in your toolbox
+[9:20] for building loops, it's language agnostic,
+[9:22] it's out of band from your TypeScript config
+[9:24] or ESLint rules, which if you're a TypeScript developer
+[9:27] you have watched Claude disable those
+[9:29] with inline comments.
+[9:31] So we can just write a simple rule
+[9:33] that finds unmigrated procedures
+[9:36] based on the pattern above.
+[9:38] Over time, we can even layer on more rules
+[9:40] that describe other patterns we wanna get rid of
+[9:42] with granular include and exclude paths.
+[9:44] If you have a multilingual mono repo like we do,
+[9:47] it'll work for any language you could possibly imagine.
+[9:49] And we can just scan our code base
+[9:51] and it'll produce a long list of violations.
+[9:54] Way too long, in fact.
+[9:55] It'll give you about 50 keys per violation,
+[9:58] so we're just gonna filter it down to four
+[9:59] and we're gonna sort it deterministically.
+[10:01] Why are we doing that?
+[10:03] At the beginning I said this was gonna be practical,
+[10:05] and so we're gonna step outside
+[10:07] of our control loop paradigm for a second,
+[10:09] because before we start incrementally
+[10:10] migrating procedures one at a time,
+[10:12] we need to enforce that all new procedures
+[10:14] are using effect, right?
+[10:15] So we're gonna run a full scan once on main,
+[10:17] sort all the violations deterministically,
+[10:19] and track it in our version control.
+[10:21] And then on every new PR,
+[10:23] we can see if the branch added any
+[10:25] unmigrated procedures, right?
+[10:27] So this is our control loop,
+[10:29] and our system is undergoing disturbances.
+[10:32] In this case, all of our teammates' shipping clots lot.
+[10:35] And this is how we make sure
+[10:36] that they're not undoing our loop's work.
+[10:38] This doesn't map directly to a part of the control loop,
+[10:40] but we can kind of like squint at it a little bit
+[10:43] and call it a disturbance dampener.
+[10:45] So now that we've stopped the bleeding,
+[10:46] we can actually design our controller.
+[10:48] For a simple controller,
+[10:49] we could just deterministically pick
+[10:51] the first violation from the list.
+[10:52] You can use bash and jq,
+[10:54] or we could get a little cleverer
+[10:57] and use astgrep to find the smallest unmigrated procedure
+[11:00] and always pick the smallest one to reduce the risk.
+[11:05] We could have an agent make the decision
+[11:06] if we really want to.
+[11:07] I don't think you should ever send an agent
+[11:09] to do deterministic code's job, but you certainly can.
+[11:12] In fact, depending on the complexity,
+[11:13] we could have the agent pick the procedure to migrate
+[11:16] and just do it at the same time, like we just talked about.
+[11:19] But we can make this even more powerful, right?
+[11:21] Because we're not just migrating to effect
+[11:22] for the sake of it, we're doing it because it's helpful
+[11:25] for handling errors and for helping us
+[11:26] instrument our code better.
+[11:28] And so what we could do if we wanna get really clever
+[11:30] is we can look at our telemetry
+[11:32] and figure out which procedures have the most errors
+[11:34] or the least instrumentation
+[11:36] or has a gap in our APM, right?
+[11:38] And when we send a control signal to our actuator agent,
+[11:41] we can include not just the procedure to migrate,
+[11:44] but also all the data about the things
+[11:46] that we're trying to fix with this migration
+[11:49] so that the actuator agent can actually make the code better
+[11:52] instead of just doing a one-to-one migration.
+[11:56] Oh man, there we go.
+[12:01] So next is building our actuator.
+[12:03] Our actuator is just an agent plus a skill.
+[12:06] Bring your CLI coding agent of choice.
+[12:08] You should spend a lot of time on the skill.
+[12:10] Not all of that should be up front.
+[12:11] You'll want to iterate on it over time based on what works.
+[12:13] At human layer we like to build out what we call
+[12:15] golden patterns by hand before setting the agent loose.
+[12:18] These are just like idiomatic handwritten examples
+[12:21] for the agent to follow because they're just
+[12:22] pattern replicators and otherwise you're getting
+[12:24] what's in the docs or what the agent knows
+[12:26] from the internet.
+[12:27] And so we pipe the skill plus our control signal
+[12:32] into our actuator agent.
+[12:33] And the skill, of course, should include a response template.
+[12:35] And the agent's going to work and work and work.
+[12:38] And it'll produce a final response.
+[12:40] And then we're going to deterministically commit and push
+[12:42] and create a PR using the final message as our PR description.
+[12:47] Now all we have to do is actually run the loop, right?
+[12:49] My recommendation is to use GitHub Actions or your GitLab
+[12:53] or your CircleCI or whatever else you're using,
+[12:55] because it has access to your code,
+[12:57] it has access to your secrets,
+[12:59] and it has great dispatch and scheduling primitives, right?
+[13:03] We don't need a new cluster for this.
+[13:05] So we can write a workflow
+[13:06] that runs a single iteration of the loop,
+[13:08] sense, control, actuate, and creates a PR.
+[13:11] And then we can schedule this to run once a day.
+[13:13] And every morning, we walk into the office
+[13:15] to a small incremental PR that's low risk.
+[13:17] And when we first did this,
+[13:19] it was actually really frustrating,
+[13:21] and we turned the loop off,
+[13:22] And, because we had to constantly update the skill,
+[13:25] we had to constantly check out the branch,
+[13:27] change the skill, change the code, commit and push,
+[13:30] and our loop was actually really high friction, right?
+[13:33] But there's a better way to do this
+[13:35] where we can put a human on the loop
+[13:36] in a really low friction way to re-steer it
+[13:38] when it goes wrong.
+[13:39] And the way to do this is to just create a feedback file
+[13:42] that's tracked in version control
+[13:43] just as a markdown file, right?
+[13:45] We can deterministically load it
+[13:46] into our actuator agent's context
+[13:48] every time that it runs after we run the controller.
+[13:51] Then we can add a label to the PR, right?
+[13:53] Each workflow needs to be able to identify PRs
+[13:55] that it created, since there might be
+[13:57] a bunch of different loops running,
+[13:58] and we only want workflows to respond to feedback
+[14:00] from comments on their PRs.
+[14:02] And we're going to add a comment trigger
+[14:04] to each loop workflow.
+[14:05] So when a user leaves a slash iterate comment on the PR,
+[14:09] the loop workflow is gonna pick that up.
+[14:11] It's going to deterministically load
+[14:13] all of the PR context, the diff, the comments,
+[14:15] the review comments, the description,
+[14:17] into the agent's context along with the skill,
+[14:20] And it's going to instruct the agent to fix the code,
+[14:22] but also to update that feedback file, right?
+[14:25] Looks kind of like this.
+[14:26] And the benefit of doing this way
+[14:28] is that now that feedback file with instructions
+[14:30] is tracked in your version control.
+[14:32] You can see how you've changed it over time.
+[14:34] You can revert it if you need to.
+[14:36] So the next thing we're going to do is add flow control.
+[14:39] Because the other problem that we had when we did this
+[14:41] was that if we were at a customer site for a week,
+[14:44] or if we were traveling, or spent six days working on slides
+[14:48] instead of writing code, the PRs from all of our loops
+[14:52] would just stack up, they'd duplicate work, they'd conflict,
+[14:55] and we wouldn't get around to doing it.
+[14:56] And the loop's work is important,
+[14:58] but it's not that important.
+[14:59] And so now we just had all this junk we had to deal with
+[15:02] that wasn't important.
+[15:03] So this is actually a really easy problem to fix,
+[15:06] because each loop and its workflow has a label
+[15:09] that gets attached to PRs.
+[15:11] When the workflow first runs, before we check out the code
+[15:14] and install the dependencies and run our sense actual,
+[15:18] or sense control actuate steps,
+[15:20] we can just check and see if the last PR that we created,
+[15:22] or any PR with the loop's label on it, is open.
+[15:25] And if so, we just shut down, right?
+[15:27] Because this means that the last time
+[15:29] that a human reviewed the code from this loop
+[15:33] was before the loop ran, right?
+[15:35] No human reviewed the last output,
+[15:37] so there's no reason to stack up even more work
+[15:39] for humans to review.
+[15:40] This way we have exactly one PR at most
+[15:42] open per loop at a time.
+[15:44] No stacking, no duplication, hopefully no conflicts.
+[15:47] And of course, once you're feeling confident in the loop,
+[15:49] we're gonna want to speed it up, right?
+[15:51] I have 150 RPC procedures to migrate.
+[15:53] If I do one at a time, it's gonna take six months,
+[15:56] which is way longer than I want to wait.
+[15:57] Fortunately, there's a lot of ways
+[15:58] to pick up the velocity of our loop.
+[16:01] We could have our controller pick three procedures
+[16:03] to migrate instead of one at a time, or five.
+[16:07] We could have our controller pick three or five
+[16:09] and then do each of those in a separate implementation phase,
+[16:12] which will be both cheaper and more reliable
+[16:14] since each migration gets its own context window.
+[16:17] Or we could just run the workflow four times
+[16:19] and give one PR to each of four people on the team.
+[16:22] So let's put it all together.
+[16:24] We built a control loop that improves our code incrementally.
+[16:27] And we're actually reading the code.
+[16:29] It has adaptive flow control, so we're not creating
+[16:32] a bunch of work that nobody wants to review.
+[16:35] And we can re-steer it on the fly in a super low friction way.
+[16:39] If you want to try this yourself, we built a skill.
+[16:41] Please try it out.
+[16:42] My Twitter handle is down there on the bottom.
+[16:44] Please share it.
+[16:45] I would love to see what you build.
+[16:47] And if you get excited by this, at HumanLayer,
+[16:50] we're hiring here in San Francisco.
+[16:51] And if you're working on mission critical systems
+[16:54] and want to figure out how to get more out of AI,
+[16:56] we'd love to chat.
+[16:57] Thank you so much.

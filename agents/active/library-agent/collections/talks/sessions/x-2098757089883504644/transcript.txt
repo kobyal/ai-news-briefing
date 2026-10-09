@@ -1,0 +1,1581 @@
+[0:00] What if Claude Code could run Claude Code?
+[0:02] That's the question everybody wants to know.
+[0:04] And everyone was trying all last year.
+[0:05] It's going Claude Code.
+[0:06] And now you're addicted.
+[0:07] Because you'll very quickly get into an equilibrium
+[0:09] where every agent is waiting.
+[0:11] There's always an agent waiting for you
+[0:12] because somebody's finished, right?
+[0:14] As soon as you spin up enough of them mathematically, right?
+[0:16] I'm serious, man.
+[0:18] Programming is going to be for everybody.
+[0:19] And it's going to be the most amazing thing
+[0:21] because you know how much fun we've been having all those years.
+[0:23] And we've been telling people it's really fun.
+[0:25] But now they're going to get to experience.
+[0:26] For engineer for 40 years.
+[0:27] He spent decades at Amazon and Google, is famous for his brutally honest rants about
+[0:32] the industry, and for being right, a lot.
+[0:35] He recently built Gastown, an open-source AI agent orchestrator, and co-authored the
+[0:39] book Vibe Coding with Gene Kim.
+[0:41] In today's conversation, we discuss Steve's eight levels of AI adoption for engineers,
+[0:46] from no AI to running multiple agents in parallel, and why 70% of engineers are still stuck at
+[0:51] the bottom levels.
+[0:52] Why AI is creating a vampiric burnout effect on developers, where you can be 100 times
+[0:57] more productive but only get three good hours a day. His prediction that big tech companies are
+[1:01] quietly dying and that small teams of two to twenty people will rival their output. And many
+[1:07] more. If you want to understand what the day-to-day of software engineering look like in the near
+[1:10] future and how not to get left behind, this episode is for you. This episode is presented by Statsig,
+[1:16] the unified platform for flags, analytics, experiments and more. Check out the show notes
+[1:20] to learn more about them and our other season sponsors Sonar and WorkOS.
+[1:24] so steve really good to have you on the podcast again what have you been up to
+[1:31] gergie great to be back it's been uh 10 months now closer to a year yeah close to a year yeah
+[1:38] boy seems like forever yeah sure it is um uh yeah uh it's there's been a lot going on now
+[1:44] i'm uh unemployed right now which has been incredibly fun unemployed or fun employed i am
+[1:52] I'm just doing whatever I want.
+[1:53] That's what I'm doing, which is real nice.
+[1:55] And I had a couple of software launches, which was nice.
+[1:58] I had a book launch last year, which was nice.
+[2:01] I've been living the life.
+[2:03] Yeah.
+[2:03] So for a very long time, you've been known as this kind of truth teller of bringing in
+[2:11] sometimes comical, sometimes really uncomfortable facts or observations, should I say.
+[2:16] You wrote like often in really kind of fun ways with rants.
+[2:20] and a lot of them resonated with people.
+[2:23] Do you remember what was a rant that really stood out
+[2:26] at any point in time that you got some really good feedback
+[2:29] either at that point or later you felt validated by it?
+[2:33] Oh, well, so a lot of people tell me,
+[2:36] well, those who know their favorite Stevie blog
+[2:39] is actually Execution in the Kingdom of Nouns.
+[2:41] I don't know if you remember that one way back in the day.
+[2:44] I was at Google, early days Google,
+[2:46] And I was trying, I was struggling to sort of like get this idea across to people that Java's growth was super linear with the amount of code.
+[2:55] So the amount of code would grow more than the amount of functionality, which is not a good place to be.
+[3:01] And Java has gotten a lot better since then.
+[3:03] Right.
+[3:04] But my post raised a lot of eyebrows at Sun because they were like, what is this guy complaining about?
+[3:08] Why doesn't he just shut up?
+[3:09] You know, but I was like, I want to use a language that has first class functions.
+[3:13] And so I wrote a very, very, very unusual blog post called Execution in the Kingdom of Now.
+[3:19] And people really loved it, where it was a story.
+[3:21] It was just a fairy tale about a land where there were no verbs.
+[3:25] And it was fun.
+[3:27] So one of your lesser known blog posts, or for a lot of listeners, it's called Rich Programmer Food Essay.
+[3:35] Rich Programmer Food.
+[3:36] And this was about compilers.
+[3:40] Do you remember what you argued about or what points you made?
+[3:42] Of course. That's one of my most important blog posts ever. I've got to tell you, I met a guy, okay, who he introduced himself at SWIX's AI engineering conference in New York. And he's like, I've wanted to meet you, Steve. I'm one of your players. Okay. And I'm like, whoa, because this dude's, you know, in his thirties and, you know, you know, he's played my game. You understand the game that I wrote.
+[4:01] It's something that most people haven't seen it because I didn't open source it.
+[4:05] I will someday.
+[4:06] It's just a pain in the butt.
+[4:07] It's a really beautiful thing.
+[4:09] And it created so much love in the players.
+[4:11] For decades, they would come back, right?
+[4:13] But this guy was so into it.
+[4:14] And he's like, I read your Rich Programmer Food blog post and decided to become a compiler expert.
+[4:21] I became a PhD.
+[4:22] He was in high school when he read it.
+[4:24] Became a PhD.
+[4:25] Started his own company.
+[4:27] He's got a startup that's doing really, really well now.
+[4:29] And he said it was all because of that post.
+[4:30] and and this post talks about i think you argued that unless you know how compilers work you're
+[4:38] not going to be a good programmer an efficient programmer i'm not sure what the phrase was
+[4:42] there's going to be a layer of magic between what you're doing and what the computer is doing that
+[4:48] is forever going to be sort of a friction for you and then i think you even argued that some phds
+[4:54] don't even understand how compilers work and this will make it really hard for them to be efficient
+[4:59] at the time that was definitely true right how do you think that post has aged because at that time
+[5:05] i think was like 2012 or so like even then i i would assume it was a bit unconventional to say
+[5:12] like you need to understand assembly because it was high level languages right java was was in
+[5:16] its prime c sharp ruby was starting to come out i mean heck javascript was starting to become big
+[5:21] react will start in a few years and most developers would have thought why would i need to know
+[5:26] compilers assembly i mean that's what the compiler is for right yeah you're asking a really really
+[5:31] really foundational question you're asking me what universities should teach is what you're
+[5:36] asking me gary gay okay in disguise and uh you know um that that those goalposts have moved
+[5:44] every few years since i got into this game in the 80s all right what you need to know in order to be
+[5:50] a software engineer it used to be assembly language it used to be like lots of bits and
+[5:55] stuff like that. And over time, my buddies and I realized that our favorite bit manipulation
+[5:59] questions were starting to bounce off candidates who'd never seen a bit before. Right. And we
+[6:04] really, you know, we did some soul searching in the 2010s, you know, and we were like,
+[6:09] yeah, do you really need to know how to manipulate bits in a bite with XORs and stuff like that
+[6:13] anymore? Probably not. Right. And that was a depressing realization because we had prided
+[6:18] ourselves in knowing how that stuff works, but we just don't need it anymore. And the sad reality
+[6:25] is that I had a lot of my own ego and identity wrapped up in my sort of compiler background.
+[6:31] It's all, it's interesting, right? But it's not useful in any meaningful sense anymore.
+[6:37] And is it not useful because the compilers have gotten so good at optimizing, for example?
+[6:44] is it that the problems have moved on to higher layers?
+[6:48] Yeah.
+[6:48] Why do you think that is?
+[6:49] We're just walking up the abstraction ladder, that's all.
+[6:51] And we're not even talking about AI just yet.
+[6:53] Like, this happened even...
+[6:54] Didn't say AI.
+[6:55] Did you say AI?
+[6:56] No, not yet.
+[6:57] We will say it.
+[6:57] But even in the, I remember, like, you know, late 2010s,
+[7:01] it didn't really come up.
+[7:03] Like, in my career, I can only remember one time
+[7:06] where it would have been nice to know what the compiler did,
+[7:09] but even then might have been a red herring, honestly.
+[7:11] Look, what you have to know just keeps moving. They just, they keep changing the courses. They keep changing what they teach. Many people don't see this because they're only looking a year or two or three back and, you know, looking a little bit forward. But I've been doing this for 40 years and I can tell you, they teach you very different things now than they used to teach. And it's because you need to know very different things. And nowhere is it more evident than when we saw the exponential curve of the graphics industry, computer graphics.
+[7:34] look at graphics today compared to 19, you know, 92 when I was learning graphics in university.
+[7:40] And I had to learn how to literally, you know, do the algorithm to figure out where the next
+[7:45] pixel goes on a line so I can render it. So eventually turned it into a triangle,
+[7:49] which is a polygon. Meanwhile, two years later, I took the same course and we were doing animation.
+[7:54] I didn't even know what a polygon was. I mean, I did, but not at that level, right?
+[7:58] The whole ladder just kept moving up and the jobs changed. Originally they needed people that could
+[8:02] right device drivers. And now they need people who can do game worlds and physics and all this
+[8:07] stuff, right? It's just graphics showed us the way. This is what happens. And software engineering
+[8:13] jobs have been very stable for, I don't know, since iOS, since mobile and cloud. Those are the
+[8:18] last two big innovations, right? Yeah. Steve just made the point that the industry goes through
+[8:22] these massive maturity leaps from raw pixels to game engines, from bare metal to cloud. And if
+[8:28] you're building software today that needs to make that leap to enterprise grade, there's a tool that
+[8:32] handles exactly that. This is our season sponsor, WorkOS. If you're building any SaaS, especially an
+[8:38] AI product, authentication, permission, security, and enterprise identity can quietly turn into a
+[8:43] long-term investment. SAML edge cases, directory sync, audit logs, and all the things enterprise
+[8:49] customers expect. It's a lot of work to build these mission-critical parts and then some more
+[8:54] to maintain them, but you don't have to. WorkOS provides these building blocks as infrastructure
+[8:58] so your team can stay focused on what actually makes your product unique.
+[9:03] That's why companies like Entropic, OpenAI, and Cursor already run on WorkOS.
+[9:07] Great engineers know what not to build.
+[9:09] If identity is one of those things for you, visit WorkOS.com.
+[9:13] With that, let's get back to the question of what the last real innovation in software engineering actually was.
+[9:19] And it's been kind of dead since then, actually.
+[9:21] Yeah.
+[9:22] I don't want to say AI because we're not talking about it yet,
+[9:24] But I think we went through a period where people stagnated a little bit, where the courses didn't change very much.
+[9:30] And we thought this is all we're ever going to need to know.
+[9:33] I feel the last big innovation, correct me if I'm wrong, was distributed systems.
+[9:38] That was the last kind of hard problem starting from like 2010s when Uber brought microservices into there, how you scale services, how you store large amounts of data.
+[9:48] I feel that was like...
+[9:50] I mean, it was big.
+[9:50] It was a big slow...
+[9:52] Yeah, but honestly, like, I feel there's a lot of migrations happening, new React versions coming up and developers struggling with that.
+[9:59] Apple every year throwing in a, you know, like a screwdriver in the wheels with a new breaking version.
+[10:06] Android developers needing to retire an Android old version and deciding like where to cut it off.
+[10:12] So I feel there was that like kind of like migrations thing.
+[10:15] And also business was just good, right?
+[10:17] Like everyone was growing.
+[10:18] We were like, everyone was busy hiring.
+[10:20] Like there's no tomorrow.
+[10:21] There was a time in 2021, the market was so hot.
+[10:24] A lot of bootcampers with three months experience were getting offers.
+[10:27] It's a pretty good company because everyone was so desperate to hire.
+[10:31] And then came AI in 2022.
+[10:35] One thing that always struck me about you, even in those like, you know, in 2020s and
+[10:39] even before, you were always pretty pragmatic.
+[10:41] You know, you were by trade, you were always into compilers, debugger tools.
+[10:46] That's where you started.
+[10:47] You worked on hard problems at Amazon, at Google, never shied away to getting into like
+[10:51] hard technical problems and you know like all these things and when ai came out i don't remember
+[10:57] you saying oh this is amazing this is going to change the world how did you feel were you kind
+[11:01] of like observing skeptical like at the very beginning right when you first came across lms
+[11:06] how was that i was pretty blown away that they could write fairly coherent emacs lisp functions
+[11:13] like like chat gpt the original one in in december 2023 2022 2022 okay boy time flies um could
+[11:22] already write code in a weird language right uh not very much of it and it was it was janky but
+[11:29] that was for me that was the beginning of oh right uh you know because i've had friends in ai for 20
+[11:35] years saying any minute now any day now right and they'd show us and they would complete better and
+[11:39] better and better. And this was the first time it was like, oh, okay. I see now. Right. But I was
+[11:44] still skeptical like everybody else. And I can, I can tell you because when, when the rumors came
+[11:49] out about Claude code in a beginning of last year, right. That Anthropic had a tool internally that
+[11:55] was writing code for them. And it was a command line tool. I, I, along with everyone else went,
+[12:00] no, it's not, you know, it's, we were just like, just flat out rejection, just absolutely not
+[12:06] happening, right? Until I used it. And then I was like, oh, I get it. We're all doomed.
+[12:10] Right? And then I wrote Death of the Junior Developer right after that, actually, I think.
+[12:14] Gosh, it might have even been after 4.0 came out that I did Death of the Junior Developer.
+[12:19] But things changed really fast once that came out. But was I a skeptic? Yes. But did I pay
+[12:25] attention to the curves from the very beginning? I figured if chat GPT-3.5 can write a coherent
+[12:31] emacs list function then in a year let's see how they do and in a year 4.0 was writing a thousand
+[12:37] lines of code a thousand lines dude that's most of the world's code is in files of a thousand lines
+[12:43] or less which means that it can make credible edits it wasn't able to up until 4.0 came out
+[12:49] right and so like man it was that point when i was like okay we're on a curve this is a ride it's not
+[12:55] stopping let's get on the ride and see where it goes and i dove in right and i was like i was
+[13:00] behind. I didn't know AI. I didn't know the fundamentals. I didn't know the lingo. Everybody
+[13:06] knows this stuff now, right? I spent a year doing nothing but reading papers and catching up, right?
+[13:12] So in this book, Vibe Coding, I remember last time you were on the podcast, this book was about
+[13:19] to come out and I was reading an early version of it or so. But the back cover, I just read the
+[13:24] back cover and I realized that you must have written this about a year ago. And it says,
+[13:27] the days of coding by hand are over.
+[13:31] When did you realize this?
+[13:32] Because I've realized this recently with Opus 4.5,
+[13:36] but this was well before that.
+[13:40] Yeah, it was a year ago.
+[13:41] It was, let's see, what is it right now?
+[13:43] January?
+[13:44] So it was over a year ago.
+[13:46] It was 12, 13 months ago when I first realized.
+[13:50] And that wasn't even my quote.
+[13:51] That was Dr. Eric Meyer, right?
+[13:54] The inventor of many, many, many things in the programming world.
+[13:58] One of the most important compiler people in the world.
+[14:00] That dude, think about it.
+[14:02] He spent his life building technology for developers to be able to write code.
+[14:06] And he's saying developers aren't going to write code anymore.
+[14:09] What would possess somebody to say, well, my life's work isn't really right?
+[14:13] And that's what caused actually Gene, Kim, and I both to go, huh, right?
+[14:17] You know, if the inventor of, you know, he made huge contributions to Visual Basic and C Sharp and Link and Haskell and PHP with a pig.
+[14:29] Is that what it's called?
+[14:29] Right.
+[14:30] All him.
+[14:31] And he's just like, no, we're done.
+[14:32] We're done writing code.
+[14:33] I mean, that's pretty big words from a languages person.
+[14:36] One of the most famous in the world.
+[14:38] Right.
+[14:38] What does he see that we didn't?
+[14:40] And he sees the curves, man.
+[14:41] It's that simple.
+[14:42] It's like exponential curves.
+[14:45] they get real steep real fast and we're heading into the steep part this year.
+[14:50] So the inventor of C-sharp and Visual Basic is saying that we're done writing code. But even if
+[14:55] the AI writes all the code, someone has to verify it. And that's where our season sponsor, Sonar,
+[15:01] comes in. Sonar, the makers of Sonar Cube, has introduced the agent-centric development cycle
+[15:06] framework, ACDC, a new software development methodology designed for the unique scale and
+[15:11] speed of AI generated code. It's a move towards a more intentional four-stage loop that gives agents
+[15:17] the guardrails they actually need. The four phases being guide. First, agents need to understand the
+[15:23] canvas on which they're being asked to create so that the output fits with what the developer and
+[15:28] organization require. Generate. The LLM-based tool generates the code it believes will achieve the
+[15:33] desired outcome within the right context. Verify. Next, the agent is deliberately required to check
+[15:40] its work, ensuring it actually achieves the desired outcomes and is reliable, maintainable,
+[15:45] and secure. Solve. Finally, any issues identified are provided to a code repair agent to fix.
+[15:52] To power this, Sonar has significantly strengthened its offering, introducing products and capabilities
+[15:57] like Sonar Context Augmentation, Sonar Cube Agentic Analysis, Sonar Cube Architecture,
+[16:04] and Sonar Cube Remediation Agent. Head to sonarsource.com slash pragmatic to learn more
+[16:08] about the latest with Sonar and how it's empowering organizations to embrace the agentic era.
+[16:13] With this, let's get back to Steve's exponential curves of AI improvement.
+[16:17] Playing devil's advocate, you know, like one thing about being an engineer is like,
+[16:22] you can draw up curves, but you know, like you never know when they end or if they flatten,
+[16:27] whatnot. We can see where it has come. What made you believe that this curve would keep going?
+[16:32] And especially that with LLMs, the fact that it even kind of works was a bit of a, I guess,
+[16:37] surprise for a lot of people and the fact that it kept scaling is a surprise and there's this
+[16:40] question of like how long they will scale yeah so the world is filled with unbelievers okay people
+[16:47] who i'm specifically who believe the curve looks like this an s it goes up and then it flattens
+[16:51] okay and they actually think we're at the hump right now yeah and they have fought that ever
+[16:56] since the gpd35 came out they're like yeah it's not going to get any better 4-0 comes out we love
+[17:00] 4-0 people love 4-0 they still do they can't get rid of it but they still think that's as good as
+[17:05] gets. Opus 4.5
+[17:07] is out and most people haven't played with it.
+[17:09] Most people don't realize
+[17:10] what's there. And that thing is already
+[17:13] two months old. The half-life between
+[17:15] model drops, far as I can tell, has
+[17:17] gone from about four months beginning of last year
+[17:19] to two months from Anthropic at the beginning of this year.
+[17:22] So any day we're going to
+[17:23] see another model from Anthropic. It'll probably be
+[17:25] out by the time we have this podcast out, right?
+[17:28] And that will be so much further up the
+[17:29] curve that people are going to start to be really
+[17:31] freaked out by it.
+[17:33] It's going to worry people when they see
+[17:35] the next model. Okay. Because all of the bugs, all the mistakes that they're complaining about
+[17:39] right now get fed right back in his training. And so that it doesn't make them the next time.
+[17:44] And this is what people aren't understanding. Right. And also time continues. There will be
+[17:49] three and five years from now, the sun's not going to stop. Right. And it's coming. So this
+[17:53] inevitable, the collision of these curves, man, it's, there will be societal upheaval is what's
+[17:58] going to happen. And it's already started and people are justifiably mad. And I'm mad with
+[18:04] them, Gergay. I'm mad at Amazon for laying off 16,000 people and blaming AI without an AI strategy
+[18:09] for it. Those people are not going to be able to find jobs, my and large, and they're the first of
+[18:13] many to come. And nobody has a plan for this. Why do you think Amazon did that if they don't
+[18:19] have an AI strategy? Because unfortunately, and people are going to hate me for saying this,
+[18:26] but me saying it doesn't make it true. It was true already. Everybody has a dial that they get to
+[18:31] turn from zero to 100. And you can keep your hand off the dial, but it just has a default setting
+[18:35] of what percentage of your engineers you need to get rid of in order to pay for the rest of them
+[18:39] to have AI. Because they're all starting to spend their own salaries in tokens. And so at least for
+[18:45] a while, if you want your engineers to be as productive as possible, you're going to have to
+[18:49] get rid of half of them to make the other half maximally productive. And as it happens, half
+[18:54] your engineers don't want to prompt anyway, and they're ready to quit. And so what's happening is
+[18:59] everybody on average is setting that out about 50% and we're going to lose about half the engineers
+[19:03] from big companies, which is scary. Yeah, that's wild. It's way, that's way bigger than we've seen
+[19:11] back at COVID. It's going to be way bigger. It's going to be awful. But at the same time,
+[19:17] something else is happening, which is AI is enabling non-programmers to write code.
+[19:21] And it's also enabling engineers who have seen the light and believe the curves are going to
+[19:24] continue to go up to actually get together in groups of two and five and 10 and 20 and 30 people
+[19:30] and start to do things that rival the output of these big companies that are tripping over
+[19:34] themselves. And so we've got this mad rush of innovation coming up, bottom up, and we've got
+[19:40] this mad knowledge workers falling out of the sky as the big companies lay them off because there's
+[19:44] clearly the big company is not the right size anymore. It's not even Andy Jassy saying it,
+[19:49] we're going to do the same thing with fewer people, right? And so does this mean we're going
+[19:53] to have a million times more companies? Is there going to be a massive explosion of software or
+[19:58] people going to get out of software altogether and we're all going to go do other stuff? I mean,
+[20:01] like, I'm very curious where all this goes. Yeah. Small teams that have the right skill set or see
+[20:07] the right business opportunity or have advantages can do way more. So there is something there in
+[20:12] that. There is. So there's this land rush starting. I think a lot of the people coming out of
+[20:17] knowledge work are just anti-AI and those people are going to struggle. I'm sorry, but if you're
+[20:22] anti-ai at this point it's like being anti this is the sun you're gonna have to go live underground
+[20:26] right but the people who are like pro-ai like i i think we're gonna see a big redistribution of
+[20:33] who's doing the work and where you get your software from and it may we may well wind up from
+[20:38] i i could actually see a happy place where amazon's not even a thing anymore
+[20:42] i really could because software becomes we don't have the words for what's happening right where
+[20:48] you know so many things happening this year that we don't have words for have you noticed that
+[20:51] But software becomes sort of like distributed.
+[20:54] I don't know.
+[20:55] I do see non-technical people getting into software.
+[20:58] Could there be a job there for engineers to come and actually take over maintenance?
+[21:03] Yeah.
+[21:03] I mean, I think there's going to be plenty of opportunity for...
+[21:06] There's going to be a lot of engineers doing software engineering.
+[21:10] I just think we're all going to be doing it with AI, right?
+[21:13] Yeah.
+[21:13] But I think it'll be quite some time before companies are comfortable trusting their code
+[21:17] to be written and deployed by AI
+[21:20] without any human being involved at all.
+[21:22] I think the point that people are missing,
+[21:24] the important point that the naysayers
+[21:26] and the skeptics are missing,
+[21:28] it's not that AI is not coming to replace your job.
+[21:31] It's not a replacement function.
+[21:32] It's an augmentation function.
+[21:34] It's here to make you better at your job, right?
+[21:37] And that's not a bad thing, actually.
+[21:40] I don't know why people would fight that, but...
+[21:43] Speaking about the job as developers,
+[21:45] you've said something that can be triggering
+[21:47] for a lot of people.
+[21:48] You've said that,
+[21:49] I think this was on the AI engineer summit,
+[21:51] that if you're still using an IDE now,
+[21:53] you're a bad engineer.
+[21:54] Yeah.
+[21:55] Well, you got to be a little provocative.
+[21:57] Yeah.
+[21:57] You know, let me put it this way.
+[22:00] Okay.
+[22:00] I'm not going to say you're a bad engineer
+[22:01] because I know some very, very good engineers,
+[22:03] better than I am,
+[22:04] who are still at like level one or two in my chart.
+[22:06] Right.
+[22:07] But I feel profoundly sorry for them.
+[22:09] I feel pity for them.
+[22:10] Like I've never felt in my life
+[22:12] for these grown people who are good engineers
+[22:15] or used to be.
+[22:16] and they're like, yeah, you know, I use Cursor
+[22:19] and I ask it questions sometimes
+[22:20] and I'm really impressed with the answers.
+[22:22] And then I review its code really carefully
+[22:23] and then I check it in and I'm like,
+[22:25] dude, you're going to get fired.
+[22:26] And you're one of the best engineers I know.
+[22:29] Tell me about your chart.
+[22:29] Tell me about your levels that you came up with.
+[22:32] Yeah, so I was drawing this on the board in Australia
+[22:34] for a big group of people
+[22:36] trying to show them what happens
+[22:38] because I saw them at all different phases.
+[22:40] Some of them had their IDs open.
+[22:41] Some of them had a big wide coding agent.
+[22:43] Some of them, the coding agent was really narrow, right?
+[22:46] you know and so i was like okay we're gonna put you all on a spectrum just to show what's going
+[22:50] on right and level one no ai right you know and and level two it's it's the the yes or no can i do
+[22:58] this thing you know in your in your ide right and then level three you're like yolo just do your
+[23:03] thing right your trust is going up right level four you're like the code you're starting to
+[23:09] squeeze the code out right because you're like you want to look at what the agent is doing and
+[23:12] not so much at the diffs anymore, right?
+[23:14] So you're not reviewing as much now.
+[23:15] You're not reviewing as much.
+[23:17] You're letting more of it through
+[23:18] and you're really focused on the conversation with the agent.
+[23:22] And then at level five, you're like,
+[23:23] okay, I just want the agent.
+[23:25] And I'll look at the code in my IDE later,
+[23:27] but I'm not coding with my IDE.
+[23:28] At level six, you're bored because you're like,
+[23:30] okay, my agent's busy.
+[23:31] I got to do something.
+[23:32] I'm twiddling my thumbs.
+[23:33] And so you fire up another agent
+[23:34] and now you're addicted
+[23:35] because you'll very quickly get into an equilibrium
+[23:37] where every agent is waiting.
+[23:39] There's always an agent waiting for you
+[23:41] because somebody's finished, right?
+[23:42] As soon as you spin up enough of them mathematically, right?
+[23:44] And so you find yourself just multiplexing between them, going like this, and you can't leave.
+[23:50] Practical question.
+[23:51] Assuming I'm working on the same code base, how do you spin up the multiple agents so that they don't get in conflict?
+[23:57] Yeah, so that takes you to level seven, which is, oh my God, I've made a mess, right?
+[24:02] I accidentally texted the wrong agent and didn't realize it, and they did a big project inside of this project because I asked them to, and now I've got to clean up this mess, et cetera, right?
+[24:11] All that stuff.
+[24:11] And that was when I started going, okay, what if we were to like coordinate this?
+[24:15] What if Cloud Code could run Cloud Code?
+[24:18] That's the question everybody wants to know.
+[24:19] And everyone was trying all last year.
+[24:21] It's going, Cloud Code, run yourself.
+[24:22] It would run for a while and it would stop, right?
+[24:25] And so it was the whole stopping thing that, so yeah, I pushed on that really, really, really hard and wound up building some stuff to help with it.
+[24:32] But yeah, boy, it's changed a lot, man.
+[24:35] It's changed so much.
+[24:36] going back to the id you you had a really good live debate with natan sobo from zed and the
+[24:41] title was the death of the id and both of you argued your view what what is your view about
+[24:49] the id and also what did you learn from from nathan on on like his take of he was a bit more
+[24:54] pro id and you were a bit more like maybe this is not gonna be around forever yeah i mean you know
+[25:00] i am where i am in my journey which is i i think that ai will do it all for us eventually and so
+[25:06] the way I see IDEs is
+[25:08] what do they really do and what are they really for?
+[25:10] It's not really for writing code.
+[25:12] It's for bringing tools together
+[25:14] and for making a big tool.
+[25:16] Right? And
+[25:18] now you have MCP for that.
+[25:20] Or whatever. Right?
+[25:22] And so I see IDEs returning
+[25:24] and I think Claude
+[25:26] co-work is a return
+[25:28] to the IDE form. It's Claude
+[25:30] code going, oh, I need to be for real people.
+[25:32] Right? But I think Claude co-work's
+[25:34] form factor probably works better for the average developer than cloud code does right so i see ide
+[25:40] i see it's coming back into a world where it's ide's except it's all conversations and you know
+[25:46] monitoring and this is a really good point my brother built a thing called craft agents which
+[25:51] is pretty similar to cloud co-work except they connected in their company their own data sources
+[25:56] and he said that some developers start to prefer that because it's a visual that's easier to see
+[26:02] parallel agents for example if you're not a power user it's easier to scroll it's just a nicer ui so
+[26:07] your point on maybe some developers should try out like if if you're not sold on cloud code like try
+[26:12] cloud co-work or any other similar more visual thing it might be more your thing but like you
+[26:17] know get some people love the command line i actually just use the ui because i just don't
+[26:21] like memorizing the commands as embarrassing it is to admit or maybe these days it's not as
+[26:26] embarrassing. Yeah. The key was try as long as you're trying something. Yeah. Probably the single
+[26:32] most important proxy metric that you can have in a company today is token burn. Because what token
+[26:39] burn says is your engineers are trying to do stuff or your non-engineers. And when they're trying,
+[26:44] they're failing and they're learning. And so if you want to get those organizational bottlenecks
+[26:49] discovered early on, and you want to get your engineers leveled up on my eight level spectrum
+[26:54] early on and you want to solve your business processes ahead, you need to start now, which
+[26:59] means try. It doesn't matter what you try. It doesn't matter which tool you use. As long as
+[27:03] you're using AI and you're trying to get it to do the work, you're doing the right thing.
+[27:08] Yeah. And I think as professionals, we really ought to just at least try. You get first-hand
+[27:12] experience and then you can make your decision. Steve's point about token burn is really
+[27:17] interesting. The companies that win are the ones that experiment the most. And if you want to bring
+[27:22] that same experimental mindset to your product, not just your AI usage, that's exactly what our
+[27:27] presenting sponsor, Static, is built for. Static gives you the complete toolkit without building
+[27:32] it yourself. You get feature flags, experimentation, and product analytics all in one platform and tied
+[27:37] to the same underlying user assignments and data. In practice, it looks like this. You roll out a
+[27:43] change to 1% of users at first. You see how it moves the top-line metrics you care about,
+[27:47] conversion, retention, whatever is relevant for that release. If something goes wrong,
+[27:52] instant rollback. If it's working, you can confidently scale it up. Companies like Notion
+[27:56] went from single-digit experiments per quarter to over 300 experiments with Statsik. They shipped
+[28:02] over 600 features behind feature flags, moving fast while protecting against metric regression.
+[28:07] Microsoft, Atlassian, and Brex use Statsik for the same reason. It's the infrastructure that
+[28:11] enables both speed and reliability at scale. Statsik has a general street tier to get started,
+[28:16] and pro pricing for teams starts at $150 per month.
+[28:19] To learn more and get a 30-day enterprise trial,
+[28:21] go to statstig.com slash pragmatic.
+[28:24] With that, let's get back to Steve's take
+[28:26] on the state of Gastown.
+[28:28] Now, there's a huge problem with people
+[28:29] not knowing how to try.
+[28:31] And they say, oh, let me do something.
+[28:32] And then it does the wrong thing
+[28:33] because they always do.
+[28:34] And then they're like, well, this is garbage.
+[28:37] So, you know, you have to teach them
+[28:38] that it's a shovel and you don't go shovel dig
+[28:40] like in Fantasia, right?
+[28:42] Like make the brooms walk around.
+[28:44] No, you pick up a shovel and you dig with it.
+[28:45] But it's a shovel that you didn't have before you were using your hands.
+[28:48] Like, it's a really, really simple analogy, but people just don't get it.
+[28:51] They don't get it.
+[28:52] And I think, and I'm going to say something that's contentious, but it's just the reality of the world.
+[28:56] Most people can't read.
+[28:58] I've ruined much of my work in my life.
+[29:01] I've just completely gone down wrong path by overestimating people's ability to read.
+[29:05] And I think that reading is, if anything, getting harder to come by as a skill these days.
+[29:10] and this is the situation
+[29:13] that we're in right now
+[29:14] is that cloud code
+[29:15] makes you read a lot.
+[29:17] So I think we're in a weird limbo
+[29:18] for the rest of this year.
+[29:20] Okay, until the UIs arrive
+[29:22] that are good enough
+[29:23] for everybody who can't read,
+[29:25] everybody who can't read
+[29:26] is going to be
+[29:27] at a severe disadvantage.
+[29:29] Tell me a little bit more
+[29:30] about your observation
+[29:31] that a lot of people
+[29:32] or a lot of developers
+[29:33] cannot read
+[29:33] because you were at Amazon.
+[29:34] That place supposedly
+[29:36] is running on six pagers
+[29:38] and people actually reading
+[29:40] does it i mean most dude most people can't read i don't know if you know this man like i they just
+[29:47] they read really slow okay and and the ai is i mean come on to most people five paragraphs as an essay
+[29:54] remember five paragraph scenes in high school is a thing we have in america i guess maybe years
+[29:58] were 100 paragraphs in the answer van but to us five paragraphs is a lot and that's like that's
+[30:03] the AI just clearing its throat, right? You know, you got to be able to read waterfalls of text.
+[30:11] And so we're looking at a world where that won't work. And so you're going to need recursive
+[30:14] summarization. You're going to need a factory. And it's funny because like, this is why, I mean,
+[30:18] trying UIs is so important because Gastown right now, the reason I say you can't use it is that
+[30:23] it's a factory filled with workers and you're talking to it through a telephone. You can also
+[30:27] go and look through the window and count on it and talk to the workers, but it's not like you're in
+[30:31] it right with a ui you're in it and you can you can see what's going on and right it's all invisible
+[30:37] and yes by and large right you know hard to see and so i really do think and i'm gonna i'm just
+[30:43] gonna make a bold prediction i think that by the end of this year and we'll see demos of it like
+[30:48] right away but by the end of this year most people will be programming by talking to a face
+[30:53] a face as in a fake person your ai like the gaston mayor will be a fox talking to you and
+[31:01] you'll say why doesn't it work and they'll say i'll go look at it and it'll go spin off its workers
+[31:06] just like it's doing but you're talking to a face and it will talk only thing yeah i think that's
+[31:11] the only thing that's going to work for most people fascinating let's let's write this down
+[31:15] prediction why do you go build it i'm not going to let's talk about gas town you mentioned gas
+[31:19] town what for those that a lot of people have heard about what is gas town gas town is an
+[31:25] orchestrator so 2023 was completions code completion yeah autocomplete yeah that's when
+[31:33] we said it's a completion acceptance rate card you remember that oh my god people were measuring it
+[31:38] yeah stupid metric by the way uh the second one was but it was close it was a proxy for are they
+[31:43] trying right then there was chat that was 2024 right and then agents was 2025 we knew you could
+[31:50] just look at that curve and go okay well if if chat is completion is in a loop basically and agents
+[31:55] are basically chatting a loop,
+[31:56] well, then we're going to put agents in a loop
+[31:59] and that'll be an orchestrator, right?
+[32:00] And a bunch of them started coming out
+[32:02] and I built one of my own, my own vision.
+[32:05] But that's all it is.
+[32:05] It's agents running agents.
+[32:07] And can you talk through a software engineer
+[32:10] to its architecture?
+[32:11] Like how is it organized?
+[32:13] How can I imagine, you know, the setup?
+[32:15] Yeah, sure.
+[32:16] I mean, look, Gaztown is really complicated
+[32:18] and it's been really broken all week
+[32:20] because I'm migrating it to Dalt.
+[32:21] And that's where I actually learned
+[32:23] how complicated it was.
+[32:24] it has a lot of features you're migrating it to to dolt it's a a new database oh okay yeah dolt
+[32:31] is uh dolt is amazing dolt is a git back to database it's a git database it's uh beads
+[32:37] is just git plus database crammed together badly and there's actually a database that does this
+[32:41] so i'm migrating to it but yeah anyway gastown is is is what it should be is one one mayor that
+[32:50] you talk to that's your your person and then whatever else needs to get done they're just
+[32:55] going to fire off workers okay it's a little a little bit more complicated than that because
+[33:00] there are really i think there are two kinds of work that that people go back and forth on and
+[33:04] people are arguing about whether they're the right one and some people at anthropic told me it's the
+[33:08] minimaxing context argument okay there are people who believe that you should maximize your context
+[33:13] window and fill it with rich juicy context so that the ai is wise and all-knowing when it's talking
+[33:18] to you they want to like you know just right at the edge of the context and then there are others
+[33:22] who are like task kill it task kill it i want the shortest window because of the quadratic x you
+[33:28] know increase in in um cost yeah combined with the dramatic drop off in cognition as the tokens go up
+[33:35] right yeah losing their track and stuff so so what which one's right and we've got people who
+[33:40] are like full on in the in the in the minimizing and the maxers and and i looked at my work
+[33:46] workflow and i was like well polecats are the min and crew are the max i have two fundamental role
+[33:52] worker roles in gas town so you have the really simple one which is the small content yeah if you
+[33:56] have a really if you have a really well specified task all broken down into subtasks then you can
+[34:01] fight and and it's like it's self-contained it's it says what to do then you can give it to a worker
+[34:06] and have it go do it right meanwhile you have a really difficult design problem you're going to
+[34:11] have to have a series of conversations about this. I maximize
+[34:15] context. I'm like, read all these docs and then we'll talk. Right. So it's
+[34:19] just two workflows. And like, I like JG. I mean, it sounds like
+[34:23] I think it's so easy to imagine like it's a little town, you know, like
+[34:27] it was wild, wild west. There's the mayor, like the crew, the workers,
+[34:31] everyone's buzzing and going around that a house are being built in practice.
+[34:35] How does this work? Like, how has it worked for you? What are you hearing
+[34:39] people get projects done versus not getting it done versus turning into absolute chaos what have
+[34:45] you learned with gas town it's been a great experiment i mean i've i've really experiment
+[34:49] right well yeah i mean right i mean i went out and built something that doesn't deliberately
+[34:53] doesn't work it's too hard it's too hard for the models even opus 4.5 is barely enough and it's
+[34:58] funny because the folks at anthropic told me they like it that they're kind of embarrassed some of
+[35:02] them because they feels like i've got all these workarounds for bugs in their model which it kind
+[35:07] it is right but it's not a bug it's their model was never trained to be a factory worker and it
+[35:11] will be soon so a lot of gas time is going to disappear a lot of the complexity a lot of the
+[35:14] roles that are monitoring all they're trying to do is tell opus four or five to be smarter and
+[35:19] that's being on the wrong side of the bitter lesson right so a lot gas town is going to simplify and
+[35:24] flatten into just minimax roles crew for your max and your polecats for your mins and and i think
+[35:30] that's the natural shape and they'll just scale up and could that be the polecats they might just
+[35:35] be sub-agents at sub-points, for example?
+[35:37] Well, sub-agent, I mean,
+[35:38] the Polkats are sub-agents.
+[35:40] It's just that they're more,
+[35:42] they're first class.
+[35:43] They have their own identity,
+[35:44] inbox, you can talk to them.
+[35:46] You can actually see
+[35:47] how they performed over time
+[35:48] by computing skill vectors
+[35:49] on their work and things like that.
+[35:51] So a little bit more than that,
+[35:53] than sub-agents.
+[35:54] I think sub-agents have the problem
+[35:55] of being opaque.
+[35:56] I'm going to fire off
+[35:57] a bunch of sub-agents
+[35:57] to go do this work.
+[35:58] And then you're like,
+[35:59] okay, let me know when you're done.
+[36:00] Whereas with Gastown,
+[36:01] you can go look at them
+[36:02] and be like, dude,
+[36:03] your Polkat's not working.
+[36:04] I'm going to poke it. Right. So Gastown gives you a lot of hands on, I don't know, steering.
+[36:10] Right. It doesn't try to be it doesn't try to get out of your way. It's in your way. Gastown.
+[36:14] It's really fun, though. I miss it. It's been down for a few days for me. And I tell you,
+[36:19] man, working with regular Claude just stinks by comparison, because it's like an idea factory.
+[36:24] Once it's actually running and all booted up and everything, you can have so many things going on
+[36:28] at once and actually track them reasonably well. Now, it can suck you into a mode where you don't
+[36:33] sleep you don't eat and you start it's not good for you and i actually wanted to talk to you a
+[36:38] little bit about what what's happening in the industry at some point but but gastown itself
+[36:43] i mean like it was all calculated all the characters you know the naming why did i even
+[36:48] do gastown right why is it why because i wanted to move the over to the window right because people
+[36:55] last year when i would say orchestration's coming they'd say no agents aren't are no swarms no
+[37:01] orchestration, whatever, everything you're saying is just not true. And now what they're saying is,
+[37:05] bro, you're being pretty aggressive, right? Which is a different conversation. They're like,
+[37:10] now they're like, well, your swarm, I don't know, maybe your swarm can't do bubble, but it's just
+[37:15] completely shifted the conversation from the realm of impossibility to the realm of possibility.
+[37:20] So is it fair to say that you took on more than you, you reasonably thought you could chew,
+[37:26] You took on this more ambitious ones because you wanted to both stress test what these models can do.
+[37:33] And find out what's next.
+[37:35] Find out and honestly just have some fun.
+[37:37] Have some fun.
+[37:37] Find out what's next.
+[37:38] And I'm continuing to do that.
+[37:40] So my next thing is I'm going to string 100 Gastowns together.
+[37:42] We have a community, a Discord.
+[37:44] And if Moltbook can get people to pitch in tokens for fun, like you're paying for the inference of your agent on Moltbook, right?
+[37:53] so if i string 100 gas towns together and we decide to build something together we will learn
+[37:59] the mechanics of federation we're probably retracing ethereum steps but we will and uh and
+[38:05] we're going to come up with something remarkable it's like the people version of mold hub uh right
+[38:10] mold book whatever it is and what what are misconceptions about gas town or what it's
+[38:17] trying to do that you feel it's kind of you know gone off a little bit of rails and it's good to
+[38:21] cleanup well i mean for starters i don't think people should be using it and they are and i really
+[38:27] mean it well i'm always saying people should not be using it like not should not be using it except
+[38:31] if you're doing research or or if you're like actually understand that this is just a proof of
+[38:36] concept so some some very very clever people that i've been talking to have have been searching
+[38:42] their problem spaces for subsets categories that gastown could productively use today
+[38:47] at a big company, a big Fortune 50 company, say.
+[38:51] Wow.
+[38:51] And they've identified some problem spaces
+[38:53] that you could put Gastown on today.
+[38:55] And I was like, oh, that's pretty clever thinking.
+[38:57] One of them was this company I talked to
+[38:59] that sets up bespoke data centers for you, okay,
+[39:01] in any region you want,
+[39:02] which is something AWS has never been able to do.
+[39:04] Google's always tried.
+[39:05] And they say it's just three months
+[39:06] of miserable button presses
+[39:08] to try to install the software
+[39:09] and check that it all works.
+[39:10] And the acceptance criteria are very clear.
+[39:13] It's, you know, it's almost a Ralph loop,
+[39:15] but they think Gastown could swarm it
+[39:16] and eventually converge on a data center that works
+[39:19] and save all the people the trouble.
+[39:22] You know what I mean?
+[39:22] And I was like, all right.
+[39:24] And this could potentially meaningful move the needle
+[39:26] on their ability to open up more of these data centers
+[39:28] for people, right?
+[39:29] Oh, yeah, go figure.
+[39:31] And the same guy was telling me
+[39:33] that he's been looking at production incidents
+[39:34] and he's realized their system is already
+[39:36] in an indeterminate, unknown, broken state
+[39:39] when they're down.
+[39:39] So how much worse can AI actually make it?
+[39:41] Now, I cautioned him and said,
+[39:42] actually, it can make it a lot worse.
+[39:43] But he's thinking on the long lines
+[39:45] that there are certain categories of outages
+[39:46] where you could have them in investigation mode or whatever, right?
+[39:49] Where they could speed things up.
+[39:50] So people are looking for the fuzzy problems.
+[39:53] There was a third one that came along.
+[39:54] I forget what it was, but there's a class of problems emerging
+[39:57] for which you can swarm them because you don't care that the results are messy.
+[40:00] It's the cumulative work that, right?
+[40:02] But that's actually how I code now.
+[40:04] I mean, right?
+[40:05] I mean, like I code myself.
+[40:06] I mean, I bit off more than I could chew.
+[40:07] There's no question about it, man.
+[40:08] Gastown is a huge mess right now.
+[40:10] And everybody's going, he's going to vibe code himself into a corner
+[40:12] and come crying out.
+[40:14] You know, they're pretty close to true.
+[40:16] Although I did manage just before we got on the plane to get it back on track and it's working again.
+[40:20] So one interesting thing about Gastown is you said you don't look at the code.
+[40:25] You have the agents write the code, which is very, very unlike what your career has been.
+[40:29] You cared about craft, code, elegance.
+[40:34] Why did you decide to do it and what are the results?
+[40:37] I mean, are the results as bad as I would think?
+[40:39] Because this is right.
+[40:41] If you imagine we're going to put 1,000 interns on a project, we've seen that in the past, and the result has been, well, eventually a senior engineer comes in and cleans up the mess.
+[40:50] And I'm just curious, how is it better or worse?
+[40:54] Well, so the ceiling of what it can actually build productively before it just dissolves into a mess is going up.
+[41:00] But right now, I think it's sitting somewhere between a half million and five million lines of code, somewhere in there.
+[41:06] Probably more on the half million side right now.
+[41:08] And with the next drop of an anthropic model, we're probably going to see it jump up to a few million lines, which is pretty good size, but it's nothing compared to what enterprises have.
+[41:16] Right. Nothing. Enterprises are very, very, very, very big.
+[41:19] They have hundreds of millions to billions of lines.
+[41:22] Yeah, but not in one code base.
+[41:23] Like having a few million lines of code is already a big code base and you'll typically have 50 plus people, sometimes 100 plus, 200 plus working on it.
+[41:30] Right. What it really comes down to, just to summarize this conversation, get to the end, is how well you're going to be able to take advantage of AI totally depends on whether you're a monolith or not. If you're a monolith, which almost every company is a monolith, they have one monolith and then a bunch of microservices, right? If you're a monolith, you're kind of hosed because I told you the ceiling's going up for what they can do, but it ain't ever going to hit your monolith. That will never fit in the context window. And you're never going to be able to never in the next 18 months be able to tell a model, go fix my monolith. You have to break it up.
+[41:58] okay if you want to take advantage of ai or rewrite it from scratch it's starting to get faster at this
+[42:03] point to think about rewriting your stack yeah one thing you you mentioned even before we started
+[42:07] that ai can really drain you it can drain your energy it can pull you and it can suck you and
+[42:12] can you tell me about this dude there is something happening that we need to start talking about
+[42:16] as a community as an industry okay there's a vampiric effect happening with ai where it gets
+[42:25] you excited and you work really, really hard and you're capturing a ton of value. For me, I'm doing
+[42:31] it all for myself. And it's still kind of like pushing me to my ragged edge. I find myself
+[42:35] napping during the day, but I'm talking to friends at startups and they're finding themselves napping
+[42:39] during the day. It's funny. They literally try to load each other up with enough context to force
+[42:43] the other one into a nap, almost like a compassion event. It's so weird. And we're starting to get
+[42:51] tired and we're starting to get cranky. And I started talking to people in the industry and
+[42:56] they're starting to get tired and cranky. And what's happening is, see, companies are set up
+[43:01] to extract value from you and then pay you for it, right? But the way all companies have always
+[43:07] been set up is that they will give you more work until you break. If you can do it, they'll just
+[43:12] happily just say, give you more, give you more until your plate flows over and you die. And
+[43:18] people have to learn the art of pushing back. Right. And that's been a thing for a long time,
+[43:22] but it's changed the equation, the way you push back, the reasons to push back and all that have
+[43:26] changed very dramatically and are changing right now because you've got all these people now who
+[43:30] can be super productive. And it's like, let's say an engineer can be a hundred times as productive,
+[43:34] just, just for sake of argument. All right. Who captures that value? If the, if the engineer
+[43:40] goes to work and works for eight hours a day and produces a hundred times as much,
+[43:44] the company captured all of that value and that is not a fair capture exchange i think we can argue
+[43:50] unless if they have early stage startup and they have a meaningful equity that's a bit different
+[43:54] but that's not the majority of people right it's a minority yeah yeah we're probably getting
+[44:02] there pretty quickly i i didn't you know we did notice one thing like and you probably saw this
+[44:07] as well about six months ago we talked about a lot the 996 problem at ai startups and we we were
+[44:13] like oh it's interesting ai starters people are working really freaking long hours and they're
+[44:17] posting that they're in the office at 3 a.m and you could tell i'll share with people what 996 is
+[44:21] who don't know okay 996 is uh 9 a.m to 9 p.m six days a week if i'm not mistaken yeah which is which
+[44:29] is 996 is it's the standard you're expected to work in most of southeast asia as far as i know
+[44:35] uh i haven't been to china or india but i assume it's pretty much similar there too right there's
+[44:40] another group of people who are capturing all of the value for themselves. Okay. They go in and
+[44:46] they work for 10 minutes a day and they get a hundred times as much done and they don't tell
+[44:50] anyone and they've captured all the value. And that's not really ideal either. Right.
+[44:55] So at least in terms of, if you're thinking in terms of how can groups of people be successful,
+[45:00] it's best if they're all contributing. Right. So what do you do? And I think that the answer is
+[45:06] each and every one of us has to learn how to say no real fast and get real good at it.
+[45:11] And we need to learn how to start capturing and the correct, this is the new work-life balance.
+[45:16] Okay. It's how much of the value are you going to capture from being a hundred times
+[45:19] it's productive and how much of it are you going to pass along to your employer?
+[45:22] And this is a really difficult place to be because we don't have any cultural,
+[45:26] all our cultural expectations are pointed in the wrong way for us to work harder.
+[45:30] And they want us to, right? Everyone wants to extract, extract, extract.
+[45:33] And so I seriously think founders and company leaders and engineering leaders at all levels, all the way down to line managers, you're going to have to be aware of this and realize that getting your engineers onto this treadmill is pulling them into a, they're using much, much more of their system too.
+[45:50] You know, they're doing much, much more of that hard thinking now.
+[45:52] The easy stuff is getting automated.
+[45:54] So you're actually draining them at a higher rate.
+[45:56] Their batteries are draining at a higher rate.
+[45:58] you might only get three productive hours out of a person at max vibe coding speed and yet they're
+[46:05] still a hundred times as productive as they would have been without ai so do you let them work for
+[46:08] three hours a day and the answer is yeah you better or your company's going to break it's
+[46:14] very interesting because also like the value extraction i think i can see us speeding up and
+[46:19] we see it with a few prominent people peter steinberger single-handedly pushes out so much
+[46:24] more value output you name it commits in any way that would have been a team of 10 pretty good
+[46:31] engineers before and he you know like in all fairness he is capturing it in the sense that he's
+[46:35] it's his project it's his baby he does not sleep much uh so so that that's definitely showing but
+[46:41] the value capture there is kind of okay but i i agree with you that this could be something
+[46:45] like in the past whenever there was a technology shift where people are more more efficient we
+[46:50] couldn't in your lifetime have you seen this where injuries became more efficient and suddenly you
+[46:55] could do a lot more with a lot less and what happened at that time people got mad yeah i'll
+[47:00] give you an example pearl the pearl programming language was a massive accelerator amazon's
+[47:05] website was built in pearl probably still is i think facebook's technically is too php is a fake
+[47:10] pearl um and you can quote me on that so and both of them were incredible productivity accelerators
+[47:16] and everybody just could see it you don't want to build webs websites and see you just don't
+[47:20] Amazon tried it and they gave up, right?
+[47:22] So that caused a huge rift, a huge schism.
+[47:25] There were second-class citizens.
+[47:27] All kinds of cultural dynamics happened there, right?
+[47:30] I'm curious about how some AI companies deal with this.
+[47:35] Can we talk about how Antrofic works?
+[47:37] Yeah.
+[47:38] From what I know.
+[47:39] From what you know from the outside,
+[47:42] I know that you talk with people across the industry,
+[47:45] but Antrofic is a very interesting place.
+[47:48] One interesting thing that Dario recently said is he thinks compensation specifically for their staff, the people who are building all these things and they're actually using the models and doing.
+[47:59] He said something interesting that maybe we should have compensation where people are compensated even after they leave the company for the value that they created, which is just something completely unheard of.
+[48:09] But it's clear that he's thinking about this thing that is changing where individuals can create massive value in a relatively short amount of time.
+[48:17] Google, you can send me a check for all that stuff you never paid me for.
+[48:21] Okay, just got to get that out of the way.
+[48:23] I like that idea.
+[48:24] Anthropic is unlike any company on Earth right now.
+[48:28] They're operating in a space that is really fragile,
+[48:31] and they're very protective of it, and they need to be
+[48:33] because they've created a hive mind.
+[48:37] They're running the company, as far as I can tell,
+[48:40] like a pure functional data structure.
+[48:42] Remember Chris Okasaki's book?
+[48:43] That was such a mind-blowing.
+[48:44] You can make data structures that never mutate,
+[48:46] then how do you mutate them right and the answer is you just keep adding it's improv yes and yes
+[48:52] and right and that's how they operate and when you say hive mind what what do you mean by that
+[48:57] it's it's a lot of it's like the markets today vibes everything's vibes it just shifts it's just
+[49:02] right but it's it's it's vibing it's it's kind of hard to explain but you see here's the thing
+[49:08] right we used to build products by like making spec and then implementing it and then complaining
+[49:12] about it and then shipping it right having a road map and planning for it and waterfall and timing
+[49:17] it for the company annual events right but apple right once a year the way you work with like
+[49:22] systems like gastown and they've got their own internal orchestrators is you create it and your
+[49:27] founders the one that like the co-founder that was non-technical you create the prototype and
+[49:31] that's your product and you start building it and you just make it the product until it's right so
+[49:36] everybody just gathers around the prototype like a campfire and builds it and that is what
+[49:41] Anthropics doing at scale with thousands of people.
+[49:44] So you're saying that the playbook of a successful tech product might have changed because the
+[49:49] traditional wisdom since the lean startup in like 2010 or so was you use your prototype to get
+[49:54] signaled that you throw it away and then you build a lot more Polish stuff, right? And we used to,
+[49:59] I think every software engineer who's been around, you don't ship a prototype, you tell people it's a
+[50:03] throwaway, you start again, you make it production-raised, scalable, that kind of stuff because
+[50:07] You don't want to give a bad experience to people.
+[50:09] What changed, though?
+[50:10] Just the ability to do an infinite number of prototypes.
+[50:13] So instead, you make prototypes until you get a great one, and you're like, let's launch this.
+[50:17] And so apparently, Claude Cowork happened in 10 days.
+[50:21] Somebody went, hey, I did a prototype.
+[50:22] And they were like, we're going to launch this.
+[50:24] And 10 days later, they launched it.
+[50:26] So, I mean, it works.
+[50:27] But I guess one important context there, when I talk with Boris Cherney about a feature that they did about how they did the tasks in Claude Code, the task list of how it completes.
+[50:36] he told me that in two days he built 20 different prototypes that are all working
+[50:41] thanks to ai i didn't know that but he's doing what i'm talking about they call it slot machine
+[50:45] programming right you do 20 implementations and is that what he's doing something like that i don't
+[50:51] want to put words in his mouth but but i was i was just floored because building 20 working
+[50:55] prototypes that would have been two weeks and and you would have not you would have stopped at three
+[51:00] right and so in our book actually if i can pitch the book for a moment fafo f-a-a-f-o is the
+[51:07] dimensions of value that you get from vibe coding and the o is optionality which is the ability to
+[51:12] create lots of prototypes what it lets you do is defer your decision until you know what the right
+[51:17] answer is which is cheating so of course everybody does it right and it's going to fundamentally
+[51:22] change the way that companies are run it's going to change the way that people and organize to
+[51:27] create software and it's gonna happen this year it's just fascinating how these changes are coming
+[51:32] but what what enables the these changes is is it the fact that we can iterate faster with these
+[51:38] things like i i look i saw a phenomenon happen at google this this is kind of a big company
+[51:44] question there's kind of two there's a big company and a small company answer your question right so
+[51:48] something happened at google i went through the golden age of google where it was like
+[51:53] It was a hive mind.
+[51:54] It was, nobody was mean.
+[51:56] Everybody was innovating and it was wonderful.
+[51:59] Yeah, this was a time where like the founders were pretty close.
+[52:01] You'd go to the cafeteria and Larry and Sergey would be sitting there and you'd hang out with them and just chat.
+[52:06] And it was like golden age, right?
+[52:09] Yeah.
+[52:09] And then it changed rather abruptly.
+[52:11] We made a few pivots and it became not that company anymore.
+[52:14] And in fact, innovation died on the vine, like altogether.
+[52:17] And since, I don't know, 2008, there has been no innovation from Google.
+[52:22] It's all been acquisitions. They've created nothing new.
+[52:26] I mean, they did Gemini a few years later, right?
+[52:30] Okay, sure. They created LLMs and then did nothing with them. That's a perfect example of why innovation dies there.
+[52:35] For five years.
+[52:36] Right? Five years they did nothing. So I don't count Gemini. That's a different Google.
+[52:41] We're talking about the Google that screwed up. I don't want Anthropic to screw up this way again, the way that Google did.
+[52:47] Google put safeguards in place to try to keep them from turning into the company that they turned into, which was ossified, territorial.
+[52:56] I hired a brilliant dude from Microsoft, brought him into Google and said, figure out what you're going to do.
+[53:01] Take as long as you need.
+[53:02] It took him six months to find something that nobody else had claimed already.
+[53:06] People claim work and then never do it at Google.
+[53:08] So I'm going to tell you something I've never said before.
+[53:11] This is a brand new take.
+[53:13] I think what happened at Google was when Larry Page became CEO and he said, we're going to put
+[53:18] more wood behind fewer arrows. That was a motto. And he put a halt to innovation. Okay. Before then,
+[53:26] there was more work than people. And after that, there were more people than work. And so people
+[53:31] started to fight over the work. And that's where people started to do land grabs and backstabbing
+[53:36] and territoriality and empire building and all the bad stuff you see, all the politics that you
+[53:42] is about fighting over work.
+[53:45] Going back to Anthropic,
+[53:46] they're at a frontier
+[53:48] and there's infinite work
+[53:49] and like literally all of them
+[53:51] have too much to do.
+[53:52] And a friend of mine,
+[53:53] a friend of mine at Amazon
+[53:54] once told me that we don't have
+[53:55] a lot of the problems
+[53:56] that Google has
+[53:57] because everyone at Amazon
+[53:58] is always slightly oversubscribed.
+[54:00] They have too much work.
+[54:02] I've heard similar with Apple as well.
+[54:03] That's kind of deliberate.
+[54:05] Interesting thing.
+[54:06] I mean, if we assume
+[54:07] I am seeing productivity gains for myself,
+[54:09] so I'm not disputing that agents
+[54:11] actually make you more productive
+[54:12] And I think we can agree on by how much, but for me, it's a lot.
+[54:16] But if this happens, a lot of companies, people can actually do a lot more work.
+[54:20] Do you think a lot of companies that are larger will see politics show up, which typically happens when...
+[54:27] Right.
+[54:28] If like the catalyst for the bad stuff beginning is more people than work, and all of a sudden people can do all the work, then the company's biggest problem is going to be finding more work or they're going to have to get rid of people, which is kind of bad, right?
+[54:41] But it's not unlike Gastown in this mall.
+[54:44] My biggest problem with Gastown is feeding it because it works so fast.
+[54:48] I have to work really hard to come up with good designs for it, right?
+[54:51] That's what I spend on my, which is why I'm taking naps all day long, because I'm trying
+[54:54] to come up with difficult work for it, right?
+[54:56] Other people have said this too.
+[54:57] This is the problem with Gastown.
+[54:58] And this is the problem with everybody who's going to use any orchestrator.
+[55:01] It doesn't have to be Gastown.
+[55:02] That thing will be dead in four months, probably, right?
+[55:04] I mean, it's the shape that worked in December 2025.
+[55:06] That's not going to be the shape that works in four months, right?
+[55:08] One thing that I think, you know, where it might sound that we're talking really abstract, especially for people who have not done this type of work in the self is like, well, we're talking about orchestrators, they're like all productive.
+[55:18] Can you point to something that has been built with an orchestrator with this higher productivity that is a production software?
+[55:24] Either you built it or you've observed someone build it that could show like, actually, this is way more productive and we can actually see the output or turning it the other way around.
+[55:33] Like we're still not seeing that much more output from companies, teams that you would expect.
+[55:40] Okay.
+[55:40] Like a lot of them are having more productivity, but like from the outside, it's easy to be skeptical when we're seeing not much has changed in terms of our days of life, the apps.
+[55:50] So, you know, we're seeing signals here and there, but nothing major.
+[55:52] Like why might that be?
+[55:54] Yeah, that's fair.
+[55:57] um my my feeling is that probably uh people have a low tolerance for non-determinism and um these
+[56:08] things are fundamentally non-deterministic so they can't just go replace customer call center software
+[56:12] because they could be wrong and it doesn't seem to matter that humans are also wrong very often
+[56:17] and ais can these days can very easily get to the same level as a human as an average human
+[56:22] in the job.
+[56:24] But I think there's still
+[56:24] a lot of risk aversion, right?
+[56:27] So I think that the companies
+[56:29] that are actually running with this
+[56:30] are actually starting
+[56:31] to see the results
+[56:32] and it's going to be reflected
+[56:33] in the quarterly earnings
+[56:34] invisibly and in other ways at first.
+[56:36] Could it be that we're focusing
+[56:38] on building the tools?
+[56:40] I'll turn it around
+[56:40] and I'll say,
+[56:41] what if what we're actually observing
+[56:43] is that innovation
+[56:45] at large companies is now dead
+[56:46] and we are only going to see
+[56:48] innovation from small places,
+[56:49] which is kind of what happened
+[56:50] when cloud came out
+[56:52] and Facebook was a college kid at one point.
+[56:55] Facebook feels like the biggest company
+[56:56] in the world right now,
+[56:57] but it was one dude, okay?
+[56:59] And so when a new enabling platform
+[57:01] technology substrate appears,
+[57:04] you're going to see innovation at the fringes
+[57:06] because of the innovator's dilemma.
+[57:08] Big companies can't innovate.
+[57:09] They're all running into this problem.
+[57:11] They may have hyperproductive engineers
+[57:12] who are producing at a very, very high rate,
+[57:15] but the company itself can't absorb that work.
+[57:18] Downstream, they're just hitting bottlenecks
+[57:19] and these engineers are getting shut down
+[57:20] and they're quitting, right?
+[57:22] So I think what's happening is we're all looking at the big companies going, when are you going to give us something?
+[57:26] And the answer is we're looking at the big dead companies.
+[57:28] We just don't know they're dead yet.
+[57:30] Do you think they're dead because, for example, it can now be cheaper to do something?
+[57:33] Like we can just say the eternal punching bag, Zendesk customer support.
+[57:38] They have been the de facto place to do your customer support because your agent can sign up.
+[57:42] They get this UI, they get this workflow, et cetera.
+[57:45] And for AI native companies that are using MCPs and whatnot, it makes no sense for them because they just want an API,
+[57:50] which Zendesk does not want to give to you
+[57:52] because they want to charge extraordinary amounts
+[57:54] for you to come to their platform
+[57:55] and buy their AI for 10 times the cost.
+[57:59] That model is going to struggle a lot in coming years
+[58:02] because people will build their own stuff bespoke with APIs.
+[58:05] This is my platform rant in real life, right?
+[58:08] If Zendesk doesn't make themselves a platform,
+[58:10] then they're going to build a product of themselves
+[58:12] out of existence, I think.
+[58:14] And the platform for looking ahead,
+[58:17] is it APIs?
+[58:18] Is it the MNCPs?
+[58:20] I mean, as far as we can know, maybe not MCP, right?
+[58:23] I mean, what did Anthropic found that what works better than MCP is having the AI write its own API to call the MCP because they're so good at writing code.
+[58:32] But then nothing really changes because platforms are always APIs from the beginning, right?
+[58:36] Yeah, so why did we need MCP?
+[58:37] Well, we needed some way to declare what the tool does in an AI way.
+[58:40] But I mean, like, I just, it's so loose and so flexible.
+[58:43] Integration's going to be really easy.
+[58:44] I don't know. I'm not following that space well enough to know if MCP is going to continue to be an important dominant player or if the AIs just use stuff directly like via command line tools, right, or APIs. But either way, we're moving into this world where the innovation is coming out of new shops who have adopted and adapted. And I see big companies struggling really bad right now with this.
+[59:11] I wonder if we will see a lot more of these building blocks that we didn't know we needed.
+[59:17] I think we're going to see a huge ecosystem of building blocks for people who are non-technical, who want to build stuff, and they need those APIs.
+[59:27] You know what I mean?
+[59:28] For storage or for matching or for whatever it is they need to do.
+[59:31] So I guess if you're in tech and if you're looking for an idea, either because, you know, like your job is looking a bit shaky or you actually just want to do something like now could be a great time to start building some of these building blocks that work.
+[59:43] Like reliable building blocks will probably be in need that are that have states that have SLAs, whatever, have some some some importance.
+[59:51] Right. That's not trivial to do.
+[59:52] That's right, because AIs are lazy with good reason.
+[59:56] They don't want to burn tokens if they don't have to.
+[59:57] So if you provide a service that's going to make something convenient for them, they'll absolutely use it.
+[1:00:03] Yeah, especially if it's a service that you need to maintain, for example, like you need to keep up with, may that be regulation or changes or logging or whatever.
+[1:00:12] That's going to have a lot of work to do even to prompt and go back every day to prompt again to update and all that.
+[1:00:18] Also, as humans, we're also lazy.
+[1:00:20] Yeah, I mean, well, Larry Wall called it, right?
+[1:00:22] That's one of the virtues of a programmer.
+[1:00:23] yeah i want to go back to one of another one of your essays from 2012 uh which was called the
+[1:00:30] borderlands gun collector club you're the one that read that one i i got recommended on blue sky and
+[1:00:38] and a lot of people liked it and i read it i realized i didn't read it and this was a really
+[1:00:41] interesting essay because seemingly it has nothing to do with what we're talking about but you talked
+[1:00:46] about gamification and you talked about how this borderlands game which you played apparently right
+[1:00:50] or back in the day you mentioned how after you completed the game there was this weird thing
+[1:00:58] that the game developers probably accidentally put in there people kept coming back to have like
+[1:01:02] custom guns and these were like a meta goal that the designers probably never thought of but it
+[1:01:07] actually made the game pretty kind of addictive and you called this as a i think it was like some
+[1:01:12] sort of elder game or something like that and you were kind of saying that hey this was pretty smart
+[1:01:17] there was an accident from the game designers,
+[1:01:18] but maybe more game designers should do this
+[1:01:20] because it just makes the game addictive
+[1:01:22] and, you know, like not saying that.
+[1:01:24] But since that, that was in 2012,
+[1:01:26] we've seen so many games
+[1:01:28] just have like deliberate gamification
+[1:01:30] and not just games,
+[1:01:31] but a lot of other things.
+[1:01:33] Yeah, a lot of them found that mechanic eventually.
+[1:01:35] Who is it?
+[1:01:36] Did Borderlands take two or I forget?
+[1:01:39] Anyway, they figured it out early.
+[1:01:41] Then they didn't capitalize on it.
+[1:01:42] But yeah.
+[1:01:43] So interestingly, I think, yeah, gamification,
+[1:01:45] gamification is kind of rearing its head.
+[1:01:48] People have pointed out that people are making game finance to Gastown, right?
+[1:01:51] I mean, why not make it a game?
+[1:01:53] Like, oh, come on, man.
+[1:01:54] I mean, like, look, we have literally, we have games for running factories.
+[1:01:58] Imagine you're running an actual factory.
+[1:02:01] How cool is that?
+[1:02:03] Right?
+[1:02:03] That's what Gastown is.
+[1:02:04] That's why it's so fun, actually.
+[1:02:05] Do you think that one of the reasons that some of the agents are more successful than others,
+[1:02:10] looking at specifically cloud code, is they also, there's some gamification where
+[1:02:14] there's always something showing there right there's a tinkering there's the there's the
+[1:02:18] different things that keeps talking to you there's always yeah is is some of maybe accidentally or
+[1:02:24] maybe deliberately oh i think they have the best product managers in the world and they have uh
+[1:02:30] they've done absolute magic with command line uis and stuff that they've done it's it's wild
+[1:02:35] but look i mean come on right that's not going to work for most devs so that's why cloud co-work
+[1:02:43] is so cool, right?
+[1:02:44] Because it's showing us
+[1:02:45] the direction that things
+[1:02:46] are going to evolve, I think.
+[1:02:48] Yeah, so I think developers
+[1:02:49] will use Cloud Cowork
+[1:02:50] or something more like it.
+[1:02:52] With traditional software,
+[1:02:53] we have tech depth
+[1:02:54] and we know how to deal with it.
+[1:02:55] And we've talked so much of this.
+[1:02:57] In fact, if we think about
+[1:02:58] like what we spent,
+[1:02:59] we're very busy with the 2010s,
+[1:03:01] tech depth, collecting it,
+[1:03:03] paying it off, migrations,
+[1:03:04] yada, yada, yada.
+[1:03:05] Now that we're doing, you know,
+[1:03:07] a lot of Vibe coding
+[1:03:08] or you call it Vibe coding,
+[1:03:10] but agentic engineering
+[1:03:11] just churning out a lot of code.
+[1:03:12] how do you think we will recognize or deal with or do we need to deal with this like vibe coding
+[1:03:17] depth or agentic depth you do you do one of my upcoming blog posts is about this actually i've
+[1:03:23] discovered that there's a thing i've given it the name of it's called a heresy okay that happens in
+[1:03:30] vibe coded code bases that you're not looking at where an idea can take root among the agents
+[1:03:35] that's incorrect it's it's there's a wrong architecture or a wrong data flow or whatever
+[1:03:40] that's that's causing an impedance mismatch for the rest of your code and what happens is i call
+[1:03:45] it a heresy because they have the tenant they have a tendency to uh to grow and to come back
+[1:03:51] and they're really hard to weed out okay i had a bunch of them in gas town there was a polecat
+[1:03:56] heresy that kept coming back and so what would happen was it's invisible and your your your
+[1:04:03] product stops working properly along the edges and you don't know why and you start having the
+[1:04:07] agents dig into it and you realize you've got a fracture you got a fault line you have like say
+[1:04:13] two complete databases that are both live and operational and you're randomly choosing between
+[1:04:19] the two of them right and you didn't realize this until just now right you find terrible you know
+[1:04:25] things in your code right uh and you try to get them all out but there'll be one reference to it
+[1:04:29] in some dock somewhere that an agent picks up on and goes, oh, that makes sense. It's the heresy
+[1:04:34] and it returns. And the agent does the wrong thing and goes off and rebuild the heresy and it starts
+[1:04:38] to spread again. It comes back, right? It's like the agents want the system to work this certain
+[1:04:43] way. And you're telling them, no, I want it to work this other way. And you're fighting with them.
+[1:04:48] And what you have to do is you have to actually document the heresy in the beginning of your
+[1:04:52] prompting and say, this is one of the ways that you can go wrong on my project. Don't do that,
+[1:04:56] And then you have to remind it periodically or even put in tooling to keep it from doing that.
+[1:05:01] Another heresy is that my agents all think they should be doing PRs.
+[1:05:05] It's like, I'm the maintainer of this code, man.
+[1:05:06] Just push to main, right?
+[1:05:08] Or a branch or something.
+[1:05:09] Don't make a PR.
+[1:05:10] It's just polluting the PR space.
+[1:05:12] That's for contributors.
+[1:05:13] They can't get this today.
+[1:05:15] Now, I could put a bunch of hacks in, but that's fighting the bitter lesson.
+[1:05:19] Opus 5 will be fine.
+[1:05:20] Opus 5 will be, oh, you don't want PRs?
+[1:05:22] I want new PRs.
+[1:05:23] What is the bitter lesson?
+[1:05:24] Oh, the bitter lesson, yes.
+[1:05:25] Richard Sutton wrote a very, very short essay.
+[1:05:28] It's like 800 words.
+[1:05:29] It's one of the best essays ever called The Bitter Lesson where he's like, yeah, we're
+[1:05:33] AI researchers and we learned a bitter lesson and you need to learn this lesson.
+[1:05:36] The bitter lesson is don't try to be smarter than the AI.
+[1:05:39] Okay.
+[1:05:39] You think that you've got special knowledge, that humans bring special domain knowledge
+[1:05:44] to this problem and we're going to teach it so that the AI will be smarter.
+[1:05:47] And what we found was bigger is smarter.
+[1:05:51] Always.
+[1:05:52] So like more data, right?
+[1:05:54] Yeah.
+[1:05:54] And so like when they're going into Australia right now, you know, you've seen the drawings, you know, how big OpenAI's training center was, how big Anthropics training center was.
+[1:06:02] And now the training centers that are big are, you know, 10 times larger.
+[1:06:05] They're massive.
+[1:06:06] They're in Australia because they have all the energy and the land and everything.
+[1:06:08] But they are going to make models that are 10 times or more smarter than the ones we have today.
+[1:06:13] Right.
+[1:06:14] We talked about the vibe that but does it not pain you?
+[1:06:17] I mean, as someone who has built software, you know how to build good software.
+[1:06:20] You went in there to clean up the mess of junior teams or like messes.
+[1:06:24] You could clean it up and put your eyes closed or maybe you had to keep it open.
+[1:06:28] This is not pain you that when you describe, oh, the AI going off trail and doing it, if you scaled it back and said, like, hang on, like, let me step in.
+[1:06:36] Let me make these decisions.
+[1:06:37] Let me be the architect.
+[1:06:38] It would not happen.
+[1:06:40] Yeah.
+[1:06:40] Well, see, the thing is, I've also been a vice president at big companies of engineering.
+[1:06:45] True.
+[1:06:46] And so when I'm working with a team of 80 agents, it's not very different from working with a team of 80 engineers.
+[1:06:52] Any one of them can screw up too, engineers.
+[1:06:54] And you've done that, right?
+[1:06:56] I have. And I'm telling you, they are isomorphic.
+[1:06:58] So what is the bitter lesson? The bitter lesson is don't try to be smart.
+[1:07:02] Just try to be large.
+[1:07:05] Now, that's not the only way to make the AI smarter.
+[1:07:08] They can also make them smarter in a couple of other important frontiers that are also getting developed.
+[1:07:12] And so to tie it full circle to a beginning of our conversation, everyone who believes right now that the curve is S-shaped, they're 100% correct.
+[1:07:23] They are 100% correct.
+[1:07:24] It is S-shaped.
+[1:07:26] Eventually, we will run out of resources.
+[1:07:28] The world will be out of resources and it will flatten, right?
+[1:07:31] But I can tell you that there are at least two more cycles left in this.
+[1:07:36] And that means they will be at least 16 times smarter than they are today.
+[1:07:39] And that is going to cause all of knowledge work to be subsumed by this stuff.
+[1:07:45] Before we go all the way there, let's talk about how all this, the better models, more productive could impact personal software.
+[1:07:53] Things that people can build themselves.
+[1:07:56] This is what I thought you were asking about earlier when you said you wanted an API from Zendesk.
+[1:08:01] Think about it.
+[1:08:01] Everyone's going to want to build their own software.
+[1:08:03] Oh, I was talking about a business.
+[1:08:05] Not personal.
+[1:08:06] Oh, businesses.
+[1:08:07] Yeah.
+[1:08:07] But also personal software. What would the future look like when everyone could have OpenClaw running in their closet or gas town or they don't have to run it on their thing, but they can turn to this agent? How could that change both personal software but also the software industry as a whole? Because for a long time, personal software was the privilege of us engineers who could build it. And we built our tools and we had open source and we had some billion dollar companies grow out of some of the cool things.
+[1:08:34] but what do you think could happen now that this this will be democratized to some extent
+[1:08:39] how do you think open source could change open source how would open source change could have
+[1:08:45] could have changed because one interesting thing that i'm seeing is a lot of remixing happening so
+[1:08:49] people you know now a lot of open source projects don't really take pull requests because there's a
+[1:08:53] lot of not great ones but a lot of people are just remixing they're just taking the open source
+[1:08:58] project they're telling the ai make this change and they publish it as open source as well often
+[1:09:02] no one looks at it but now they don't need to ask for permission a lot of people are like weaving
+[1:09:06] things together they say take this project take this thing right and it's actually so that's a
+[1:09:10] lot more open i see what you're saying in the old days the f word fork you used to be like kind of a
+[1:09:16] declaration of war yeah if you forked somebody's project it meant you had had enough of them
+[1:09:21] like root code forked klein and then somebody else forked root code and it's just like i think it's
+[1:09:26] now going to be an everyday occurrence right because it used to be that to fork it it would
+[1:09:31] be a lot of time and effort to maintain a fork to merge back the thing is a fork isn't it it is
+[1:09:38] yeah and that's a lot of work that's a lot of work yeah um a lot less work now right so uh yeah
+[1:09:44] everyone's gonna be forking so yeah no i think that that's a that's a natural yeah consequence
+[1:09:49] of of um everybody writing code yeah just like everyone can take a picture now that didn't used
+[1:09:55] to be true yeah what what are some of your beliefs from early on in your career that held really
+[1:10:01] really well until recently and now you just abandoned because of ai engineers are special
+[1:10:07] here's one come on we are special no we are i think we're so special we can yeah sure we learned
+[1:10:13] how to do something by hand that computers can do now kind of cool i guess what about the engineering
+[1:10:19] mindset we we have that like it's not just coding that we do right well look for one thing is i
+[1:10:25] believe that our thirst for new software will never ever ever diminish it will only grow and so
+[1:10:31] we're at the beginning of software all the software we have right now is garbage that right there obs
+[1:10:36] especially and we're going to see a new world over the next 10 years where software is commonplace and
+[1:10:42] good and you'll have your choice and it won't be i have to pick and choose between three really bad
+[1:10:48] OAuth solutions or
+[1:10:50] company HR systems or whatever
+[1:10:53] stupid ass thing, right? Like today, the
+[1:10:55] selection is terrible. SaaS is awful.
+[1:10:58] The whole, the whole, right?
+[1:10:59] Airline apps.
+[1:11:01] Airline apps, right? I mean, we
+[1:11:03] ran a vibe coding workshop in Sydney where
+[1:11:05] a dude actually wrote an airline check-in app
+[1:11:07] for himself and got into the Android queue before
+[1:11:09] Southwest realized and shut
+[1:11:11] him down because he was a bot. But that's what people
+[1:11:13] want. They want personal bespoke
+[1:11:15] software and they're going to get it.
+[1:11:16] And so, yeah, I think you're going to see.
+[1:11:18] That's why when Jeffrey Emanuel forked beads, I was like, you go, you go.
+[1:11:21] He's like, I feel so bad about it.
+[1:11:23] I'm like, dude, this is the new world, man.
+[1:11:25] Fork, fork, fork.
+[1:11:25] Let's have beads in every language.
+[1:11:26] I don't care.
+[1:11:27] Right?
+[1:11:28] I mean, in all fairness, like just looking at it from the positive side, like I wouldn't mind just having good software for the stuff that I use day to day.
+[1:11:35] My utility provider is somewhat is getting better.
+[1:11:38] The government websites that I have to access.
+[1:11:41] Yeah, they're terrible.
+[1:11:41] My, my paying my parking fine.
+[1:11:43] The other day I tried to send a package to Canada from the Netherlands and the post, like the official post has been broken.
+[1:11:50] They cannot send anything for a week and I see the exception.
+[1:11:53] They cannot fix it.
+[1:11:53] So I had to go DHL and pay a bunch more money.
+[1:11:55] That's right.
+[1:11:56] And like, there's a lot of bad software out there.
+[1:12:00] And your agent will be dealing with it, not you.
+[1:12:03] Yeah.
+[1:12:03] But I think people who write software that agents like and prefer and choose, and then they find a way to market it and get the agents aware of it, they're going to win big because everyone will use agents. We'll all be dependent on it.
+[1:12:16] Well, plus also, I guess, software or ways of making agents write quality software, because I have a feeling like you will want to do better stuff that if you do the same, you're not going to have a business, right?
+[1:12:26] Yeah. So, I mean, look, I think businesses will compete on more and more complex software. The ceiling will just keep going.
+[1:12:31] we're building like we're gonna until we build the death star or whatever right i mean like we're
+[1:12:35] building bigger and bigger things oddly enough okay i am an optimist through all of this that's
+[1:12:41] my first belief i think first and foremost is that it's all going to work out so asking the optimist
+[1:12:46] now i got this question of i think was on blue sky this person asked like how do you think the
+[1:12:51] software industry will continue to exist if we get to the point that any software could be trivially
+[1:12:56] cloned yeah where will that leave us what cannot be cloned what is the moat just we we just jump
+[1:13:04] ahead we assume that this these things actually can do it connections human connections are
+[1:13:08] probably the biggest one as as i you know kind of almost counterintuitively as software does more
+[1:13:13] and more automated for you people are going to be like oh well yeah but that's that's just
+[1:13:18] automated i want a human to do it and they will literally want a human to bring their thing instead
+[1:13:22] have a drone you know they'll they'll they'll want humans to curate things for them and i think
+[1:13:26] that's going to be humans will be a moat do you think if you look back at some history like from
+[1:13:31] you know the history of the rest history like have we seen some changes that felt a bit like this and
+[1:13:37] then we saw some professions thrive because of either more automation or you know like stack
+[1:13:42] overflow i don't know i mean like that one jumped to mind uh mechanical turk i mean like we've seen
+[1:13:48] a bunch of big step functions.
+[1:13:50] It's just that we're about to see
+[1:13:52] a whole bunch of them at once, right?
+[1:13:54] I mean, look at the news lately.
+[1:13:56] I mean, like, you're like,
+[1:13:57] this is the funny thing is where I was like,
+[1:13:58] where's all the innovation?
+[1:14:00] And then in the news all day long,
+[1:14:01] they're seeing all this innovation in AI.
+[1:14:03] It's just not coming from, you know,
+[1:14:04] the Walmarts and Microsofts.
+[1:14:05] It's coming from random individuals, right?
+[1:14:08] But the innovation's there.
+[1:14:10] And from the startups that I've been talking to,
+[1:14:13] you know, I've been talking to anywhere
+[1:14:14] from two, five to 20 person startups.
+[1:14:16] I think we're going to see some really impressive stuff launching in the next couple of months.
+[1:14:21] Are you seeing these small startups change how they work?
+[1:14:24] Oh, God, it's so different, dude.
+[1:14:26] Tell me how.
+[1:14:27] It's so different.
+[1:14:28] Okay, for starters, I think in the new world, I'm convinced of this, okay?
+[1:14:34] Everything that you do will either have to be fully transparent or you're hiding it for a reason.
+[1:14:39] Tell me more.
+[1:14:40] In other words, if you don't want people to see what you're doing, just don't show it to them and they will never see it.
+[1:14:44] And if you do want them to see what you're doing, then you had better get it out in front of them as you do it instantly or else the train will pass you by.
+[1:14:53] So what they're saying is like, so I told the story on my blog.
+[1:14:56] People have heard it, but they yelled at a teammate.
+[1:14:58] They were mad because he implemented a feature that they'd asked for two hours before.
+[1:15:01] And they were like, two hours ago, it's changed too much since then, right?
+[1:15:05] And he's like, well, what do I do?
+[1:15:06] So, you know, what's happening is they're getting into this mode where they realize that stuff moves so fast that everything is invisible, effectively, from the volume.
+[1:15:17] And so you have to be extremely loud and transparent and intentional about saying everything that you're doing so that if anybody else is doing it, they can stop you right then.
+[1:15:26] And if they need to integrate with you, they can start right then.
+[1:15:28] And we're talking about startups that are looking for product fit, looking for customers.
+[1:15:32] they actually just want to get what we call product market fit,
+[1:15:35] where the traditional wisdom was built something amazing
+[1:15:38] and then release it to the world.
+[1:15:39] That's right.
+[1:15:40] That's right.
+[1:15:40] Try to find product market fit in secret as much as you can
+[1:15:43] and then launch it and then tune, right?
+[1:15:47] That's the formula.
+[1:15:48] And many people fail at it.
+[1:15:50] It used to be.
+[1:15:50] Now, like you're saying, with Gastown,
+[1:15:53] I realized I'm not going to find product market fit by myself.
+[1:15:57] So I launched it as soon as it kind of worked
+[1:15:59] and was like, help me.
+[1:16:00] And that's how I found out about the DOLT database, which was a big change.
+[1:16:03] And people fixed a bunch of bugs.
+[1:16:05] I got 100 plus PRs the first couple of days.
+[1:16:07] And so it found its way closer to product market fit just by me getting it out there.
+[1:16:12] And would you say that has brought you, like on one end, people look at you, well, yeah, it's just one other open source project.
+[1:16:19] But is it bringing actually opportunity?
+[1:16:20] If you wanted to, could you turn this into a business?
+[1:16:23] Has it brought you the things?
+[1:16:25] Where I'm getting at is these things that take off either of those open source projects.
+[1:16:29] Like, can they actually turn into actual businesses?
+[1:16:31] Are we at that stage?
+[1:16:33] I promise you, if you had made Gastown, you would be shaking venture capitalists off you like ticks right now.
+[1:16:40] I am.
+[1:16:42] They're finding me everywhere, okay?
+[1:16:44] And I tell you, it's because there's a lot of money out there right now sniffing, wanting to find its way into it.
+[1:16:50] I know something big is going to happen, right?
+[1:16:53] And it's looking, and you can see it in all these different micro economies that are springing up.
+[1:16:57] But nowhere can you see it more clearly than when you launch something cool like Jeff Huntley did Ralph Wiggum.
+[1:17:03] VCs, right?
+[1:17:04] You know, everyone want to talk to him.
+[1:17:06] You just got to be real careful because anything you build probably has a real short shelf life at this point.
+[1:17:10] Right?
+[1:17:11] A real short one.
+[1:17:12] I don't know.
+[1:17:12] I'm not attached to Gastown in any way because I think it'll be supplanted by something better within six months, if not sooner.
+[1:17:18] Right?
+[1:17:19] So.
+[1:17:19] So.
+[1:17:20] Too attached.
+[1:17:20] So let's assume that staff engineer is listening to this podcast or watching it on their commute and they're at the type of company where they have co-pilots still.
+[1:17:29] There's people like this and they're using it and they want to believe you, but they're not sure they can.
+[1:17:35] What would you tell them?
+[1:17:36] What is the thing that they can do to get proof that you're actually right and this thing is working?
+[1:17:41] We're not at 100%.
+[1:17:43] We're not even at 50% for people.
+[1:17:44] Like a lot of people who are in this field have tried it out, but there's a lot of people who are.
+[1:17:49] I would say probably still 70% aren't, aren't doing it. Yeah. Um, so like,
+[1:17:54] what would I say? I had a really good message for them. Oh yeah. Get out,
+[1:17:57] get out. Um, so here's the thing, right? Copilot is, uh,
+[1:18:04] if you were to line up all of the tools, you know, from best to worst, right?
+[1:18:08] Copilot is like, you're a line, right?
+[1:18:10] He doesn't even know about the line, right?
+[1:18:12] But it used to be the best four years ago in 2021, right? Yeah.
+[1:18:15] It was not a competition.
+[1:18:18] Even maybe two and a half years ago, I was quite stunned that somebody asked,
+[1:18:22] does anybody use Copilot at an AI Tinkers meeting?
+[1:18:25] And somebody raised their hand and he goes, do you have to?
+[1:18:27] And everyone laughed.
+[1:18:28] And I was like, what happened, right?
+[1:18:30] The brand just tanked.
+[1:18:32] But I'm serious.
+[1:18:32] If you're working at a company that gave you Copilot,
+[1:18:35] they think that they're starting to move faster.
+[1:18:38] And there's a barbarian horde of people using Opus 4.5 that are going to destroy your company sooner or later.
+[1:18:45] So what you need to do is go into the crazy part of crazy town and figure the stuff out
+[1:18:50] and start building.
+[1:18:51] And because we are moving into a world very quickly this year where proof of work is so
+[1:18:57] important.
+[1:18:57] And I mean, proof of work, not the Bitcoin sense, but your proof of what you have done,
+[1:19:01] your resume.
+[1:19:02] And I don't mean your resume because nobody's going to believe that.
+[1:19:04] I mean, the actual work that you did, which has to be visible back to our transparency,
+[1:19:09] right?
+[1:19:09] I think everyone's going to be bringing their work with them.
+[1:19:11] I mean, the notion of proprietary work is starting to be threatened, I think, because it's so easy to fork.
+[1:19:17] It's so easy to clone.
+[1:19:18] It's so easy to route around.
+[1:19:19] If you have anything proprietary, you become this thing that everybody just wants to run around you.
+[1:19:25] And so, right?
+[1:19:27] So big, big changes are afoot.
+[1:19:28] But man, if you're working with co-pilot right now, you are going to get left behind.
+[1:19:33] And so what you need to do is get yourself, find a half an hour a day to go play with Cloud Code, right?
+[1:19:40] and uh and and and and it's like i said or if you're a company make your token burn as high
+[1:19:46] as your investors will let you go right because that token burn is your practice it's your it's
+[1:19:52] your sorting things out so i i want to ask you the other way around let's assume you're just wrong in
+[1:20:00] terms of the the curve and we're at the peak and it will not be 10x it will plot to at 3x or let's
+[1:20:06] just say the next model is inexplicably dumber than opus 4.5 and we've peaked what would happen
+[1:20:12] to the person who takes your advice and they go all in and they learn these things what's the
+[1:20:16] worst thing that could happen to them if you know if if these things take off it's a great investment
+[1:20:19] right but but what would happen to them if if they followed your advice and the models didn't follow
+[1:20:25] where would that lead them exactly where they need to go because the damage is done opus 4.5
+[1:20:31] made this officially an engineering problem we don't need you ai researchers anymore thank you
+[1:20:36] You can make smarter models, I guess, but we don't need them because we have something that can take a bite-sized chunk out of a mountain, and it's a bite-sized about town size now, and so we can eat mountains.
+[1:20:48] It's purely an engineering problem at this point.
+[1:20:50] It's like fire or steam.
+[1:20:52] It's a force.
+[1:20:53] It's a power.
+[1:20:54] And we wrap layer, layer, layer, layer.
+[1:20:55] I worked on a nuclear reactor.
+[1:20:57] I was in the Navy.
+[1:20:58] I know how these things work.
+[1:20:59] OK, we are going to put all right layers around Opus 4.5, if that's the smartest model ever.
+[1:21:05] And that will do all of the engineering from now on.
+[1:21:08] So it's done.
+[1:21:09] So it's OK to jump into the pool now.
+[1:21:11] Your first job was about debuggers or not debuggers, but you worked at this amazing company.
+[1:21:16] You told me they had the best debugger tools.
+[1:21:18] What was the name?
+[1:21:18] It was GeoWorks and the debugger was called SWAT.
+[1:21:21] And it was amazing.
+[1:21:22] Time machine and all that.
+[1:21:23] And on the first Pragmatic Engineer interview, when we talked, this is in the newsletter,
+[1:21:27] you're actually saying that you to this date you've not seen as good of a debugger but you're
+[1:21:33] kind of determined to like build at some point and help build that i did build a debugger enclosure
+[1:21:38] for the jvm called ganja it was actually pretty cool but then i got an argument with rich hickey
+[1:21:44] about how well he wanted to support the jvm and he doesn't so um yeah but anyway you're a guy who
+[1:21:49] is passionate about about story somewhere though yeah you're passionate about debugging what will
+[1:21:54] happen with debugging what will happen debugging tooling what do you think the future of debugging
+[1:21:58] is with agents when i see agents say i'm going to debug this they all use print fs so uh you know
+[1:22:08] i'm curious it could very well be that they just haven't been trained on debuggers yet
+[1:22:12] and that they'll all wake up in six months and go oh i should have been using this
+[1:22:16] but it could also be that we don't need them anymore i don't know and another step further
+[1:22:21] what do you think the future of the developer workstation,
+[1:22:23] like our rigs, our machines, will be, right?
+[1:22:26] Like, do you think it'll...
+[1:22:28] Phone.
+[1:22:29] I want gas down on my phone.
+[1:22:30] I almost have, I have it,
+[1:22:32] but I just haven't worked on it yet.
+[1:22:33] Peter Sandberger told me that he had Vibe Tunnel
+[1:22:36] where he could do it from your phone.
+[1:22:37] He said he stopped it because it became too addictive.
+[1:22:39] Oh, yeah.
+[1:22:39] No, tail scale.
+[1:22:40] And yeah, actually, the only thing that's keeping me
+[1:22:42] from just being addicted to it all day long
+[1:22:44] is it's too hard to enter control characters in.
+[1:22:46] But that's going to get fixed at some point.
+[1:22:47] Programming on your phone will be a thing.
+[1:22:49] But so do you think that developer workstations can be just lightweight, Chromebook, whatnot, or we actually want beefy ones which can run our local agents, whatnot?
+[1:22:58] Like, where do you think it'll be headed on the short term and then maybe on the longer term?
+[1:23:02] Yeah.
+[1:23:03] See what I mean? Local models?
+[1:23:04] Yeah, no, look, I love my laptop. I've been programming 40 years. I get the local thing, but I've been saying for at least 15 years that we don't need this stuff locally, right?
+[1:23:14] Google had an amazing client in the cloud, high-speed network connection.
+[1:23:18] And what you can do with it.
+[1:23:19] Cider, right?
+[1:23:20] Citsi was the base, and then Cider was built way up on a higher layer.
+[1:23:24] But when you get something like that and you're not restrained by that,
+[1:23:27] especially in the world where you can run kind of unlimited agents based on your pocketbook,
+[1:23:31] yeah, people are not going to be wanting to work on their laptops.
+[1:23:34] And I've already, Gastown has already completely stressed out my laptop to the where, you know,
+[1:23:39] because Cloud Code actually takes quite a bit of memory.
+[1:23:41] so yeah i think we're moving to a world where uh people will work on servers and and on mobile
+[1:23:47] devices probably less less and ipads not on um laptops as much in the past you've said that one
+[1:23:53] of the most important kind of predictors of the productivity is language design well-designed
+[1:23:58] languages are easier to work with do you think this has completely erased or do you think it
+[1:24:02] might come back at some point either purpose-built languages i think there will probably be purpose
+[1:24:07] built languages by AIs for AIs maybe.
+[1:24:10] But right now we're in a funny place where some languages work better than others still
+[1:24:14] because they have better training data.
+[1:24:15] But in the fullness of time, all the languages will work equally well.
+[1:24:20] I'd push back on that.
+[1:24:22] Like if a new language never has training data, how would it work?
+[1:24:25] No, I mean, sorry, all the existing ones.
+[1:24:27] Oh, yeah.
+[1:24:27] TypeScript, it struggles with TypeScript today.
+[1:24:29] Yeah.
+[1:24:29] It does.
+[1:24:30] But it's not going to in one or two model releases.
+[1:24:33] It won't matter.
+[1:24:33] So could we see a stagnation?
+[1:24:35] Just fewer languages or no languages launching because they just get the job done.
+[1:24:39] And launching a new language seems a bit suicidal unless you bring a bunch of training data with it, right?
+[1:24:44] Man, that's a loaded question.
+[1:24:46] I didn't mean to make it a loaded question.
+[1:24:49] No, it's a good question, right?
+[1:24:50] Part of me says languages just don't matter anymore, right?
+[1:24:53] Any more than assembly languages matter, except for a few people who are trying to optimize really important things.
+[1:25:00] And then everybody else, it just doesn't matter, right?
+[1:25:02] But then part of me says, well, energy is the most constrained and important resource on this planet, and it's only going to get worse.
+[1:25:09] So finding better algorithms, finding better ways to solve problems is often a language problem.
+[1:25:14] Finding a DSL, you know.
+[1:25:17] So I think from an optimization perspective, an efficiency perspective, the search for new languages will probably continue.
+[1:25:24] But for pragmatic, for every day, I don't think it doesn't matter what you pick.
+[1:25:28] You might not even ask your agent what language it's using.
+[1:25:32] So as a software professional who loves the crafts, is into languages, debuggers, tooling, etc.
+[1:25:38] A lot of what we talked about is pretty sad because a lot of the beauty, the challenges that we worked, it seems they might be going away if we continue and if this continues as well.
+[1:25:51] How did you work through this yourself?
+[1:25:54] And also, what is the thing that actually excites you looking ahead?
+[1:25:58] right so i had the benefit of going through 30 years of graphics evolution and so i saw the
+[1:26:05] sadness and i saw the resulting much better games we got after all that happy stuff we were doing by
+[1:26:10] hand moved into the hardware we're sad because we're used to it change is part of life okay
+[1:26:17] and we're you know at one point i had to say goodbye to assembly language right i was like
+[1:26:21] those compiler writers they finally caught up right and then we were mad but then we were happier
+[1:26:26] because compilers are obviously way better
+[1:26:28] than writing an assembly language.
+[1:26:29] Anybody would be stupid to say,
+[1:26:31] oh God, yeah, no, you're not a good engineer
+[1:26:32] if you can't write an assembly language today.
+[1:26:34] But that was actually what we were saying in 1992.
+[1:26:37] Yeah, and then you had the blog post out in 2012 as well.
+[1:26:40] Yeah, no, I'm just saying stuff changes.
+[1:26:42] What you need to know as an engineer will change
+[1:26:44] and you can't rest on your laurels.
+[1:26:45] And we're going through a period of faster change now,
+[1:26:48] but you have helpers called agents
+[1:26:51] that can actually help you through this change.
+[1:26:53] So stop complaining and just go do it.
+[1:26:55] Yeah. And I think just recognize we're in this industry where change is a thing.
+[1:26:59] And that's right. Now, with that said, I didn't go through the five phases of grief, right? The five stages of grief. I mean, like I went through, I don't know if I, I don't know about anger. I was angry, really angry for a lot of reasons two years ago. But, but no, I mean, like if you've ever truly grieved, if you've like lost someone, you know, that it hits you in a lot of weird ways where you feel reality is disconnected. You feel sick. You feel stunned. You feel all day long.
+[1:27:25] The world goes monochrome, all color disappears, all kind of weird stuff, right?
+[1:27:28] And I went through that for about, I don't know, six or seven days.
+[1:27:31] It didn't take me that long to get through it, fortunately.
+[1:27:33] Or maybe that was the peak, and I was surrounded by a few months of it on either side.
+[1:27:38] But there was a period that I went through it where I was checking off things that no longer mattered that I had really cared about,
+[1:27:46] like my ability to memorize or my ability to write or my ability to compute or whatever, anything computing-related.
+[1:27:52] I was very sad, right?
+[1:27:55] Because those things made me special somehow, right?
+[1:27:58] But then to your question, what makes me excited?
+[1:28:00] Like, as soon as I got through that, I was like,
+[1:28:02] but wait, I'm writing 10 times more code than I ever was.
+[1:28:04] And I'm having fun.
+[1:28:06] And why should I be sad?
+[1:28:07] Right?
+[1:28:08] And so I realized it's just me holding on to the old,
+[1:28:11] just like I did in graphics.
+[1:28:12] And there's no point because the future is actually more fun than the present.
+[1:28:16] It's going to be.
+[1:28:17] You're known for your predictions, and I'd like to put it to a test.
+[1:28:20] Let's give some specific predictions for next year in 2027.
+[1:28:24] things that you think will happen either with how we develop or or how the industry works i think
+[1:28:30] that my wife is going to be the top contributor to our video game oh bold claim summer of next year
+[1:28:36] and she is not a developer i'm guessing no oh no no no but she loves our game and she has lots of
+[1:28:42] ideas right amazing yeah in fact i think my whole family might be in on it now i i'm serious man
+[1:28:49] programming is going to be for everybody and it's going to be the most amazing thing because
+[1:28:53] you know how much fun we've been having all those years and we've been telling people it's really
+[1:28:57] fun but now they're going to get to experience it right i look at my kids and how they look at ai
+[1:29:02] they're having so much fun with it creating they're just prompting gemini or any of these
+[1:29:07] with their imagination and they actually have they don't think it's weird i think it's weird
+[1:29:11] so i never would think of it but they just enhance our photos with like squirrels on my head and it
+[1:29:16] it just made me laugh and fun and you realize like there's just a lot of fun and new things with it
+[1:29:21] When you let go or you never knew what was before.
+[1:29:25] It's given the people the ability to do very sophisticated mashups of anything.
+[1:29:30] And mashups are really where innovation happens, right?
+[1:29:32] Innovation comes from taking things and putting them together and seeing where it goes, right?
+[1:29:35] We're going to see everybody innovating, man.
+[1:29:37] And it's going to be the most amazing thing ever.
+[1:29:40] And then we're going to need ecosystems of agents that can go find stuff that you like.
+[1:29:45] Because there'll be so much content.
+[1:29:47] How are you going to find the stuff that's really like, that you like?
+[1:29:50] You're going to have an agent that knows you really well.
+[1:29:51] I think any software engineer who wants to go make a big business right now should go start working on agents that know how to go and search the new world, everything that's coming out.
+[1:30:01] I don't even know what we call it, right?
+[1:30:02] The work pile for software that you like, for experiences that you like.
+[1:30:08] If everybody's creating it, think about it.
+[1:30:11] When the internet came out and everybody could make a webpage and upload shit, we needed aggregators.
+[1:30:16] We needed search engines.
+[1:30:18] We needed ways to organize and find and surface the good stuff, right?
+[1:30:22] None of that exists right now, but everybody's about to start coding.
+[1:30:26] Like, right?
+[1:30:27] You know, and so like, you can get ahead of this.
+[1:30:29] This is why I keep saying, just believe the curves, pick a point on the curve and aim
+[1:30:34] for it.
+[1:30:34] And you will land there and you'll be first when the AIs are ready for your thing.
+[1:30:39] Yeah.
+[1:30:39] And I think as end years, we already can build.
+[1:30:41] We don't need permission.
+[1:30:41] We can use this tool super efficiently.
+[1:30:43] Right now.
+[1:30:44] And we are ahead of the rest of the world right now.
+[1:30:47] Right now.
+[1:30:48] Well, it's exciting times. Well, Steve, we'll have to check back on how, if that prediction will come through with your wife contributing more. But this has been, I think, really eye-opening. And it's, you know, sometimes I think it's good to go through the has-been and the can-be.
+[1:31:03] Yeah. Well, thanks.
+[1:31:06] I hope you enjoyed this conversation as much as I did. An interesting thought from Steve is his parallel between the graphics industry and what's happening in software engineering right now.
+[1:31:15] In 1992, Steve was learning to calculate where individual pixels go on a line.
+[1:31:20] Two years later, the same course was teaching animation.
+[1:31:23] The work in graphics went from writing device drivers to building game worlds and physics engines.
+[1:31:28] It all just moved up the abstraction layer.
+[1:31:30] Steve's argument is that software engineering is going through exactly that same shift right now,
+[1:31:35] except it's faster.
+[1:31:36] Instead of asking, will engineers have jobs at all?
+[1:31:39] A better question might be, what will the new jobs we do as software engineers look like?
+[1:31:43] Another thing was the grief of this change.
+[1:31:46] Steve is someone who spent 40 years building his identity around compilers, debuggers,
+[1:31:50] elegant code. And then one day he sat down and started checking off one by one the things that
+[1:31:55] made him special that no longer mattered. His world went monochrome, as he said.
+[1:32:00] Within a week or so, he came out from the other side and realized he was writing 10 times more
+[1:32:05] code and that he was having more fun doing it. Still, I think a lot of engineers are quietly
+[1:32:10] going through something similar right now, and it's usually taking longer than a week to digest
+[1:32:14] all of this. Finally, one thing I found really honest from Steve was his point about value
+[1:32:19] capture. If you become 100 times more productive with AI, who benefits? If you work 8 hours and
+[1:32:24] produce 100 times the output, the company captured all of that. But if you just work 10 minutes in a
+[1:32:29] day and produce the same value as before, you technically captured all of it, and your company
+[1:32:33] captured none of it. Now, neither extreme is sustainable. Steve is saying that this new work
+[1:32:38] work-life balance is a question that we'll need to figure out. We don't have the cultural norms
+[1:32:42] for any of this, and it's going to be messy as we figure it out. If you've enjoyed this podcast,
+[1:32:47] please do subscribe on your favorite podcast platform and on YouTube. A special thank you
+[1:32:51] if you also leave a rating for the show. Thanks, and see you in the next one.

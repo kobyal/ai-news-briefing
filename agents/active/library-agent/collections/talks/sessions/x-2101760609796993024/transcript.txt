@@ -1,0 +1,335 @@
+[0:00] Hi, everyone. I hope that you can hear me. I'm not sure.
+[0:04] I'm here at Anthropic, and today I want to talk about how you can get the most value out of your cloud code sessions.
+[0:10] And just a quick bit of housekeeping first, because I know there are so many of you here today, which is great,
+[0:15] but it also means we won't be able to get to every question live.
+[0:19] So drop your questions in the Q&A as we go, and we'll answer as many as we can at the end.
+[0:25] And the ones we don't get to, we'll follow up on afterwards, together with the recording and the links.
+[0:30] But just so you know what this is about, this session is about how Cloud Code actually spends tokens when you work with it, what you control about that, so your own habits and settings in a session, and at the end, also just the levers that you have if you set it up for a team.
+[0:44] I want you to walk out of this session here feeling in control of how efficiently you work in Cloud Code and also with a good mental model of what a task ends up costing and why.
+[0:55] And again, if you're the person who sets up
+[0:57] clock code for your whole team,
+[0:59] I hope you stay till the end
+[1:00] because I'll also go through some of the levers
+[1:01] that you have in our dashboard.
+[1:03] And I kind of want to show the mental model on purpose
+[1:06] because I feel like we often just give you a checklist
+[1:08] like, hey, do these things.
+[1:10] But that tends to go stale the moment we ship something new.
+[1:13] And personally, I think if you understand
+[1:15] the mechanism behind something,
+[1:17] you can just work out the right move yourself
+[1:19] for your environment, in your context,
+[1:21] all that kind of stuff.
+[1:23] And honestly, I think this is a new skill for engineers.
+[1:25] You know, software used to be a flat fee.
+[1:27] We used to pay for the tool or for the seats.
+[1:30] But in the era of agency coding, we're paying for the work itself, right?
+[1:34] Task by task, you're paying per prompt.
+[1:36] So understanding how to be efficient with that is just part of the job now.
+[1:41] And the unit we're going to talk about most, pretty much the whole time, is tokens.
+[1:46] If your company runs cloud code on API billing or through a cloud provider, you're paying per token.
+[1:51] So this table, I'm sure you're familiar with this table, you know tokens already.
+[1:56] But if you're on Pro or Max or Team or Enterprise, you have these five-hour windows or a weekly window instead.
+[2:01] But also, those windows are measured in tokens.
+[2:05] So whichever way you're set up, tokens are the unit.
+[2:08] And how many tokens go into a task is what we're going to get better at today.
+[2:13] And this isn't about sending fewer of them or using clotless.
+[2:15] we just want to make sure that the tokens that do go into a session actually go toward a thing you,
+[2:21] you know, ask Claude to do. So let's take a step back real quick and look at what actually happens
+[2:26] behind the scenes when we send a prompt to Claude. So say that I have a failing test and I type
+[2:32] fixed the failing test in utils.test. Yes, I press enter. Now, Claude code doesn't just send that one
+[2:38] prompt to the model. When I started this session, it already loaded a bunch of things for me. Claude's
+[2:44] own instructions, the system prompt, the definitions of the built-in tools, so read, edit, bash, and so
+[2:49] on, my environment, current working directory, get everything. We also have my cloud MD file, and I
+[2:55] have some skills in here, an MCP server set up, and it will also include a short name and description
+[3:01] for all these things as well. So all the way at the end is our message. So all of this, this entire
+[3:07] bundle goes to the model as one request. So that's already the first thing to understand, it's never
+[3:12] just the prompt. And this bar down here, as we're walking through this, this is the context window.
+[3:17] So everything the model gets to see in this request. And I'll keep this on the screen here
+[3:21] because honestly, this bar is what this talk is about. So our request arrives at the model,
+[3:26] but the model doesn't just read this as text. It first goes through a tokenizer. So this splits
+[3:30] everything we send, including the system prompt, CloudMD, everything into tokens, which are just
+[3:36] small chunks, roughly word-sized. And the model processes those. I won't go too deep into that
+[3:41] today, but it's important to understand that the input into the model is tokens, and also whatever
+[3:46] the model generates afterwards is also tokens. So from here on, everything in this bar, everything
+[3:51] that comes back is token. So the request arrives at the model, the model reads all of it, gets to
+[3:57] my message, and goes, okay, you want me to fix something, but I only have a file name, you didn't
+[4:01] send the actual file. So what it comes back is not a fix, it's just a tool call, like, hey, read
+[4:06] utils.test.ts, cloud code or the harness then performs that,
+[4:10] it reads the file and sends this back to the model and so on.
+[4:13] Now, I'm not going to walk through every step here.
+[4:15] That's not the point.
+[4:16] The point is the loop here.
+[4:18] The model decides that it needs to do something,
+[4:20] it sends a tool call back,
+[4:22] cloud code performs it and then sends this result back to the model.
+[4:25] But notice that I didn't do anything here in the CLI.
+[4:28] It's the model choosing these tool calls.
+[4:30] And on every one of those round trip, the bar grows.
+[4:33] So as we keep watching this, you'll see a few things in the bar.
+[4:36] So there's a couple colors, but two of these.
+[4:39] Whatever we send to the model, I've marked blue,
+[4:41] and whatever the model sends back is orange.
+[4:46] There's also this container around the beginning of the request
+[4:49] that just keeps getting longer.
+[4:50] I'll get to that in a second.
+[4:52] But the most important thing here is what we're looking at
+[4:54] is three kinds of tokens.
+[4:57] So first we have the input tokens,
+[4:59] which is everything we send to the model,
+[5:02] so everything in the bar here.
+[5:03] We have output tokens,
+[5:04] which is everything the model sends back. And that's not just the summary at the end. It's also
+[5:10] the tool calls, the edit, the thinking, everything the model did. And everything inside this container,
+[5:16] these are cached tokens. So we have three types. We have input, output, and cached. And you might
+[5:22] recognize this from the pricing page because that's exactly how it's laid out, right? Like
+[5:26] we have a price per token per model and then separate columns for the input, cached input,
+[5:30] and output. Now I just want to take a quick look at why these are priced so differently. First input,
+[5:36] so whenever we send something to the model, the model still has to process every input token,
+[5:42] but it can do all of them together like in one pass. So GPUs are extremely good at that, so per
+[5:47] token the input is pretty cheap, but output is different. So the model writes one token at a
+[5:52] time. So to write something seemingly simple like const x equals one, it does a full pass over
+[5:58] everything in the context just to produce const, appends it, does another full pass just to produce
+[6:03] x and another one for equals and everything else. So there's a lot more compute behind every output
+[6:10] token and that's also why output is priced the highest of the token types. And then there's cash
+[6:17] tokens which is the cheapest one. So a big part of the request is the same every time, right? Like
+[6:22] on every round trip we're only appending to the end but everything before that the model has already
+[6:27] processed on the previous request. So the server doesn't treat that part as brand new. It just
+[6:32] keeps the internal state that it built up the last time and only does all the recomputation
+[6:38] or the computation on the point where this request starts to differ from the previous one.
+[6:43] And that's the prompt cache. So the identical part at the front is called the prefix,
+[6:48] and that's the container that you saw growing. And this is read back for just a small fraction
+[6:52] of the normal input price. So the new part pays the full price once and then from the next request
+[6:58] on it's inside the container. Now Cloud Code sets this all up for you automatically but cash here
+[7:04] honestly I think is your biggest lever because look at the bar again like a lot goes in and a
+[7:09] very little comes out and nearly everything that goes in is inside that container. So in a healthy
+[7:15] session, most of your input is the cheap cached kind. And you can check for that on your own
+[7:21] session with usage. So there's a line here for the prompt cache, and that shows you exactly how much
+[7:28] of your input came from cache. In a healthy session, that number should be high. But there
+[7:32] are a few things to keep in mind here, because what we just saw is, you know, a list of things
+[7:37] that we get to optimize. So how many tokens go in, how many come out, and how many of those are cached.
+[7:43] There's also one more thing, is whether the model that's running all of this is actually the right model for the task.
+[7:49] Because we saw that the model has to process every single one of these tokens.
+[7:53] And a larger model, like Opus or Fable, is more expensive simply because per token, it does a lot more computation.
+[8:01] And that's great for a lot of tasks, but you might not need it for yours.
+[8:05] And because it applies to every token, both in and out, it directly multiplies everything else we're about to look at.
+[8:12] So that's the first thing to get right.
+[8:14] Don't run the biggest model on a task that just doesn't need it.
+[8:19] And also to be clear, a smaller model is not a worse model.
+[8:22] The way I like to think about it is Sonnet is a really good generalist,
+[8:26] Ope is the expert, and Fable is the specialist who's seen the problems no one else has.
+[8:31] And Haiku is just like a quick assistant.
+[8:32] Like an edit that you can describe precisely or a mechanical change
+[8:36] or a question about the code that's already in the context.
+[8:38] that's great for generalist work and sonnet gets you there perfectly paying way less per token
+[8:44] but if there's like a subtle bug or just unfamiliar territory something you don't really know what's
+[8:49] going on then opus is a great expert and it's worth paying a bit more for that but that's not
+[8:54] for every task right the next thing is to give clod the right context so it needs fewer tool
+[9:00] calls and fewer of these round trips to figure out what you're actually trying to do and some of that
+[9:05] is in your prompt and some of this is having the right environment, the right cloud MD,
+[9:09] skills setup. And a really small one is you can actually add the file to the prompt. So in this
+[9:14] case, we could have said fix the failing test in at utils.test.yes. So then before the request even
+[9:21] goes to the model, cloud code already puts the contents of that file in. So that first read
+[9:26] tool call just never happens because the model already has all the context. Small one, of course,
+[9:32] over a large session, but I still like it. Then it's also important to make sure that
+[9:38] there's not a bunch of stuff in your context that you don't need for this specific task.
+[9:43] And you can say what's in your context by typing context in a fresh session, and you see exactly
+[9:49] that. So you see the system prompt, you see the tools that are loaded, your Cloud MD, how many
+[9:53] tokens everything is using as well, your skills, your MCPs. So this is always worth doing before
+[10:00] you start a new session just to make sure like okay am I adding stuff that is unnecessary can I
+[10:06] make my prompt more lean now after seeing those insights there's a couple of things you can do
+[10:11] the first one is CloudMD generally just don't keep anything in here that doesn't serve every task
+[10:18] you might look at yours and find something like for database migrations do this do this and do
+[10:23] that but that doesn't apply to every task but we are still sending it on every prompt those things
+[10:29] usually you want to move to skills. The nice thing about a skill is that they only load
+[10:34] whenever the model decides that it actually needs them for this task. It only sends by default the
+[10:40] name and the description and based on the description the model can pick like okay
+[10:43] this skill makes sense to load now because we're asking for a database migration.
+[10:48] But by default you don't want to add this to every single task if you're just asking for
+[10:52] I don't know a file rewrite or something. Something that has nothing to do with a database migration.
+[10:58] So a CloudMD generally is just what applies for every task.
+[11:01] And then second, so in your CloudMD is check if you still need all of this information.
+[11:07] Models have gotten really, really good.
+[11:09] And instructions that you had to give the model maybe three months ago just might not apply anymore.
+[11:14] We have a skill for this now called Cloud API Prompt Audit.
+[11:18] And this goes through all your instructions or your CloudMD, your skills, and checks whether this is still relevant also for newer models.
+[11:25] and if not it proposes a diff with what you can remove or refine for this model.
+[11:30] So that alone already takes a good chunk out of your input tokens and the same idea here for MCP
+[11:37] servers. So you might have a lot of MCPs connected to your session and there are full tool definitions
+[11:42] load on demand these days. So an idle server is pretty cheap but it's still not nothing. So run
+[11:48] MCP, switch off whatever you're not using in that session or maybe use a CLI instead like the GitHub
+[11:54] CLI, AWS CLI, all of that stuff, Claude can just run it and nothing, you know, loads up front at all.
+[11:59] And then one other thing that also fills this bar is command output. So whenever a command prints
+[12:05] goes into this conversation exactly like a normal, you know, file that Claude read, and it stays there
+[12:11] for the rest of the session. Now, a really big output is already handled by Claude code. With
+[12:16] past a certain size, Claude code writes it to a file and then only puts a short preview of the
+[12:21] path in a conversation. But a thing to watch for is everything under that. So a test runner that
+[12:28] prints like one line for each of your 400 passing tests can come under that limit. So all 400 lines
+[12:35] are now part of every request after it. So a quiet reporter that only prints the failures is also a
+[12:41] tiny fraction of that. And Cloud will often add the quiet flag itself, but the reliable way is to put
+[12:46] the two or three commands that you run all day in your Cloud MD, also written exactly how you would
+[12:52] run them. So like run a single test with npx retest run file name and then reporter dot. That's
+[12:58] just once it's committed, it's a team-wide setting or for something super noisy, just have it run in
+[13:03] a sub-agent, which we'll get to in a moment. Then in some cases, you'll also notice the model reaches
+[13:08] a lot further than you expected. It does a lot more, more thinking, more tool calls, more file
+[13:12] edits, all that stuff. In some session, you can say, you know, make the button green, and one time
+[13:20] it just changes the color, and another time it'll try to understand your whole code base and your
+[13:25] design system, everything. And most of that is related to effort. So effort goes along with your
+[13:30] request, and it just tells the model how thorough it should be before it calls the job done. And the
+[13:36] default that we set is usually fine, but I also get that it's tempting to run on extra high or
+[13:42] max because you care about the task, but that's really not always necessary. And higher effort
+[13:48] means more output tokens, which then also means more input tokens, everything else. We see that
+[13:54] with larger models like Fable 5.1, medium effort is excellent. And even though the name medium
+[14:00] might not sound like that'll give you enough effort for the task you're doing, lower effort
+[14:07] levels are sometimes just as good as previous models on higher effort levels. And this also
+[14:12] gives you kind of a nice rule of thumb when a result misses is, did it not know enough or did
+[14:18] it not try hard enough? If it didn't know enough, that's a model question. You might want to up the
+[14:23] model. If it skipped a file or it was lazy, it didn't run the test or stopped halfway, that's
+[14:29] effort. And it also goes the other way, right? Like if you notice that it's doing too much, dial down
+[14:33] the effort. Now before we get to the cache, one more thing about the amount of tokens. The model
+[14:39] only ever adds to your context. It never removes anything. So in a long session, everything we've
+[14:45] talked about so far is still there on every request. And even though most of it is cached,
+[14:50] cached is not zero. So the model is still processing it and for most of the time you don't
+[14:56] need it anymore. So here like in the top row, I ran clear between the tasks. So every task starts
+[15:02] small again and the bottom row is a long session where every column still carries the task before
+[15:07] it and it just keeps getting taller. Now the bottom session uses twice the amount of tokens
+[15:12] as a top session just because task two and three were still carrying task one around the whole time.
+[15:19] So there's a couple things you can do here. The first is compaction. So you can run compact.
+[15:23] Cloud replaces the whole conversation with a summary. By the way you can also give it hints
+[15:28] about what to remember and what to prioritize. You can run rewind to drop the last few turns
+[15:33] and run clear when you're starting something new. And that's the top route that I kept doing there.
+[15:40] So if you think you'll want the old conversation back later, you can actually rename it first. So
+[15:45] rename the session, then clear, and then resume still resumes that old session if you want. Now
+[15:51] getting back to that cached prefix that we talked about earlier, it's important to remember that the
+[15:55] server can only reuse the part of the request that's identical to the previous request starting
+[16:01] from the very first token. And again, that identical front part is called the prefix.
+[16:05] But the moment that one token is different, everything after that point is new to the server
+[16:11] and gets processed at full price. So that's important to remember here with compact and clear,
+[16:16] we changed the prefix. There's no way around that because we just changed everything that
+[16:21] leads up to this point, so it breaks the cache. And then on the next request, you pay the full
+[16:25] price for whatever's in there now. And after a compact, that's just a small summary, so that's
+[16:30] usually pretty fine. But everything else that's in this prefix is also good to know. So this also
+[16:35] includes the tool definitions and your system prompt. The system prompt includes things like
+[16:40] your working directory and the snapshot of your git state when a session started, then your cloud
+[16:45] MD, and then the conversation so far. And this is also why the same thing happens when you change
+[16:49] models mid-session because the cache is that model's own internal state. So a different model
+[16:54] has nothing to reuse and it just reads your whole conversation fresh once. When you change the effort
+[17:01] level on most models, because that also sits in front of your request with Fable 5.1 being the
+[17:07] exception, you'll also break prompt cache when you change effort level. We do warn you a lot of the
+[17:12] time before this happens. So if you run model or effort while the cache is still warm, Cloud Code
+[17:17] it will ask you to confirm first.
+[17:19] And there's also plenty of things that are totally fine to change mid-session, by the way,
+[17:23] like editing files, changing permission mode.
+[17:25] That's all on the Cloud Code side.
+[17:27] This never touches your request.
+[17:29] And your Cloud MD is only read once at session start.
+[17:31] So even if you edit this mid-session, nothing changes.
+[17:35] It just shows up in your next session or after you clear.
+[17:38] Now, time is the next thing because we don't cache forever.
+[17:41] The server just keeps this prefix around for a limited amount of time.
+[17:45] and then every request you send resets this timer. So while you're working, the cache is still warm.
+[17:50] Today, that window is about an hour on a plan within your plan's usage and about five minutes
+[17:56] on API billing or a cloud provider. Subagents also get five minutes everywhere, plan or API,
+[18:01] but you can change that. So there is a prompt cache TTL setting for the main conversation and
+[18:07] also a matching one for subagents. But you don't always want to do this because the long window
+[18:11] also isn't free. Writing tokens into a one-hour cache is built at a higher rate than writing them
+[18:17] into a five-minute one. So if you work in like steady bursts and rarely pause for more than a
+[18:23] few minutes, the short window is usually cheaper because you'd be paying extra for the time that
+[18:28] you never use. So the long window pays off if you do step away, maybe a meeting or a lunch or long
+[18:33] build and you know come back to the same session. Okay so practically TLDR, what does this mean and
+[18:39] what can you do? Well, first, don't break the cache yourself or try to avoid it. Make the model an
+[18:43] effort choice at the start of a session or right after you're clear so there's nothing cached to
+[18:47] lose. Now, if you do want to switch model in the middle of a task, maybe compact first and then
+[18:52] switch so that the new model only has to read a short summary instead of your entire conversation.
+[18:57] And also make sure that you compact while the cache is still warm because compacting means that
+[19:01] the model reads your entire conversation one more time to write that summary. So if the cache is
+[19:05] still warm, that read is pretty cheap. But if you wait until after the window, say you come back
+[19:11] after an hour and then compact, that same read is now full price, full input price. So try to compact
+[19:17] or change before you step away, not when you come back. And it's the same story when you resume an
+[19:22] old session. So by then, in most cases, the cache has already expired, or at least mine has. My
+[19:28] sessions are long and I take breaks. So that first session or that first message back sends the whole
+[19:34] conversation to the model again and none of it is cached so it's all just plain input and if you
+[19:40] need that full context that's fine it's only once but if you know that you'll come back tomorrow
+[19:45] maybe it's better to run like compact first before you leave so that what you resume the next day is
+[19:51] just a shorter summary and one more tool for keeping what's in your session useful is subagent
+[19:57] so sometimes clod needs to kind of research something bigger to answer your question maybe
+[20:02] a long log, a whole repo, a full test run, something. And you really only want the conclusion,
+[20:08] but not all these 30 files that it read to get there. And that's what a subagent is for. So this
+[20:13] runs in its own context, which is own small system prompt, your CloudMD file, and just a task.
+[20:20] And it does all the reading and all the tool calls over there, and it only sends you the final
+[20:24] conclusion back into the main conversation, but everything else that it read dropped.
+[20:28] Now, token-wise, to be clear, a subagent isn't free.
+[20:32] It still has its own input and output tokens, its own cache.
+[20:35] And again, that cache is that five-minute window.
+[20:38] So the total for that one job can even be a bit higher at some points.
+[20:42] But what you win is that your main conversation stays small and optimized for the task that you actually want Claude to do.
+[20:48] So every turn after that is cheaper.
+[20:51] And your context window is also not full of all these log files.
+[20:55] and you actually have a lot of control and subagents. So you can run a different model
+[21:00] than your session. So a Haiku or Sonnet subagent for digging, you can set the effort level. And if
+[21:06] you have any custom subagents, just know that you can also set the model and effort level
+[21:10] for that subagent. So far, everything here was about your own sessions. But if you're the person
+[21:16] who sets cloud code up for a whole team, there's also an admin side to all of this. And it's really
+[21:21] the same levers set once just for everyone. And most of this lives in one place, managed settings.
+[21:28] And this is a settings file that you define in the admin console. So every install on your team
+[21:33] picks it up at startup and users cannot override it. There's a couple of things that you can
+[21:37] configure here. So first is the starting model and also which models people can pick at all.
+[21:42] So when a team's spend is unexpectedly high, this usually traces back to just the biggest model,
+[21:47] just being left on as a default. You may not need that. So you may just pick a smaller model. That's
+[21:53] just one line and it's the highest leverage thing here. Second is the starting effort level. And it's
+[21:58] the same story as earlier. People tend to leave it on highest because they care, but you definitely
+[22:03] don't always need the highest effort level. So you can set the default once and still raise it for a
+[22:08] task if you want to. And on enterprise, you can also cap the maximum per model. And third is the
+[22:14] cache window if your team is on API or cloud. So that's the prompt cache TTL from earlier. You can
+[22:19] just set it once for your whole team. So if your developers tend to work in like steady burst, you
+[22:23] can leave the short window, but if they tend to disappear in the meetings and come back to the
+[22:28] same session, you can set this to like an hour and just accept the higher write price. You can also
+[22:34] set which MCP servers are allowed so there isn't just a pile of idle ones sitting around, and
+[22:38] there's an organization-wide cloud MD that you can ship to every machine. So every session on the
+[22:44] team starts with them. Then you can also see what's happening. So the console has this analytics view
+[22:49] for adoption and a spend report per user and per model when you've turned on usage credits.
+[22:55] Another useful one is OpenTelemetry. You just set it with two environment variables in that same
+[23:00] managed settings file. And then every install reports input, output, cache reads, and catch
+[23:05] writes per person. And you can see the cache reads here as a share of all the input per user.
+[23:10] And that should be by far the biggest chunk because that means that their sessions are staying warm.
+[23:15] If someone's share for these cash tokens is low, that means they're breaking the cash somewhere.
+[23:20] And, you know, as we talked about before, maybe it's a model switch, an effort switch.
+[23:24] And you can also see the info tokens per session over time.
+[23:27] And what you want to see here is a line that climbs during a task, but then drops back every time they clear or start a new session.
+[23:34] If it only ever climbs, then someone is just living in one endless session and maybe resuming an older session when cash had already expired.
+[23:44] You can also see the cost by model per user.
+[23:46] So this tells you which people have a bigger model for everything.
+[23:50] So those are kind of exactly the habits from this talk per person.
+[23:55] And each one is just a one message fix.
+[23:57] Like, hey, I noticed you've been doing that.
+[23:58] And last is limit.
+[24:00] So on team and enterprise, the seat's five-hour and weekly window is the ceiling.
+[24:05] So no one gets past that by accident.
+[24:07] But if you do want your people to keep working, you can turn on usage credits and put a spend
+[24:11] limit on it, either per organization, per group, or per person.
+[24:14] And one related setting here is auto continue at usage limit.
+[24:18] And this defines whether a session that hit that window just waits, but then automatically
+[24:22] picks the task back up when the window resets.
+[24:25] So this matters for these long, unattended runs.
+[24:27] So one prompt is many requests.
+[24:30] and every request carries the entire conversation. And the cache makes that history cheap as long as
+[24:36] the front or the prefix of the cache stays the same and you keep moving. So ultimately what you
+[24:43] should remember is three things. One is to pick your model, your effort level, and your MCP servers
+[24:48] at the start of a session and leave them alone. You can change your effort level if you're using
+[24:53] Fable 5.1 but that's the only model that doesn't break prompt cache. But by not changing any of
+[24:58] these settings, the front of every request keeps matching the one before it, so it doesn't break
+[25:04] front cache. So Claude can keep reading from the cache instead of having to reprocess the whole
+[25:09] conversation. And two is to be deliberate about what you put into the conversation, right? So
+[25:14] point Claude at the files you already know about, keep your command output quiet, and send the really
+[25:19] noisy digging into a sub-agent, and so that way only the summary comes back into your main
+[25:26] conversation. And the third one is to make sure your session stays focused. So clear whenever you
+[25:31] start a new task. So you're not, you know, paying for task one during task three, all that. And try
+[25:36] to compact if you're doing that before you step away while the cache is still warm. And remember
+[25:41] that resuming an old session or coming back after a long break after the cache expired means one
+[25:47] full read of everything. And the model is a multiplier of all of this. So pick the model
+[25:53] that's right for your task. And for a team, you can make those same choices in managed settings.
+[25:58] So using Cloud Code efficiently doesn't mean using fewer tokens. You just want the ones that you do
+[26:03] use going towards the thing you actually asked it. Prices and features will keep changing, but
+[26:09] hopefully that part won't. I hope this helped kind of demystify where tokens go at least a little bit.
+[26:15] Appreciate you coming to this webinar. Let me know if you have any questions.
+[26:23] you

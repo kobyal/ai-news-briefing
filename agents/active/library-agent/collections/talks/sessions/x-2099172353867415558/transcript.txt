@@ -1,0 +1,716 @@
+[0:00] Welcome, welcome. I'm Alex. I'm a member of technical staff at Anthropic and I'm joined here by...
+[0:04] Nadine. Hi, I'm Nadine. Nice to meet you all.
+[0:06] Both members of technical staff here.
+[0:08] And we're here to tell you about some of the really cool research findings that we've recently published at Anthropic on long horizon coding agents.
+[0:17] We'd really love for you to kind of consider a couple of the lessons that we ourselves learned that we're here to share.
+[0:24] One of those being that we're still the thinkers, right? And that's why I'm wearing this thinking cap.
+[0:28] We're still the thinkers, even though the agents can do a lot of the work for us.
+[0:34] That's one of the lessons.
+[0:35] That's kind of the societal impacts lesson, if you will.
+[0:38] And then the second one is the technical learnings that we're here to share.
+[0:43] Yeah, so if you're here at reInvent Live, then you might have actually seen our demo
+[0:47] live in the Anthropics booth, specifically in the Claude Keeps Building booth, in which
+[0:53] Claude is building a project management tool that we're calling Canopy.
+[0:58] And it's taking in feature requests from attendees like yourself to continuing to iterate on the
+[1:03] minimum viable product.
+[1:06] And so this is all being hosted on AWS infrastructure, specifically Asian Core runtime.
+[1:12] And we'll be going in detail about the architecture a little bit later on.
+[1:16] But to get started, we just want to give you a little bit of context on why this is important
+[1:21] and the lessons that we learned along the way to reach this point.
+[1:24] Yeah, so let's jam with the silent disco and get into it.
+[1:27] So really, what are long horizon agents?
+[1:31] What are we really talking about here?
+[1:33] So we've been thinking about this in terms of what are the ways that we can teach AI to handle the quote-unquote boring parts.
+[1:42] And so when we talk about boring parts, it's very much a tongue-in-cheek phrase.
+[1:47] How many of you here are developers in the room?
+[1:50] Quite a few of you. Awesome, right?
+[1:52] So if you think about the development workflow, we really want to encourage us to continue to be the thinkers in the room while allowing the AI to do some of the things that maybe aren't as exciting.
+[2:05] We'll talk about that here soon.
+[2:07] But really what we want to do here are the lessons from building agents that work across these many sessions.
+[2:14] And that's going to be the technical aspect of this presentation.
+[2:17] So let me ground this in developer reality.
+[2:22] So as you might all know, your Monday plan might start off.
+[2:26] You have a few features or maybe like a pretty optimistic one
+[2:28] where you want to work on updating some API documentation,
+[2:32] maybe writing some unit tests for edge cases,
+[2:35] maybe fixing a bug.
+[2:37] And then finally, if you have the time,
+[2:39] work on some sort of innovative feature
+[2:41] that you've been wanting to get to for a long time.
+[2:44] But then reality strikes or hits.
+[2:47] And what ends up happening is the quick sync
+[2:49] that was meant to take 15 minutes
+[2:50] might have become a 45-minute heated debate about the roadmap,
+[2:55] or a SEV1 comes and you have to fix some sort of production bug,
+[2:59] or there's a 47-message Slack thread that requires your input to continue.
+[3:07] And so by the time you actually get to opening your IDE and working,
+[3:11] it's already 4.30.
+[3:13] So basically what we were looking to solve and what we were looking to,
+[3:18] So what we were questioning was whether AI or LLM specifically could handle some of this more mechanical or repetitive implementation and work.
+[3:28] And humans can focus on the judgment calls.
+[3:31] And I want to be very clear.
+[3:32] We're not saying this is like a fix for everything.
+[3:35] This is not going to solve all your problems.
+[3:36] It won't like free up all your time.
+[3:38] What we're saying is that we've seen specific trends and specific things that work for specific types of tasks,
+[3:48] and we want to share those learnings with you today.
+[3:52] So, yeah, that's sort of what our focus is.
+[3:54] And to get that started, there's a specific challenge that we want to describe,
+[3:59] and that's the fact that LMs have a fundamental limitation.
+[4:04] So, yeah, thank you.
+[4:06] As you all might know, LLMs are forgetful, right?
+[4:10] So they're unable to keep a persistent memory
+[4:13] from session to session.
+[4:15] So while in theory this new pair programmer might be great
+[4:19] because they love to write tests, which is awesome,
+[4:21] they never complain about updating the documentation,
+[4:24] which is also great,
+[4:25] and they follow your coding standards to the T,
+[4:28] they might forget where they left off session to session.
+[4:32] And that might seem like a problem,
+[4:34] problem, like a problem that we want to solve. But what we've seen is while this
+[4:39] is great, for example, for quick tasks where you have a function, you ask cloud
+[4:45] to write a function and it finishes it and you're done, for longer projects
+[4:50] where it might be 200 features that run over hours and maybe days, this feels
+[4:56] like it would be a problem. What we've discovered, and this might be a little
+[5:00] counterintuitive is that forgetting isn't necessarily a bad thing because forgetting
+[5:05] means that the model isn't picking up bad habits. It's not sort of reinforcing these incorrect
+[5:13] assumptions and it's able to generally be more focused. So if we solve for this memory externally
+[5:22] rather than through the model, then forgetting becomes a feature, not a bug. And that's what
+[5:28] we're talking about today.
+[5:30] Yeah, and so let's ground this in the reality, right?
+[5:33] So if we think of us humans, it takes quite a while for us
+[5:37] to get back into flow if we get distracted.
+[5:41] Some research has shown that it can take 20 minutes
+[5:43] for somebody to get back into flow as a developer.
+[5:46] I've certainly been there.
+[5:47] If you think about us here at Vegas,
+[5:50] and we go out and party, and we come back the next day,
+[5:53] it might take actually quite a bit longer.
+[5:55] It might take an hour before you're back in flow the next day.
+[5:58] With the agents, they really can do this very, very quickly.
+[6:02] They can come back into flow very quickly,
+[6:04] but there is a fundamental problem, and that's the context.
+[6:07] So while we as humans take longer than agents to get into the next session,
+[6:14] the issue for the agents is, as Nadine was saying,
+[6:18] how do we, when the agent wakes up, how does it know what to do next?
+[6:22] And so each new session begins with no real memory of what came before.
+[6:28] And that's both a superpower and a bit of a flaw too.
+[6:31] So really, we're talking about how do we imbue the agent from session to session with the correct context so that it can continue building where it left off.
+[6:43] Yeah, and so this changes sort of how we think of the human AI division of labor.
+[6:48] And we wanted to show you what we found to be effective.
+[6:51] So what we've looked at is that the human would be in charge of creating the vision
+[6:58] or designing the vision and the requirements and setting the standards and the constraints
+[7:05] and actually making the architectural decisions and then reviewing the outputs of the models.
+[7:13] And then the models, the AI builders or more specifically the LLM builders
+[7:17] will be implementing those features following that vision or the guidance,
+[7:23] and then the test will be done against the criteria that you've set,
+[7:30] and the documentation will be constantly updated as it works, which is really great,
+[7:35] and then it will basically iterate on the feedback that you're providing it.
+[7:40] And a key word here that I want to emphasize is constraints.
+[7:45] So you will have a sort of standards file, and this should be read-only to the agent.
+[7:51] So the agent shouldn't be allowed to go in and edit your style or edit your architectural decisions.
+[7:58] The way I like to think of it is you're the architect,
+[8:01] and the AI or the LLM is sort of the builder that's following the blueprint that you designed.
+[8:09] So let's talk about what environment as memory really looks like.
+[8:13] And this is something that we're going to show you in a live demonstration here in a few minutes.
+[8:17] So we're not just going to talk off the slides, I promise.
+[8:21] But really, you know, there are things that we have to consider when we think about the environment.
+[8:25] One of those things is the feature list, right?
+[8:28] So interestingly, we've discovered that if we have the agent build up the feature list from a specification,
+[8:35] this is kind of a form of specification-driven development.
+[8:37] You've probably heard this before, both as developers and in the AI space.
+[8:41] It's almost like all the old things are new again.
+[8:44] We have the agent build up a feature list, and that feature list is a JSON file.
+[8:49] And again, the reason why it's a JSON file and not a markdown file is that we've discovered
+[8:52] that if we have it create a JSON file, it's actually less likely to write to that file
+[8:57] if we give it instructions to do that than if we had a readme markdown file.
+[9:01] If we have a markdown file, it's more likely to edit it, and we don't want it to do that
+[9:05] once it has come up with the initial specification.
+[9:08] So that's very important.
+[9:09] As Nadine was saying, we also want the agent on every subsequent session to have the same
+[9:14] standards as it had in the previous session.
+[9:17] So we have a standards MD file that we give the agent with the standards of whatever development
+[9:21] team that you are on, right?
+[9:25] There's also a CloudProgress MD file.
+[9:27] And the CloudProgress MD file is another sort of piece of information that we give the agent
+[9:31] at the beginning of the session so that the new session knows where the previous session
+[9:36] left off.
+[9:38] actually joined up with git commits.
+[9:41] So we as developers know what that's like, right?
+[9:43] If we write good commits, next developers that come and look at the code base can look
+[9:48] at the commit history that previous developers have actually added to the code base, right?
+[9:54] And we are learning that if we give the agents these same sort of primitives, if you will,
+[10:00] the agents do a better job.
+[10:01] They kind of think like us.
+[10:03] They work like us.
+[10:04] Probably not a surprise because we train them, right?
+[10:06] even though it's on the knowledge of the Internet.
+[10:09] And then finally, there is an init.sh file.
+[10:11] And it turns out that this is actually quite important as well, because when the agent
+[10:15] starts a new session, we want the agent to start the dev server, right?
+[10:20] We want the agent to look at the environment.
+[10:22] There are sort of some things that are quite deterministic, right?
+[10:26] And those deterministic things go into that init.sh file.
+[10:29] So there's the nondeterministic nature of what the agent will actually do, but there
+[10:33] There is the deterministic part of actually getting that environment started on each session
+[10:37] and start it in a very repeatable and deterministic way.
+[10:40] So that's what the init.sh file is about.
+[10:43] And so with that, sorry, I'm getting a little bit excited, as you can probably tell, because
+[10:48] this is a lot of fun.
+[10:50] The loop that never breaks, right?
+[10:52] So I was talking about kind of the fundamentals of each environment.
+[10:56] But what actually happens when the session starts?
+[11:00] When the session starts, there's essentially this agentic loop.
+[11:03] If you're familiar with any of the work that we've done and any of the talks we've done
+[11:06] about what agents are, agents are nothing more than an LLM, its environment, its tools,
+[11:11] and running in a loop, running continuously, right?
+[11:14] So the loop that never breaks, pretty much from each iteration to each iteration, the
+[11:19] agent is going to look at its environment first.
+[11:22] It's always going to look at what happened before and what environment is it working
+[11:26] within.
+[11:26] It's then going to run the test suite to make sure that the things that happened in the previous
+[11:32] session are still repeatable in the next session.
+[11:35] Probably quite familiar to the work that we do as developers.
+[11:37] If you're a developer, you know that you've got to run the tests to make sure that they
+[11:40] still pass from iteration to iteration, that no new regressions have occurred.
+[11:45] So this is why we have the agent actually create a test suite and run it every time that the
+[11:50] session starts.
+[11:51] So there's some basic verification that it does.
+[11:54] After it's completed the verification, we actually go in and have the agent pick up
+[11:58] the next available feature to have the agent start working on that feature.
+[12:02] As it's working on that feature, it's also continuing to run the tests.
+[12:06] And there's some interesting insights here that we'll share about what we found so far,
+[12:10] whether it should be a single agent, two agents, or multiple agents.
+[12:14] We'll talk about that here pretty soon.
+[12:16] So the agent then continues to build.
+[12:18] It continues to implement the feature.
+[12:19] This is something we'll show you in real time here.
+[12:22] And then it's going to, again, test like a human and commit its work.
+[12:26] Because at the end of the day, we really want the agent to continue to write to the history.
+[12:30] We want it to write the sort of the progress of the work that it has done.
+[12:34] Excuse me.
+[12:35] I need some water.
+[12:37] See, this is why I'm human and not an agent.
+[12:39] Anyway, so it will write the commits and it will write the progress.
+[12:43] And then eventually the next session will pick up and look at that history and be able
+[12:48] to kind of get started again.
+[12:50] Yeah.
+[12:51] And this loop sort of emerged from the learnings that we had.
+[12:53] So we wanted to briefly explain to you the breakthroughs that we had moving from one-shotting to incremental progress.
+[13:00] Initially, the approach we worked with, and by yesterday, I mean like around a month ago,
+[13:05] what we were working with is we had an agent that tries to implement everything at once.
+[13:09] And we noticed that there was a bit of an issue with the context running out mid-feature, which was not ideal.
+[13:16] And we also realized that the model sometimes declared victory a bit too early.
+[13:22] It was quite smart, so sometimes it gamed its own success criteria and reward hacked.
+[13:28] So we noticed that we also, as Alex mentioned, we noticed that we had to explicitly tell it that it was unacceptable to remove or edit tests to make them pass.
+[13:37] And then what we decided to do and what we found most effective and what we'll be showing you today and we've been showing at the demos.
+[13:44] If you can remember.
+[13:46] Yeah.
+[13:46] is that basically we ideally work on one feature at a time,
+[13:54] and this helps with what we mentioned
+[13:55] with the context window running out.
+[13:58] And then another thing is that we leave the environment
+[14:00] in a clean state.
+[14:02] So we're using the commits as memory,
+[14:05] but we're leaving the actual environment clean
+[14:07] every time it starts off with a new feature.
+[14:10] And the most important thing is that it tests end-to-end
+[14:13] like a human would.
+[14:14] So we actually give it the ability to use browser automation so it can check the UI and work through the fixes and the features to see that they're actually working and not just working in theory.
+[14:26] And this might not sound sort of revolutionary, and it seems sort of like what a good engineer would do from a day to day.
+[14:35] But what we were working on was trying to explicitly encode this and allow the agent to work in this manner.
+[14:42] So, yeah.
+[14:42] Yeah, and that's actually by design, right?
+[14:46] We, in our research, have found that the closer we actually mimic the developer workflow,
+[14:51] the better the agent does.
+[14:52] So precisely what Nadine was talking about.
+[14:55] I will go further and talk a little bit more about this 200 feature manifesto in a moment,
+[15:00] but I want to go back to some of what Nadine was talking about when she was talking about
+[15:03] the specification and the tests.
+[15:06] So we have the agent write the tests as it continues to build.
+[15:09] And what we've discovered as well, even just building the demo for the booth at Booth 8.10,
+[15:14] please come and check it out, and we'll show you some of that today as well, is that if
+[15:18] the agent is asked to write individual tests, what happens is as the time approaches for
+[15:25] the agent to complete its work, it will actually run into these anxiety attacks.
+[15:32] Quite literally, you'll see in the logs, it's saying, hey, we are running out of time, so
+[15:36] we better finish this quickly, and starts to reward hack, as Nadine was talking about.
+[15:41] And so some of the things that you ought to consider when you are building this kind of
+[15:45] stuff is how do you prevent those reward hacks, and what are some of the ways that that can be
+[15:49] resolved? And as Nadine was saying, if we think about the agent as sort of a junior to mid-level
+[15:54] developer, then we really arrive at this idea of a 200-feature manifesto, if you will. And it's a
+[16:00] little bit of work up front. Building a specification, which we'll actually show you an
+[16:04] example of that has enough details for the agent to do the work well, for the agent to
+[16:10] write tests, is not an easy task up front, but it pays dividends in the end.
+[16:15] If you start with a specification that the agent can follow quite closely, but still
+[16:19] have enough capability to act non-deterministically and explore different paths, that's kind of
+[16:25] the holy grail.
+[16:26] So what winds up happening is that we go from a specification, which is a markdown file
+[16:30] that we as humans write into this JSON sort of format
+[16:34] that the agent can then or is less likely to edit,
+[16:37] which we don't want the agent to modify this.
+[16:40] We want the agent to use the JSON file specification
+[16:43] and mark tests as passing
+[16:46] as it continues to do its work from session to session.
+[16:49] And so that's kind of the interesting thing here.
+[16:51] This changes how developers spend their time.
+[16:54] Yeah, so we wanted to give you a bit of an idea
+[16:56] of what this model would look like in practice
+[16:59] and how this would change for developers like yourself.
+[17:02] So we're going from, originally you'd be writing the code yourself,
+[17:06] you're debugging manually, you're documenting afterwards, if at all,
+[17:11] and you're probably context switching between tasks
+[17:14] as you have a lot of different fixes at different times.
+[17:17] And the model that we're envisioning for after
+[17:19] is that you're spending more of your time defining these requirements
+[17:23] for the LLM to follow, like I mentioned earlier.
+[17:26] You're also reviewing the AI's test results rather than fully debugging manually
+[17:33] and making sure that they're correct and following what you're expecting.
+[17:37] And then the really nice thing is the documentation is generated as the LLM or AI is working
+[17:43] because this is encoded into the workflow and the way that it's working.
+[17:48] And the last thing is that the agent is what's maintaining its progress notes of how it's working.
+[17:55] And what we found is, like, you might be wondering if this is faster overall or if it's not.
+[18:01] For us, from what we found is that oftentimes it is faster, but it's faster for a very well-specified project.
+[18:08] So it really depends on, for you, how your specification, the domain you're in, and your tolerance for review cycles.
+[18:17] And, yeah, so we wanted to be a bit clearer about what becomes possible and, like, where the limitations are.
+[18:23] So, yeah, to start, what it's improving, so I've mentioned this a lot of times because this is really important to me, but the tests are written for every feature by default, which is awesome because then you have a lot of test coverage, which we found when we were doing the demos.
+[18:40] So that's done by default.
+[18:42] And then the other thing is the documentation is updated for every session, so it's constantly up to date and it's constantly accurate.
+[18:48] And then the last thing is that it's consistent with your coding style, which is really great because, like I mentioned earlier, it's following your standards and your style almost religiously.
+[19:00] But there are some limitations that we wanted to highlight.
+[19:03] So one of the main ones and one that you're probably aware of is the vision gaps.
+[19:06] So the models might not be the best at seeing every single visual bug.
+[19:12] So oftentimes, it needs your judgment, and that's why we're saying this is like a collaborative sort of model to check and find these bugs and these features and make those requests sort of like how we're doing live in a demo at the booth.
+[19:24] And then the other thing is that automation, like browser automations like Puppeteer or Playwrights oftentimes can't see native alerts, which is something you should be aware of.
+[19:35] And the other thing is that, like I mentioned and like we iterate a lot, this is not replacing human review.
+[19:40] It's not sort of a fire forget and forget sort of model.
+[19:44] It's one that you would need to like verify before it goes fully in production.
+[19:49] So yeah, that's sort of what we wanted to emphasize today what's possible and the limitations there.
+[19:54] Yeah, and let's ground this in reality and this is going to be the preamble to the actual demo.
+[19:59] So this is the architecture that we implemented for the demo booth and what we're going to show here today.
+[20:04] And so you can see that hopefully this works. I'm trying to do the laser pointer thing maybe.
+[20:09] No, it's not going to be that great on a white background, but hopefully it'll work.
+[20:14] So there are three major components to this architecture, really four, if you will.
+[20:19] The first is the list of GitHub issues.
+[20:22] And we think of the GitHub issues as kind of the backlog for the agent to work on the
+[20:26] MVP first and all the subsequent issues that are added.
+[20:30] And because we're going to do this in a public repository, we're actually going to very happily
+[20:33] ask you to submit features and have the agent build them.
+[20:38] This is going to be running over the next couple of days.
+[20:40] Really our goal is to, by the end of reInvent, have an application that's quite functional.
+[20:45] It already is.
+[20:46] Over the last two days, you'll see what we've built.
+[20:49] GitHub issues is one of the components.
+[20:50] I mentioned that there are four.
+[20:52] There are GitHub actions as well.
+[20:54] The GitHub actions that we've written is essentially you can think of that as just the CI CD that
+[20:58] we're all very happily familiar with.
+[21:01] What happens is there's an issue puller that basically sits there and on a cron job, essentially
+[21:06] on a scheduled basis, looks at the GitHub issues that are in that GitHub repository and
+[21:10] picks up new issues to work on.
+[21:12] The way that we do that is we've kind of come up with a way to allow folks to vote on the
+[21:17] issues and also for some of us, myself, Nadine, and Philly at the booth to actually approve
+[21:23] issues that could be worked on by the agent using React.js.
+[21:26] So there's a thumbs up emoji for voting.
+[21:29] Whenever any of you add a feature, you can also come in and vote for that feature.
+[21:33] We'll show you that in a moment.
+[21:34] And then we'll approve those features if we think they're good to go.
+[21:38] And then those features are going to be built by the agent.
+[21:40] And that brings us to the agent core runtime.
+[21:43] So we think of the agent core runtime in this architecture as kind of the infrastructure
+[21:47] provision and infrastructure orchestration piece.
+[21:50] We initially started by thinking about building this with ECS and managing all of our own
+[21:55] infrastructure.
+[21:56] And that could have been something we could do, but we only had about three weeks.
+[21:59] And we thought, what can kind of accelerate our work?
+[22:02] And agent core runtime turned out to be a great choice.
+[22:05] There are some interesting caveats there.
+[22:07] For example, this architecture diagram, this EFS storage piece.
+[22:11] Initially we were considering using EFS, an EFS mounted volume in an ECS container to
+[22:16] maintain state.
+[22:17] It turns out that with agent core runtime we can't do that.
+[22:20] But that's okay.
+[22:21] That's not a bad thing.
+[22:22] We figured out that agent core runtime is quite ephemeral and we can't use it with an
+[22:27] EFS volume mounted in it.
+[22:29] Maybe that's coming.
+[22:30] I don't know.
+[22:31] I don't speak for AWS.
+[22:32] What we did instead is we used GitHub, so a Git repository,
+[22:35] as the state, as the source of truth, instead of an EFS volume.
+[22:39] And that then brings us to the fourth component, which
+[22:41] is here, so the Anthropic API running on Cloud Opus 4.5.
+[22:47] What we did there is we've taken the work
+[22:49] of our amazing applied AI team and our researchers
+[22:51] who built a custom harness, and we built on top of that harness.
+[22:55] And that harness leverages the Cloud code, Cloud Agent SDK,
+[22:59] recently renamed.
+[23:01] And we use the Cloud Opus 4.5 model.
+[23:06] And that's actually quite nice, because if you
+[23:08] know anything about Cloud Opus 4.5,
+[23:10] it has much better vision capabilities
+[23:12] than some of our older models.
+[23:14] And so with Cloud Opus 4.5 running inside,
+[23:18] essentially running, excuse me, with the agent SDK
+[23:22] using Cloud Opus 4.5 and the runtime and these GitHub
+[23:26] actions, we're then able to have the agents,
+[23:28] that the agent runtime build new versions of the application.
+[23:32] Those versions then get deployed to an S3 bucket fronted
+[23:36] by a CloudFront distribution for all of us to see.
+[23:39] So that's essentially the high-level architecture
+[23:42] that we're about to show in the demo.
+[23:44] All right, let's do it.
+[23:48] So this is where things might get a little exciting.
+[23:50] Let's see what happens.
+[23:53] Right, live demos.
+[23:54] So maybe, Nadine, if you want to talk to this feature.
+[23:58] Yeah, so I can quickly also show you just a lot of the issues that we got requested.
+[24:04] If the Wi-Fi is in our favor, if it's not, then never mind.
+[24:07] Okay, perfect.
+[24:08] So we got, throughout the reInvent, we got a lot of feature requests,
+[24:12] and we've basically been building on them.
+[24:13] And once we have approved them, you can see that the label changes and becomes,
+[24:17] when it's finished, agent complete.
+[24:20] When it's building, it's actually an agent building label.
+[24:23] Wi-Fi is a little slow, so that's not ideal,
+[24:26] but you can check it out in the repo.
+[24:28] And this is an example of a feature that we actually got at the booth.
+[24:33] So we got a feature where someone requested to translate individual pages into Japanese.
+[24:38] And what you see here is once the agent started building,
+[24:42] it changed its tag to Asian building.
+[24:44] And this is all done by the agent, by the way. This is not us doing it.
+[24:47] And then it starts the session.
+[24:49] And then as it's working, it's actually taking screenshots.
+[24:52] And this is because we've connected it to the Playwright MCP,
+[24:55] and it's able to take those screenshots and show us what it's seeing
+[24:59] as it's working to debug.
+[25:01] And we'll be looking a bit, we're going to dive deep into sort of what you're seeing in the logs as well
+[25:05] because it helps you see how the model is reasoning and what it's thinking
+[25:08] and how it's looking at these pictures that it's taking.
+[25:13] So yeah, Alex, you want to go ahead?
+[25:14] Yeah, of course.
+[25:15] Yeah, so we'll jump into the logs here momentarily,
+[25:17] but I actually want to kind of come back to one thing that I forgot to come back to earlier.
+[25:21] So this is the initial project specification that we were describing.
+[25:26] And you can see here that this project specification has a certain shape to it, if you will, right?
+[25:31] And you can see that it's XML.
+[25:33] And you might be wondering, well, why isn't this just a standard markdown file?
+[25:37] So it turns out that, as many of you probably know, that if we add sort of XML tags, we add structure.
+[25:44] And the model is much better at reading this kind of structure than just a markdown file.
+[25:49] You can see here that this defines kind of the overall idea behind the application.
+[25:53] As we were describing earlier, this is, you know, essentially a Jira clone that we call Canopy because, you know, it's a canopy of trees and features anyway.
+[26:01] And then there is, you know, a definition for the technology stack.
+[26:05] So, like, what does the front end of this application look like?
+[26:08] What does the data layer look like?
+[26:10] So this is, like, fairly prescriptive.
+[26:12] And this is the MVP version of the app that the agent had built.
+[26:16] And we'll show that to you here momentarily.
+[26:17] core data entities and so on. And I want to add, like we mentioned a lot about testing. So also
+[26:22] within this, we've sort of given it, if I can get to it, sort of testing scenarios. Okay, it's good.
+[26:30] It's hard to find it. Okay. Yeah, here, like test scenarios. These aren't for specific features,
+[26:37] but it's sort of just to show it how it can do the testing. And like we're mentioning,
+[26:41] actually using the browser automation to do this. So this is within our build plan.
+[26:45] Yeah, and so then what we'd like to show you is what was initially built.
+[26:50] So if we go here, and I think it was issue 14.
+[26:54] Yeah.
+[26:55] So we mentioned that this kind of builds several iterations.
+[26:59] And so let's go back to the MVP for a second.
+[27:04] And maybe I shouldn't have done this because the internet is not cooperating.
+[27:08] It'll load eventually.
+[27:09] Maybe load the other one.
+[27:12] Yeah, good call.
+[27:15] 36, was it?
+[27:16] Yes.
+[27:17] Yeah.
+[27:18] All right.
+[27:19] Let's see if this works.
+[27:23] There we go.
+[27:23] Okay.
+[27:24] All right, good.
+[27:25] We didn't fail in the demo, right?
+[27:26] So this was the initial version of the application that was built.
+[27:32] This is the MVP based on the specification that you saw.
+[27:36] And then Nadine was showing you earlier that there was a feature that we had the agent build,
+[27:40] which is this, you know, translate the application into Japanese.
+[27:45] And so what you can see here is that, first of all, this is like issue 36.
+[27:49] We started with issue 14, so you can do the math in terms of the number of features
+[27:52] that were built between then and now.
+[27:54] And then you can see here, again, as Nadine was mentioning,
+[27:57] that there is a very, very nice audit log of all the things that the agent has done, right?
+[28:03] So you can see that there was a workflow that got started, that the session started.
+[28:07] There's a session ID from the agent core runtime.
+[28:10] You can see the screenshots that it takes.
+[28:12] One of the folks in the audience submitted that one,
+[28:15] the admin feature.
+[28:16] He's sitting somewhere in there.
+[28:18] He's on my team.
+[28:20] Actually, he's my boss, Ellie.
+[28:24] Thanks for that one.
+[28:25] And then sort of continuing through and looking at everything
+[28:32] that the state was at the previous session.
+[28:35] So it's taking screenshots of the previous state
+[28:38] of the application.
+[28:40] And then eventually, it gets to a point
+[28:43] where it actually does new things.
+[28:45] So you can see so many screenshots in here,
+[28:47] and you might be wondering to yourself,
+[28:48] well, how the heck is it able to deal
+[28:51] with so much context, right?
+[28:52] If it's taking these screenshots
+[28:54] and it's reading them in real time as it's working.
+[28:56] With the agent SDK, there's built-in compaction
+[28:59] and built-in context management,
+[29:01] and so it's able to actually sort of work
+[29:03] with its own context and minimize it down
+[29:06] to only what it needs.
+[29:07] So that's important to note there.
+[29:08] And then as we continue, more and more screenshots,
+[29:11] and then eventually there's gonna be a commit.
+[29:13] This is like probably 150 screenshots that it took,
+[29:16] something like that, something wild.
+[29:18] And then eventually it builds the feature, right?
+[29:22] And then it takes screenshots of the translations.
+[29:25] And then here, let's see if we can scroll down
+[29:28] a little bit more, there's the commit,
+[29:30] and the work has been done.
+[29:32] The application has been translated into Japanese,
+[29:35] And so let's take a look at what that looks like here.
+[29:38] And of course, I forgot to put a slash at the end.
+[29:40] And that caused me to not load this page.
+[29:44] So let's do that.
+[29:45] And so here, if we go into Settings now,
+[29:48] I believe is where it implemented it.
+[29:50] There you go.
+[29:51] Japanese translation.
+[29:52] So if I click into that, we have the app translated
+[29:54] into Japanese.
+[29:56] It did this in one session.
+[29:58] So I think that is a pretty good idea for you
+[30:01] in terms of what the workflow looks like.
+[30:04] But Nadine also mentioned logs.
+[30:05] Do you want to cover some of that?
+[30:06] Yeah.
+[30:07] So if we look into CloudWatch,
+[30:10] so the awesome thing is because we're using Asian Core Runtime,
+[30:12] we can actually look at the CloudWatch logs
+[30:14] and sort of get an idea of what's going on in the process.
+[30:18] So we can see it starting off here.
+[30:21] So let me just get to the first message.
+[30:23] It started in the background.
+[30:26] Then let me get to it.
+[30:28] It's initializing some things.
+[30:30] It's first starting off by let me understand the test structure,
+[30:33] Let me read the end of the test.json to see the latest tests.
+[30:37] So it's actually looking at the previous commits
+[30:39] and understanding what the previous session was doing.
+[30:42] And then it's like, let me understand the current app structure and the file.
+[30:47] So you can basically get insights into what it's doing, its reasoning.
+[30:53] And also when it does take screenshots, we also get insights into what it's seeing.
+[30:57] So if I go somewhere here, okay, it's a little hard to get,
+[31:02] It's a little hard to get, but basically it will be able to see, and it will make judgments
+[31:06] based on that, like it's saying, let me update this and this and this because of the screenshots
+[31:11] that it took.
+[31:12] So it's really great to get basically an insight about the development process and what it's
+[31:16] going through.
+[31:17] Do you want to add anything, Alex?
+[31:19] No, I think this is probably good, and we can take questions in the end.
+[31:23] So let's continue.
+[31:24] Yes.
+[31:24] Yeah, so we covered this, but just to summarize everything that you've seen.
+[31:36] So as we've mentioned in kind of the introduction, every time that a session starts, you know,
+[31:42] we have the agent set up the environment.
+[31:44] So we have the agent look at the previous commits.
+[31:46] We have the agent look at the previous screenshots that it took, take new screenshots as it runs
+[31:50] the tests.
+[31:52] the coding agent picking up the so so we we've already done that but it kind of
+[31:56] just going over what we what we what we demonstrated it picks up a new feature
+[32:00] to work on in each session and then we we demonstrated that it does automated
+[32:05] testing and one of the things when the key takeaways that we we wanted you to
+[32:08] walk away with is that when we when we ask the agent to write its own tests
+[32:13] it's much better to sort of to suggest to it that it should write the tests for
+[32:20] full workflows end to end.
+[32:21] And this is something that Dean was covering earlier.
+[32:23] Because we found that if we, again, just to reiterate,
+[32:27] if we ask the agent to write tests for just individual
+[32:30] screens, then that winds up ending up in reward hacking.
+[32:34] Reward hacking behavior.
+[32:35] So ask it to write full tests, full end to end tests
+[32:38] for each feature.
+[32:40] And then, of course, the git progress
+[32:43] and sort of the notes that it takes from session to session.
+[32:45] And that's something we can show you as well,
+[32:47] where it writes to a file.
+[32:50] And so the compounding effect of this is that we, you know, over a period of time, this agent builds a full end-to-end application, right?
+[33:01] And, you know, in the first few minutes, you'll kind of see everything we've just talked about, where, you know, the agent sets up the environment, starts building some of the core functionality by 30 minutes.
+[33:10] You know, if you look at the MVP feature on that repo, you'll see that it completed the work actually in a little bit longer period than that, but it was about an hour toward a full MVP.
+[33:19] but every subsequent session winds up taking a lot less time because it's already built the MVP,
+[33:24] so now it's just building the next iteration, and that actually takes fewer than 30 minutes.
+[33:30] And so this kind of shows the workflow for building that initial MVP,
+[33:34] but every subsequent feature actually takes a lot less time.
+[33:37] And so, you know, by hour, in this case, by hour one, because we've actually constrained,
+[33:42] we initially started with a full eight-hour time horizon.
+[33:45] We've constrained it down to an hour.
+[33:47] Eight hours is the limitation that Agent Core has.
+[33:51] But we decided to narrow it to kind of demonstrate how the sessions can be restarted.
+[33:57] So that's one reason that we took it down to an hour.
+[34:01] But at any rate, by the end of just a couple of days, we've had the agent build a fully featured application.
+[34:09] And that's really the compounding effect that we wanted you to take away.
+[34:13] And we just want to emphasize that we're still learning here.
+[34:16] and we're open to your suggestions and your opinions.
+[34:19] And there are a few questions that we want to highlight
+[34:22] and that we'd love for you to come and let us know your opinion on.
+[34:26] So the first one is something we're still figuring out.
+[34:29] So is a single general purpose agent best
+[34:32] or should we have you or use specialized agents
+[34:36] in a more multi-agent architecture?
+[34:40] So this is still something we're deliberating at the moment.
+[34:43] The way it works is that we have one agent that's sort of the initializer, and then another agent that's doing the main coding and most of the work.
+[34:53] But yeah, we're not sure at the moment if that's the best approach.
+[34:56] And that's still something we're working on because this is research in progress, right?
+[35:00] And then another thing is we are questioning whether these patterns generalize beyond web apps.
+[35:07] So we've sort of optimized this for like JSON, TypeScript, React, Node.js.
+[35:13] but we haven't yet had the chance to experiment
+[35:16] sort of with more data science workflows
+[35:18] or like different domains and things like that,
+[35:21] or even mobile.
+[35:22] So that's something where we'd love to explore.
+[35:26] And then another thing is that
+[35:28] we don't really know the full failure modes,
+[35:31] and there are probably failure modes
+[35:34] that we haven't discovered yet, right?
+[35:35] So we've been running this for days
+[35:37] or actually maybe like closer to weeks,
+[35:39] but we haven't been running this for months, right?
+[35:42] And as you run things for longer, there are more things that you discover, like design problems, things like that.
+[35:48] And this is something we're still looking into, and we'd love for you to feed back to us so that we can find these issues and actually work towards fixing them and optimizing this.
+[35:58] Yeah?
+[35:59] Yeah, so let's summarize the developer experience challenge and what every team faces, right?
+[36:06] When we as developers spend a lot of time on repetitive tasks,
+[36:11] there are certain things that the agent can do for us.
+[36:16] Context switching, as we talked about,
+[36:18] if we come back and want to get into flow,
+[36:20] it can take 20 minutes or longer.
+[36:22] That's an issue that disrupts our flow.
+[36:24] As developers, agents don't experience that.
+[36:26] So it's a really...
+[36:27] Sorry if I tapped the mic and it was loud.
+[36:29] I apologize.
+[36:31] The context switching can disrupt flow,
+[36:33] but it doesn't do that for the agents.
+[36:35] In fact, it's sort of a feature, not a bug.
+[36:37] We actually do want it to context switch while maintaining previous information.
+[36:43] Documentation can be out of date.
+[36:44] These agents will write the documentation and the tests for you, so that's really fantastic.
+[36:49] The tests are written as the agent continues to build, and you can actually verify that
+[36:53] in the repository.
+[36:55] There are specifications and specs that the agent has written and committed to the repo.
+[36:59] The technical debt can still accumulate, so this isn't perfect.
+[37:03] We did say in the beginning that this isn't a solved problem because this is an agentic
+[37:07] architecture.
+[37:08] There's a lot of non-determinism, and so the human is still very much in the loop.
+[37:12] Remember the thinking cap?
+[37:14] We're still the ones that kind of control the flow.
+[37:18] And I do want you to walk away with that, that this isn't about full automation.
+[37:23] This is a lot more about augmenting us as developers with this fantastic, fantastic tool.
+[37:29] This will help with most of these things, but it's not going to solve everything, and
+[37:33] It's not going to solve everything in every case.
+[37:35] So that's very, very important.
+[37:37] Yeah, so here's how you can basically go try this yourself.
+[37:40] So the CloudAsia SDK, which is what we've been working with,
+[37:43] the framework that we're working with, is out.
+[37:46] You can go use that.
+[37:47] You can go play around with it, test it,
+[37:50] and try this out yourself.
+[37:51] All the patterns that we have here
+[37:53] are documented in the blog post that Alex mentioned,
+[37:57] and we'll be sharing a QR code.
+[37:58] So you can scan that and get access to it,
+[38:01] and read through and understand our reasoning in more depth.
+[38:05] And then there's also an example documentation
+[38:07] in our Quick Start that you can also fork and work on.
+[38:10] So you can really get started today if you wanted to.
+[38:14] And that's what we'd love for you to do.
+[38:17] And one thing we want to emphasize,
+[38:18] and it's really important, even though it's
+[38:19] at the end of the slide, but it's your standards.
+[38:23] So you're in control.
+[38:25] The agent follows your standard.md.
+[38:29] So if there's something you don't like about the output,
+[38:32] you can update the standards.
+[38:33] It's not a black box fully.
+[38:35] So yeah, we want you to really play around with this
+[38:37] and take control.
+[38:39] And if you're at reInvent, which you guys are,
+[38:42] we'd love to see you at the booth.
+[38:43] And you can come see it live or even ask us more questions
+[38:46] if you would like.
+[38:48] Yeah.
+[38:49] And with that, just a couple of the core takeaways
+[38:52] on the technical side.
+[38:54] You know, when we were working on this research,
+[38:58] we thought to ourselves, how can we mimic real developer workflows?
+[39:03] And that's what you're seeing here on this slide, right?
+[39:05] What are the parts of the developer workflow that we can imbue the agent with
+[39:09] so that it does work similarly to how real developers do this work?
+[39:13] So, you know, starting out by reading the docs,
+[39:15] understanding the current state of a feature
+[39:17] before it continues to build additional incremental changes,
+[39:21] you know, leaving things cleaner than it found it.
+[39:24] And really what that means at the end of the day, in practical terms,
+[39:27] is writing tests, writing tests that it can run
+[39:30] on every subsequent iteration.
+[39:32] And that's extremely critical.
+[39:34] So leave things cleaner than you found them.
+[39:36] And that also has to do with looking for errors.
+[39:39] So what we wrote in our system prompt is to,
+[39:43] and I don't mean system prompt for Claude,
+[39:45] I mean for this harness that we created,
+[39:49] to suggest that not only do you write tests,
+[39:53] but you also verify that there are no errors in the browser
+[39:57] logs.
+[39:58] And so leaving things cleaner than you found them means, hey, leaving things in a clean
+[40:01] state where there are no errors for the next session so that when the next session starts,
+[40:05] it doesn't start with a whole bunch of problems.
+[40:08] We do have an interesting thing here that I do want to highlight if you look at the
+[40:12] code base is that one of the things that we do is I mentioned that we've constricted
+[40:16] the session timeframe to one hour.
+[40:19] So sometimes what will happen is the agent will not have completed its work by that one
+[40:24] hour time horizon within that session.
+[40:26] And so we actually have the agent make a commit right before the session ends, even if it
+[40:32] has not completed its work.
+[40:33] So that no matter what, if the agent runs out of time and gets anxious or whatever,
+[40:37] it still at least writes the history.
+[40:39] And then the next agent can pick up and clean up whatever the previous agent left in maybe
+[40:43] not such a great state.
+[40:44] So that does happen, that it's a failure mode if you constrict that time frame and it can't
+[40:48] complete its work in time.
+[40:50] And then of course, the final one, which we've already said so many times before, test before
+[40:55] declaring victory because if you just have it write code and not test its code, you're
+[41:02] not going to get the best results.
+[41:04] This is what Nadine and I were talking about earlier.
+[41:06] If we ask Claude to just one shot, it can produce a good outcome, but it might have
+[41:11] surprising failure modes, surprising bugs.
+[41:14] Just like we as developers, we want the agent to write those tests as it continues the work.
+[41:18] Yeah.
+[41:19] So, that's all.
+[41:21] Thank you so much, guys, for attending this talk, and we hope it was valuable.
+[41:24] If you're here, we'd love for you to come to our booth, take a look.
+[41:30] We'll also be sharing the QR code now that I mentioned.
+[41:33] So there it is.
+[41:34] So feel free to scan it.
+[41:35] This will give you access to the blog post, the architecture, and also a few things.
+[41:42] So please do scan it and come and see us.
+[41:46] Yeah, thanks so much.
+[41:47] Thank you.
+[41:47] We do have some time.
+[41:48] I know we might be breaking out a little bit of the AV advice,
+[41:54] but if anybody wants to give us a question, we can take one.
+[41:56] But we're just going to have to repeat it,
+[41:58] and you're going to have to speak up because we don't have mics.
+[42:00] Right, so, I mean, we can go into a lot of different paths with your question,
+[42:05] but those are some, like, you know, top-of-mind thoughts that I wanted to offer.
+[42:08] Yeah, of course.
+[42:10] All right, well, thank you all so much, and enjoy the rest of reInvent.
+[42:13] Stop by the booth. We'll be there, basically, for the next few days.
+[42:17] Thank you so much.
+[42:17] Thank you.

@@ -1,0 +1,475 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "no_slides": false,
+ "title": "Claude Opus 5.5 לעבודה: וובינר הדגמה של Anthropic",
+ "subtitle": "מה השתנה מ-Opus 5 במחיר, במהירות ובתקשורת, ואיך זה נראה ב-Cowork עם Docs ו-Slides",
+ "meta": [
+  "Amelia Pedone, Nathan Wu, Nick Lin · וובינר של Anthropic (המקור המקורי לא זוהה; הועלה מחדש ב-X על ידי Codez) · 2026-10-06",
+  "משך: כ-52 דקות · X",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Amelia Pedone, Nathan Wu, Nick Lin",
+ "topics": [
+  "Claude Opus 5.5",
+  "Claude Cowork",
+  "Prompting",
+  "Artifacts"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זה וובינר של Anthropic בשם Opus 5.5 for work, באורך של כשעה, ומיועד במפורש לשימושים של לא-מפתחים. מציגים בו שלושה אנשים: Amelia (על השקף מופיע Amelia Pedone), שמנחה ומציגה את השינויים במודל; Nathan Wu מצוות Applied AI, שמריץ את הדמו של ניתוח הנתונים; ו-Nick Lin מצוות המוצר (בחלון הווידאו כתוב Nicholas Lin), שמציג את התרחישים הפיננסיים. רוב הזמן הוקדש לעבודה חיה ב-Claude Cowork.\n\nהטענה המרכזית: Opus 5.5 זול בכ-40% מ-Opus 5, מהיר יותר בייצור פלט וכותב תשובות ברורות יותר, ולכן Anthropic רוצה שתשתמשו בו כ-daily driver בעבודה. כדי להמחיש את זה הם עוברים על פרויקט אחד: חברת ריטייל שהצמיחה שלה מואטת. מנתחים את הנתונים, בונים מסמך אינטראקטיבי ב-Claude Docs, עובדים עליו כמה אנשים במקביל, ובסוף ממירים אותו למצגת לדירקטוריון. בדרך יש גם השוואה ישירה של מצגות ש-Opus 5 ו-Opus 5.5 יצרו. חשוב לציין: הכיתוב של ההעלאה מחדש ב-X מדבר על motion design ועל \"premier motion studio\", אבל שני הנושאים האלה לא עולים בכלל בתמליל."
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות המרכזיות עם חותמות זמן, ומה לא נאמר."
+    ],
+    [
+     "2. מה השתנה מ-Opus 5: ",
+     "מחיר, מנופי התמחור, מהירות ותקשורת."
+    ],
+    [
+     "3. בטיחות ו-alignment: ",
+     "prompt injection, safeguards ומה קורה כשבקשה נחסמת."
+    ],
+    [
+     "4. איפה Opus 5.5 מצטיין, וטיפים לפרומפטים: ",
+     "פיננסים, vision, ומה כדאי לשנות בפרומפטים."
+    ],
+    [
+     "5. הדמו: ניתוח נתונים ו-Claude Docs: ",
+     "בדיקת השערות, ממצא חדש ועבודה של כמה משתמשים במקביל."
+    ],
+    [
+     "6. Slides: Opus 5 מול Opus 5.5: ",
+     "השוואה חזותית והמצגת לדירקטוריון."
+    ],
+    [
+     "7. שאלות ותשובות: ",
+     "גישה ל-artifacts, effort, brand guidelines, Sonnet."
+    ],
+    [
+     "8–9. מסקנות ומילון מונחים: ",
+     "מה לעשות עכשיו, שאלות פתוחות ומונחים."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך הופק אוטומטית מהתמליל של ההקלטה ומהשקפים שצולמו ממנה. התמליל נוצר ב-ASR, ולכן שמות ומונחים עלולים להופיע משובשים. למשל, cash reads הוא כמעט בוודאות cache reads, ו-co-work הוא Cowork. במקומות שבהם יש ספק סימנו זאת במפורש. הציטוטים מועתקים מילה במילה מהתמליל ונבדקו מול חותמת הזמן שלהם. לא נוסף שום מידע ממקורות חיצוניים."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "זה וובינר השקה ולא הרצאה טכנית. המספרים בו הם הערכות פנימיות של Anthropic, והדמו מתנהל לפי תסריט שהוכן מראש. ובכל זאת יש בו כמה דברים פרקטיים: כיצד לשנות את הפרומפטים מול המודל החדש, איזו רמת effort לבחור כברירת מחדל, ואילו יכולות מוצר חדשות נוספו (Docs, Slides ו-Design כ-artifacts, וגם עבודה של כמה משתמשים במקביל)."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "עלות נמוכה בכ-40%: ",
+     "המחיר לכל token ירד, וגם מספר ה-tokens למשימה ירד. לפי Anthropic, input ו-output זולים ב-20% ו-cache reads ב-60% [1:33]."
+    ],
+    [
+     "פלט מהיר ביותר מ-30%: ",
+     "Opus 5.5 מייצר פלט מהר יותר מ-Opus 5 ומגיע לתשובה בפחות tokens [3:04]."
+    ],
+    [
+     "תקשורת טובה יותר: ",
+     "התשובות קלות יותר לסריקה והמידע החשוב מופיע ראשון. הודגם על דוגמה של order exports שנכשלו [3:04]."
+    ],
+    [
+     "הכי קשה לחטוף עד היום: ",
+     "הוראות נסתרות הצליחו רק ב-1% מהמקרים, בתוך 15 ניסיונות. כשבקשה נחסמת, העבודה ממשיכה על מודל קודם במקום לקבל סירוב [4:38]."
+    ],
+    [
+     "פיננסים ו-vision: ",
+     "65% על benchmark פיננסי (השם לא ברור בתמליל). בדמו של merger model הוא היה מהיר בכ-30% וזול בכמעט 90% במשימה הזו [6:15], [7:47]."
+    ],
+    [
+     "להפסיק לכתוב think hard: ",
+     "המודל תמיד חושב לפני שהוא עונה, ורמת ה-effort קובעת כמה. ברירת המחדל המומלצת היא medium [10:55], [12:27]."
+    ],
+    [
+     "להגדיר מראש איך נראה done: ",
+     "מטרה אחת בהודעה הראשונה במקום הוראות צעד אחר צעד. כך נבנה גם הפרומפט בדמו [12:27], [18:40]."
+    ],
+    [
+     "Docs כמשטח עבודה משותף: ",
+     "בדמו Claude הפריך את ארבע ההשערות של ההנהלה והציע הסבר חדש: חנויות חדשות שנפתחו קרוב מדי לחנויות קיימות [25:01]."
+    ],
+    [
+     "Context הוא המנוף הכי חזק: ",
+     "לחבר את Claude למערכות הארגון דרך connectors [50:04]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "אין מחירים מוחלטים: ",
+     "הוצגו רק אחוזי ירידה, בלי מחיר לכל מיליון tokens."
+    ],
+    [
+     "אין מתודולוגיה: ",
+     "ה-40% מבוסס על \"in our evaluations\", וה-90% מתייחס למשימה בודדת. לא נמסר על אילו משימות נמדד ובאיזה פיזור."
+    ],
+    [
+     "שם ה-benchmark הפיננסי ושם המודל להשוואה לא ברורים: ",
+     "בתמליל מופיעים big finance bench ו-Fable 5.1. ייתכן שאלה שיבושי ASR."
+    ],
+    [
+     "ציון ה-alignment לא פורסם: ",
+     "נאמר רק שהוא היה exceptional."
+    ],
+    [
+     "motion design לא הוזכר: ",
+     "הכיתוב של ההעלאה מחדש ב-X לא תואם את תוכן הוובינר."
+    ],
+    [
+     "אין לוח זמנים: ",
+     "לא נאמר מתי יגיעו Sonnet החדש ותוכן למפתחים."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. מה השתנה מ-Opus 5: מחיר, מהירות, תקשורת"
+  },
+  {
+   "kind": "image",
+   "file": "k_007.jpg",
+   "caption": "שקף התמחור: Our most cost effective Opus model, עם טבלת Price per million tokens שמשווה בין Opus 5 ל-Opus 5.5 בשורות input, output, cache reads ו-cache writes",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Amelia מחלקת את השינויים לשלושה: מחיר, מהירות ותקשורת. במחיר יש שני אפקטים שמצטברים: כל token זול יותר, ובכל משימה נצרכים פחות tokens. Anthropic מעבירה את החיסכון למשתמשים דרך שלושה מנופים: input ‎-20%, output ‎-20% ו-cache reads ‎-60%. הירידה הכי גדולה היא ב-cache reads, ויש לזה הסבר: בעבודה agentic, \"every time you type a new answer, quad has to read and reload the content that came before it\" [3:04]. לכן Cowork היה יקר יותר מ-chat. הנקודה הזו חוזרת גם ב-Q&A [42:18].\n\nבמהירות, הפלט מהיר ביותר מ-30% מזה של Opus 5. בתקשורת, הדוגמה הייתה דוח על orders שנכשלים בגלל timeout. בגרסה של Opus 5 קשה לעקוב אחרי ההסבר. Opus 5.5 פותח בעובדה (ה-exports נכשלו פעמיים החודש), ואחריה מפרט פעולות לטווח המיידי ולטווח הארוך. הניסוח שלה: \"it's just writing a little bit more closely to how we think\" [4:38]."
+  },
+  {
+   "kind": "quote",
+   "text": "Opus 5.5 costs less per token than Opus 5 and also uses fewer tokens per task. So in our evaluations, this nets out to about a 40% drop in costs.",
+   "by": "— Amelia Pedone [1:33]"
+  },
+  {
+   "kind": "h1",
+   "text": "3. בטיחות ו-alignment"
+  },
+  {
+   "kind": "image",
+   "file": "k_008.jpg",
+   "caption": "שקף Safety & alignment עם ארבעה רכיבים: Prompt injection protection, Independently evaluated, Fable-level cyber and bio safeguards ו-Best behavioral alignment score",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "לפי Anthropic, Opus 5.5 הוא \"the hardest model to hijack that we've ever tested\" [4:38]. הוראות נסתרות הצליחו רק ב-1% מהמקרים בתוך 15 ניסיונות, תוצאה שזהה לזו של מודל שנקרא בתמליל Fable 5.1. השם מופיע גם בשקף (Fable-level safeguards), אבל לא ברור לנו לאיזה מודל הוא מתייחס, ולכן מסומן כלא ודאי. לפני ההשקה המודל עבר הערכה של ארבעה גופים בלתי תלויים, ויש בו safeguards ל-cyber ול-bio.\n\nהשינוי ההתנהגותי שהכי משפיע על המשתמש: \"When a request is blocked because of the topic or the type of prompt that you asked, the work will continue on an earlier model instead of ending in a refusal\" [4:38]. בנוסף נאמר שהמודל קיבל את ציון ה-behavioral alignment הטוב ביותר באודיט האוטומטי ש-Anthropic מריצה על כל מודל. המספר עצמו לא נמסר."
+  },
+  {
+   "kind": "h1",
+   "text": "4. איפה Opus 5.5 מצטיין, וטיפים לפרומפטים"
+  },
+  {
+   "kind": "body",
+   "text": "Nick מונה שלושה תחומים שבהם המודל חזק: איכות פלט (\"follows instructions precisely and states its scope\", כך שגיליונות, שקפים ומסמכים צריכים מעט מאוד עריכה), ניתוח נתונים ופיננסים, ו-vision (חילוץ מידע ממסמכים, גרפים, צילומי מסך ודיאגרמות) [6:15]. בתחום הפיננסי הוא מציין 65% על benchmark פיננסי, וארבע תכונות: קריאה של מקורות צפופים, שמירת ה-context לאורך עסקה שלמה, הצגה ואימות של העבודה, ופלט שמוכן לשיתוף. הדמו המוקלט הציג merger model ו-football field ב-Excel וב-PowerPoint, Opus 5 מול Opus 5.5: \"we're seeing that opus 5 5 is about 30 faster and on this task specifically almost 90 cheaper than opus 5\" [7:47].\n\nאחר כך Amelia עוברת ל-AI fluency, כלומר לבדוק מחדש מה אפשרי עם כל מודל חדש. היא מציעה ארבעה דברים לנסות: לבקש את הקובץ הסופי ולא רק outline, לבקש בדיקה מדוקדקת של מסמכים ארוכים (באחד המבחנים המודל זיהה גרף בדוח שלא התאים למספרים בדק), מחקר פתוח ארוך, ויצירתיות חזותית [9:19]. הטבלה מסכמת את השינויים שהיא ממליצה לעשות בפרומפטים."
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "טיפ",
+    "מה נאמר",
+    "זמן"
+   ],
+   "rows": [
+    [
+     "להוריד think hard / think carefully",
+     "המודל תמיד חושב לפני שהוא עונה, ורמת ה-effort קובעת כמה. אם מורידים את ההוראה, התשובה מתחילה מוקדם יותר.",
+     "10:55"
+    ],
+    [
+     "ברירת מחדל: effort medium",
+     "\"the best calibrated for cost and performance\". מעבר ל-max או extra max לא תמיד משפר את התוצאה.",
+     "12:27, 43:50"
+    ],
+    [
+     "להגדיר done בהודעה הראשונה",
+     "מטרה ופלט רצוי בהודעה אחת. המודל טוב יותר מ-Opus 5 בעבודה ארוכה עם כמה שלבים.",
+     "12:27"
+    ],
+    [
+     "לפרט אילו סגנונות לא רוצים",
+     "בלי הכוונה המודל חוזר לכמה סגנונות ברירת מחדל. \"avoid generic\" רק מחליף ברירת מחדל אחת באחרת. רשימה של patterns ו-anti-patterns עובדת טוב יותר.",
+     "12:27"
+    ],
+    [
+     "לשתף את הגרף עצמו",
+     "לא צריך להקליד מחדש נתונים מגרף או מצילום מסך, המודל קורא אותם בדיוק.",
+     "14:04"
+    ]
+   ],
+   "widths": [
+    1.6,
+    4.2,
+    0.9
+   ]
+  },
+  {
+   "kind": "image",
+   "file": "k_011.jpg",
+   "caption": "שקף New artifact types available in Claude: Docs, Slides ו-Design, כולם בתיוג Beta. בתחתית: Default off in Enterprises, ואדמינים מפעילים אותם ב-Organization settings לקבוצות ספציפיות",
+   "width": 5.6
+  },
+  {
+   "kind": "h1",
+   "text": "5. הדמו: ניתוח נתונים ו-Claude Docs"
+  },
+  {
+   "kind": "image",
+   "file": "k_013.jpg",
+   "caption": "שקף One Project, Three Demos: חברת ריטייל שהצמיחה שלה יורדת, Amelia בתפקיד המנהלת של Nathan, ושלושה חלקים: Data analysis, Multiplayer work in Docs ו-Head to head: Creating slides Opus 5 vs. Opus 5.5",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Nathan פותח session ב-Cowork עם Opus 5.5 ב-effort medium. ל-session הועלו מראש קבצי CSV של חנויות ומכירות, קובצי PDF מה-offsite של ההנהלה ועוד מקורות, חלקם מובנים וחלקם לא. הוא מסביר שבעבודה אמיתית ה-context מגיע דרך connectors כמו Google Drive, SharePoint או BigQuery. הפרומפט נכתב בכוונה בלי \"think really hard\" ובלי לפרט שלבים: לבדוק את ארבע ההשערות של ההנהלה מול הנתונים ולומר אילו מחזיקות [18:40]. אחר כך הוא שואל שאלת המשך על הנחות ומבצעים, ומבקש להפוך את התוצאה לדוח ב-house style.\n\nכשהוא מנסה ליצור את ה-Doc בשידור חי, זה נתקע. מתברר שצריך להפעיל את Claude Docs בלשונית ה-connectors, ובסוף הוא מדלג לפלט שהוכן מראש [23:31]. ב-Doc יש תוכן עניינים, סטטיסטיקות, אנימציה לכל השערה, regression של המרחק בין חנות חדשה לחנות קיימת, ו-slider אינטראקטיבי שמראה איך המכירות משתנות לפי המרחק. ההנחות והמבצעים נפסלו, והשערה אחת לא נשללה לגמרי אבל גם לא נמצא לה ביסוס בנתונים."
+  },
+  {
+   "kind": "image",
+   "file": "k_022.jpg",
+   "caption": "ה-Doc שנוצר ב-Cowork: Executive summary עם תבליטים, משפטים מסומנים בהדגשה, והערות של משתתפים בעמודה הימנית",
+   "width": 6.3
+  },
+  {
+   "kind": "quote",
+   "text": "Claude is proposing that the reason sales have declined is because the new stores that we open are actually too close to our existing stores.",
+   "by": "— Nathan Wu [25:01]"
+  },
+  {
+   "kind": "h1",
+   "text": "6. Slides: Opus 5 מול Opus 5.5"
+  },
+  {
+   "kind": "image",
+   "file": "k_031.jpg",
+   "caption": "פלט של Opus 5 על סקר משוב מכנס לקוחות: שקף כהה בשם Three accounts worth a call this week עם טבלה עמוסה בטקסט",
+   "width": 5.6
+  },
+  {
+   "kind": "image",
+   "file": "k_040.jpg",
+   "caption": "הגרסה היצירתית של Opus 5.5 לאותו משוב: שקף פתיחה עם התזה We threw one summit. Our clients went to two.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Amelia חוזרת לפני כן ל-Doc כדי להציג עבודה משותפת. Nathan משתף איתה את ה-Doc, היא נכנסת כ-viewer, מבקשת הרשאת edit ומקבלת אותה. מכאן כל אחד מהם יכול לתייג את Claude בתגובה, ו-Claude מבצע. בדוגמה Nathan ביקש להחליף את הריבועים בגרף בסמיילים. אחר כך היא מבקשת להפוך את ה-Doc לשקפים לדירקטוריון, עם סיכום של ההשערות שהופרכו והסיבה לכך.\n\nבזמן שהשקפים נוצרים היא מציגה השוואה על סקר משוב מכנס לקוחות שנמשך מ-Google Sheet. לדבריה, הגרסה של Opus 5 \"a little bit corporate\": עמוסה בטקסט, עם רווחים לא אחידים וגדלי פונט שונים. גם אחרי שביקשה גרסה יצירתית היא נשארה ארוכה מדי. הגרסה של Opus 5.5 נקייה, והכותרות שלה מעבירות את המסר בעצמן: משתמשים חדשים נתנו ציון גבוה ולקוחות ותיקים לא. בגרסה היצירתית יש תזה בפתיחה וגרף התפלגות שמספר את הסיפור. במצגת לדירקטוריון היא נותנת תגובה על טבלה (\"can you make this into columns instead of a boring table?\") ומשתפת את Nathan כ-editor [37:35], [39:08]. בסיום מוצגות אפשרויות ה-export: PowerPoint (התוכן נשאר ניתן לעריכה), PDF, Word, Google Docs ו-Notion."
+  },
+  {
+   "kind": "quote",
+   "text": "it seems like Opus is looking, Opus 5.5 is looking at, like, the full story that I need to tell, whereas Opus 5 attacks each slide, like, individually",
+   "by": "— Amelia Pedone [37:35]"
+  },
+  {
+   "kind": "image",
+   "file": "k_046.jpg",
+   "caption": "המצגת לדירקטוריון שנוצרה מה-Doc: שקף בשם Growth nearly halved, and our own new stores are the main reason, עם כרטיסי מדדים, ולצידו צ'אט ה-sidebar",
+   "width": 6.3
+  },
+  {
+   "kind": "h1",
+   "text": "7. שאלות ותשובות"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "Chat או Cowork: ",
+     "אפשר ליצור פלטים גם מ-chat. הירידה במחיר cache reads נועדה לטפל בכך ש-Cowork היה יקר יותר [42:18]."
+    ],
+    [
+     "לא רואים artifacts: ",
+     "בתוכנית Enterprise האדמין צריך להפעיל אותם, ואפשר להפעיל רק לקבוצת משתמשים לניסיון [42:18]."
+    ],
+    [
+     "Opus 5 על high מול Opus 5.5 על medium: ",
+     "ברירת המחדל נקבעת לפי evals על כל משטח מוצר. \"running it on like max or extra max won't always like get you a much, much better output\" [43:50]."
+    ],
+    [
+     "Brand guidelines: ",
+     "אפשר להדביק הנחיות כטקסט, ואולי יידרשו כמה סבבים. דרך נוספת היא להפנות דרך connector לתיקייה ב-Drive עם המצגות הטובות ביותר של הארגון. בדמו הוחלו ה-brand guidelines של Anthropic [45:24]."
+    ],
+    [
+     "Sonnet מול Opus: ",
+     "ההמלצה היא לנסות קודם את Opus 5.5 כ-daily driver. Sonnet חדש בדרך, בלי תאריך [47:01]."
+    ],
+    [
+     "Design artifact מול אפליקציית Design העצמאית: ",
+     "הכול עדיין ב-beta. המטרה היא תאימות מלאה (one-to-one), וכל היכולות כבר הועברו [47:01]."
+    ],
+    [
+     "איחוד chat ו-Cowork: ",
+     "בהדרגה במהלך השבועות הקרובים. ב-Enterprise זה לא יופעל אוטומטית ותהיה תקופת מעבר [48:32]."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "8. מסקנות ופעולות"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "לנקות את ספריית הפרומפטים: ",
+     "להוריד think hard ו-make no mistakes ולבדוק אם התשובות מתחילות מהר יותר."
+    ],
+    [
+     "להעביר workflows ל-effort medium: ",
+     "ולבדוק מול high לפני שמניחים ש-max משתלם."
+    ],
+    [
+     "לכתוב פרומפטים שמוגדרים לפי מטרה: ",
+     "הגדרה של done בהודעה הראשונה, בלי לפרק לשלבים."
+    ],
+    [
+     "בעיצוב, לתת רשימת anti-patterns מפורשת: ",
+     "ולא רק avoid generic."
+    ],
+    [
+     "לבקש מהאדמין להפעיל את Docs, Slides ו-Design: ",
+     "לקבוצת pilot. הם כבויים כברירת מחדל ב-Enterprise."
+    ],
+    [
+     "להשקיע ב-connectors: ",
+     "לפי הדוברים זה \"the single highest leverage thing that you can do\" [50:04]."
+    ],
+    [
+     "למדוד עלות בעצמכם: ",
+     "ה-40% וה-90% הם מספרים של Anthropic. כדאי להשוות token usage על משימות שלכם."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "למה זה חשוב"
+   ],
+   "rows": [
+    [
+     "מה המחיר המוחלט לכל מיליון tokens?",
+     "בלי זה אי אפשר לחשב תקציב, רק להשוות לגרסה הקודמת."
+    ],
+    [
+     "על אילו משימות נמדדה הירידה של 40%?",
+     "הדמו הפיננסי הראה 90% במשימה אחת. הפער מראה שהחיסכון משתנה הרבה בין משימות."
+    ],
+    [
+     "מהו Fable 5.1 ומהו ה-benchmark הפיננסי?",
+     "השמות מגיעים מ-ASR. צריך לבדוק אותם לפני שמצטטים."
+    ],
+    [
+     "כמה פעמים העבודה עוברת למודל קודם בגלל safeguards?",
+     "המעבר השקט משפיע על איכות הפלט בלי שהמשתמש יודע."
+    ],
+    [
+     "מתי יגיע Sonnet החדש ובאיזה מחיר?",
+     "החלטה בין Sonnet ל-Opus לשימוש יומיומי בארגון."
+    ]
+   ],
+   "widths": [
+    2.6,
+    4.0
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "9. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "Cache reads",
+     "קריאה של context ששמור ב-cache. בכל תור בשיחה agentic קוראים מחדש את כל מה שקדם לו"
+    ],
+    [
+     "Effort level",
+     "הגדרה שקובעת כמה המודל חושב לפני שהוא עונה (medium, high, max)"
+    ],
+    [
+     "Prompt injection",
+     "הוראות נסתרות בתוכן שמנסות להשתלט על המודל"
+    ],
+    [
+     "Daily driver",
+     "המודל שמשתמשים בו כברירת מחדל בעבודה היומיומית"
+    ],
+    [
+     "AI fluency",
+     "היכולת לבחון מחדש מה אפשרי עם כל מודל חדש ולהתאים את דרך העבודה"
+    ],
+    [
+     "Cowork",
+     "משטח העבודה ה-agentic של Claude שבו רץ הדמו"
+    ],
+    [
+     "Artifacts",
+     "פלטים עשירים בתוך Claude: Docs, Slides ו-Design"
+    ],
+    [
+     "Connectors",
+     "אינטגרציות למערכות הארגון (Drive, SharePoint, BigQuery)"
+    ],
+    [
+     "Multiplayer",
+     "כמה משתמשים ו-Claude עובדים יחד על אותו מסמך"
+    ],
+    [
+     "Context",
+     "המידע שניתן למודל כדי לבצע את המשימה"
+    ],
+    [
+     "Merger model / Football field",
+     "מודל מיזוג פיננסי וגרף טווחי שווי שמקובלים ב-investment banking"
+    ],
+    [
+     "House style",
+     "סגנון הכתיבה והעיצוב של הארגון"
+    ]
+   ],
+   "widths": [
+    1.8,
+    4.8
+   ]
+  }
+ ]
+}

@@ -1,0 +1,125 @@
+---
+title: "Agent Skills: ה-agent לא צריך עוד מסמך, הוא צריך workflow"
+description: "Agent Skills בעברית: מה נטען ל-context ומתי, מה SkillsBench מצא במספרים, ו-SKILL.md שאפשר להעתיק כבר השבוע."
+lang: he
+key: agent-skills
+term: "agent skills"
+kind: explainer
+pubDate: 2026-10-10
+tags: ["agent-skills", "claude-code", "skill-md", "agents", "context-engineering"]
+hook: "scene"
+cover: type
+tldr: ["תכתבו description שמתחיל ב-Use when, אחרת ה-skill פשוט לא ייטען.", "skill הוא צעדים עם checkpoints ותנאי יציאה, לא מסמך best practices.", "תמדדו חמש משימות עם ובלי ה-skill. אין הפרש? תמחקו אותו."]
+hero: /posts/agent-skills/hero.jpg
+diagram: /posts/agent-skills/diagram.svg
+sources:
+  - { title: "Agent Skills", url: "https://addyosmani.com/blog/agent-skills", date: "2026-05-04" }
+  - { title: "You're probably using Agent Skills wrong", url: "https://notes.ansonbiggs.com/youre-probably-using-agent-skills-wrong", date: "2026-06-22" }
+  - { title: "Show HN: Craigslist for agent skills, curated by a human", url: "https://skillbay.sh", date: "2026-09-17" }
+  - { title: "Agent Skills – Open Security Database", url: "https://index.tego.security/skills", date: "2026-03-16" }
+  - { title: "Agent Skills: One-Shot PySpark from the CLI", url: "https://lakesail.com/blog/sail-agent-skills", date: "2026-03-26" }
+  - { title: "Agent Skills Explained: What They Are, What They Aren't, and How to Use Them - DEV Community", url: "https://dev.to/loc_carrre_0d798813c662/agent-skills-explained-what-they-are-what-they-arent-and-how-to-use-them-bf9", date: "" }
+  - { title: "Agent Skills Explained: When to Use Them and Why They Fail | Aerospike", url: "https://aerospike.com/blog/agent-skills-guide", date: "" }
+  - { title: "Medium", url: "https://medium.com/@tahirbalarabe2/ai-agent-skills-explained-simply-4010f6d9db92", date: "" }
+opinion: "לדעתנו skills הם מהמונחים הבודדים בגל הזה שבאמת משנים מה עושים ביום שני: במקום להסביר ל-agent את אותו תהליך בפעם העשירית, כותבים אותו פעם אחת ובודקים. אבל skill שווה משהו רק אם יש בו checkpoint שאפשר לאמת, טסט שרץ, schema, פלט שמודבק, ולא עוד פסקה של best practices. כל מה שאפשר להפוך ל-script, אנחנו הופכים ל-script, ומשאירים למודל רק את ההחלטות שבאמת צריכות שיקול דעת. skills שמודל כתב לעצמו לא נכנסים אצלנו בלי שבן אדם קרא אותם ובלי מדידה מול ריצה בלעדיהם. והוויכוח ב-HN על SkillsBench הוא דווקא סימן טוב: מתווכחים על דברים שעובדים."
+madeWith: { model: "claude-opus-5-5", sourceCount: 8, reviewedBy: "Koby Almog" }
+---
+
+ב-16 בפברואר 2026 Anson Biggs פותח את HN ורואה בעמוד הראשי כותרת: "Study: Self-generated Agent Skills are useless". מאחוריה יש מאמר בשם SkillsBench: ‏86 משימות ב-11 תחומים, 7 שילובים של agent ומודל, 7,308 ריצות. Biggs מתעצבן, יושב וכותב פוסט עם כותרת שלא משאירה מקום לספק: "You're probably using Agent Skills wrong".
+
+שלושה חודשים אחר כך, ב-3 במאי, Addy Osmani כותב שה-repo שלו, addyosmani/agent-skills, עבר 27 אלף כוכבים. בקיצור, אנשים גם מתקינים skills בכמויות וגם מתווכחים עליהם בקולי קולות. בעיני זה הסימן הכי טוב שמונח הוא אמיתי ולא עוד שם ל-job title.
+
+## תיקייה, קובץ, workflow
+
+אנטרופיק המציאה את הפורמט בשביל קלוד, ובדצמבר 2025 שחררה אותו כסטנדרט פתוח ב-agentskills.io. היום הוא עובד גם ב-Codex של OpenAI, ב-GitHub Copilot, ב-VS Code וב-Cursor. אז skill שכתבתם פעם אחת רץ אצל כל client שתומך בסטנדרט.
+
+בגדול, skill הוא תיקייה עם קובץ `SKILL.md`. למעלה frontmatter עם שני שדות חובה: `name` ו-`description`. מתחת, ההוראות. ליד הקובץ אפשר לשים `scripts/`, `references/` ו-`assets/`, וה-agent נוגע בהם רק כשההוראות אומרות לו.
+
+מה זה לא: זה לא תיעוד. Osmani ניסח את זה הכי טוב:
+
+> If you put a 2,000-word essay on testing best practices into the agent's context, the agent reads it, generates plausible-looking text, and skips the actual testing.
+> — Addy Osmani, "Agent Skills", מאי 2026
+
+skill טוב הוא סדרת צעדים עם checkpoints שמייצרים ראיות, ונגמר בתנאי יציאה מוגדר. וזה גם לא MCP. ב-Aerospike חילקו את זה יפה: skill מתאר איך לחשוב על בעיה, MCP וכלים מבצעים אותה.
+
+## מה נכנס ל-context ומתי
+
+הטריק שמאחורי skills נקרא progressive disclosure, ובפועל הוא ארבעה שלבים:
+
+1. כשה-agent עולה, הוא קורא רק את ה-`name` וה-`description` של כל skill. לא את הגוף.
+2. משימה נכנסת. המודל משווה אותה לתיאורים ומחליט אם אחד מהם מתאים.
+3. רק אז גוף ה-`SKILL.md` נטען ל-context.
+4. scripts ו-references נטענים או רצים רק אם ההוראות מבקשות.
+
+רגע, למה זה בכלל משנה? כי האלטרנטיבה היא system prompt שגדל. בפוסט ב-dev.to מתארים את המסלול המוכר: prompt שהתחיל ב-200 tokens ונהיה 5,000. כל יכולת חדשה מוסיפה עוד הוראות ועוד edge cases, וה-agent משלם עליהן בכל הודעה, גם כשהן לא רלוונטיות. הוא נהיה איטי, יקר, ומתברבר יותר. עם skills אתם משלמים על שורת תיאור אחת לכל יכולת, ועל הגוף רק כשבאמת צריך.
+
+מכאן כלל אחד: ה-`description` הוא לא תקציר, הוא ה-trigger. אם הוא מעורפל, ה-skill פשוט לא ייטען.
+
+<figure><img src="/posts/agent-skills/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/agent-skills/v1-svg-he.jpg" alt="ה-system prompt משלם על כל יכולת בכל הודעה; skill משלם על שורת תיאור, ועל הגוף רק כשצריך (dev.to, agentskills.io)" loading="lazy" /><figcaption>ה-system prompt משלם על כל יכולת בכל הודעה; skill משלם על שורת תיאור, ועל הגוף רק כשצריך (dev.to, agentskills.io)</figcaption></figure>
+
+## מה SkillsBench מצא, במספרים
+
+המאמר (arXiv 2602.12670, פברואר 2026) הריץ כל משימה בשלושה מצבים: בלי skills, עם skills שאנשים כתבו, ועם skills שהמודל כתב לעצמו. לכל משימה יש verifier דטרמיניסטי, אז אין פה "נראה לי שזה עבד".
+
+- skills כתובים ביד העלו את אחוז ההצלחה ב-16.2 נקודות אחוז בממוצע.
+- בהנדסת תוכנה רק ‎+4.5. ברפואה ‎+51.9.
+- ב-16 מתוך 84 משימות ה-skills דווקא הורידו את התוצאה.
+- skills ממוקדים עם 2–3 מודולים ניצחו תיעוד מקיף.
+- מודלים קטנים עם skills הגיעו לרמה של מודלים גדולים בלעדיהם.
+- skills שהמודל כתב לעצמו: אפס תועלת בממוצע.
+
+מה שיוצא לי מזה: בקוד המודל כבר יודע הרבה, אז skill שמסביר לו איך כותבים טסטים מוסיף מעט. הערך הוא בידע שהוא לא ראה: הקונבנציות שלכם, ה-gates שלכם, הכלים הפנימיים. ו-skill ענק הוא סיכון, לא ביטוח.
+
+> **הסתייגות:** אני מסכים עם Biggs בנקודה אחת. במאמר, self-generated אומר שה-agent כותב את ה-skill לפני שהוא בכלל ניסה לפתור, וזה בעיקר thinking בפורמט אחר. skill שמודל כותב אחרי ריצה שהצליחה, ואדם עבר עליו, זה ניסוי שהמאמר לא בדק.
+
+<figure><img src="/posts/agent-skills/v2-chart-he.jpg" alt="דווקא בקוד skills עוזרים הכי פחות, כי המודל כבר יודע את הבסיס. הערך הוא בידע הפנימי שלכם (SkillsBench)" loading="lazy" /><figcaption>דווקא בקוד skills עוזרים הכי פחות, כי המודל כבר יודע את הבסיס. הערך הוא בידע הפנימי שלכם (SkillsBench)</figcaption></figure>
+
+## איך כותבים skill שלא נופל
+
+הנה skill שאפשר להעתיק ולהתאים. הוא בנוי על מה ש-Osmani קורא לו החלקים שלא מופיעים ב-diff: טסטים, גודל שינוי, ראיות.
+
+```markdown title=".claude/skills/pr-ready/SKILL.md"
+---
+name: pr-ready
+description: Use before opening a pull request or when the user says "ready for review". Runs tests, checks diff size, writes the PR description.
+---
+
+# PR ready
+
+1. Run `npm test`. If anything fails, stop and list the failing test names. Do not continue.
+2. Run `git diff --stat main...HEAD`. If more than 400 lines changed, propose a split and stop.
+3. Run `scripts/check_secrets.sh`. Any hit = stop and report the file.
+4. Write the PR description: what changed, why, how it was tested.
+   Paste the exact test command and the last line of its output.
+
+Done when: tests pass, diff <= 400 lines, no secrets, and the description contains real test output.
+```
+
+ב-Claude Code שמים את זה ב-`.claude/skills/` של הפרויקט, או ב-`~/.claude/skills/` אם זה אישי. כמה כללים שעולים מהמקורות:
+
+- **ה-description מתחיל ב-"Use when"**. ככה המודל יודע מתי לטעון, לא רק מה יש בפנים.
+- **כל צעד נגמר בפעולה שאפשר לבדוק**. "תריצו ותדביקו את השורה האחרונה", לא "תוודאו שהכל תקין".
+- **תנאי יציאה מפורש**. בלעדיו ה-agent יכריז שסיים מתי שבא לו.
+- **מה שדטרמיניסטי, הולך ל-script**. ב-LakeSail עשו בדיוק את זה: מאז Sail 0.5.3 יש `sail spark run`, שמריץ סקריפט PySpark בלי לפתוח cluster, וה-`SKILL.md` שלהם רק מלמד את ה-agent להשתמש בפקודה. לדבריהם כל סקריפט עולה תוך שנייה, במקום דקות של cluster. המודל כבר יודע Spark. מה שהיה חסר לו זה כלי מהיר.
+
+## מתי skill הוא הכלי הלא נכון
+
+- **מידע שמשתנה כל יום**. מחירים, סטטוס של תור, נתונים מ-DB. זה עבודה ל-MCP או לכלי. ב-Aerospike כותבים ש-skill מתאים לידע שמחזיק שבועות.
+- **משימה חד פעמית**. תכתבו prompt. skill שווה משהו רק כשחוזרים על אותו תהליך.
+- **skill מהאינטרנט עם תיקיית `scripts/`**. זה קוד שה-agent שלכם יריץ עם ההרשאות שלכם. ב-Tego Security בנו אינדקס שמדרג skills ציבוריים לפי Code Execution, File System, Network ועוד. חלק מהאוספים שם עם עשרות אלפי כוכבים, למשל sickn33 עם 40,883. כוכבים זה לא code review.
+
+ב-Skillbay, שעלה ל-Show HN בספטמבר 2026, ניסו לפתור בדיוק את זה: חנות skills שבן אדם מסנן ידנית. משעמם וטוב.
+
+<figure><img src="/posts/agent-skills/src3.jpg" alt="חנות skills עם אוצר אנושי היא בדיוק מה שחסר: מישהו שקרא את ה-scripts לפני שה-agent שלכם מריץ אותם (credit: Skillbay)" loading="lazy" /><figcaption>חנות skills עם אוצר אנושי היא בדיוק מה שחסר: מישהו שקרא את ה-scripts לפני שה-agent שלכם מריץ אותם (credit: Skillbay)</figcaption></figure>
+
+## מה לנסות השבוע
+
+1. תעשו מלאי: `ls ~/.claude/skills .claude/skills`. כמה skills יש לכם, ומתי בפעם האחרונה מישהו קרא אותם.
+2. תבחרו תהליך אחד שאתם מסבירים ל-agent שוב ושוב, release notes, PR review, migration, ותכתבו לו `SKILL.md` עם תנאי יציאה.
+3. תמדדו כמו SkillsBench, רק בקטן: חמש משימות אמיתיות בלי ה-skill וחמש איתו, עם בדיקה אוטומטית שעוברת או נופלת. אין הפרש? תמחקו.
+4. skill שעבר כמה מאות שורות, תפצלו ל-2–3 קבצים ב-`references/`. זה מה שניצח במאמר.
+5. לפני שאתם מתקינים skill מ-repo ציבורי, `cat scripts/*` ותחפשו אותו באינדקס של Tego.
+
+skill שלא מדדתם הוא עוד 2,000 מילים שה-agent קורא ומדלג עליהן.

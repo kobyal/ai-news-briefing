@@ -1,0 +1,433 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "title": "מתי לבנות agent harness משלכם",
+ "subtitle": "Harrison Chase מ-LangChain מסביר מה ה-harness עושה, איך מתאימים אותו עם middleware, ולמה evals ו-observability הם הבסיס ל-data flywheel",
+ "meta": [
+  "Harrison Chase · Sequoia Capital · 13 באוגוסט 2026",
+  "משך: כ-24 דקות · YouTube",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Harrison Chase",
+ "topics": [
+  "Agent Harness",
+  "Evals",
+  "Observability",
+  "LangChain"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זו הרצאה של כ-24 דקות מכנס Own Your Intelligence של Sequoia Capital. מרצה בה Harrison Chase, co-founder ו-CEO של LangChain. בערך 17 דקות הן מצגת ודמו של LangSmith Engine, והשאר שאלות מהקהל. המנחה שהציגה אותו לא מזוהה בשמה בתמליל.\n\nהטענה המרכזית: agent מורכב משלושה חלקים, harness, model ו-context, ומי שרוצה לשלוט ב-intelligence שלו צריך לשלוט בשלושתם. ההרצאה מתמקדת ב-harness. היא מסבירה מה התפקיד שלו, איך מתאימים את הלולאה הבסיסית בעזרת middleware, ומתי כדאי לבנות harness משלכם במקום להשתמש ב-Claude Code או ב-Codex. מכאן היא עוברת ל-evals ול-observability, שהם הבסיס ל-data flywheel שמשפר את ה-agent לאורך זמן."
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות המרכזיות עם חותמות זמן, ומה לא נאמר."
+    ],
+    [
+     "2. שלושת החלקים של agent: ",
+     "model, context ו-harness, ומה ה-harness בעצם עושה."
+    ],
+    [
+     "3. התאמת הלולאה: ",
+     "middleware, DeepAgents ו-cognitive architectures."
+    ],
+    [
+     "4. לבנות או לקחת מוכן: ",
+     "in-distribution מול out-of-distribution, ודוגמת עריכת הקבצים."
+    ],
+    [
+     "5. Evals ו-Harbor: ",
+     "איך בנויה משימת eval, ומה מודדים מלבד accuracy."
+    ],
+    [
+     "6. Observability, flywheel ו-LangSmith Engine: ",
+     "מ-traces לשיפורים, כולל הדמו."
+    ],
+    [
+     "7. שאלות ותשובות: ",
+     "Engine על Engine, codexification, והשאלה אם ה-harnesses יתכנסו."
+    ],
+    [
+     "8–9. המלצות ומילון מונחים: ",
+     "מה לעשות עכשיו, שאלות פתוחות, ופירוש המונחים."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך הופק אוטומטית מהתמליל ומהשקפים של ההקלטה. התמליל נוצר ב-ASR, ולכן שמות ומונחים עלולים להשתבש. למשל LangChain הופיע בתמליל כ-LinkChain, Claude Code כ-Cloud Code ו-Harbor כ-Harvard. במקומות כאלה תיקנו את השם לפי השקפים או סימנו אותו כלא ודאי. הציטוטים מועתקים מילה במילה ונבדקו מול חותמת הזמן שלהם. לא נוסף שום מידע ממקורות חיצוניים."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "Chase מציג גישה מעשית: כמעט כל agent היום הוא אותה לולאה פשוטה של LLM שקורא ל-tools. ההבדלים בין agents נובעים ממה שמוסיפים מסביב ללולאה, וממידת ההתאמה בין המשימה למה שהמודל אומן עליו. כדי לדעת אם שינוי עזר צריך evals, וכדי להבין למה ה-agent נכשל צריך observability. שני אלה ביחד מאפשרים להפוך traces מ-production לשיפורים."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "agent = harness + model + context: ",
+     "לשליטה ב-intelligence צריך לשלוט בשלושתם. לגבי model, הוא מדגיש את היכולת להחליף מודלים כדי להימנע מ-lock-in, בדומה לגישת cloud agnostic של פעם [0:00, 1:31]."
+    ],
+    [
+     "התפקיד של ה-harness: ",
+     "להביא למודל את ה-context הנכון בזמן הנכון. הוא מתזמר context קבוע ודינמי, ומחזיר ללולאה את מה שמערכות חיצוניות פולטות [1:31]."
+    ],
+    [
+     "כל ה-harnesses המתקדמים מריצים אותה לולאה: ",
+     "LLM שקורא ל-tools. ההתאמה נעשית דרך middleware: before_agent, before_model, wrap_model_call, wrap_tool_call. כך מוסיפים summarization, context offloading, sub-agents ו-sandbox [3:03, 4:34]."
+    ],
+    [
+     "מתחילים מ-harness כללי: ",
+     "זו הדרך המהירה ביותר להגיע לערך. אחר כך, ככל שמצמצמים את ה-use case, מוסיפים gates ובדיקות [6:07]."
+    ],
+    [
+     "לבנות או לקחת מוכן תלוי במרחק מה-distribution: ",
+     "ככל שהמשימה רחוקה יותר ממה שהמודלים אומנו עליו, צריך יותר התאמה. גם ב-harness מותאם כדאי להשאיר רכיבים שהמודל אומן עליהם, כמו עריכת קבצים, קרובים למימוש המקורי של אותו מודל [6:07, 7:40]."
+    ],
+    [
+     "כל agent קריטי ידרוש benchmark: ",
+     "Harbor, eval runner בקוד פתוח מהיוצרים של TerminalBench2, הופך לסטנדרט. מודדים בו accuracy, latency ועלות [9:11, 12:13]."
+    ],
+    [
+     "רוב הכשלים נובעים מה-context, לא מהמודל: ",
+     "לכן observability נשמעת בסיסית אבל לדבריו היא מוערכת בחסר [12:13]."
+    ],
+    [
+     "ה-data flywheel: ",
+     "מריצים agent, אוספים traces, אוצרים אותם ומריצים ניסויים. feedback מגיע מ-UX חכם או מ-online evaluators זולים, למשל SLMs שעברו fine-tuning [13:46, 15:17]."
+    ],
+    [
+     "LangSmith Engine: ",
+     "agent שרץ ברקע על ה-traces, פותח issues ומציע תיקונים ל-prompt, ל-context ולקוד של ה-harness [16:49, 18:22]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "אין מספרים על Engine: ",
+     "לא הוצגו נתונים על הדיוק שלו, על כמה מההצעות שלו מתקבלות או על החיסכון בזמן."
+    ],
+    [
+     "החיסכון עם Harvey לא כומת: ",
+     "נאמר שהעלות של LLM-as-a-judge ירדה \"significantly\" בעזרת SLMs, בלי מספר ובלי השוואת איכות."
+    ],
+    [
+     "אין קריטריון ל-out-of-distribution: ",
+     "הכלל ברור, אבל לא הוצג אף מדד שעוזר להחליט מתי משימה רחוקה מספיק כדי להצדיק harness מותאם."
+    ],
+    [
+     "תוצאות ה-benchmarks לא נותחו: ",
+     "שקף FrontierBench הוצג כדוגמה לממשק, בלי מסקנות לגבי harness או מודל ספציפיים."
+    ],
+    [
+     "אין סיפורי כישלון: ",
+     "לא סופר מה נשבר ב-DeepAgents או ב-Engine בדרך, מלבד הלקח מ-Codex."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. שלושת החלקים של agent ומה ה-harness עושה"
+  },
+  {
+   "kind": "image",
+   "file": "k_007.jpg",
+   "caption": "\"To own your intelligence, you have to own all three parts\": בצד ה-Model, open weights ויכולת החלפה (התקפית והגנתית). בצד ה-Context, episodic (היסטוריית שיחה), semantic (RAG) ו-procedural (skills).",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "על המודל עצמו Chase כמעט לא מדבר. הוא מפנה להרצאה קודמת בכנס על open weight models של מרצה מ-Fireworks (השם בתמליל, \"Lynn\", לא ודאי). מה שחשוב לו הוא היכולת להחליף מודל, גם כדי להימנע מ-lock-in וגם כדי לעבור למודל הטוב ביותר ברגע שהוא יוצא. את ה-context הוא מחלק ל-memory, לידע סמנטי ולשיחות קודמות, וכולם משמשים להתאמה אישית ולהכוונה של ה-agent.\n\nאת התפקיד של ה-harness הוא מגדיר כך: \"The main job of the harness is to bring context to the model at the right point in time.\" [1:31]. שקף נוסף מפרט מה agent צריך לעשות: לפעול בסביבה שבה הוא יכול לבצע פעולות, להתחבר לנתונים, לנהל context שגדל לאורך ריצות ארוכות, להריץ משימות במקביל, לשלב human-in-the-loop ולהשתפר עם הזמן."
+  },
+  {
+   "kind": "image",
+   "file": "k_013.jpg",
+   "caption": "\"What is an agent?\": מודל שקורא ל-tools בלולאה עד שהמשימה מושלמת ומוחזרת תוצאה. Request נכנס, ה-agent מבצע action מול Tools, מקבל observation, ובסוף מחזיר Result.",
+   "width": 5.6
+  },
+  {
+   "kind": "h1",
+   "text": "3. התאמת הלולאה: middleware, DeepAgents ו-cognitive architectures"
+  },
+  {
+   "kind": "image",
+   "file": "k_014.jpg",
+   "caption": "משמאל הלולאה הבסיסית (request, model, tools, result). מימין נקודות ה-middleware: before_agent, before_model, wrap_tool_call, wrap_model_call, after_model, after_agent.",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "LangChain הוא harness מינימלי במכוון. DeepAgents, שלדברי Chase הוא \"model agnostic and more general purpose version\" של Claude Code [3:03], בנוי מעליו ומוסיף file systems, skills ו-sub-agents, הכול בעזרת אותם hooks. לדבריו גם מנגנוני ה-hooks וה-plugins ב-coding agents עושים בעצם אותו דבר: לוקחים את הלולאה הבסיסית ומוסיפים נקודות התאמה.\n\nשתי דוגמאות קונקרטיות: summarization נכנס לפני קריאה למודל. בודקים אם ה-context ארוך מדי, ואם כן מסכמים אותו. context offloading עוטף את קריאת ה-tool ומוריד מה-context תוצאות גדולות [4:34]. אלה בדיוק הנקודות שבהן אפשר להכניס לוגיקה ייעודית לתחום שלכם."
+  },
+  {
+   "kind": "image",
+   "file": "k_016.jpg",
+   "caption": "Case study: האנטומיה של deepagents על גבי langchain. Execution environment (Code interpreter, Sandbox, Filesystem), Delegation (Planning, Subagents), Steering (Human-in-the-loop), ו-Context management (Skills, Memory, Summarization, Context offloading, Prompt caching).",
+   "width": 6.3
+  },
+  {
+   "kind": "image",
+   "file": "k_018.jpg",
+   "caption": "Custom cognitive architectures: משמאל זרימת deep research (יצירת שאלות מחקר, fan-out לביצוע מקבילי, ואז Report Agent). מימין code review bot עם שלבי Search, Plan, Execute ו-Validate.",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "הדרך השנייה להתאים harness היא cognitive architecture מפורשת. כך בנו agents ב-2023–2024, כשהמודלים לא היו מספיק טובים כדי לרוץ לבד בלולאה. לדבריו חלק גדול מזה עבר היום לתוך ה-harness, כשינויים בלולאה הבסיסית, אבל עדיין משתמשים בזה בזרימות ספציפיות מאוד. ההמלצה שלו: \"One thing that we recommend to people is to start with a general harness.\" [6:07]. אחר כך, ככל שמתמקדים ב-use case שרוצים להצטיין בו, מוסיפים gates ובדיקות."
+  },
+  {
+   "kind": "h1",
+   "text": "4. לבנות או לקחת מוכן: in-distribution מול out-of-distribution"
+  },
+  {
+   "kind": "body",
+   "text": "ה-harnesses המוכנים קשורים בדרך כלל למודלים מסוימים: Claude Code ו-Claude Agent SDK עובדים עם המודלים של Anthropic, ו-Codex עם המודלים של OpenAI. Chase מגדיר את השאלה הזו כשאלה פתוחה בתעשייה, ונותן כלל אצבע."
+  },
+  {
+   "kind": "quote",
+   "text": "the more in distribution you are of what the models are trained on, then the better the off-the-shelf harness will be. As soon as you start to move further and further out of distribution, then you'll probably want to tune your harness in some way.",
+   "by": "— Harrison Chase [6:07]"
+  },
+  {
+   "kind": "body",
+   "text": "הדוגמה שלו היא legal AI, בהתייחסות למרצה קודם בשם Gabe (השם והחברה לא ודאיים, וההקשר מרמז על Harvey), שבנה harness משלו. המשימה הכוללת, משפט, רחוקה מה-distribution של המודלים. אבל עריכת קבצים היא בדיוק מה שכל המודלים עברו עליו RL, וכל אחד בדרך אחרת: מודלים של OpenAI ושל Claude עורכים קבצים בצורה שונה ב-harness שלהם, ולכן כל מודל הכי טוב בשיטה שלו.\n\nהמסקנה: harness מותאם למשימה הכוללת, אבל עם edit file tool שתואם למודל שבשימוש. ב-DeepAgents זה ממומש בעזרת model profiles, שמחליפים את מימוש עריכת הקבצים לפי המודל. בלשונו: \"keeping smaller in distribution parts as close to the model layer as possible\" [7:40]."
+  },
+  {
+   "kind": "h1",
+   "text": "5. Evals ו-Harbor"
+  },
+  {
+   "kind": "image",
+   "file": "k_024.jpg",
+   "caption": "שלושה ציטוטים מהמאמר של Satya Nadella, \"The Reverse Information Paradox\": evals פרטיים מגדירים מה \"טוב\" בארגון, לשמור בעלות על memory, traces, feedbacks ו-decisions, וליצור continuous learning loop שגורם להשקעות ה-AI לצבור ערך.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Chase טוען ש-evals ו-observability רלוונטיים לכל אחד משלושת החלקים, לא רק ל-harness. לדבריו כל חברה שבונה mission critical agent תבנה לו benchmark, גם כדי לתפוס רגרסיות וגם כדי לעשות hill climbing, בין אם על ידי שינוי ה-harness ובין אם על ידי שינוי המודל [9:11].\n\nהכלי שהוא רואה כסטנדרט המתהווה הוא Harbor, eval runner בקוד פתוח מהיוצרים של TerminalBench2. כדוגמה הוא מציג את FrontierBench, benchmark נוסף ל-coding, שבו משווים harnesses, מודלים ו-reasoning efforts על אותה משימה [10:43]."
+  },
+  {
+   "kind": "image",
+   "file": "k_028.jpg",
+   "caption": "דף ה-leaderboard של frontier-bench: עמודות Agent, Model, Reasoning Effort, Accuracy, תאריך וחברה, עם שורות ל-Claude Code ול-Codex על מודלים שונים.",
+   "width": 6.3
+  },
+  {
+   "kind": "image",
+   "file": "k_030.jpg",
+   "caption": "Harbor Evals: Dataset של משימות, שכל אחת רצה ב-Sandbox נפרד מול Agent (Task #1, Task #2).",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "משימת Harbor בנויה מארבעה רכיבים [10:43, 12:13]:\n\nenvironment: הסביבה שבה ה-agent רץ, מוגדרת ב-Dockerfile ומורצת ב-sandbox. זה חשוב ל-agents ארוכים ו-stateful שצריכים לעבוד מול סביבה.\n\nsolution: פתרון golden לבדיקת שפיות. Chase מציין שזה \"not that interesting\".\n\ntests: ה-verifier וה\"עיקר\" לדבריו. סקריפט שיכול להריץ קוד, unit tests, LLM as a judge או אפילו agent as a judge.\n\ninstruction.md: ה-prompt שה-agent מקבל.\n\nאת התוצאות מציגים ב-LangSmith, שלו יש אינטגרציה עם Harbor. מעבר ל-feedback score, שבדוגמה הוא reward function אחת, עוקבים גם אחרי latency ו-tokens: \"you probably don't just care about accuracy. You also probably care about latency and cost.\" [12:13]."
+  },
+  {
+   "kind": "h1",
+   "text": "6. Observability, ה-data flywheel ו-LangSmith Engine"
+  },
+  {
+   "kind": "body",
+   "text": "Chase מסביר כאן למה observability חשובה. כש-agent נכשל, זה תמיד בגלל שקריאה ל-LLM השתבשה, ויש לכך שתי סיבות אפשריות: המודל לא מספיק טוב, או שה-context שהוא קיבל לא מספיק טוב. \"And so I actually think it's the second one that more often than not causes issues.\" [12:13]. לכן צריך לראות מה נכנס ל-context window, איך ה-context הצטבר ואילו tools רצו.\n\nב-LangSmith יש שתי תצוגות. הראשונה היא תצוגת trajectory ידידותית בסגנון Claude Code: רשימת ההודעות, כשקריאות tool מקופלות (\"seven tool calls\"). השנייה היא trace מלא, שבו אפשר להיכנס לכל צעד ולראות בדיוק מה נכנס למודל. לדבריו ה-trajectory לבדה \"not enough to fully debug it\" [13:46]."
+  },
+  {
+   "kind": "image",
+   "file": "k_037.jpg",
+   "caption": "\"A Recipe for Continuously Improving Agents\": בונים agent v1 ומתחילים להריץ, אוספים הרבה traces, אוצרים את ה-trace data (\"hello data mining\"), ומריצים ניסויים על הנתונים.",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "המתכון הוצג במקור, לדבריו, בכנס AI Engineer (השם בתמליל משובש). את ה-feedback, שהוא המרכיב הקריטי, אפשר לקבל משני מקורות. הראשון הוא ה-UX: \"They may not click thumbs up or thumbs down explicitly. No one really is doing that.\" [15:17], ולכן צריך לתכנן את הממשק כך שיפיק feedback עקיף. השני הוא online evaluators סינתטיים. הרצת Opus על כל trace יקרה מדי, ולכן LangChain עשו fine-tuning ל-SLMs לתפקיד הזה. אפשר גם להשתמש במודל מוכן עם custom prompting, או בקוד פשוט לבדיקות פשוטות.\n\nאת הנתונים שנאספו אפשר להפנות לכל אחד משלושת החלקים: harness engineering ל-harness, fine-tuning למודל ו-memory ל-context. LangSmith Engine, שהוצג בדמו, מנסה להפוך את זה לאוטומטי. זה coding agent שרץ ברקע עם גישה ל-LangSmith CLI (סינון traces לפי feedback וכדומה), עם prompt גדול ו-sub-agents. הוא מחפש דפוסים, פותח issues עם תיאור וקישורים ל-traces, ומציע תיקונים: שינוי prompt, עדכון הוראות והוספת קוד ל-harness. Chase מסכם את זה כ-\"run agent, get traces, see patterns, fix.\" [18:22]."
+  },
+  {
+   "kind": "h1",
+   "text": "7. שאלות ותשובות: Engine על Engine, ולאן הולכים ה-harnesses"
+  },
+  {
+   "kind": "body",
+   "text": "לשאלה אם הריצו את Engine על עצמו: כן. Engine מחובר ל-Slack ושולח דוחות על עצמו. בנוסף נבנה Issue Bench, benchmark בפורמט Harbor, שעליו משווים מודלים ו-harnesses. כשהריצו עליו את DeepAgents, Codex ו-Claude Code, ראו ש-Codex כותב לעצמו באגרסיביות הרבה סקריפטים קטנים שרצים על ה-traces, ושזה משפר את הביצועים שלו. \"So we did a sprint to do what we call the kind of like codexification of engine\" [19:53]. זו לדבריו עוד תועלת של benchmark: אפשר ללמוד מ-harnesses מתחרים ולהכניס את הלקח ל-harness שלכם.\n\nלשאלה אם ה-harnesses יתכנסו לאחד או יתפצלו, התשובה הכנה שלו: \"I don't know is the honest answer.\" [19:53]. ה-harnesses הכלליים כבר מספיק טובים כדי להתחיל, ולכן הוא ממליץ לפתוח עם DeepAgents, Codex או Claude Code. זה ספקטרום: בצד אחד harness מוכן, באמצע hooks ו-middleware, ובקצה השני cognitive architecture מלאה. סיבה נוספת לבחור בקצה הזה היא predictability ושליטה. לקוחות מ-financial services שראו את DeepAgents הגיבו \"whoa, whoa, whoa, that's way too scary an agent for us.\" [21:25]. לגבי המעבדות, הוא מעריך שהן מתכנסות לכיוון coding, אבל יש ביניהן הבדלים קטנים ולא מוסברים, כמו עריכת קבצים. אם מעבדה אחת תתמקד, למשל, ב-bio, גם ה-harnesses יתחילו להתפצל. \"It's a fast-moving space.\" [22:56]."
+  },
+  {
+   "kind": "h1",
+   "text": "8. מה לעשות עכשיו"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "להתחיל עם harness מוכן: ",
+     "Claude Code, Codex או DeepAgents. לעבור להתאמה רק כשה-use case מצטמצם וברור שהמשימה רחוקה מה-distribution של המודל."
+    ],
+    [
+     "להתאים דרך middleware לפני שבונים מאפס: ",
+     "summarization לפני המודל, context offloading סביב tools, ו-gates ייעודיים לתחום."
+    ],
+    [
+     "להשאיר רכיבים in-distribution קרובים למודל: ",
+     "edit file tool בפורמט שהמודל אומן עליו, ובחירת המימוש לפי מודל (בדומה ל-model profiles)."
+    ],
+    [
+     "לבנות benchmark פרטי בפורמט Harbor: ",
+     "environment ב-Docker, tests כ-verifier, ו-instruction.md. למדוד accuracy, latency ועלות, ולהריץ עליו גם harnesses מתחרים כדי ללמוד מהם."
+    ],
+    [
+     "להשקיע ב-observability ברמת ה-context: ",
+     "לראות מה בדיוק נכנס ל-context window בכל קריאה, לא רק את ה-trajectory."
+    ],
+    [
+     "לתכנן את ה-UX כך שיפיק feedback: ",
+     "ולהוסיף online evaluators זולים (SLM, prompt או קוד) במקום להריץ מודל frontier על כל trace."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "מה נאמר בהרצאה"
+   ],
+   "rows": [
+    [
+     "איך מודדים כמה משימה רחוקה מה-distribution?",
+     "רק כלל אצבע איכותי, בלי מדד או סף."
+    ],
+    [
+     "האם ה-harnesses יתכנסו לאחד או יתפצלו?",
+     "\"I don't know\". ההימור שלו: התכנסות סביב coding, ופיצול אם מעבדות יתמחו בתחומים שונים."
+    ],
+    [
+     "כמה אמינות ההצעות של LangSmith Engine?",
+     "הוצג דמו בלבד, בלי שיעורי קבלה או דיוק."
+    ],
+    [
+     "מה התמורה בפועל של SLM כ-online evaluator?",
+     "נאמר שהעלות ירדה משמעותית בניסוי עם Harvey, בלי מספרים או השוואת איכות."
+    ],
+    [
+     "למה OpenAI ו-Anthropic עורכים קבצים בצורה שונה, ואיזו שיטה עדיפה?",
+     "גם Chase לא יודע להסביר. הוא ציין שמישהו שדיבר איתו חשב ששיטה אחת עדיפה בבירור."
+    ]
+   ],
+   "widths": [
+    2.6,
+    3.4
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "9. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "פירוש"
+   ],
+   "rows": [
+    [
+     "Harness",
+     "הקוד שמתזמר את הלולאה סביב המודל ומביא לו את ה-context הנכון בזמן הנכון"
+    ],
+    [
+     "Middleware / Hooks",
+     "נקודות התאמה בלולאה (before_model, wrap_tool_call וכדומה) שמאפשרות להוסיף לוגיקה בלי לשנות את הלולאה"
+    ],
+    [
+     "Summarization",
+     "סיכום ה-context כשהוא ארוך מדי, לפני הקריאה למודל"
+    ],
+    [
+     "Context offloading",
+     "הוצאה של תוצאות tool גדולות מה-context, למשל לקובץ"
+    ],
+    [
+     "Sub-agents",
+     "agents משניים שה-agent הראשי מאציל להם משימות"
+    ],
+    [
+     "Cognitive architecture",
+     "זרימה מפורשת ומוגדרת מראש של שלבים, במקום לולאה חופשית"
+    ],
+    [
+     "In-distribution / Out-of-distribution",
+     "משימה שדומה או רחוקה ממה שהמודל אומן עליו"
+    ],
+    [
+     "Model profiles",
+     "מנגנון ב-DeepAgents שבוחר מימוש tool (למשל עריכת קבצים) לפי המודל"
+    ],
+    [
+     "Benchmark / Evals",
+     "אוסף משימות ומדדים להערכת agent, לתפיסת רגרסיות ולשיפור"
+    ],
+    [
+     "Hill climbing",
+     "שיפור איטרטיבי מול benchmark קבוע"
+    ],
+    [
+     "Harbor",
+     "eval runner בקוד פתוח מהיוצרים של TerminalBench2"
+    ],
+    [
+     "Verifier / LLM as a judge",
+     "הרכיב שנותן ציון לריצה, בקוד או בעזרת מודל"
+    ],
+    [
+     "Trajectory",
+     "רשימת ההודעות וקריאות ה-tool של ריצה"
+    ],
+    [
+     "Trace",
+     "תיעוד מלא של ריצה, כולל מה בדיוק נכנס לכל קריאה למודל"
+    ],
+    [
+     "Online evaluators",
+     "בודקים אוטומטיים שרצים על traces מ-production"
+    ],
+    [
+     "SLM",
+     "Small language model, מודל קטן וזול, כאן לתפקיד evaluator"
+    ],
+    [
+     "Data flywheel",
+     "מחזור של traces, אוצרות, ניסויים ושיפור, שחוזר על עצמו"
+    ],
+    [
+     "Harness engineering",
+     "שיפור ה-harness עצמו על סמך נתונים"
+    ]
+   ],
+   "widths": [
+    1.8,
+    4.2
+   ]
+  }
+ ]
+}

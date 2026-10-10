@@ -1,0 +1,125 @@
+---
+title: "Agent Skills: your agent doesn't need another doc, it needs a workflow"
+description: "Agent Skills explained: what loads into context and when, what SkillsBench measured, and a SKILL.md you can copy this week."
+lang: en
+key: agent-skills
+term: "agent skills"
+kind: explainer
+pubDate: 2026-10-10
+tags: ["agent-skills", "claude-code", "skill-md", "agents", "context-engineering"]
+hook: "scene"
+cover: type
+tldr: ["Write a description that starts with \"Use when\", or the skill won't load.", "A skill is steps with checkpoints and an exit condition, not a best-practices doc.", "Measure five tasks with the skill and five without. No difference? Delete it."]
+hero: /posts/agent-skills/hero-en.jpg
+diagram: /posts/agent-skills/diagram.svg
+sources:
+  - { title: "Agent Skills", url: "https://addyosmani.com/blog/agent-skills", date: "2026-05-04" }
+  - { title: "You're probably using Agent Skills wrong", url: "https://notes.ansonbiggs.com/youre-probably-using-agent-skills-wrong", date: "2026-06-22" }
+  - { title: "Show HN: Craigslist for agent skills, curated by a human", url: "https://skillbay.sh", date: "2026-09-17" }
+  - { title: "Agent Skills – Open Security Database", url: "https://index.tego.security/skills", date: "2026-03-16" }
+  - { title: "Agent Skills: One-Shot PySpark from the CLI", url: "https://lakesail.com/blog/sail-agent-skills", date: "2026-03-26" }
+  - { title: "Agent Skills Explained: What They Are, What They Aren't, and How to Use Them - DEV Community", url: "https://dev.to/loc_carrre_0d798813c662/agent-skills-explained-what-they-are-what-they-arent-and-how-to-use-them-bf9", date: "" }
+  - { title: "Agent Skills Explained: When to Use Them and Why They Fail | Aerospike", url: "https://aerospike.com/blog/agent-skills-guide", date: "" }
+  - { title: "Medium", url: "https://medium.com/@tahirbalarabe2/ai-agent-skills-explained-simply-4010f6d9db92", date: "" }
+opinion: "We think skills are one of the few terms in this wave that actually change what you do on Monday: instead of explaining the same process to the agent for the tenth time, you write it once and test it. But a skill is only worth something if it has a checkpoint you can verify, a test that runs, a schema, pasted output, not another paragraph of best practices. Anything that can become a script, we turn into a script, and leave the model only the decisions that really need judgment. Skills a model wrote for itself don't get in without a human reading them and a measurement against runs without them. And the HN argument over SkillsBench is actually a good sign: people argue about things that work."
+madeWith: { model: "claude-opus-5-5", sourceCount: 8, reviewedBy: "Koby Almog" }
+---
+
+On February 16, 2026, Anson Biggs opens HN and sees this headline on the front page: "Study: Self-generated Agent Skills are useless". Behind it is a paper called SkillsBench: 86 tasks across 11 domains, 7 agent-model combinations, 7,308 runs. Biggs gets annoyed, sits down, and writes a post with a title that leaves no room for doubt: "You're probably using Agent Skills wrong".
+
+Three months later, on May 3, Addy Osmani writes that his repo, addyosmani/agent-skills, has passed 27,000 stars. So people are installing skills in bulk and arguing about them loudly. To me, that's the best sign a term is real and not just another job title.
+
+## A folder, a file, a workflow
+
+Anthropic created the format for Claude, and in December 2025 released it as an open standard at agentskills.io. Today it also works in OpenAI's Codex, GitHub Copilot, VS Code and Cursor. A skill you write once runs in any client that supports the standard.
+
+A skill is a folder with a `SKILL.md` file. At the top is frontmatter with two required fields: `name` and `description`. Below that are the instructions. Next to the file you can put `scripts/`, `references/` and `assets/`, and the agent only touches them when the instructions tell it to.
+
+What it isn't: documentation. Osmani put it best:
+
+> If you put a 2,000-word essay on testing best practices into the agent's context, the agent reads it, generates plausible-looking text, and skips the actual testing.
+> — Addy Osmani, "Agent Skills", May 2026
+
+A good skill is a sequence of steps with checkpoints that produce evidence, ending in a defined exit condition. It's also not MCP. Aerospike draws the line well: a skill describes how to think about a problem; MCP and tools do the work.
+
+## What enters the context, and when
+
+The trick behind skills is called progressive disclosure, and in practice it's four stages:
+
+1. When the agent starts, it reads only the `name` and `description` of each skill. Not the body.
+2. A task comes in. The model compares it to the descriptions and decides whether one fits.
+3. Only then is the body of `SKILL.md` loaded into context.
+4. Scripts and references are loaded or run only if the instructions ask for them.
+
+Why does this matter? Because the alternative is a system prompt that keeps growing. A dev.to post describes the familiar path: a prompt that started at 200 tokens and became 5,000. Every new capability adds more instructions and more edge cases, and the agent pays for them on every message, even when they're irrelevant. It gets slower, more expensive, and more confused. With skills you pay for one line of description per capability, and for the body only when you actually need it.
+
+One rule follows: the `description` isn't a summary, it's the trigger. If it's vague, the skill won't load.
+
+<figure><img src="/posts/agent-skills/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/agent-skills/v1-svg-en.jpg" alt="A system prompt pays for every capability on every message; a skill pays for one line of description, and for the body only when needed (dev.to, agentskills.io)" loading="lazy" /><figcaption>A system prompt pays for every capability on every message; a skill pays for one line of description, and for the body only when needed (dev.to, agentskills.io)</figcaption></figure>
+
+## What SkillsBench found, in numbers
+
+The paper (arXiv 2602.12670, February 2026) ran each task in three modes: no skills, human-written skills, and skills the model wrote for itself. Every task has a deterministic verifier, so there's no "looks like it worked".
+
+- Human-written skills raised the success rate by 16.2 percentage points on average.
+- In software engineering, only +4.5. In medicine, +51.9.
+- In 16 of 84 tasks, skills actually lowered the result.
+- Focused skills with 2–3 modules beat comprehensive documentation.
+- Small models with skills matched large models without them.
+- Skills the model wrote for itself: zero benefit on average.
+
+My read: in code, the model already knows a lot, so a skill explaining how to write tests adds little. The value is in knowledge it hasn't seen: your conventions, your gates, your internal tools. And a huge skill is a risk, not insurance.
+
+> **Caveat:** I agree with Biggs on one point. In the paper, self-generated means the agent writes the skill before it has even tried to solve the task, which is mostly thinking in a different format. A skill a model writes after a successful run, reviewed by a human, is an experiment the paper didn't test.
+
+<figure><img src="/posts/agent-skills/v2-chart-en.jpg" alt="Skills help least in code, because the model already knows the basics. The value is in your internal knowledge (SkillsBench)" loading="lazy" /><figcaption>Skills help least in code, because the model already knows the basics. The value is in your internal knowledge (SkillsBench)</figcaption></figure>
+
+## How to write a skill that holds up
+
+Here's a skill you can copy and adapt. It's built on what Osmani calls the parts that don't show up in the diff: tests, change size, evidence.
+
+```markdown title=".claude/skills/pr-ready/SKILL.md"
+---
+name: pr-ready
+description: Use before opening a pull request or when the user says "ready for review". Runs tests, checks diff size, writes the PR description.
+---
+
+# PR ready
+
+1. Run `npm test`. If anything fails, stop and list the failing test names. Do not continue.
+2. Run `git diff --stat main...HEAD`. If more than 400 lines changed, propose a split and stop.
+3. Run `scripts/check_secrets.sh`. Any hit = stop and report the file.
+4. Write the PR description: what changed, why, how it was tested.
+   Paste the exact test command and the last line of its output.
+
+Done when: tests pass, diff <= 400 lines, no secrets, and the description contains real test output.
+```
+
+In Claude Code, put it in the project's `.claude/skills/`, or in `~/.claude/skills/` if it's personal. A few rules that come out of the sources:
+
+- **The description starts with "Use when"**. That way the model knows when to load it, not just what's inside.
+- **Every step ends in an action you can check**. "Run it and paste the last line", not "make sure everything is fine".
+- **An explicit exit condition**. Without one, the agent will declare it's done whenever it feels like it.
+- **Anything deterministic goes into a script**. LakeSail did exactly this: since Sail 0.5.3 there's `sail spark run`, which runs a PySpark script without spinning up a cluster, and their `SKILL.md` just teaches the agent to use the command. They say each script starts in under a second, instead of minutes for a cluster. The model already knows Spark. What it lacked was a fast tool.
+
+## When a skill is the wrong tool
+
+- **Data that changes daily**. Prices, queue status, DB data. That's a job for MCP or a tool. Aerospike writes that skills fit knowledge that holds for weeks.
+- **A one-off task**. Write a prompt. A skill only pays off when you repeat the same process.
+- **A skill from the internet with a `scripts/` folder**. That's code your agent will run with your permissions. Tego Security built an index that rates public skills by Code Execution, File System, Network and more. Some collections there have tens of thousands of stars, like sickn33 with 40,883. Stars aren't code review.
+
+Skillbay, which hit Show HN in September 2026, tries to solve exactly this: a skills store filtered by hand by a human. Boring, and good.
+
+<figure><img src="/posts/agent-skills/src3.jpg" alt="A human-curated skills store is exactly what's missing: someone who read the scripts before your agent runs them (credit: Skillbay)" loading="lazy" /><figcaption>A human-curated skills store is exactly what's missing: someone who read the scripts before your agent runs them (credit: Skillbay)</figcaption></figure>
+
+## What to try this week
+
+1. Take inventory: `ls ~/.claude/skills .claude/skills`. How many skills do you have, and when did anyone last read them?
+2. Pick one process you keep explaining to the agent, release notes, PR review, a migration, and write a `SKILL.md` for it with an exit condition.
+3. Measure like SkillsBench, just smaller: five real tasks without the skill and five with it, with an automated check that passes or fails. No difference? Delete it.
+4. If a skill has grown past a few hundred lines, split it into 2–3 files under `references/`. That's what won in the paper.
+5. Before installing a skill from a public repo, `cat scripts/*` and look it up in the Tego index.
+
+A skill you haven't measured is just another 2,000 words the agent reads and skips.

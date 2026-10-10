@@ -1,0 +1,535 @@
+[0:00] Harnesses. I think this is a very important topic. A lot of you are thinking through building your
+[0:04] own harnesses right now. I'm very excited to introduce Harrison. I first noticed Harrison
+[0:10] on Twitter in 2022, back in the GPT-3 era. And Harrison was one of the first people thinking
+[0:17] about, okay, we have these models. How can we build an entire harness around them so that they're not
+[0:22] just autocomplete tasks but that they start acting as virtual collaborators or agents
+[0:29] and Harrison like the ecosystem has grown so much since 2022 and I've seen you you also grow a lot
+[0:36] in terms of how you think about building agents building harnesses how to eval them etc so I'm
+[0:41] very excited to have you talk today I think the talk's gonna be both about harnesses and evals
+[0:46] and then format again will be 15 minutes or so of presentation com content 15 minutes of Q&A
+[0:52] Thanks for joining us, Harrison.
+[0:57] Cool. My name is Harrison, co-founder and CEO of LinkChain.
+[1:01] I want to talk about evals and harnesses in the context of owning your own intelligence.
+[1:07] So when we talk about intelligence, we're normally talking about agents.
+[1:11] What exactly makes up an agent?
+[1:13] At LinkChain, we think there's three main parts.
+[1:16] There's a harness that orchestrates a model and some context.
+[1:19] And if you're talking about owning your intelligence in general,
+[1:21] you probably want to own all three parts of these.
+[1:24] And so owning the model, I'm not going to talk too much about.
+[1:27] Lynn was here from Fireworks and talking
+[1:29] about open weight models and owning that.
+[1:31] A big part of this is also the ability to switch models.
+[1:34] There used to be this concept of kind of being like cloud
+[1:37] agnostic and being able to switch clouds back in the day.
+[1:40] Same thing exists, but for models,
+[1:41] you want to be able to switch to avoid lock-in,
+[1:43] but also to just use the best model when it's available.
+[1:45] Context, you want to own all the context
+[1:48] that your agent uses, whether that is memory,
+[1:52] whether that is semantic knowledge,
+[1:54] whether that is previous conversations.
+[1:56] These can help personalize and guide the agent
+[1:58] as it goes along.
+[1:59] And then the last bit is the harness,
+[2:00] and that's what I really want to focus on.
+[2:03] So how do you really own your harness?
+[2:05] What does that even mean?
+[2:06] What's the main job of the harness?
+[2:07] The main job of the harness is to bring context to the model
+[2:10] at the right point in time.
+[2:12] And so it does all the orchestration
+[2:13] around the fixed context, the dynamic context.
+[2:18] It brings it into the context window of the model,
+[2:20] shows it something, gets some response,
+[2:22] and then does something with that.
+[2:24] And so agents need to do all these different things
+[2:27] in order to accomplish their jobs.
+[2:29] There's a ton of domain-specific stuff
+[2:31] that they need to do as well.
+[2:32] But they need to interact with external systems.
+[2:34] These external systems, when you interact with them,
+[2:36] they emit more context that can get fed back
+[2:37] into the agent and into the loop.
+[2:39] And so the harness is the thing that really orchestrates all
+[2:41] of this together.
+[2:44] Agents, they're kind of like simplest.
+[2:46] When everyone talks about agents, what they really talk about is just an LLM running in a loop calling tools.
+[2:52] And this is a really simple but really general architecture.
+[2:55] Some request comes in, the LLM makes some generation.
+[3:00] That generation may include a tool to call.
+[3:03] If it does, you invoke those tools and you pass that observation back to the LLM.
+[3:06] And this is the core architecture behind pretty much every agent out there today.
+[3:12] But they're all different in slightly different ways.
+[3:14] And so on the left here, this is kind of like the base core kind of like loop.
+[3:19] But there's a bunch of different things that you can do in your particular harness at different stages.
+[3:25] And so this is over here.
+[3:27] This is so we build LangChain, which is a really, really base minimal harness.
+[3:31] And that's LangChain over here.
+[3:32] And then this is DeepAgents.
+[3:33] DeepAgents is kind of like our model agnostic and more general purpose version of cloud code.
+[3:39] And so it does more things.
+[3:40] It connects to file systems.
+[3:42] It has skills.
+[3:43] It has sub-agents.
+[3:44] It's built on top of this really simple harness,
+[3:47] but we customize it by using these levers over here.
+[3:50] So you can run particular code snippets
+[3:53] before the agents invoked, before each model call.
+[3:56] You can wrap these model calls.
+[3:58] You can wrap the tool calls.
+[4:00] And you can customize this core simple loop
+[4:04] in a lot of really powerful ways just
+[4:07] by using small what we call middleware constructs.
+[4:10] There's other ways to customize the harness as well.
+[4:13] But this has kind of emerged as there's a concept of hooks
+[4:16] and plugins and a lot of the coding agents as well.
+[4:18] And that's essentially what they're doing.
+[4:20] They're taking this base loop that's running
+[4:22] and they're adding little hooks or plugins at various points
+[4:24] to let you customize it.
+[4:26] And so a lot of the stuff that you can do and you can customize,
+[4:29] this is all done by that concept of middleware,
+[4:32] by just modifying that core loop.
+[4:34] So the agent's still running in a loop.
+[4:36] It's still doing that same simple architecture.
+[4:38] But through that, you can give it access to a sandbox.
+[4:41] You can give it access to a file system.
+[4:43] You can give it access to sub-agents.
+[4:45] You can give it access to memory.
+[4:47] You can have summarizations.
+[4:48] So summarization, if we go back to this thing,
+[4:51] summarization would come in before the model.
+[4:53] Before the model is invoked, you check if the context is too
+[4:55] long, and then you summarize it.
+[4:57] And so that you can add into this core loop
+[4:59] through this concept of middleware.
+[5:00] Same with context offloading, which
+[5:03] is a way of basically taking large tool calls
+[5:05] and dumping them.
+[5:06] That kind of wraps the tool call.
+[5:08] And so the point is, there's this really simple kind
+[5:11] of general architecture of an agent.
+[5:14] All of these more advanced agent harnesses
+[5:16] are basically doing that loop, but adding in a bunch of stuff
+[5:19] while still running this core loop.
+[5:20] And so as you think about building or customizing
+[5:24] your own harness, these are the different places
+[5:27] that you can insert things into.
+[5:28] You can add your own summarization step.
+[5:30] You can add your own handling of particular tool calls.
+[5:33] And that's one way that you can customize the agent
+[5:36] to your particular domain and the harness
+[5:39] to your particular domain.
+[5:41] The other way that you can customize the harnesses
+[5:43] that the agent runs in is by having
+[5:45] a more explicit kind of like cognitive architecture.
+[5:48] So this used to be the way that a lot of people
+[5:50] would build agents in kind of 2023, 2024,
+[5:53] because the models weren't good enough to run in a loop.
+[5:56] And so in order to get it to do particular things,
+[5:58] you would have these very bespoke cognitive architectures.
+[6:01] And so this one over here is for a deep research example,
+[6:07] where it would generate some sub-questions, fan them out,
+[6:10] and then go and execute them.
+[6:12] And then this one over here is for a code review bot.
+[6:14] And you can see that there's these very kind of bespoke
+[6:16] steps.
+[6:17] A lot of this has gone into the harness now.
+[6:21] And by the harness, I mean it's still this core loop.
+[6:23] These might be added as particular kind of modifications
+[6:26] to that core loop.
+[6:28] But for a lot of really particular kind of flows,
+[6:31] we do see people still using cognitive architectures
+[6:35] like these to really guide it in particular ways.
+[6:37] One thing that we recommend to people
+[6:39] is to start with a general harness.
+[6:41] That's the easiest to get started.
+[6:42] It's going to be quickest of time to value.
+[6:44] And then as you narrow in on the use case
+[6:47] that you want to be excellent at,
+[6:48] you can start to add more of these gates and checks around it
+[6:52] to guide it into particular ways.
+[6:56] One question that we get a lot is when
+[6:58] to think about building your own harness
+[7:00] versus using an off-the-shelf harness.
+[7:03] A lot of the off-the-shelf harnesses
+[7:05] work with particular models.
+[7:07] So the off-the-shelf harnesses include things
+[7:10] like Cloud Code or Cloud Agent SDK, which
+[7:12] works with anthropic models, Codex, which
+[7:14] works with OpenAI models.
+[7:16] I think this is a big open question in the industry.
+[7:19] My answer generally is, the more in distribution
+[7:22] you are of what the models are trained on,
+[7:24] then the better the off-the-shelf harness will be.
+[7:27] As soon as you start to move further and further out
+[7:29] of distribution, then you'll probably
+[7:31] want to tune your harness in some way.
+[7:34] There's different ways to tune the harness as well.
+[7:36] So the models may be in distribution on particular things
+[7:40] that you are doing on an out-of-distribution task.
+[7:43] So what I mean by that is if you think about something
+[7:46] like legal AI, which Gabe just talked about,
+[7:48] and I think he mentioned how they have their own harness,
+[7:51] there are things that are in legal AI that
+[7:53] are still in distribution of the main models.
+[7:57] So for example, editing files is something
+[8:00] that the main models have all been RL'd on.
+[8:03] And they've actually all been RL'd in very particular ways.
+[8:06] So OpenAI and Cloud models edit files in different ways
+[8:10] in their harnesses.
+[8:11] And as a result, their models are actually
+[8:13] best at editing files in different ways.
+[8:16] Now, the models themselves are out of distribution
+[8:19] on this larger task of legal AI, but they're
+[8:21] in distribution on this task of editing files.
+[8:24] So if you think about building a harness that works there,
+[8:27] you'll probably want a custom harness,
+[8:29] but you'll want it to use the edit file tool that
+[8:32] is in distribution for the model that you're using.
+[8:37] So one of the things we do in Deep Agents, for example,
+[8:39] so Deep Agents is our customizable harness,
+[8:41] we actually have this concept of model profiles, where
+[8:44] for things that are in distribution of models,
+[8:47] like editing files, we basically switch between different edit
+[8:50] file implementations depending on which model is being used.
+[8:54] And so I think that's an example of customizing
+[8:56] the overall harness when it's out of distribution for a task,
+[8:59] but keeping smaller in distribution parts
+[9:02] as close to the model layer as possible.
+[9:06] The second big part of what I want to talk about
+[9:08] is evals and observability.
+[9:10] And so I think as you're experimenting
+[9:11] with all parts of an agent, whether it's
+[9:14] the model or the harness or the context,
+[9:16] you're going to want to know what's going on inside
+[9:19] of this system, and you're going to want
+[9:20] to be able to evaluate it.
+[9:22] And so these are useful tools that you can use, again,
+[9:24] not just for custom harnesses, but also for custom models.
+[9:29] So there was a great Twitter article
+[9:30] that Satya wrote two weeks ago where he talked about a lot
+[9:35] of these concepts.
+[9:36] And there's three quotes in particular
+[9:38] that kind of stood out for me.
+[9:39] One, create your private evals because eval defines
+[9:42] what good looks like inside the organization.
+[9:44] Two, retain ownership of your organization's memory,
+[9:47] traces, feedback, that bold is mine,
+[9:50] decisions and institutional context.
+[9:52] And then three, you create your own continuous learning loop,
+[9:55] hill climbing machine that will allow your AI investments
+[9:58] to compound the value of your firm.
+[9:59] And so I think these speak to the importance of evals
+[10:03] and observability and the learning loop
+[10:05] that they power in really owning your intelligence
+[10:08] and compounding it.
+[10:09] So how exactly do they do that?
+[10:11] So evals.
+[10:13] Gabe was here talking about how they built benchmarks
+[10:15] for the legal domain.
+[10:17] I think every company, when they're
+[10:19] building a mission critical agent,
+[10:21] they will build benchmarks for that agent.
+[10:23] You can use it to define and catch regressions,
+[10:26] or you can hill climb on that benchmark,
+[10:28] again, either by adjusting the harness or adjusting the model.
+[10:31] One of the things that we see becoming the industry standard
+[10:33] for defining these benchmarks is Harbor.
+[10:36] Harbor is an open source eval runner.
+[10:38] It's created by the makers of TerminalBench2,
+[10:41] which is one of the industry standard benchmarks
+[10:43] for benchmarking coding agents.
+[10:45] And it's become pretty popular for a variety of domains.
+[10:48] What it lets you do, so this is FrontierBench,
+[10:50] which is another coding benchmark.
+[10:52] You get this nice benchmark, and you
+[10:54] can compare different agent harnesses, different models,
+[10:58] different reasoning efforts, and you
+[10:59] can get this nice benchmark.
+[11:01] And you can see how all these different harnesses
+[11:03] and all these different models do on your task.
+[11:04] And so having a benchmark for your task
+[11:06] will become really, really important when
+[11:08] you're trying to define it.
+[11:11] What exactly is Harbor?
+[11:12] It's pretty simple.
+[11:13] At a high level, it consists of agent.
+[11:16] You run an agent against the data set.
+[11:18] A data set has a bunch of different tasks.
+[11:21] Generally, they're run in sandboxes
+[11:22] because there are a lot of these different tasks,
+[11:25] and you might want to parallelize them.
+[11:27] And as we'll talk about in a little bit,
+[11:29] each task has its own kind of environment.
+[11:31] So this is what a harbor task looks like.
+[11:33] So on the right, you can see that it has an environment.
+[11:36] This is where you define the environment
+[11:37] that the agent runs.
+[11:38] And a lot of these longer-running, more stateful agents
+[11:40] need to interact with their environment.
+[11:42] And so you basically spin up a sandbox,
+[11:44] give it its own environment that's defined in a Docker file,
+[11:47] and run it there.
+[11:48] There's then a solution, which is basically,
+[11:51] This is a golden solution that you use to sanity check it,
+[11:54] so it's not that interesting.
+[11:55] Tests is more interesting.
+[11:56] This is basically the verifier for the agent run.
+[12:01] The test scripts can do anything.
+[12:02] They can run code.
+[12:04] They can run unit tests.
+[12:05] They can run another LLM as a judge.
+[12:06] They can run an agent as a judge.
+[12:08] You basically define how the agent is scored in this test.
+[12:11] And then instruction.md is the prompt
+[12:13] that the agent is given.
+[12:14] And that's kind of like the core of Harvard.
+[12:17] You define these tasks, which are bundled up things that
+[12:20] can be run in a sandbox, and then you run a bunch of them
+[12:22] against agents.
+[12:23] And agents, again, consist of models and harnesses,
+[12:25] and you score how they do.
+[12:29] When you do all of that, what do you get?
+[12:30] You get some nice results that you can compare.
+[12:32] So this is LangSmith, the platform
+[12:34] that we build for evals and observability.
+[12:36] And so you can see here a bunch of different experiments.
+[12:39] We have a great integration with Harbor.
+[12:40] You can see the feedback scores.
+[12:42] In this case, it's a single reward function.
+[12:44] You can also track latency and tokens.
+[12:46] So when you're benchmarking agents,
+[12:47] you probably don't just care about accuracy.
+[12:50] You also probably care about latency and cost.
+[12:53] And so you'll want to track all of those.
+[12:55] And then for a particular experiment that you run,
+[12:58] these would be the different tasks that
+[13:00] are in a harbor data set.
+[13:04] Talking a little bit about observability,
+[13:07] observability sounds basic, but I think
+[13:08] is really important and really underrated for agents,
+[13:10] actually.
+[13:11] So when agents mess up, they mess up
+[13:12] because an LLM call goes wrong.
+[13:13] Why might it go wrong?
+[13:14] It might go wrong for one of two reasons.
+[13:16] One, the model is not good enough.
+[13:18] Two, the context that the LM received isn't good enough.
+[13:20] And so I actually think it's the second one that more often
+[13:23] than not causes issues.
+[13:24] And so having really good observability
+[13:26] into what is going into the context window of the model,
+[13:30] and then how that context is accumulated, what steps were
+[13:34] run, what tools were run, how does that context get there,
+[13:37] all of that is really important for debugging your agent
+[13:40] when it goes wrong.
+[13:43] So this is one view of observability that we have.
+[13:46] This is intended to be a more user-friendly view,
+[13:49] where we actually represent it.
+[13:50] This is similar to what you might see in Cloud Code.
+[13:53] We hide some of the tool calls, so you
+[13:55] can see seven tool calls up there.
+[13:57] And so we try to make it really easy
+[13:59] to skim through this.
+[14:00] Most agent paths these days come in the form of trajectories.
+[14:04] Trajectories are basically, you can
+[14:06] think of them as the list of messages
+[14:08] that you see Cloud Code running.
+[14:10] So when you run Cloud Code or another agent,
+[14:12] you type in a human message.
+[14:13] It then makes a bunch of tool calls.
+[14:15] Those are all messages under the hood.
+[14:16] And then it responds.
+[14:17] And then you type in another human message.
+[14:19] That's kind of like this message trajectory
+[14:21] that is becoming more and more of a central part
+[14:24] of these agents.
+[14:25] But that's not enough to fully debug it.
+[14:27] And so we also have this full kind of trace.
+[14:30] And you can click into particular things
+[14:31] and see exactly what goes on inside the model.
+[14:34] And this type of observability is pretty important
+[14:36] for knowing what's going on.
+[14:39] Evals and observability really let
+[14:40] you set up this data flywheel and compound
+[14:43] the intelligence as you start to use the agent,
+[14:46] as your users start to use the agent,
+[14:48] and you start to get feedback.
+[14:51] So this is a slide that one of our team members
+[14:54] presented at SWIX's AI engineering fair, actually,
+[14:58] around a recipe for continuously improving agents.
+[15:02] At a high level, it's really simple.
+[15:03] You build an agent.
+[15:04] You start running it.
+[15:05] You collect lots of traces.
+[15:06] You then curate the trace data.
+[15:08] And then you run experiments on that data that you create.
+[15:10] And so it's really simple.
+[15:12] But of course, there's a lot of complexity under the hood.
+[15:15] So one thing that's really important for this
+[15:17] is feedback, getting feedback, either from the environment
+[15:21] or from a synthetic source.
+[15:23] So from the environment, one thing
+[15:24] that I think is really underestimated in agent design
+[15:26] is actually UX design of how you present the agent
+[15:28] to your users.
+[15:29] If you present it in a really intelligent way,
+[15:31] you can actually end up getting a lot of feedback from them.
+[15:34] They may not click thumbs up or thumbs down explicitly.
+[15:36] No one really is doing that.
+[15:38] But if you design the UX in a clever way,
+[15:40] you can get some of that feedback.
+[15:42] The other thing you can do is you can start
+[15:44] to get synthetic feedback.
+[15:46] So you can run what we call kind of like online evaluators
+[15:49] over these traces to judge things.
+[15:52] So Gabe was talking about an experiment
+[15:53] that we did with Harvey where we significantly reduced
+[15:56] the cost of some of these LLM as a judge type things.
+[16:00] So if you imagine running Opus over every single trace
+[16:03] that comes into your system, that's
+[16:04] going to rack up a big bill.
+[16:05] And so you want a really cheap and fast way of doing this.
+[16:08] So we've fine-tuned some SLMs for actually doing this.
+[16:10] but you can, of course, use off-the-shelf models
+[16:12] with custom prompting to do it.
+[16:14] Or you can just use code if some of the things
+[16:16] that you want to test are simple enough.
+[16:20] So this is the full part of it.
+[16:23] The curating the trace data feedback is a big part there.
+[16:26] And then the other thing is when you use that data
+[16:30] to update what happens, you can update any part of the agent
+[16:34] with this kind of system.
+[16:36] So you can update the harness by doing harness engineering.
+[16:39] You can update the model by doing fine tuning on that.
+[16:42] You can update the context by doing memory.
+[16:45] And so the part that we think most about at Langchain
+[16:49] is the harness engineering part of that.
+[16:51] And so I want to show a really quick demo of one
+[16:53] of the things that we added to help with that.
+[16:55] But I think trajectory is talking next
+[16:57] on some fine tuning that can be done.
+[17:00] And so it's a very similar process where you run the agent,
+[17:02] get some traces, use that data in some way
+[17:05] to improve the system.
+[17:06] What is the system?
+[17:07] It's these three pieces.
+[17:08] and each of them can be updated in some way.
+[17:11] And so, yeah, this is the full end-to-end flow
+[17:17] that you might want to do.
+[17:18] One of the things that we think about
+[17:20] is how can you automate this as much as possible,
+[17:23] because this is tricky and takes a lot of time.
+[17:25] And so that's one of the things that we've
+[17:27] been thinking about for the past few months.
+[17:29] I want to do a quick demo of what
+[17:31] we call Langsmith Engine, which is basically
+[17:33] an agent that sits on top of your traces
+[17:36] and does all this work.
+[17:37] So if we look at what that work was, you've got these traces.
+[17:41] The work from there is curating the traces
+[17:43] and running some experiments and suggesting fixes
+[17:45] to one of the three things.
+[17:47] And as I mentioned, we mostly focus on the harness engineering
+[17:49] bit.
+[17:50] So in the demo, I want to show what this looks like
+[17:54] and how it represents that.
+[17:56] So hopefully, this will work.
+[17:58] If not, it's not that big of a deal.
+[17:59] Perfect.
+[18:00] OK, so this is Langsmith.
+[18:01] This is a bunch of traces we have coming in.
+[18:04] We have this tab called Engine over here.
+[18:07] This is an agent.
+[18:08] It runs in the background.
+[18:09] It creates what we call kind of like issue boards.
+[18:11] So this is the part of curating data.
+[18:13] It will look for it.
+[18:14] Basically, under the HUD, it's a coding agent
+[18:16] that has access to our Langsmith CLI.
+[18:18] The Langsmith CLI, you can filter traces for feedback
+[18:22] and other things like that.
+[18:23] So we give it a nice big prompt and some sub-agents
+[18:25] that help it basically go out and explore this data
+[18:27] and identify issues and see what common things are.
+[18:30] And then it will create these issues right here.
+[18:32] And so here, it's created an issue.
+[18:35] It gives a description of it.
+[18:36] It links to the traces, so I can go see some supporting evidence.
+[18:40] And then down here, I guess this is very simple changes to the prompts,
+[18:44] but here it's updating part of the context in this case.
+[18:49] Here it's also updating some instructions,
+[18:52] and we can see here that it's adding some code to go into the harness as well.
+[18:57] And so this is something we launched in the past few months,
+[19:01] and I think speaks to this data flywheel,
+[19:04] which again is a very simple thing.
+[19:06] run agent, get traces, see patterns, fix.
+[19:10] And this is our attempt at automating it.
+[19:14] That's all.
+[19:15] I've got happy to take any questions on harnesses or evals.
+[19:20] This is great, by the way.
+[19:21] I really appreciate the whole presentation.
+[19:23] Engine itself is an agent, right?
+[19:26] That's given a prompt and go search over things.
+[19:28] Have you run Engine on Engine?
+[19:31] We have it running, yeah.
+[19:32] So Engine also hooks up to Slack
+[19:34] and sends it reports about itself. That's how we dog food it. We also created what we call
+[19:45] issue bench for engine, which again is a harbor formatted benchmark basically that we're constantly
+[19:53] benchmarking different models and different harnesses on. I think Gabe talked about this a
+[19:59] little bit, but one of the benefits of having a benchmark is you can benchmark it on a bunch of
+[20:03] different harnesses and see what they're good and bad at. So we, I think a few weeks ago,
+[20:07] we ran our own kind of like DeepAgents and then Codex and then Cloud Code on this. And we saw that
+[20:13] Codex was doing a really interesting thing where it would write itself a bunch of small scripts to
+[20:18] run against these traces. And it was doing that really aggressively and actually allowing it to
+[20:22] perform really well. So we did a sprint to do what we call the kind of like codexification of engine
+[20:28] and basically take that learning and bring it into the core engine harness.
+[20:33] And so I think that's another benefit of having a benchmark is you can just run a bunch of
+[20:37] different things on it and see how they actually perform, and then bring those things back into
+[20:41] your core agent harness. Super cool talk. To which extent do you think that harnesses will converge
+[20:50] into one thing and users will be educated to do that and the models will be best for that versus
+[20:55] diversifying here every company has their own uh way of doing things uh optimized for them
+[21:02] yeah yeah really good question and one that we think a lot about and um i i chatted with
+[21:06] you know from factory who also kind of like thinks a lot about this um and i think there's
+[21:11] some stuff we talked about this um i i think uh i think there's i i think the model i i don't know
+[21:21] is the honest answer.
+[21:23] I think some things that I've seen
+[21:25] is that the general purpose harnesses
+[21:28] have gotten good enough to work
+[21:30] for a lot of basic tasks,
+[21:33] at least when you're getting started.
+[21:34] So I would recommend getting started
+[21:35] with an off-the-shelf harness,
+[21:37] whether it's deep agents or codecs
+[21:38] or Claude code or something like that,
+[21:40] because I think the models are now good enough
+[21:42] and the things that we've learned
+[21:43] about what makes these models good,
+[21:45] access to file systems, subagents,
+[21:47] things like that,
+[21:48] those are kind of good enough.
+[21:50] I think we often see that the more out of distribution you get, the more you're going to want to customize the harness.
+[21:58] And it's a scale, right?
+[22:00] So at the extreme end of a scale, you might want to build a complete kind of cognitive architecture that is really focused on things.
+[22:09] Another reason you might want to do that, by the way, is kind of like for predictability and control.
+[22:13] And so we have a lot of customers in financial services where they need kind of like predictability.
+[22:18] And so we show them something like deep agents and they're like, whoa, whoa, whoa, that's way too scary an agent for us.
+[22:24] We want more of this kind of custom cognitive architecture where we can really control things.
+[22:29] But then on the other end, you could just use an off-the-shelf harness and there's things in the middle, like hooks or middleware that you can use.
+[22:36] So it's a spectrum as well.
+[22:38] The more out of distribution you get, the more custom harness you're going to want to have.
+[22:41] And then there's other weird things where, again, I think both OpenAI and Anthropic are getting really good at coding, but they've landed on different ways to edit files that are actually pretty different.
+[22:56] I think they have some benchmark, and I think he thought that one way was just better than the other way, just like strictly superior.
+[23:06] And so I think the model labs will kind of converge in that they all seem to be kind of like really good at coding.
+[23:13] The harnesses will converge to kind of like being really good at coding if they keep on going down that path.
+[23:18] But at the same time, there are these like really small differences, and I don't really know how to explain those either.
+[23:22] And right now, I think those show up most concretely in small things.
+[23:27] But you could imagine, what if one lab really goes down kind of like bio,
+[23:32] and those harnesses become really good at kind of like bio-agent things?
+[23:36] Then the harnesses themselves start to diverge.
+[23:39] And so, I don't know is the answer. It's a fast-moving space.
+[23:43] That's why evals and observability are important, and I think we, yeah, to measure all of that.
+[23:49] Cool. Awesome. Thank you, guys.
+[23:52] Thank you.

@@ -1388,9 +1388,26 @@ Sources: {_sources_label} · merged by {_merger_label} · sent from <b>{RUNNER}<
 msg.attach(MIMEText(body_plain, "plain"))
 msg.attach(MIMEText(body_html,  "html"))
 
-with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-    server.login(SENDER, APP_PASSWORD)
-    server.sendmail(SENDER, RECIPIENT, msg.as_string())
+try:
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(SENDER, APP_PASSWORD)
+        server.sendmail(SENDER, RECIPIENT, msg.as_string())
+except (smtplib.SMTPException, OSError) as e:
+    # From 2026-10-09 Gmail drops every SMTP AUTH from this machine (even a
+    # wrong password gets "Connection unexpectedly closed", not 535), so the
+    # daily email silently stopped. Same MIME message via the Gmail API (gws,
+    # OAuth). gws lives under nvm, which launchd's shell may not have on PATH.
+    import base64, shutil, subprocess
+    print(f"  ⚠ SMTP send failed ({e!r}) — retrying via the Gmail API (gws)")
+    gws = shutil.which("gws") or next(iter(sorted(glob.glob(os.path.expanduser("~/.nvm/versions/node/*/bin/gws")))), None)
+    if not gws:
+        raise
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+    res = subprocess.run([gws, "gmail", "users", "messages", "send", "--params", '{"userId": "me"}',
+                          "--json", json.dumps({"raw": raw})], capture_output=True, text=True, timeout=120,
+                         env={**os.environ, "PATH": f"{os.path.dirname(gws)}:{os.environ.get('PATH', '')}"})
+    if res.returncode != 0 or '"id"' not in res.stdout:
+        raise RuntimeError(f"Gmail API fallback failed: {(res.stderr or res.stdout)[-300:]}") from e
 
 print(f"Email sent → {RECIPIENT}")
 

@@ -1,0 +1,133 @@
+---
+title: "MCP Security: איך שדה config אחד הפך ל-RCE ב-150 מיליון הורדות"
+description: "באפריל 2026 באג אחד בעיצוב של MCP STDIO הוליד 10 CVEs על 150 מיליון הורדות. מה נשבר, למה הפילטר לא עזר, ומה לבדוק אצלכם השבוע."
+lang: he
+key: mcp-security
+term: "mcp security"
+kind: warstory
+pubDate: 2026-10-11
+tags: ["mcp", "security", "agents", "supply-chain", "rce"]
+hook: "number"
+cover: illus
+tldr: ["חפשו StdioServerParameters בקוד. אם command מגיע מקלט, תחליפו ב-allowlist לפי שם.", "תצמידו גרסה מדויקת לכל שרת MCP. בלי npx -y לחבילה בלי @version.", "תשלחו tools/list בלי token לכל endpoint. כל תשובה חוץ מ-401 היא באג."]
+hero: /posts/mcp-security/hero.jpg
+diagram: /posts/mcp-security/diagram.svg
+sources:
+  - { title: "The State of MCP Security [pdf]", url: "https://www.canopii.dev/State%20of%20MCP%20Security%202026.pdf", date: "2026-07-12" }
+  - { title: "MCP Security 2026: 30 CVEs in 60 Days", url: "https://www.heyuan110.com/posts/ai/2026-03-10-mcp-security-2026", date: "2026-03-12" }
+  - { title: "The AI agent economy is going mainstream", url: "https://datadome.co/agent-trust-management/why-anthropics-connector-expansion-makes-mcp-security-a-business-imperative", date: "2026-05-11" }
+  - { title: "A Timeline of MCP Security Breaches (2025-2026)", url: "https://authzed.com/blog/timeline-mcp-breaches", date: "2026-05-07" }
+  - { title: "Show HN: MCP Security Checklist – security controls for MCP server deployments", url: "https://checklist.helixar.ai", date: "2026-03-09" }
+opinion: "אנחנו חושבים ש-MCP security הוא אחד המונחים הבודדים בגל הנוכחי שבאמת משנה מה עושים ביום שני: יש לו grep, יש לו curl, יש לו allowlist. הלקח מהסיפור של OX הוא לא \"תסננו טוב יותר\". הלקח הוא להוציא את שיקול הדעת מהתמונה: שם שממופה לפקודה קבועה, במקום מחרוזת חופשית ופילטר שמנחש. בכל מקום שהחלפנו החלטה פתוחה בכלל דטרמיניסטי, יצא זול ואמין יותר, וזה בדיוק המקרה. ואנחנו לא סומכים על כוכבים ב-GitHub כמדד אבטחה. בדיקה אוטומטית שרצה על כל גרסה, hash של הגדרות ה-tools ו-401 בלי token, שווה יותר מכל רשימה של \"השרתים המוכרים\"."
+madeWith: { model: "claude-opus-5-5", sourceCount: 5, reviewedBy: "Koby Almog" }
+---
+
+150 מיליון הורדות. זה היקף הקוד שהחוקרים של OX Security קשרו באפריל 2026 לממצא אחד. וזה לא באג בספרייה של מישהו, זו הדרך שבה MCP מריץ שרתים מקומיים. מהממצא הזה יצאו יותר מ-30 disclosures ו-10 CVEs בכמה שפות, אצל LangFlow, Letta, Flowise, Windsurf וה-adapters של LangChain. הם קראו לזה "The Mother of All AI Supply Chains". שם דרמטי, אבל הפעם המספרים מצדיקים אותו.
+
+אני מספר את הסיפור הזה כי זה המקרה הכי נקי שראיתי של פרוטוקול חדש שפוגש צוותים ממהרים. ומה שהכי שווה ללמוד ממנו הוא דווקא התיקון הראשון, זה שלא עבד.
+
+## נובמבר 2024: שקע אחד לכל הכלים
+
+אנטרופיק שחררו את MCP בנובמבר 2024 עם הבטחה פשוטה: USB-C ל-agents. כותבים שרת פעם אחת, וכל client יודע לדבר איתו. יש שני transports עיקריים. HTTP לשרתים מרוחקים, ו-STDIO לשרתים מקומיים. ב-STDIO ה-client מקבל `command` ו-`args`, מרים את השרת כ-subprocess ומדבר איתו דרך stdin ו-stdout.
+
+ב-Python זו שורה אחת: `StdioServerParameters(command="npx", args=[...])`. משעמם וטוב, כל עוד אתם אלה שכותבים אותה.
+
+ואז כולם רצו. עד פברואר 2026 היו 518 שרתים ב-registry הרשמי, וסריקות של הקהילה מצאו ש-38 עד 41 אחוז מהשרתים לא דורשים authentication בכלל. כל פלטפורמת agents הוסיפה כפתור "Add MCP server" ל-UI או ל-API שלה. הכפתור הזה הוא הגיבור של הסיפור.
+
+## אפריל 2026: הגדרה שהופכת לפקודה
+
+הממצא של OX, בגדול: ב-STDIO אין שכבה בין config לבין הרצה. ה-SDK מקבל מחרוזת ומריץ אותה כתהליך. זה לא באג במובן הרגיל, זה העיצוב. ברגע שהשדה `command` מגיע ממקום שמשתמש, או תוקף, יכול לכתוב אליו, "להוסיף שרת MCP" ו"להריץ פקודה על השרת שלכם" הם אותו דבר.
+
+שלוש תוצאות, לפי הטיימליין ש-AuthZed מתחזקים:
+
+- **LangFlow**: השתלטות על השרת בלי authentication, כי הגדרות ה-MCP היו חשופות.
+- **Letta AI**: RCE למשתמש מחובר. כל מי שיש לו חשבון מריץ קוד על ה-host.
+- **Flowise**: עקיפה של פילטרי האבטחה שכבר היו שם. נגיע לזה.
+
+ה-adapters של LangChain נפלו באותה צורה, כי גם הם עוברים דרך `StdioServerParameters`.
+
+<figure><img src="/posts/mcp-security/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/mcp-security/v1-strip-he.jpg" alt="באג אחד בעיצוב, עשרה CVEs אצל ספקים שונים. ככה נראית בעיה ב-SDK ולא במוצר (OX Security, דרך AuthZed)" loading="lazy" /><figcaption>באג אחד בעיצוב, עשרה CVEs אצל ספקים שונים. ככה נראית בעיה ב-SDK ולא במוצר (OX Security, דרך AuthZed)</figcaption></figure>
+
+## איך זה נראה מבחוץ
+
+פה החלק המטריד. מבחוץ זה לא נראה כמו התקפה. אין crash, אין payload מוזר שה-WAF תופס. יש בקשה תקינה ל-endpoint לגיטימי שאומרת "תוסיף שרת בשם notes, הפקודה היא X". בלוג זה נראה כמו משתמש שמגדיר כלי.
+
+והתהליך שעולה רץ עם ההרשאות של האפליקציה. משתני הסביבה, API keys, credentials ל-DB, ה-token של ה-cloud. כל מה שהפלטפורמה יודעת, הפקודה החדשה יודעת.
+
+חוץ מזה, 10 CVEs אצל ספקים שונים נראים מבחוץ כמו 10 באגים נפרדים. נראה לי שכל צוות ראה "באג במוצר שלנו", תיקן וסגר טיקט. לקח זמן עד שמישהו חיבר את זה לדפוס אחד.
+
+<figure><img src="/posts/mcp-security/src4.jpg" alt="הטיימליין מראה דפוס ולא תאונה: אותם כשלים של auth ו-input validation חוזרים מ-2025 עד 2026 (credit: AuthZed)" loading="lazy" /><figcaption>הטיימליין מראה דפוס ולא תאונה: אותם כשלים של auth ו-input validation חוזרים מ-2025 עד 2026 (credit: AuthZed)</figcaption></figure>
+
+## התיקון הראשון: עוד פילטר
+
+רגע, אז למה Flowise לא היה מוגן? הוא דווקא ניסה. היו שם פילטרים על הקלט, והחוקרים עקפו אותם.
+
+וזה צפוי. תחשבו מה צריך לחסום: `bash -c`, `python -c`, `node -e`. בסדר. אבל `npx -y some-package` מוריד חבילה מ-npm ומריץ אותה, ובשם החבילה אין שום מילה חשודה. `uvx` עושה בדיוק את אותו דבר. פילטר מחרוזות מנסה לנחש מה רע, והתוקף צריך למצוא רק דבר אחד שהפילטר לא ניחש.
+
+AuthZed כתבו את זה ישר: הבעיה ארכיטקטונית, העיצוב מתיר הרצת subprocess, ולכן סינון קלט אד-הוק לא מספיק.
+
+> **הדעה שלי:** אני לא קונה את ה"זה רק misconfiguration". כשעשרה צוותים שונים עושים את אותה טעות, הבעיה היא בברירת המחדל של ה-SDK ולא בצוותים. מחרוזת נכנסת, תהליך יוצא, וזה פשוט קל מדי.
+
+## הסיבה האמיתית: config הוא קוד
+
+השדה `command` הוא קוד. מי שיכול לכתוב אותו יכול להריץ קוד. זהו בגדול. החוקרים המליצו על אחד משניים: רשימה סגורה של פקודות שהוגדרה מראש, או דגל "dangerous mode" מפורש שמישהו צריך להדליק בכוונה.
+
+בפועל: המשתמש בוחר **שם**, והקוד שלכם ממפה את השם לפקודה ולגרסה שנקבעו ב-code review.
+
+```python title="mcp_servers.py"
+import os
+import shutil
+from mcp import StdioServerParameters
+
+# User input picks a NAME. Command, args and version live here, reviewed in PRs.
+ALLOWED_SERVERS = {
+    "filesystem": ("npx", ["-y", "@modelcontextprotocol/server-filesystem@X.Y.Z", "/srv/shared"], []),
+    "github": ("docker", ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+                          "ghcr.io/github/github-mcp-server:X.Y.Z"], ["GITHUB_PERSONAL_ACCESS_TOKEN"]),
+}
+
+def server_params(name: str) -> StdioServerParameters:
+    if name not in ALLOWED_SERVERS:
+        raise PermissionError(f"MCP server {name!r} is not in the allowlist")
+    command, args, env_keys = ALLOWED_SERVERS[name]
+    binary = shutil.which(command)
+    if binary is None:
+        raise RuntimeError(f"{command} not found on PATH")
+    # Only PATH plus what this server needs. Never the whole app env.
+    env = {"PATH": os.environ["PATH"], **{k: os.environ[k] for k in env_keys}}
+    return StdioServerParameters(command=binary, args=list(args), env=env)
+```
+
+ובמקביל, הבעיה לא נגמרת בצד ה-client. Canopii סרקו ביולי 2026 את כל ה-11,524 שרתים הפומביים. ב-232 מהם נמצא sink מסוכן מאומת: 141 עם eval של קוד שרירותי, 69 עם command injection, 42 עם deserialization לא בטוח. 184 גרסאות שינו בשקט את הגדרות ה-tools אחרי שפורסמו. ו-741 tools היו פתוחים לכל אחד בלי הזדהות, ב-endpoints שטוענים שהם דורשים auth.
+
+הנתון שהכי הפתיע אותי: שרתים עם יותר מ-1,000 כוכבים ב-GitHub יצאו high-risk ב-18.7 אחוז, מול 3.6 אחוז אצל שרתים עם פחות מ-10 כוכבים.
+
+> Teams that whitelist "the famous ones" are selecting for risk, not against it.
+>
+> — Canopii, State of MCP Security 2026
+
+<figure><img src="/posts/mcp-security/v3-svg-he.jpg" alt="שורה אחת ב-config היא כל ההבדל בין אינטגרציה ל-RCE, ופילטר לא סוגר אותה. רק מיפוי של שם לפקודה קבועה (OX Security, דרך AuthZed)" loading="lazy" /><figcaption>שורה אחת ב-config היא כל ההבדל בין אינטגרציה ל-RCE, ופילטר לא סוגר אותה. רק מיפוי של שם לפקודה קבועה (OX Security, דרך AuthZed)</figcaption></figure>
+
+## מה לבדוק אצלכם השבוע
+
+והשטח רק גדל. בשבוע שאחרי שאנטרופיק הרחיבו את ה-connectors של קלוד במאי, DataDome ראו קפיצה של פי 50 בתעבורת MCP אצל הלקוחות שלהם.
+
+- **איפה נוצר `command`.** תריצו `rg -n 'StdioServerParameters|"command":' .` על כל ה-repos. לכל תוצאה, תשאלו מי יכול לכתוב את הערך. אם זה UI, API או טבלה ב-DB, תחליפו ב-allowlist לפי שם.
+- **מי יכול להוסיף שרת.** ה-endpoint של "add MCP server" צריך להיות מאחורי auth והרשאת admin. בדיוק זה הפיל את LangFlow.
+- **גרסה מוצמדת לכל שרת.** אין `npx -y pkg` בלי `@version`. 184 rug pulls אומר שגרסה חדשה יכולה להחליף לכם את ה-tools בלי שתשימו לב.
+- **env מינימלי.** ה-subprocess מקבל `PATH` ומה שהשרת הספציפי צריך. לא את כל ה-env של האפליקציה.
+- **auth אמיתי.** מול כל שרת MCP מרוחק שלכם, `tools/list` בלי token:
+
+```bash title="check-mcp-auth.sh"
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -X POST "$MCP_URL" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+צריך לצאת 401. אם קיבלתם 400 על session חסר, תשלחו קודם `initialize` בלי token ותבדקו שוב. ואם חזרה רשימת tools, אתם בין ה-741. ה-checklist של Helixar מוסיף בדיקה ששווה לעשות: הרשאה ברמת ה-tool ולא רק ב-gateway, כי אפשר לדבר עם שרת MCP ישירות ולעקוף את ה-gateway.
+
+אם משתמש יכול לכתוב את השדה `command`, אין לכם פיצ'ר של אינטגרציות. יש לכם RCE עם UI יפה.

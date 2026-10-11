@@ -1,0 +1,133 @@
+---
+title: "MCP Security: how one config field became RCE across 150 million downloads"
+description: "In April 2026 one MCP STDIO design flaw produced 10 CVEs across 150M downloads. What broke, why the filter failed, and what to check this week."
+lang: en
+key: mcp-security
+term: "mcp security"
+kind: warstory
+pubDate: 2026-10-11
+tags: ["mcp", "security", "agents", "supply-chain", "rce"]
+hook: "number"
+cover: illus
+tldr: ["Search your code for StdioServerParameters. If command comes from input, replace it with an allowlist keyed by name.", "Pin an exact version for every MCP server. No npx -y on a package without @version.", "Send tools/list without a token to every endpoint. Any response other than 401 is a bug."]
+hero: /posts/mcp-security/hero-en.jpg
+diagram: /posts/mcp-security/diagram.svg
+sources:
+  - { title: "The State of MCP Security [pdf]", url: "https://www.canopii.dev/State%20of%20MCP%20Security%202026.pdf", date: "2026-07-12" }
+  - { title: "MCP Security 2026: 30 CVEs in 60 Days", url: "https://www.heyuan110.com/posts/ai/2026-03-10-mcp-security-2026", date: "2026-03-12" }
+  - { title: "The AI agent economy is going mainstream", url: "https://datadome.co/agent-trust-management/why-anthropics-connector-expansion-makes-mcp-security-a-business-imperative", date: "2026-05-11" }
+  - { title: "A Timeline of MCP Security Breaches (2025-2026)", url: "https://authzed.com/blog/timeline-mcp-breaches", date: "2026-05-07" }
+  - { title: "Show HN: MCP Security Checklist – security controls for MCP server deployments", url: "https://checklist.helixar.ai", date: "2026-03-09" }
+opinion: "We think MCP security is one of the few terms in the current wave that actually changes what you do on Monday: it has a grep, it has a curl, it has an allowlist. The lesson from the OX story isn't \"filter better.\" It's to take judgment out of the picture: a name mapped to a fixed command, instead of a free-form string and a filter that guesses. Everywhere we've replaced an open-ended decision with a deterministic rule, it came out cheaper and more reliable, and this is exactly that case. And we don't trust GitHub stars as a security signal. An automated check that runs on every version, a hash of the tool definitions and a 401 without a token, is worth more than any list of \"the well-known servers.\""
+madeWith: { model: "claude-opus-5-5", sourceCount: 5, reviewedBy: "Koby Almog" }
+---
+
+150 million downloads. That's how much code OX Security's researchers tied to a single finding in April 2026. It isn't a bug in someone's library. It's the way MCP runs local servers. The finding produced more than 30 disclosures and 10 CVEs across several languages, at LangFlow, Letta, Flowise, Windsurf and the LangChain adapters. They called it "The Mother of All AI Supply Chains." A dramatic name, but this time the numbers back it up.
+
+I'm telling this story because it's the cleanest case I've seen of a new protocol meeting teams in a hurry. The most useful lesson is the first fix, the one that didn't work.
+
+## November 2024: one socket for every tool
+
+Anthropic released MCP in November 2024 with a simple promise: USB-C for agents. Write a server once, and every client can talk to it. There are two main transports. HTTP for remote servers, and STDIO for local ones. With STDIO the client gets a `command` and `args`, starts the server as a subprocess, and talks to it over stdin and stdout.
+
+In Python it's one line: `StdioServerParameters(command="npx", args=[...])`. Boring and fine, as long as you're the one writing it.
+
+Then everyone rushed in. By February 2026 the official registry had 518 servers, and community scans found that 38 to 41 percent of servers required no authentication at all. Every agent platform added an "Add MCP server" button to its UI or API. That button is the hero of this story.
+
+## April 2026: config that becomes a command
+
+OX's finding, roughly: in STDIO there's no layer between config and execution. The SDK takes a string and runs it as a process. That's not a bug in the usual sense. It's the design. Once the `command` field comes from somewhere a user, or an attacker, can write to, "add an MCP server" and "run a command on your server" are the same thing.
+
+Three outcomes, per the timeline AuthZed maintains:
+
+- **LangFlow**: unauthenticated server takeover, because the MCP settings were exposed.
+- **Letta AI**: RCE for any logged-in user. Anyone with an account runs code on the host.
+- **Flowise**: a bypass of the security filters that were already in place. More on that below.
+
+The LangChain adapters fell the same way, because they also go through `StdioServerParameters`.
+
+<figure><img src="/posts/mcp-security/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/mcp-security/v1-strip-en.jpg" alt="One design flaw, ten CVEs at different vendors. That's what an SDK problem looks like, not a product problem (OX Security, via AuthZed)" loading="lazy" /><figcaption>One design flaw, ten CVEs at different vendors. That's what an SDK problem looks like, not a product problem (OX Security, via AuthZed)</figcaption></figure>
+
+## What it looks like from the outside
+
+This is the unsettling part. From the outside it doesn't look like an attack. No crash, no weird payload for the WAF to catch. There's a valid request to a legitimate endpoint saying "add a server called notes, the command is X." In the logs it looks like a user configuring a tool.
+
+And the process that starts runs with the application's permissions. Environment variables, API keys, DB credentials, the cloud token. Whatever the platform knows, the new command knows.
+
+On top of that, 10 CVEs at different vendors look like 10 separate bugs. My guess is each team saw "a bug in our product," fixed it, and closed the ticket. It took a while before someone connected them into one pattern.
+
+<figure><img src="/posts/mcp-security/src4.jpg" alt="The timeline shows a pattern, not an accident: the same auth and input validation failures repeat from 2025 through 2026 (credit: AuthZed)" loading="lazy" /><figcaption>The timeline shows a pattern, not an accident: the same auth and input validation failures repeat from 2025 through 2026 (credit: AuthZed)</figcaption></figure>
+
+## The first fix: another filter
+
+So why wasn't Flowise protected? It actually tried. There were input filters, and the researchers bypassed them.
+
+That's expected. Think about what you'd need to block: `bash -c`, `python -c`, `node -e`. Fine. But `npx -y some-package` downloads a package from npm and runs it, and the package name contains nothing suspicious. `uvx` does exactly the same. A string filter tries to guess what's bad, and the attacker only needs one thing the filter didn't guess.
+
+AuthZed put it plainly: the problem is architectural, the design permits subprocess execution, so ad-hoc input filtering isn't enough.
+
+> **My take:** I don't buy "it's just misconfiguration." When ten different teams make the same mistake, the problem is the SDK's default, not the teams. String in, process out. It's simply too easy.
+
+## The real cause: config is code
+
+The `command` field is code. Whoever can write it can run code. That's basically it. The researchers recommended one of two things: a closed list of commands defined in advance, or an explicit "dangerous mode" flag that someone has to turn on deliberately.
+
+In practice: the user picks a **name**, and your code maps the name to a command and version that went through code review.
+
+```python title="mcp_servers.py"
+import os
+import shutil
+from mcp import StdioServerParameters
+
+# User input picks a NAME. Command, args and version live here, reviewed in PRs.
+ALLOWED_SERVERS = {
+    "filesystem": ("npx", ["-y", "@modelcontextprotocol/server-filesystem@X.Y.Z", "/srv/shared"], []),
+    "github": ("docker", ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+                          "ghcr.io/github/github-mcp-server:X.Y.Z"], ["GITHUB_PERSONAL_ACCESS_TOKEN"]),
+}
+
+def server_params(name: str) -> StdioServerParameters:
+    if name not in ALLOWED_SERVERS:
+        raise PermissionError(f"MCP server {name!r} is not in the allowlist")
+    command, args, env_keys = ALLOWED_SERVERS[name]
+    binary = shutil.which(command)
+    if binary is None:
+        raise RuntimeError(f"{command} not found on PATH")
+    # Only PATH plus what this server needs. Never the whole app env.
+    env = {"PATH": os.environ["PATH"], **{k: os.environ[k] for k in env_keys}}
+    return StdioServerParameters(command=binary, args=list(args), env=env)
+```
+
+The problem doesn't stop on the client side, either. In July 2026 Canopii scanned all 11,524 public servers. 232 of them had a verified dangerous sink: 141 with arbitrary code eval, 69 with command injection, 42 with unsafe deserialization. 184 versions quietly changed their tool definitions after publishing. And 741 tools were open to anyone without authentication, on endpoints that claim to require auth.
+
+The number that surprised me most: servers with more than 1,000 GitHub stars came out high-risk 18.7 percent of the time, versus 3.6 percent for servers with fewer than 10 stars.
+
+> Teams that whitelist "the famous ones" are selecting for risk, not against it.
+>
+> — Canopii, State of MCP Security 2026
+
+<figure><img src="/posts/mcp-security/v3-svg-en.jpg" alt="One line of config is the whole difference between an integration and RCE, and a filter doesn't close it. Only mapping a name to a fixed command does (OX Security, via AuthZed)" loading="lazy" /><figcaption>One line of config is the whole difference between an integration and RCE, and a filter doesn't close it. Only mapping a name to a fixed command does (OX Security, via AuthZed)</figcaption></figure>
+
+## What to check this week
+
+The surface is only growing. In the week after Anthropic expanded Claude's connectors in May, DataDome saw a 50x jump in MCP traffic across its customers.
+
+- **Where `command` is created.** Run `rg -n 'StdioServerParameters|"command":' .` across all your repos. For each hit, ask who can write the value. If it's a UI, an API or a DB table, replace it with an allowlist keyed by name.
+- **Who can add a server.** The "add MCP server" endpoint needs auth and admin permission. That's exactly what took down LangFlow.
+- **A pinned version for every server.** No `npx -y pkg` without `@version`. 184 rug pulls means a new version can swap your tools without you noticing.
+- **Minimal env.** The subprocess gets `PATH` and whatever that specific server needs. Not the whole app env.
+- **Real auth.** Against every remote MCP server you run, `tools/list` without a token:
+
+```bash title="check-mcp-auth.sh"
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -X POST "$MCP_URL" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+You should get 401. If you get 400 for a missing session, send `initialize` without a token first and check again. If a list of tools comes back, you're one of the 741. Helixar's checklist adds a check worth doing: authorization at the tool level, not just at the gateway, because you can talk to an MCP server directly and skip the gateway.
+
+If a user can write the `command` field, you don't have an integrations feature. You have RCE with a nice UI.

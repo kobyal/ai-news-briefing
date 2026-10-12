@@ -1,0 +1,143 @@
+---
+title: "Forward Deployed Engineering: six steps to put an agent into someone else's org"
+description: "620 open FDE roles, $4B for OpenAI's DeployCo. What it takes to put an agent into a customer's org: six steps, with evals and shadow mode."
+lang: en
+key: deployed-engineering
+term: "deployed engineering"
+kind: fieldnotes
+pubDate: 2026-10-12
+tags: ["forward-deployed-engineering", "agents", "evals", "enterprise-ai", "deployment"]
+hook: "claim"
+cover: photo
+tldr: ["In the first meeting, ask how long it takes to approve a new outbound connection.", "30–50 real cases in cases.jsonl, a threshold agreed up front, and exit 1 blocks the merge.", "Tools that write stay blocked until two weeks of shadow mode are over."]
+hero: /posts/deployed-engineering/hero-en.jpg
+sources:
+  - { title: "Show HN: Forward Deployed Engineering Jobs", url: "https://topfdejobs.com", date: "2026-10-08" }
+  - { title: "Rise of the Forward Deployed Engineer", url: "https://newsletter.gtmengineering.ai/p/forward-deployed-engineering-101", date: "2026-06-01" }
+  - { title: "Forward deployed engineering heats up again", url: "https://blog.pragmaticengineer.com/the-pulse-forward-deployed-engineering-heats-up-again", date: "2026-05-24" }
+  - { title: "Sierra: Evolution of Forward Deployed Engineering and Agent Engineering in the AI Era - ZenML LLMOps Database", url: "https://www.zenml.io/llmops-database/evolution-of-forward-deployed-engineering-and-agent-engineering-in-the-ai-era", date: "" }
+  - { title: "Forward-Deployed Engineering: The Four-Layer Agent Stack", url: "https://ibl.ai/blog/forward-deployed-engineering-production-stack-2026", date: "" }
+  - { title: "Forward Deployed Engineering and AI Agents for Enterprise AI | Sigmoid", url: "https://www.sigmoid.com/forward-deployed-engineering", date: "" }
+  - { title: "Autonomous AI Agents in Production: A Complete CTO Guide", url: "https://deployflow.co/blog/autonomous-ai-agents-production", date: "" }
+opinion: "We think FDE passes only half the hype test. The name showed up in job titles long before it showed up in articles, and that's usually a sign to be careful. Still, the work itself is real and not new: DevOps, integration, evals and rollback, all with an LLM in the middle. Our Monday test is simple: if your CI doesn't block a deploy without an eval built from the customer's cases, you didn't do forward deployed engineering, you did an expensive demo. And the skill worth paying for isn't writing a prompt at the customer. It's designing what the agent sees, what it touches, and how it gets tested every day."
+madeWith: { model: "claude-opus-5-5", sourceCount: 7, reviewedBy: "Koby Almog" }
+---
+
+Forward deployed engineering isn't a role. It's a task list that anyone who has put an agent into production at a customer already works through, just without the title and without the $200k.
+
+I'm not the only one who thinks so. Natalie Mier, Head of Agent Engineering at Sierra and a Palantir alum, opened a talk by claiming that "forward deployed engineering doesn't exist". What she meant is that this isn't one discipline. It's a set of skills every engineer will need as code gets cheaper.
+
+The market is doing the exact opposite. On October 8 a site called topfdejobs hit HN with 620 open FDE roles, most in the $140–300k range. On May 11 OpenAI announced The OpenAI Deployment Company, a separate company that raised $4 billion at a $14 billion valuation, whose whole job is getting AI into organizations. Google Cloud cut FDE hiring from 4–6 interviews over several weeks to two interviews in two days. And a16z put it best: an organization buying AI is like a grandmother who got an iPhone. She wants to use it. Someone just has to set it up for her.
+
+The name comes from Palantir. In 2008 an FDE was mostly DevOps at the customer: sit on site, keep an on-prem install alive, answer pages at 2am. In 2012, once the platform stabilized, data integration was added. Mier compares the platform without it to a movie theater with no movies. Today there's a third layer: an agent that has to survive in someone else's environment.
+
+So set the title debate aside for a minute. Here are the steps themselves, based on the stack ibl.ai published at the end of September and on what Sierra and deployflow describe.
+
+## 01 · Week one: map the environment, not the prompt
+
+What you do: sit down with IT, with security, and with the team that will use the agent. Don't open an IDE.
+
+What you see: a list of blockers that have nothing to do with the model. ibl.ai describe it exactly: the IdP is different from the one you built against, the data can't leave a certain boundary, and approving a new outbound connection takes weeks.
+
+The artifact is six questions for the first meeting:
+
+- Which IdP? Okta, Entra ID, or something homegrown?
+- Where does the data live, and what can't leave the boundary?
+- How long does it take to approve an outbound connection to a model API?
+- Which models are approved: Bedrock, Azure OpenAI, or only an open model on-prem?
+- Who signs off on writes to a production system?
+- What does the workflow look like today, step by step, and who does each step?
+
+The third question is the one that kills timelines. If the answer is "three weeks", that's your critical path, not the prompt. deployflow say it flatly: legacy integration is always the longest item on the schedule, so map it first.
+
+<figure><img src="/posts/deployed-engineering/v1-svg-en.jpg" alt="No layer went away: a 2026 FDE still spends week one on 2008-era DevOps, just with an agent on top (Sierra, Natalie Mier)" loading="lazy" /><figcaption>No layer went away: a 2026 FDE still spends week one on 2008-era DevOps, just with an agent on top (Sierra, Natalie Mier)</figcaption></figure>
+
+## 02 · An environment that comes up with one command
+
+What you do: Terraform and Helm that stand up an isolated environment per customer or business unit, with SSO wired in and secrets management, in one command. Something like `make env CUSTOMER=acme STAGE=sandbox`.
+
+What you see: the second customer takes a day, not a month. And when something breaks at the first one, you spin up a clean copy and check whether the problem is in the code or in the environment.
+
+ibl.ai wrote it this way in their post:
+
+> The gap between an AI demo and an AI deployment is not model quality. It is that a demo needs one environment to work once, and a deployment needs an environment that can be rebuilt, evaluated, governed and tested before anyone depends on it.
+
+Basically, this is Palantir's DevOps from 2008. Except now the model, the prompt and the tools are part of the same IaC, not a file someone edited by hand on the customer's server.
+
+<figure><img src="/posts/deployed-engineering/v2-screenshot-en.jpg" alt="ibl.ai present the four layers as an ownership checklist, and that's the right framing: the question is who owns each layer when something breaks (credit: ibl.ai)" loading="lazy" /><figcaption>ibl.ai present the four layers as an ownership checklist, and that's the right framing: the question is who owns each layer when something breaks (credit: ibl.ai)</figcaption></figure>
+
+## 03 · Evals before the agent, on real customer cases
+
+What you do: collect 30–50 real cases from the last month, with the decision a human made on each one. Every line in `evals/cases.jsonl` is an input, the correct decision, and what the agent must not do. Foundation Capital set the scary bar: a legal assistant that has to flag compliance risks at 99%+ accuracy. A "helpful" chatbot doesn't come close.
+
+The runner I copy from project to project:
+
+```python title="evals/run_cases.py"
+import json
+import sys
+
+from agent import run_agent  # your agent, any framework
+
+THRESHOLD = 0.9  # agree on this with the customer BEFORE the first run
+
+
+def check(case, out):
+    exp = case["expected"]
+    if exp.get("must_flag") and exp["must_flag"] not in out.get("flags", []):
+        return False
+    if exp.get("must_not_call") and exp["must_not_call"] in out.get("tools_called", []):
+        return False
+    return out.get("decision") == exp["decision"]
+
+
+cases = [json.loads(line) for line in open("evals/cases.jsonl") if line.strip()]
+fails = [c["id"] for c in cases if not check(c, run_agent(c["input"]))]
+
+score = 1 - len(fails) / len(cases)
+print(f"{score:.0%} ({len(cases) - len(fails)}/{len(cases)})  fails: {fails[:10]}")
+sys.exit(0 if score >= THRESHOLD else 1)
+```
+
+What you see: the first number is usually embarrassing. That's what it's for. The threshold gets locked with the customer before the deploy, not after they've seen the result. Put it in CI: every change to the prompt, the model or a tool runs the file, and exit 1 blocks the merge.
+
+## 04 · Deploy with narrow tools, read-only at first
+
+What you do: give the agent only the tools the workflow needs, and route every tool that writes through human approval until shadow mode is over. deployflow list this among the three decisions that set how far an agent can go: memory, tool scoping and orchestration.
+
+Wait, why so careful? Because in 2025 Replit's agent deleted a production database in the middle of a code freeze, after being told explicitly not to touch it. That wasn't a model bug. It simply had the permission.
+
+The artifact: a permissions table the customer signs.
+
+| tool | weeks 1–2 | weeks 3–4 | after sign-off |
+|---|---|---|---|
+| Read from CRM | open | open | open |
+| Update a CRM record | blocked | with human approval | open, with audit log |
+| Send email to a customer | blocked | draft only | with human approval |
+| Any delete | blocked | blocked | blocked |
+
+The last row never changes. If the workflow really needs a delete, it stays with a human.
+
+## 05 · Two weeks of shadow mode
+
+What you do: the agent runs in parallel with the real team. It gets the same cases, and its decisions are logged without being executed.
+
+What you see: a daily disagreement report. Case ID, what the human decided, what the agent decided, and who was right. deployflow point out that input in a live environment, especially in customer service, doesn't look like what you see in development. That's exactly what you'll find. In some cases the agent turns out to be wrong. In others it turns out the process has a rule nobody ever wrote down.
+
+The artifact: every disagreement becomes a new line in `cases.jsonl`. After two weeks the eval is no longer 40 cases you picked, but hundreds of cases reality picked. In practice this is the loop that holds the whole thing together: a test that grows every day, not a better first draft.
+
+## 06 · Handoff: what stays with the customer, what goes back to product
+
+What you do: lock one outcome metric the customer understands, for example the share of tickets closed without a human. At Sierra this is the basis of the business model: once an agent's outcome is measured, you can also price it. Then write a runbook: how to rebuild the environment, how to run the eval, how to roll back to a previous prompt version.
+
+What you see: half of what you built, you already built at the previous customer. That's what goes back to the product team. At Palantir this was the whole mechanism: the FDE finds the pattern in the field, and a product engineer turns it into a feature.
+
+> **Caveat:** I don't buy Sigmoid's promise that one FDE with an army of agents replaces six or seven teams. That's a services-company pitch. What I've seen work is an FDE who spots the pattern, and a product that saves them the work next time.
+
+<figure><img src="/posts/deployed-engineering/src3.jpg" alt="Google cut FDE hiring to two interviews in two days. When screening gets that short, demand has outrun supply, and your runbook is worth more than the title (credit: The Pragmatic Engineer)" loading="lazy" /><figcaption>Google cut FDE hiring to two interviews in two days. When screening gets that short, demand has outrun supply, and your runbook is worth more than the title (credit: The Pragmatic Engineer)</figcaption></figure>
+
+## What to take away
+
+- Before you write a prompt, ask how long it takes to approve an outbound connection. That's the real schedule.
+- An environment that doesn't come up with one command won't come up at the second customer either.
+- No deploy without a `cases.jsonl` built from the customer's cases and a threshold agreed up front.
+- Every disagreement in shadow mode is a new case. That's how the eval grows instead of rotting.

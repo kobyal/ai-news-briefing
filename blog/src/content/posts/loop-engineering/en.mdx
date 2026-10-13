@@ -1,0 +1,114 @@
+---
+title: "Loop engineering: who decides the loop is done"
+description: "What loop engineering is, where it came from in June 2026, where it breaks, and a minimal bash loop with a check, a budget and memory you can run tomorrow."
+lang: en
+key: loop-engineering
+term: "loop engineering"
+kind: explainer
+pubDate: 2026-10-13
+tags: ["loop-engineering", "agents", "claude-code", "codex", "verification"]
+hook: "scene"
+cover: type
+tldr: ["The stop condition is a check's exit code, never the model's answer", "Cap rounds and max-turns, and measure total_cost_usd for one round before an overnight run", "Review in a clean session on git diff, not by the agent that wrote the code"]
+hero: /posts/loop-engineering/hero-en.jpg
+diagram: /posts/loop-engineering/diagram.svg
+sources:
+  - { title: "Loop Engineering: Optimizing Code Generation and Verification", url: "https://bradleygibbs.dev/posts/loop-optimization", date: "2026-10-11" }
+  - { title: "Loop Engineering: Designing loops that prompt coding agents", url: "https://addyosmani.com/blog/loop-engineering", date: "2026-06-13" }
+  - { title: "Hot Take: Harness, Loop Engineering, Graph Engineering Are Bullshit", url: "https://akitaonrails.com/en/2026/08/18/hot-take-harness-loop-engineering-graph-engineering-are-bullshit", date: "2026-08-22" }
+  - { title: "Loop Engineering, Graph Engineering, and Layers That Matters", url: "https://iii.dev/blog/loops-graphs-and-the-layer-that-matters", date: "2026-07-21" }
+  - { title: "Poor Man's Loop Engineering", url: "https://awaitinginput.substack.com/p/poor-mans-loop-engineering", date: "2026-08-18" }
+  - { title: "Loop Engineering Is a Pattern, Not a Feature", url: "https://iii.dev/blog/loop-engineering-is-a-pattern-not-a-feature", date: "2026-07-29" }
+  - { title: "The /Goal Function Made Loop Engineering Click for Me", url: "https://bhart.org/articles/the-goal-function-made-loop-engineering-click-for-me", date: "2026-07-20" }
+  - { title: "What Is Loop Engineering? | IBM", url: "https://www.ibm.com/think/topics/loop-engineering", date: "" }
+  - { title: "What Is Loop Engineering? A Complete Guide from Prompt to Harness Engineering (2026) | Tosea.ai", url: "https://tosea.ai/blog/loop-engineering-ai-agents-complete-guide-2026", date: "" }
+  - { title: "Understanding loop engineering in AI agents", url: "https://www.facebook.com/groups/3670562573177653/posts/4609317682635466", date: "" }
+opinion: "We buy the thing, not the name. Loop engineering is another case of an old discipline, a state machine with a stop condition and a budget, rediscovered with an LLM in the middle, and our test is whether it changes what you do on Monday. This time it does: it forces you to write done as code, and that's the most useful thing to happen to coding agents this year. Determinism wherever possible, model judgment only where it's required, and in our own pipeline every place we replaced a model call with nothing at all just got cheaper and more stable. Checking beats generating: a mediocre loop with a good check will beat a brilliant prompt with no check, every time."
+madeWith: { model: "claude-opus-5-5", sourceCount: 10, reviewedBy: "Koby Almog" }
+---
+
+Early June 2026. Boris Cherny, who leads Claude Code at Anthropic, posts three lines on X. That same week, half the timeline laughed at them:
+
+> I don't prompt Claude anymore. I have loops running that prompt Claude and figuring out what to do. My job is to write loops
+>
+> — Boris Cherny, head of Claude Code at Anthropic, on X
+
+Around the same time, Peter Steinberger wrote almost the same thing: you don't write prompts for coding agents anymore, you design loops that write them. On June 7, Addy Osmani of Google gave it a name on his blog, loop engineering, and it stuck. According to Tosea, the post that kicked off the discussion passed 6.5 million views within a few days. By July 17 IBM had a definition page, and by late July the timeline was arguing about whether we'd already moved on to graph engineering.
+
+Hold on, though. The shape isn't new. People have been wrapping agents in bash loops since late 2023. What changed in 2026 is that the parts now ship inside the products: Codex has `/goal`, and Claude Code runs headless with `claude -p`.
+
+## What it is, and what it isn't
+
+The short version: instead of you typing the next prompt, a small system does it. It finds work, hands it to an agent, checks the result, records what's done and decides what comes next. Osmani lists five parts plus one place for memory, and puts the whole thing one floor above the harness. The harness is the environment a single agent runs in. The loop is that same harness, except it runs on a timer, spins up helpers and feeds itself.
+
+What it isn't: the while loop inside every agent. Avi Chawla described that one like this: send context to the model, get tool calls back, run them, append the results to the context and send again, until the model answers without asking for a tool. That loop is nearly identical in LangGraph, the OpenAI Agents SDK and Claude Code. Nobody competes on the while. What you write is everything around it: when to stop, what stays in context, which tools are allowed, and how the result gets checked.
+
+It's not a product either. iii.dev put it most sharply: an agentic loop is calling the model, looking at what came back and deciding whether to go around again. "That is not a product category! That is a `while` statement."
+
+<figure><img src="/posts/loop-engineering/src2.jpg" alt="Osmani puts the loop one floor above the harness. The model and the while are exactly the part you don't write (credit: addyosmani.com)" loading="lazy" /><figcaption>Osmani puts the loop one floor above the harness. The model and the while are exactly the part you don't write (credit: addyosmani.com)</figcaption></figure>
+
+## Where it breaks: when the model decides it's done
+
+The best example I found is from iii.dev, July 29. An agent scans files looking for vulnerabilities. To know it's done, it has to compare the list of files it went through against the list of all files. Ask a frontier model whether two lists are identical and sometimes you get the right answer. Sometimes you don't. A loop where the model decides when to stop will stop too early, too late, or never.
+
+Bruce Hart, writing on July 7 about `/goal` in Codex, adds the other side: a model can pass a test for the wrong reason, and it can decide what it wrote is probably correct because it wrote it. So there are two problems and one fix: the stop condition has to be code, and the check has to come from something other than the agent that wrote the code.
+
+Bradley Gibbs, in an October 11 post, calls this making done checkable: turn the spec into independent checks and stop rules that are actually enforced. The August post Poor Man's Loop Engineering boils it down to two things: the agent has to be able to check its own work, and someone else has to review it. Everything else is extras.
+
+<figure><img src="/posts/loop-engineering/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## A minimal loop you can run tomorrow
+
+Here's the smallest version I'm willing to run on a real repo. One check that returns an exit code, a round budget, and a notes file that carries over between rounds:
+
+```bash title="loop.sh"
+#!/usr/bin/env bash
+set -u
+GOAL="Make every test in tests/billing pass. Do not edit or skip tests."
+MAX=8
+mkdir -p .loop
+touch .loop/NOTES.md
+
+for i in $(seq 1 "$MAX"); do
+  if make test > .loop/last_test.txt 2>&1; then
+    echo "green in round $i"
+    exit 0
+  fi
+  PROMPT="$GOAL
+Read .loop/NOTES.md first, then .loop/last_test.txt.
+Fix ONE failure. Append to .loop/NOTES.md what you tried and the result."
+  claude -p "$PROMPT" --max-turns 20 --allowedTools "Read,Edit,Write,Bash(make test)"
+done
+
+echo "out of budget after $MAX rounds - read .loop/NOTES.md"
+exit 1
+```
+
+Nothing here is accidental. First, `make test` decides we're done, not Claude. Exit code 0, we're out. Second, `MAX=8` and `--max-turns 20` are the budget: without them, a task that never converges burns tokens all night. And `NOTES.md` is the memory, so round 5 doesn't retry exactly what failed in round 2. The "Fix ONE failure" instruction keeps the diff small enough to read.
+
+Exit 0 still doesn't mean merge. Open a new session, with no history, that only reads `git diff main` and looks for tests that were deleted, skipped or edited. That's the reviewer that isn't the agent that wrote the code.
+
+<figure><img src="/posts/loop-engineering/v2-svg-en.jpg" alt="Two brakes, and neither asks the model whether it's done. A model comparing file lists is sometimes wrong; an exit code doesn't argue (iii.dev)" loading="lazy" /><figcaption>Two brakes, and neither asks the model whether it's done. A model comparing file lists is sometimes wrong; an exit code doesn't argue (iii.dev)</figcaption></figure>
+
+## When not to build a loop
+
+On August 18, Fabio Akita published a hot take calling harness, loop and graph engineering plain bullshit. His argument: once a technology becomes a commodity, the money moves to taxonomy. And he has receipts. Between January and May he shipped more than 30 public repos without a complicated setup, switching between Claude Code, Codex and Kimi CLI on the same day. iii.dev also counted four names in three years: prompt in 2023, context in 2024, loop in 2025–26, graph in July 2026.
+
+That said, even Osmani, who coined the name, writes that he's skeptical and that you need to be very careful about token cost. So here's when not to:
+
+- There's no automated check that returns yes or no. Without one there's no loop, just a model guessing in circles and burning tokens.
+- Done is a matter of taste: design, wording, a product decision. A human stays in the loop here.
+- There are actions you can't undo: deploys, deleting data, money. Hart recommends a human gate before those parts, and I wouldn't skip it.
+- A ten-minute task. Building a loop around it takes longer than just doing it.
+
+> **My take:** Akita is right about the courses and the certificates, and wrong about the loop. He himself wrote that what works is knowing what you want, and a good loop is exactly that: what you want, written as a command that returns an exit code. You can throw away the name. Not the stop condition.
+
+## What to try this week
+
+1. Pick one task with a check that returns an exit code: failing tests, `tsc --noEmit`, lint. Don't have one? Start by writing it. That's step one in Poor Man's too.
+2. Write done as a command, not a sentence. `make test` passes and `git diff` doesn't touch `tests/`: that's done. "The code works" isn't.
+3. Run one round with `claude -p ... --output-format json` and look at `total_cost_usd`. Multiply by MAX. If the number scares you, lower MAX or shrink the task.
+4. Add the NOTES file and the clean-session reviewer. Each costs a line or two.
+5. After a week, count which check actually caught something. Gibbs calls this measuring which checks pay for themselves. A check that caught nothing in twenty runs is a candidate for removal.
+
+And if you can't write the stop condition as a single line of bash, you don't have a loop yet. You have a chat that runs overnight.

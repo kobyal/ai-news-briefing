@@ -1,0 +1,114 @@
+---
+title: "Loop engineering: מי מחליט שהלולאה סיימה"
+description: "מה זה loop engineering, מאיפה הגיע ביוני 2026, איפה זה נשבר, ולולאת bash מינימלית עם בדיקה, תקציב וזיכרון שאפשר להריץ מחר."
+lang: he
+key: loop-engineering
+term: "loop engineering"
+kind: explainer
+pubDate: 2026-10-13
+tags: ["loop-engineering", "agents", "claude-code", "codex", "verification"]
+hook: "scene"
+cover: type
+tldr: ["תנאי העצירה הוא exit code של בדיקה, אף פעם לא תשובה של המודל", "תגבילו סבבים ו-max-turns, ותמדדו total_cost_usd של סבב אחד לפני ריצת לילה", "review בשיחה נקייה על git diff, לא על ידי ה-agent שכתב"]
+hero: /posts/loop-engineering/hero.jpg
+diagram: /posts/loop-engineering/diagram.svg
+sources:
+  - { title: "Loop Engineering: Optimizing Code Generation and Verification", url: "https://bradleygibbs.dev/posts/loop-optimization", date: "2026-10-11" }
+  - { title: "Loop Engineering: Designing loops that prompt coding agents", url: "https://addyosmani.com/blog/loop-engineering", date: "2026-06-13" }
+  - { title: "Hot Take: Harness, Loop Engineering, Graph Engineering Are Bullshit", url: "https://akitaonrails.com/en/2026/08/18/hot-take-harness-loop-engineering-graph-engineering-are-bullshit", date: "2026-08-22" }
+  - { title: "Loop Engineering, Graph Engineering, and Layers That Matters", url: "https://iii.dev/blog/loops-graphs-and-the-layer-that-matters", date: "2026-07-21" }
+  - { title: "Poor Man's Loop Engineering", url: "https://awaitinginput.substack.com/p/poor-mans-loop-engineering", date: "2026-08-18" }
+  - { title: "Loop Engineering Is a Pattern, Not a Feature", url: "https://iii.dev/blog/loop-engineering-is-a-pattern-not-a-feature", date: "2026-07-29" }
+  - { title: "The /Goal Function Made Loop Engineering Click for Me", url: "https://bhart.org/articles/the-goal-function-made-loop-engineering-click-for-me", date: "2026-07-20" }
+  - { title: "What Is Loop Engineering? | IBM", url: "https://www.ibm.com/think/topics/loop-engineering", date: "" }
+  - { title: "What Is Loop Engineering? A Complete Guide from Prompt to Harness Engineering (2026) | Tosea.ai", url: "https://tosea.ai/blog/loop-engineering-ai-agents-complete-guide-2026", date: "" }
+  - { title: "Understanding loop engineering in AI agents", url: "https://www.facebook.com/groups/3670562573177653/posts/4609317682635466", date: "" }
+opinion: "אנחנו קונים את הדבר ולא את השם. loop engineering הוא עוד מקרה של דיסציפלינה ישנה, state machine עם תנאי עצירה ותקציב, שהתגלתה מחדש עם LLM באמצע, והמבחן שלנו הוא אם זה משנה מה אתם עושים ביום ראשון. הפעם כן: זה מכריח לכתוב done כקוד, וזה הדבר הכי שימושי שקרה ל-coding agents השנה. דטרמיניזם איפה שאפשר, שיקול דעת של מודל רק איפה שחייבים, ואצלנו כל מקום שבו החלפנו קריאה למודל בכלל פשוט נהיה זול ויציב יותר. ובדיקה שווה יותר מיצירה: לולאה בינונית עם בדיקה טובה תנצח prompt מבריק בלי בדיקה, כל פעם."
+madeWith: { model: "claude-opus-5-5", sourceCount: 10, reviewedBy: "Koby Almog" }
+---
+
+תחילת יוני 2026. בוריס צ'רני, שמוביל את Claude Code באנטרופיק, כותב ב-X שלוש שורות. באותו שבוע חצי מהטיימליין צחק עליהן:
+
+> I don't prompt Claude anymore. I have loops running that prompt Claude and figuring out what to do. My job is to write loops
+>
+> — בוריס צ'רני, ראש Claude Code באנטרופיק, ב-X
+
+באותם ימים פיטר שטיינברגר כתב כמעט אותו דבר: לא כותבים יותר prompts ל-coding agents, מתכננים לולאות שכותבות אותם. ב-7 ביוני אדי אוסמני מגוגל נתן לזה שם בבלוג שלו, loop engineering, ומשם זה פשוט נדבק. לפי Tosea, הפוסט שהצית את הדיון עבר 6.5 מיליון צפיות תוך כמה ימים. ב-17 ביולי כבר היה ל-IBM עמוד הגדרה, ובסוף יולי הטיימליין התווכח אם עברנו כבר ל-graph engineering.
+
+רגע, הצורה עצמה לא חדשה. אנשים כתבו לולאות בבאש סביב agents עוד מסוף 2023. מה שהשתנה ב-2026 זה שהחלקים יושבים בתוך המוצרים: ב-Codex יש `/goal`, ו-Claude Code רץ headless עם `claude -p`.
+
+## מה זה בפועל, ומה זה לא
+
+בגדול: במקום שאתם תקלידו את ה-prompt הבא, מערכת קטנה עושה את זה. היא מוצאת עבודה, מעבירה אותה ל-agent, בודקת את התוצאה, רושמת מה נגמר ומחליטה מה הלאה. אוסמני מונה חמישה חלקים ועוד מקום אחד לזיכרון, ושם את זה קומה אחת מעל ה-harness. ה-harness הוא הסביבה ש-agent אחד רץ בתוכה. הלולאה היא אותו harness, רק שהוא רץ לפי טיימר, מרים עוזרים ומזין את עצמו.
+
+מה זה לא: זה לא ה-while שבתוך כל agent. אבי צ'אוולה תיאר את זה ככה: שולחים context למודל, מקבלים tool calls, מריצים, מוסיפים את התוצאות ל-context ושולחים שוב, עד שהמודל עונה בלי לבקש כלי. הלולאה הזאת כמעט זהה ב-LangGraph, ב-OpenAI Agents SDK וב-Claude Code. על ה-while אף אחד לא מתחרה. מה שאתם כותבים זה מה שמסביב: מתי עוצרים, מה נשאר ב-context, לאילו כלים יש גישה, ואיך בודקים את התוצאה.
+
+וזה גם לא מוצר. ב-iii.dev ניסחו את זה הכי חד: agentic loop זה לקרוא למודל, להסתכל מה חזר ולהחליט אם להסתובב עוד פעם. "That is not a product category! That is a `while` statement."
+
+<figure><img src="/posts/loop-engineering/src2.jpg" alt="אוסמני שם את הלולאה קומה אחת מעל ה-harness. המודל וה-while הם בדיוק החלק שאתם לא כותבים (credit: addyosmani.com)" loading="lazy" /><figcaption>אוסמני שם את הלולאה קומה אחת מעל ה-harness. המודל וה-while הם בדיוק החלק שאתם לא כותבים (credit: addyosmani.com)</figcaption></figure>
+
+## איפה זה נשבר: כשהמודל מחליט שסיים
+
+הדוגמה הכי טובה שמצאתי היא של iii.dev, מ-29 ביולי. agent סורק קבצים ומחפש חולשות. כדי לדעת שסיים, צריך להשוות את רשימת הקבצים שעבר עליהם לרשימת כל הקבצים. תשאלו מודל מוביל אם שתי רשימות זהות, ולפעמים תקבלו תשובה נכונה. ולפעמים לא. לולאה שבה המודל מחליט מתי לעצור תסיים מוקדם מדי, מאוחר מדי, או בכלל לא.
+
+ברוס הארט, שכתב ב-7 ביולי על `/goal` ב-Codex, מוסיף את הצד השני: מודל יכול לעבור טסט מהסיבה הלא נכונה, ויכול להחליט שמה שהוא כתב כנראה נכון כי הוא זה שכתב. בקיצור, יש פה שתי בעיות ופתרון אחד: תנאי העצירה צריך להיות קוד, והבדיקה צריכה לבוא ממישהו שהוא לא ה-agent שכתב.
+
+בראדלי גיבס, בפוסט מ-11 באוקטובר, קורא לזה make done checkable: להפוך את ה-spec לבדיקות עצמאיות ולכללי עצירה שנאכפים. הפוסט Poor Man's Loop Engineering מאוגוסט מצמצם את זה לשני דברים: ה-agent צריך להיות מסוגל לבדוק את העבודה של עצמו, ומישהו אחר צריך לעשות לה review. כל השאר תוספות.
+
+<figure><img src="/posts/loop-engineering/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+## לולאה מינימלית שאפשר להריץ מחר
+
+הנה הגרסה הכי קטנה שאני מוכן להריץ על repo אמיתי. בדיקה אחת שמחזירה exit code, תקציב של סבבים, וקובץ notes שעובר מסבב לסבב:
+
+```bash title="loop.sh"
+#!/usr/bin/env bash
+set -u
+GOAL="Make every test in tests/billing pass. Do not edit or skip tests."
+MAX=8
+mkdir -p .loop
+touch .loop/NOTES.md
+
+for i in $(seq 1 "$MAX"); do
+  if make test > .loop/last_test.txt 2>&1; then
+    echo "green in round $i"
+    exit 0
+  fi
+  PROMPT="$GOAL
+Read .loop/NOTES.md first, then .loop/last_test.txt.
+Fix ONE failure. Append to .loop/NOTES.md what you tried and the result."
+  claude -p "$PROMPT" --max-turns 20 --allowedTools "Read,Edit,Write,Bash(make test)"
+done
+
+echo "out of budget after $MAX rounds - read .loop/NOTES.md"
+exit 1
+```
+
+שום דבר פה לא מקרי. קודם כל, `make test` מחליט שסיימנו, לא קלוד. exit code 0, יוצאים. חוץ מזה, `MAX=8` ו-`--max-turns 20` הם התקציב: בלעדיהם משימה שלא מתכנסת שורפת טוקנים כל הלילה. ו-`NOTES.md` הוא הזיכרון, כדי שסבב 5 לא ינסה שוב בדיוק מה שנכשל בסבב 2. ההוראה Fix ONE failure שומרת על diff קטן שאפשר לקרוא.
+
+אחרי exit 0 עוד לא ממרג'ים. תפתחו שיחה חדשה, בלי ההיסטוריה, שרק קוראת את `git diff main` ומחפשת טסטים שנמחקו, דולגו או נערכו. זה ה-reviewer שהוא לא ה-agent שכתב.
+
+<figure><img src="/posts/loop-engineering/v2-svg-he.jpg" alt="שני מעצורים, ואף אחד מהם לא שואל את המודל אם סיים. מודל שמשווה רשימות קבצים טועה לפעמים, exit code לא מתווכח (iii.dev)" loading="lazy" /><figcaption>שני מעצורים, ואף אחד מהם לא שואל את המודל אם סיים. מודל שמשווה רשימות קבצים טועה לפעמים, exit code לא מתווכח (iii.dev)</figcaption></figure>
+
+## מתי לא לבנות לולאה
+
+פאביו אקיטה פרסם ב-18 באוגוסט hot take שקרא ל-harness, loop ו-graph engineering פשוט bullshit. הטענה שלו: כשהטכנולוגיה הופכת ל-commodity, הכסף עובר לטקסונומיה. ויש לו קבלות. בין ינואר למאי הוא פרסם יותר מ-30 repos פומביים בלי לסבך את ה-setup, ומחליף בין Claude Code, Codex ו-Kimi CLI באותו יום. גם iii.dev ספרו ארבעה שמות בשלוש שנים: prompt ב-2023, context ב-2024, loop ב-2025–26, graph ביולי 2026.
+
+מה שכן, גם אוסמני, שנתן את השם, כותב שהוא סקפטי ושצריך להיזהר מאוד עם עלות הטוקנים. אז הנה מתי לא:
+
+- אין בדיקה אוטומטית שמחזירה כן או לא. בלי זה אין לולאה, יש מודל שמנחש בסיבובים ושורף טוקנים.
+- ה-done הוא עניין של טעם: עיצוב, ניסוח, החלטת מוצר. פה אדם נשאר בלולאה.
+- יש פעולות שאי אפשר לבטל: deploy, מחיקת נתונים, כסף. הארט ממליץ על human gate לפני החלקים האלה, ואני לא הייתי מוותר עליו.
+- משימה של עשר דקות. לבנות סביבה לולאה ייקח יותר זמן מלעשות אותה.
+
+> **הדעה שלי:** אקיטה צודק לגבי הקורסים והתעודות, ולא צודק לגבי הלולאה. הוא בעצמו כתב שמה שעובד זה לדעת מה אתה רוצה, ולולאה טובה היא בדיוק זה: מה שאתה רוצה, כתוב כפקודה שמחזירה exit code. את השם אפשר לזרוק, את תנאי העצירה לא.
+
+## מה לנסות השבוע
+
+1. תבחרו משימה אחת עם בדיקה שמחזירה exit code: טסטים אדומים, `tsc --noEmit`, lint. אין כזאת? תתחילו מלכתוב אותה. זה הצעד הראשון גם ב-Poor Man's.
+2. תכתבו את ה-done כפקודה, לא כמשפט. `make test` עובר ו-`git diff` לא נוגע ב-`tests/` זה done. הקוד עובד זה לא.
+3. תריצו סבב אחד עם `claude -p ... --output-format json` ותסתכלו על `total_cost_usd`. תכפילו ב-MAX. אם המספר מפחיד, תורידו את MAX או תקטינו את המשימה.
+4. תוסיפו את קובץ ה-NOTES ואת ה-reviewer בשיחה נקייה. כל אחד מהם עולה שורה או שתיים.
+5. אחרי שבוע, תספרו איזו בדיקה תפסה משהו בפועל. גיבס קורא לזה למדוד אילו בדיקות מצדיקות את העלות שלהן. בדיקה שלא תפסה כלום בעשרים ריצות, תשקלו להוריד.
+
+ואם אתם לא מצליחים לכתוב את תנאי העצירה בשורת bash אחת, עוד אין לכם לולאה. יש לכם צ'אט שרץ בלילה.

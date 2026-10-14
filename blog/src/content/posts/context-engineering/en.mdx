@@ -1,0 +1,104 @@
+---
+title: "Context engineering: how Anthropic cut 80% of Claude Code's prompt and lost nothing"
+description: "Anthropic cut over 80% of Claude Code's system prompt with no drop in evals. What went wrong in the context, and how to audit your CLAUDE.md this week."
+lang: en
+key: context-engineering
+term: "context engineering"
+kind: warstory
+pubDate: 2026-10-14
+tags: ["context-engineering", "claude-code", "agents", "evals", "prompts"]
+hook: "number"
+cover: illus
+tldr: ["Run /doctor in Claude Code and trim every skill and CLAUDE.md it flags", "Look for conflicting instructions across the system prompt, skills and CLAUDE.md, and keep only one", "Without a before-and-after eval, don't delete or add a single rule"]
+hero: /posts/context-engineering/hero-en.jpg
+diagram: /posts/context-engineering/diagram.svg
+sources:
+  - { title: "The new rules of context engineering for Claude 5 generation models", url: "https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models", date: "2026-07-25" }
+  - { title: "Context engineering: shifting from \"tokenmaxxing\" to deliberate curation", url: "https://corti.com/from-tokenmaxxing-to-token-discipline-the-2026-reckoning-in-ai-assisted-engineering", date: "2026-06-26" }
+  - { title: "Context Engineering for AI Agents Explained - a simple overview of the basics", url: "https://departmentofproduct.substack.com/p/context-engineering-for-ai-agents", date: "" }
+  - { title: "Context Engineering Guide for Developers", url: "https://www.faros.ai/blog/context-engineering-for-developers", date: "" }
+  - { title: "Context Engineering: A Practical Guide for AI Agents (2026) | Sourcegraph", url: "https://sourcegraph.com/blog/context-engineering", date: "" }
+opinion: "To us, Anthropic's post is a story about evals more than about prompts: they could delete only because they had a number before and after. Context engineering passes our \"what do we do with this on Monday\" test, but only if it includes deleting, not just adding. At the same time, some of the shouted rules simply don't belong in the prompt at all. \"DO NOT add comments\" is a lint rule or a hook, not a sentence the model should weigh on every request. Anywhere you can swap an instruction for a deterministic check, it comes out cheaper and more reliable, and the context stays free for what actually needs judgment."
+madeWith: { model: "claude-opus-5-5", sourceCount: 5, reviewedBy: "Koby Almog" }
+---
+
+80%. That's how much of Claude Code's system prompt Anthropic deleted when they moved to Opus 5 and Fable 5. They wrote it on the Claude blog on July 24, 2026, and in the same sentence added that they saw no measurable drop in their coding evals.
+
+Think about what that means. Four out of every five lines the team building the tool wrote for Claude did nothing. Or worse, they got in the way. This is the story of how they got there, and odds are the same thing is happening in your CLAUDE.md right now.
+
+## June 2025 to April 2026: everyone adds context
+
+The term stuck in June 2025. Tobi Lütke, Shopify's CEO, defined it as "the art of providing all the context for the task to be plausibly solvable by the LLM", and Karpathy gave it a +1 over prompt engineering. Phil Schmid and others turned it into a discipline: system prompt, tools, history, memory, retrieval. Everything that goes into the context window on every call.
+
+In Claude Code it looks like this: the prompt you type is a small part. Around it, the system prompt, Skills, CLAUDE.md files and memory get loaded. Each layer was written by someone else, at a different time, for a different problem.
+
+Meanwhile, the industry pushed in exactly the opposite direction from precision. In April 2026 a Meta employee set up an internal leaderboard called "Claudeonomics" that ranked about 85,000 employees by how many tokens went through them. First place was at 281 billion tokens a month. Meta took the board down within days, but the message had already landed: more tokens means more work. They called it tokenmaxxing.
+
+<figure><img src="/posts/context-engineering/v1-strip-en.jpg" alt="Three months separated a leaderboard that rewarded burning tokens from deleting 80% of the prompt at no cost (Corti, Anthropic)" loading="lazy" /><figcaption>Three months separated a leaderboard that rewarded burning tokens from deleting 80% of the prompt at no cost (Corti, Anthropic)</figcaption></figure>
+
+## One request, two contradicting instructions
+
+Anthropic sat down and read transcripts of their own internal Claude Code usage. Here's what they found:
+
+> "we see several conflicting messages in a single request like 'leave documentation as appropriate,' or 'DO NOT add comments' as our system prompt, skills, and user requests clash with each other."
+> — Anthropic, The new rules of context engineering for Claude 5 generation models, July 2026
+
+One request. Three layers. Two instructions you can't satisfy at the same time. The system prompt says one thing, a skill someone wrote six months ago says the opposite, and the user's request pulls a third way.
+
+<figure><img src="/posts/context-engineering/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/context-engineering/v2-svg-en.jpg" alt="The layers were written separately and contradict each other within a single request, and deleting over 80% of the prompt cost nothing on evals (Anthropic)" loading="lazy" /><figcaption>The layers were written separately and contradict each other within a single request, and deleting over 80% of the prompt cost nothing on evals (Anthropic)</figcaption></figure>
+
+## From the outside it doesn't look like a bug
+
+This is the sneaky part. Anthropic writes that Claude usually does reach the right answer, because it understands what the user wants. But it has to think harder about the overlapping and conflicting instructions before it decides what to do.
+
+No exception. No failing test. What you actually see is an agent that's a bit slower, a bit less consistent, and sometimes picks the wrong one of the two instructions. And you blame the model.
+
+There is one sign that's easy to miss: the problem grows over time. Every new skill and every new line in CLAUDE.md is another chance for a conflict. Nobody writes a contradicting instruction on purpose. It just accumulates.
+
+## The first fix: another rule
+
+The natural habit, and what Anthropic itself did, is to answer every bad behavior with a rule. The model added pointless comments? DO NOT add comments. The model didn't document? leave documentation as appropriate. Each of those rules made sense the day it was written. They say themselves that these rules "were once needed to avoid worst case scenarios". Together they turned into noise.
+
+Basically, it's tokenmaxxing in prompt form: we measure how much we covered, not how much we helped. Faros put it best in their guide: the goal isn't to maximize context, it's to make it relevant and usable.
+
+## The real cause: the model moved on, the context didn't
+
+The root wasn't one bad instruction. The rules were written for older models. Claude's 5th generation handles judgment and surrounding context fine, and the rules meant to guard against the worst case just block it. The headings in their post say it bluntly: Then: Give Claude rules. Now: Let Claude use judgement.
+
+On top of that, CLAUDE.md used to be a dumping ground for everything: memory, facts, guidelines. Today Claude Code also has memory, artifacts and skills, and each has its own way to load context only when it's needed. One huge file loaded on every request is no longer the right tool.
+
+So they deleted. More than 80%. And they measured. That's the part people miss when they only read the headline: they could delete only because they had an eval before and after.
+
+<figure><img src="/posts/context-engineering/src1.jpg" alt="Anthropic itself declares that yesterday's best practices have become myths, including the rules it wrote itself (credit: Claude blog)" loading="lazy" /><figcaption>Anthropic itself declares that yesterday's best practices have become myths, including the rules it wrote itself (credit: Claude blog)</figcaption></figure>
+
+## What to check this week
+
+First, run `/doctor` inside Claude Code. Anthropic put the best practices from the post in there, and it flags skills and CLAUDE.md files worth trimming.
+
+Then, count. This script walks every CLAUDE.md and SKILL.md in the repo and in the global directory, and shows how many words and how many shouted rules each one has:
+
+```bash title="audit-context.sh"
+#!/usr/bin/env bash
+# How many words and how many shouted rules are in each context file
+find . ~/.claude \( -name 'CLAUDE.md' -o -name 'SKILL.md' \) \
+  -not -path '*/node_modules/*' 2>/dev/null |
+while read -r f; do
+  words=$(wc -w < "$f" | tr -d ' ')
+  rules=$(grep -cE 'NEVER|ALWAYS|DO NOT|MUST|IMPORTANT' "$f")
+  printf '%6s words  %3s rules  %s\n' "$words" "$rules" "$f"
+done | sort -rn
+```
+
+What to look for in the output:
+
+- **The files at the top of the list.** Every word there gets loaded on every request, even when it's irrelevant to the task.
+- **The rules column.** Every NEVER or ALWAYS is probably a rule written after an incident. Ask whether that incident still happens with the model you run today.
+- **The same topic in two places.** Run `grep -ri comment` across all the files and see whether the system prompt, a skill and CLAUDE.md say different things. If they do, keep one.
+
+Then the rule that turns this from cleanup into improvement: run the same 10–20 tasks before and after the deletion. Real tasks from the backlog, the same definition of success, the same model. Without a number before and after, you're not trimming context, you're guessing.
+
+> **Caveat:** The 80% is Anthropic's, on their coding evals and their newest models. If you're still on an older model or an open model, some of these rules are probably still doing work. I wouldn't delete a line without an eval of my own.
+
+The cheapest improvement you can give your agent this week is a deletion. But only if you know how to measure what you lost.

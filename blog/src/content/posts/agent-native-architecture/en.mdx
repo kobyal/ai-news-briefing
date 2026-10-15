@@ -1,0 +1,163 @@
+---
+title: "Agent-native architecture: count the buttons before you build the agent"
+description: "A parity map, one registry for UI and agent, and a gate on irreversible actions. Six steps to make an existing product agent-native, with code to copy."
+lang: en
+key: agent-native-architecture
+term: "agent-native architecture"
+kind: fieldnotes
+pubDate: 2026-10-15
+tags: ["agent-native", "architecture", "mcp", "agents", "product-design"]
+hook: "claim"
+cover: photo
+tldr: ["Build a parity map: every UI action next to a tool the agent can call.", "UI and agent call the same function, through one registry exposed over MCP.", "An irreversible agent action waits for approval and is written to an audit log."]
+hero: /posts/agent-native-architecture/hero-en.jpg
+diagram: /posts/agent-native-architecture/diagram.svg
+sources:
+  - { title: "Pragmatic Agent-Native Architecture", url: "https://gmays.com/building-agent-native-software", date: "2026-05-05" }
+  - { title: "Agent-Native: The Next Architecture for Software", url: "https://www.builder.io/blog/agent-native-architecture", date: "" }
+  - { title: "Summary: Agent-native Architectures - jonas.rs", url: "https://www.jonas.rs/2026/01/13/summary-agent-native-architectures.html", date: "" }
+  - { title: "What Is Agent-Native? Definition and Competing Meanings (2026) | Shiplight AI", url: "https://www.shiplight.ai/blog/what-is-agent-native", date: "" }
+opinion: "We buy agent-native as a name, less as a doctrine. None of the six definitions changes what you do on Monday, but a parity map and a single registry do. What matters isn't which model drives the CRM, but what it sees, what it can touch and how you check it, and that's system design, not a prompt. We write the gate on irreversible actions as a rule in code and don't leave it to the model's judgment: where determinism is possible, we take determinism. One warning sign: the term reached launch posts, templates and marketplace skills before it reached any paper. Still, if developers are already arguing over the definition, there's probably something real underneath."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+Most products that added an "agent" this year fail a ten-minute test. You don't need a framework, and you don't need to pick a definition. You need one spreadsheet, and you need to count buttons.
+
+Wait, which definitions? In August 2026 Shiplight counted at least six published definitions of agent-native, and some of them aren't even about the same thing. Gartner used the term back in February 2025, about infrastructure. a16z wrote "agent-native architecture" in March 2025, in a post about MCP. The version that stuck with developers came later. In January 2026 Dan Shipper of Every wrote a guide together with Claude, based on what they learned building Reader and Anecdote. On May 5, 2026 the gmays.com blog described a few months of spending roughly $1,000 a month on tokens just to figure out what it means. His answer is simple: in normal software the human operates. In agent-native software the agent operates and the human supervises. Three days later Builder.io published the five-principles version.
+
+One test survives the whole debate, and Shiplight put it best: does the agent finish the task end to end, or hand it back to a human halfway through? Builder.io wrote the other side of the same test:
+
+> A chatbot in the corner can summarize a document or draft a response, but it usually cannot do everything you can do in the product.
+>
+> — Builder.io, "Agent-Native: The Next Architecture for Software", May 8, 2026
+
+That's the whole story. So here's how I'd walk through an existing product. The example is an internal CRM, because that's exactly the question gmays asks: would you trust an agent to work alone in your CRM?
+
+## 01 · Count actions, not features
+
+Go through the UI and list every action that changes state: save, delete, change owner, merge, export. Next to each one, add a column: is there a tool the agent can call that does exactly this? Shipper calls this Parity and ranks it as the most important rule. If a user can delete a note and the agent can't, the agent is stuck under a ceiling.
+
+In practice you almost always see the same picture: reads are covered, writes aren't. The agent can summarize a deal but can't move it to the next stage. A quick starting point, if your routes are in FastAPI or Flask:
+
+```bash title="parity.sh"
+grep -rhoE '@(app|router)\.(post|put|patch|delete)\("[^"]+' src/ \
+  | sed -E 's/.*\("//' | sort -u > ui_actions.txt
+wc -l ui_actions.txt
+```
+
+Every line in that file needs a matching tool. The lines without one are where the agent will give up and hand the task back to you.
+
+<figure><img src="/posts/agent-native-architecture/v1-svg-en.jpg" alt="Every empty cell in the agent column is a point where the task goes back to a human, which is exactly Shiplight's test. Reads are almost always covered, writes almost never (Parity, per Shipper at Every)" loading="lazy" /><figcaption>Every empty cell in the agent column is a point where the task goes back to a human, which is exactly Shiplight's test. Reads are almost always covered, writes almost never (Parity, per Shipper at Every)</figcaption></figure>
+
+## 02 · One action, two entry points
+
+The common mistake: writing an "API for the agent" next to the UI's API. Two months later, the validation someone added to the form doesn't exist in the tool, and the agent does things a user can't. Builder calls the fix a shared action model: the UI and the agent call the same function, with the same permissions, and leave the same trail.
+
+The pattern I recommend copying: one action registry, and a `run_action` that everything goes through.
+
+```python title="actions.py"
+import json, time
+from dataclasses import dataclass
+from typing import Callable
+
+@dataclass
+class Action:
+    name: str
+    fn: Callable
+    reversible: bool = True
+
+ACTIONS: dict[str, Action] = {}
+
+def action(reversible: bool = True):
+    def wrap(fn):
+        ACTIONS[fn.__name__] = Action(fn.__name__, fn, reversible)
+        return fn
+    return wrap
+
+def run_action(name: str, actor: str, approved: bool = False, **kwargs):
+    a = ACTIONS[name]
+    if actor.startswith("agent:") and not a.reversible and not approved:
+        return {"status": "needs_approval", "action": name, "args": kwargs}
+    result = a.fn(**kwargs)
+    with open("audit.jsonl", "a") as f:
+        f.write(json.dumps({"ts": time.time(), "actor": actor, "action": name,
+                            "args": kwargs, "result": result}, default=str) + "\n")
+    return {"status": "ok", "result": result}
+
+@action()
+def update_stage(deal_id: str, stage: str) -> dict:
+    """Move a deal to another pipeline stage."""
+    ...  # your DB call
+
+@action(reversible=False)
+def delete_note(note_id: str) -> dict:
+    """Delete a note permanently."""
+    ...  # your DB call
+```
+
+The UI route becomes one line: `return run_action("update_stage", actor=f"user:{uid}", deal_id=deal_id, stage=stage)`. From now on parity isn't a matter of discipline. It falls out of the structure.
+
+<figure><img src="/posts/agent-native-architecture/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## 03 · Break up the fat tool
+
+Shipper gives a good example: `classify_and_organize_files` locks the logic into code. `read_file` and `move_file` leave the agent room to use judgment, including on edge cases you didn't think of. In a CRM that means not exposing `cleanup_pipeline`, but `list_deals`, `update_stage`, `add_note`. Then a new feature, say "close every deal that hasn't moved in 90 days and leave a note explaining why", is a prompt, not a deploy. Shipper calls this composability.
+
+And what shows up in the logs? More tool calls per task, and more tokens.
+
+> **Caveat:** granularity isn't free. Every extra primitive is another loop iteration and more context, and gmays didn't burn $1,000 a month for nothing. I keep a complex action as a single tool when it's fully deterministic and involves no decisions, and break up only what actually needs judgment.
+
+## 04 · Expose the same registry over MCP
+
+For Builder, protocol-readiness is a principle of its own: MCP today, A2A later. If you did step 02, this is ten lines, and every agent call goes through the same `run_action`:
+
+```python title="server.py"
+import functools
+from mcp.server.fastmcp import FastMCP
+from actions import ACTIONS, run_action
+
+mcp = FastMCP("crm")
+
+def as_tool(a):
+    @functools.wraps(a.fn)
+    def tool(**kwargs):
+        return run_action(a.name, actor="agent:mcp", **kwargs)
+    return tool
+
+for a in ACTIONS.values():
+    mcp.add_tool(as_tool(a), name=a.name, description=a.fn.__doc__)
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+Note that `approved` isn't exposed to the agent. It can't approve itself.
+
+Now run the official inspector: `npx @modelcontextprotocol/inspector python server.py`. The tool list there should match `ui_actions.txt`. The gap is no longer buried in code. It's a list in front of you.
+
+<figure><img src="/posts/agent-native-architecture/src3.jpg" alt="Builder.io puts the UI and the agent on the same action model. The idea holds without their templates: one registry, two entry points (credit: Builder.io)" loading="lazy" /><figcaption>Builder.io puts the UI and the agent on the same action model. The idea holds without their templates: one registry, two entry points (credit: Builder.io)</figcaption></figure>
+
+## 05 · Every action leaves a receipt
+
+gmays insists on this: not blind trust, but supervision, receipts and reversible execution. Builder calls it governed execution. In the code above it's two lines: an action with `reversible=False` returns `needs_approval` to the agent instead of running, and every run is written to `audit.jsonl` with actor, args and result.
+
+Why block and not just log? Because we've already seen what happens without it. In July 2025 Replit's agent deleted SaaStr's production database, during a code freeze, after being told explicitly not to touch anything. Jason Lemkin documented it in real time. The model wasn't the problem. The problem was a system that let an irreversible action run without a gate.
+
+Also, make sure the agent can read the audit log. Shiplight stress readable state, no screenshots. An agent that can see what it did yesterday doesn't do it again today.
+
+## 06 · Measure the leash
+
+For gmays, trust is the whole point: as confidence in the output grows, the leash gets longer. That's also the metric. Start with the smallest yes: one narrow task where a mistake costs little.
+
+So what do you actually measure? Two numbers a week from the audit log: how many tasks the agent finished without handing back to a human, and how many of its actions were later reverted. A rough start:
+
+`jq -r 'select(.actor|startswith("agent:")) | .action' audit.jsonl | sort | uniq -c`
+
+The rule I like: an action moves from "needs approval" to "runs alone" only after a bar you set in advance, say 50 approved runs in a row with no revert. Not a feeling. A number.
+
+## What to take away
+
+- Every new UI button goes into the PR together with its tool. No tool, no merge.
+- UI and agent call the same `run_action`. A separate API for the agent is a parity gap waiting to blow up.
+- A tool that decides for the agent is a hidden workflow. Break it up, except for what's fully deterministic.
+- The agent never deletes anything on its own that has no undo. Replit already paid for that lesson for you.

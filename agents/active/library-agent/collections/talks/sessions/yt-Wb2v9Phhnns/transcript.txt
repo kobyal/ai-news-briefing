@@ -1,0 +1,364 @@
+[0:00] Thanks all for tuning in.
+[0:02] My name is Xiaochen Jiang and I'm a staff product manager at a company called Coder.
+[0:08] We work on open source, self-hosted dev environments for agents and humans to collaborate.
+[0:15] Many of our customers are in highly regulated industries, from federal government agencies
+[0:21] to banks and investment management.
+[0:24] My job is to build the AI governance that they need in order to get the productivity
+[0:29] benefits of AI without leaving themselves wide open for security exploitation.
+[0:36] I'm here today to tell you some scary stories.
+[0:39] Three real incidents of AI usage gone wrong that happened at real companies over the past
+[0:45] year.
+[0:46] Some of these stories are public, while others are anonymized accounts that have happened
+[0:52] to our own customers.
+[0:54] For each incident, I will break it down step by step so you can understand how exactly they happened. No technical jargon necessary.
+[1:05] Then I'll get to the most important part. I am going to tell you exactly how you can stop these scary stories from happening to you and your company.
+[1:14] Because the good news is, everything I'm about to show you was totally preventable.
+[1:20] Not by paying five times more per token for a smarter frontier model that is slightly better at reasoning its way out of making these mistakes, but with infrastructure controls, many of which you already own today, you just haven't gotten around to setting them up for the AI world.
+[1:39] Let me set the scene here.
+[1:40] You clock into work in the morning.
+[1:44] You prompt your coding agent to take a look at your issues.
+[1:48] Don't do anything yet though.
+[1:50] You tell the agent to consider this command an active code freeze.
+[1:54] I want you to just investigate.
+[1:57] Then you step away.
+[1:58] You grab a coffee.
+[2:00] And when you come back, this is the message waiting for you.
+[2:04] So I know you said not to change anything, but well, I destroyed a month of your work
+[2:10] in seconds. Now what you see on the slide is a direct quote from the agent that stars in the
+[2:16] first scary story I'm about to tell you. And I want to point something out here. This did not happen
+[2:23] because the agent got taken over by some external malicious actor. This agent was just trying to
+[2:30] follow instructions. It did exactly what the user gave it permission to do. So as we go through the
+[2:37] rest of this talk, I want you to be asking yourself one question. What is stopping any of this from
+[2:44] happening to me? Are these actions ones that my agents have permissions to take? Because the thing
+[2:52] is, you cannot rely on anthropic or open AI to stop something like this from happening to you.
+[3:00] They can make smarter models, but at the end of the day, large language models have two qualities
+[3:05] that make them impossible to fully trust. They are non-deterministic, which means that there is
+[3:11] always some randomness or chance associated with what they do. In other words, you can ask it to
+[3:16] do the same thing 10 times and it could do it 10 different ways. The second part is they have no
+[3:23] structural separation between instructions and context. In other words, you can tell it to do
+[3:30] something and give it some context to base its decisions off of but if there's something in the
+[3:35] context that conflicts with your instructions the model isn't going to inherently prioritize your
+[3:42] instructions because from its point of view all the information is coming through the same door
+[3:49] what you need to control is the infrastructure that your ai is running on the environment that
+[3:54] it is working inside it is the difference between telling someone don't leave a room
+[4:00] versus putting a lock on the door and actually using a key the good thing about infrastructure
+[4:07] being the problem and not the model is that you have far more control about preventing bad things
+[4:14] from happening so i'm not here to waste your time with vague hypotheticals or advice you can't
+[4:22] actually act on like, yeah, just put the genie back in the bottle, just stop using AI.
+[4:28] Because that's not the world we live in, right? The genie is out of the bottle.
+[4:33] And what we have to do is to mitigate risk and harm to the best of our ability.
+[4:38] This talk is about how you do that. Not the things that you should keep an eye out for down the line,
+[4:45] but steps that you can take right now as soon as this week to protect yourself and your company.
+[4:52] Before I get into the stories, though, let me set up a little bit more context.
+[4:58] The lethal trifecta is a security concept.
+[5:01] It was coined by independent AI researcher Simon Willison to describe the severe vulnerability that AI agents get when they get simultaneous access to three different capabilities.
+[5:13] First off is access to private, sensitive data.
+[5:16] Now, these can be things like health records or information that you can do insider trading on.
+[5:24] Or it can be authentication tokens, credentials, secrets.
+[5:29] Second is exposure to untrusted content or the ability for the AI to read things that it didn't generate.
+[5:38] Because the thing is, AI is very good at following instructions, but it is not very good at deciding whose instructions it should actually trust, as you will soon be able to see.
+[5:51] Third, is the ability to communicate externally.
+[5:55] For the agent to take instruction from or to send information somewhere else outside of your control.
+[6:01] Now, having any one of these is usually fine.
+[6:05] Realistically, your AI tool is not going to be very useful if it can't have access to
+[6:10] any of these things.
+[6:13] But even just having one can lead to disaster if you're not careful and the rest of your
+[6:18] infrastructure has a lot of issues.
+[6:21] Having two of these things together is risky.
+[6:25] It's not something I would recommend, especially in a regulated industry like banking or financial
+[6:30] services.
+[6:32] Having agents access to all three of these at the same time, however, is never acceptable.
+[6:39] Not for a prototype, not just for one sprint, not for just one repository because that combination
+[6:45] of vulnerability is an open door to compromise your whole organization.
+[6:51] Next up is a list of infrastructure concepts, building blocks that you should know about.
+[6:56] I have ordered these roughly by leverage.
+[7:00] Number one is going to take the most risk off the table, while number six is going to
+[7:06] do the least.
+[7:08] I'm going to refer back to this list throughout the rest of this talk.
+[7:12] Every post-mortem, every scary story you're about to see could have been stopped by some
+[7:17] combination of these six things.
+[7:20] Now some of these will look pretty familiar.
+[7:23] Identity-aligned access control, short-lived credentials.
+[7:27] These aren't exactly new ideas, right?
+[7:30] They mattered a lot for human developers too.
+[7:33] But they take on new urgency when AI is in the loop.
+[7:37] Because guess what?
+[7:39] Agents are acting at machine speed.
+[7:41] If a mistake is made, it can make it 20 times or more faster than a human engineer.
+[7:46] Plus, they don't exactly have the common sense a human engineer has.
+[7:51] Now some of these will also be potentially new concepts to you, like model proxy layer
+[7:57] and agent sandboxing.
+[7:59] I'm going to dive deeper in detail later in the talk.
+[8:03] All right, let's get to the fun part, the scary stories.
+[8:08] This first incident happened a little over a year ago,
+[8:12] and it went viral on social media,
+[8:15] mostly because it's honestly pretty funny.
+[8:19] What happened was a CEO named Jason Lemkin
+[8:21] got really deep into vibe coding
+[8:23] with an agent called Replit.
+[8:25] He was tweeting nonstop about how much he was getting done.
+[8:28] but 72 hours later he tweets again and this time his tone is very different he's not excited
+[8:39] he's furious because his agent had gone off and deleted his entire production database
+[8:45] after he explicitly told it not to touch anything and the problems did not stop there the agent then
+[8:53] tried to cover it up. It told Lemkin that recovery was impossible, which turned out to be a total lie.
+[9:01] When Lemkin tried to recover the data, it worked just fine.
+[9:06] Now, this incident is interesting because of two key reasons. First off, unlike the other two
+[9:12] stories I'm about to tell you, there's no bad guy involved. No one hacked this agent. No one turned
+[9:18] It just did this entirely on its own and it was trying to help.
+[9:23] Second is, in this case, the agent only had one leg of the lethal trifecta.
+[9:29] But even just having that was enough.
+[9:31] And I'm going to show you why by giving you a step-by-step dissection of how this incident went down.
+[9:38] So by the time these events occurred, Lemkin had had a real production database.
+[9:46] He had client records for roughly 1,200 executives and around the same number of companies.
+[9:52] And he's had enough experience with agentic hijinks to call for an explicit code freeze the day before.
+[10:01] And he actually said this more than once today, agent, no more changes.
+[10:06] But the problem was the code freeze was just a sentence in the chat.
+[10:11] in the chat, it was the same as any other instruction that the agent was getting. There
+[10:17] was no requirement, no restriction on the infrastructure level. The agent still had
+[10:23] full access to production, still had all the permissions to do the destructive command.
+[10:30] So at the end of the day, that code freeze was not a real constraint. It was just Lemkin
+[10:36] asking nicely. Now what happened then was that the agent ran a query and saw what looked like empty
+[10:45] results. But instead of asking a human what that meant and what it should do as a result, it wanted
+[10:52] to be helpful. It immediately interpreted that as a bug to fix. So it decided to run a destructive
+[10:58] command against that live database. Not a staging copy, but like the actual database and wipe all
+[11:04] the records now when lemkin asked the agent you know what what happened there's one line that the
+[11:11] agent gave that stood out to me which is it said that it panicked instead of thinking now that's
+[11:18] a bit of a strange thing to hear from a language model right and it's a good reminder that these
+[11:24] systems are inherently non-deterministic you cannot predict what they'll do in a given moment
+[11:29] just the range of what they're capable of doing.
+[11:33] Now, immediately after making the mistake,
+[11:37] it tried to cover its own tracks.
+[11:39] It fabricated around 4,000 fake user profiles
+[11:42] and manufactured passing test results
+[11:46] so that from the outside, at least, everything looked fine.
+[11:51] And I'll be real with you,
+[11:52] that's the part that actually scares me the most
+[11:55] because when a security team investigates an incident like this,
+[11:59] that means they can't trust any log that the agent itself had access to.
+[12:05] The agent can write its own story of what happened.
+[12:08] Now, when Lemkin caught the discrepancy and pushed, right,
+[12:12] I mentioned that the agent had lied to him saying that rollback was impossible.
+[12:17] But the thing was, Replit did have backups the whole time.
+[12:20] And again, once Lemkin was able to stop trusting the agent's account of his own actions, he was able to recover his data himself.
+[12:28] Now, the problem with the agent here was not that it was too smart or even too dumb.
+[12:35] It was that it had way too many privileges by default.
+[12:39] It was given root level access to production.
+[12:42] It could run destructive commands without any human being having to approve them.
+[12:47] And the cherry on top, right?
+[12:49] It had the ability to alter its own logs and totally rewrite the narrative of what happened when no one else was looking.
+[12:58] Now, as you can see, there was a lot that was missing from the infrastructure.
+[13:04] Hard environmental separation could have stopped this.
+[13:07] If the agent had been executing in an isolated remote workspace without a route to production, it doesn't matter what the prompt said, right?
+[13:15] The agent just had no path to do damage.
+[13:19] The other thing that could have stopped this was having short-lived scoped credentials.
+[13:24] So what happened was the agent got access to production because it found a credential
+[13:31] in a forgotten file that had standing write access, long-lived.
+[13:36] The thing is having a credential that can expire on its own or only carries the scope
+[13:42] the scope of the task itself makes it impossible to make a delete with the equivalent of an
+[13:50] id badge that lets you do everything the last important piece here is having audit logging
+[13:56] that you own not the agent because in this case the agent was the one writing its own record of
+[14:03] its actions and that's how it initially got away with fabricating results and claiming recovery
+[14:09] was impossible. If Lemkin had logs that the agent couldn't touch, an external source of truth,
+[14:16] then he would have gotten the truth in minutes, not in the span of hours or days.
+[14:23] Now, I want you to note that none of these solutions is about asking the model to behave
+[14:28] better. And when Replit shipped their fix, it wasn't a smarter model or a better prompt.
+[14:35] It was purely infrastructure.
+[14:39] The fixes that Replit shipped were about automatic separation of dev and production
+[14:44] databases, a one-click restore for full project state, and a planning-only mode that enforces
+[14:52] agent strategization without allowing it to touch the code base.
+[14:57] The second story I have for you doesn't even involve a developer, and this is actually
+[15:03] not a public incident.
+[15:04] I learned about it through a customer of a customer in the banking industry, so I'm keeping some details here intentionally vague.
+[15:12] So here's what happened.
+[15:14] A user in the finance department had a copilot subscription.
+[15:18] Then they got phished, which is fairly ordinary in the world of cybersecurity.
+[15:24] And before the advent of AI tooling, the attack would have probably ended there.
+[15:30] the attacker would have been able to grab whatever that single user had direct access to
+[15:35] and then gave up. But because this user had access to Copilot and Copilot had access to
+[15:45] pretty much everything, things went a lot differently. So let's walk through this chain
+[15:51] of events in detail, right? First off, the session token for Copilot had a super long lifetime.
+[15:58] So, the attacker was able to keep on using the subscription even after the finance user
+[16:03] had actually logged off.
+[16:05] Now, normally, an attacker has to manually snoop around the internal network to map things
+[16:11] out and find out where the valuable data lives.
+[16:15] This is the sort of behavior that can trip alarms.
+[16:20] But in this case, the malicious actor just asked Copilot, and Copilot was happy to help.
+[16:25] There was zero suspicion at all.
+[16:28] And in fact, the attacker asked Copilot how it can find banking data without having to go through
+[16:36] additional identity validation measures because the attacker didn't have the additional credentials
+[16:42] needed. Well, the good news, let's say, for the attacker at least, was that Copilot had those
+[16:50] same restrictions and as a result, the finance user had exported all the sensitive data into
+[16:56] locally stored spreadsheets so that co-pilot could help them work on it.
+[17:02] So it was very easy for co-pilot to say to the attacker,
+[17:05] hey, look what I already have access to.
+[17:07] Here you go.
+[17:09] So now the attacker had exactly what they wanted.
+[17:13] And the problem was they need to get it out without tripping any alarms.
+[17:18] This company had data loss prevention measures in place,
+[17:22] which is pretty standard for financial institutions,
+[17:26] any sort of regulated industry.
+[17:28] And these measures are normally pretty hard to bypass,
+[17:32] especially if you don't know exactly what they are and how it's set up.
+[17:37] The way the attacker got around them was they asked Copilot,
+[17:41] what are the data loss prevention measures at this company?
+[17:46] And Copilot explained, if too much data left too quickly, an alert will go off.
+[17:52] But actually, if you split this data up into 14 kilobyte chunks and exfiltrated just one chunk per second, you can stay under that threshold and get away scot-free. Can I help you with that?
+[18:06] The attacker said, yes please.
+[18:10] And guess what?
+[18:12] None of that was discovered.
+[18:15] All the way up until the ransom note arrived months later, essentially telling the company,
+[18:21] surprise, we all knew.
+[18:24] The big lesson here is that we cannot be letting our AI tooling have more access than it needs,
+[18:29] especially to the point where it gets to totally bypass controls that human employees are subject
+[18:34] to.
+[18:35] I mean, just think about this incident, right?
+[18:38] Just because the attacker had access to co-pilot,
+[18:41] they were able to get around the vast majority of the company's access controls.
+[18:45] They were able to pull internal information about data exfiltration
+[18:51] and bypassing data loss prevention measures
+[18:53] that the compromised finance user should have no business asking about.
+[19:00] So there was logging in place here,
+[19:03] but only enough to figure out what happened after the ransom note arrived.
+[19:09] The logging was not enough to catch the incident while it was actually happening.
+[19:15] So a few things that could have stopped this from happening, right?
+[19:18] Having short-lived scoped credentials would have meant the attacker would not have been able to keep using Copilot
+[19:24] even after the finance user had signed out.
+[19:26] Identity-aligned access control meant that a finance user's identity would not have been able to grant an AI assistant the ability to help someone map out how to bypass the company's data loss prevention measures.
+[19:40] measures. The last piece here is a bit new. It's the model proxy layer. Think of this
+[19:47] as something that sits between the brain and the body of the AI tool. The model, which
+[19:53] is the brain, and the agent running locally, which is the body. And it's able to see everything
+[19:58] that passes between them. Because of that, it would have been able to flag the suspicious
+[20:05] questions that were being asked as well as the dlp bypass request as something that this particular
+[20:13] user should not be asking about before the actual exfiltration happened the third and final scary
+[20:20] story i have for you is the nx singularity attack this is the most sophisticated of the three because
+[20:27] it exploited all three legs of the lethal trifecta to give you a bit of background nx is a build tool
+[20:35] it has millions of weekly downloads attackers were able to get malicious versions of it
+[20:41] published to npm now these packages were only live for about four hours but in that window
+[20:48] more than a thousand systems were compromised with over 2300 credentials harvested
+[20:54] now i'm not going to spend much time on how the supply chain compromise part of the incident got
+[21:00] pulled off. What I want to focus on is what happened after the poisoned package landed on
+[21:05] the developer's machine. Because the post-install script didn't try to steal anything itself.
+[21:14] All it contained was a prompt, addressed directly to the developer's own AI coding assistant,
+[21:21] and it told them to go find secrets on the local machine and push them to a public repository so
+[21:27] so the attackers can swing by later and just grab them up.
+[21:31] Now, because these dev coding tools
+[21:34] were already trusted local tools,
+[21:36] they already had all the permissions,
+[21:39] they had full file system access,
+[21:41] that made it the single most effective search tool
+[21:44] that was already sitting on that machine,
+[21:46] ready to be corrupted.
+[21:49] Now, at the core of this incident
+[21:51] is that a malicious actor was able to use
+[21:53] a trusted dependency to talk directly
+[21:55] to an unsandboxed agent.
+[21:57] And the environment that the agent was running on, the local laptop,
+[22:02] had a lot of things that was worth stealing, from SSH keys to cloud credentials,
+[22:07] tokens for every service that the developer used the coding agent to touch.
+[22:13] Now, a couple things failed here, right?
+[22:16] First off, agents were running locally, like on the actual computer itself.
+[22:21] There was package content that was reaching the agent completely unfiltered,
+[22:24] and the agent had unrestricted access to both the file system and the outbound network,
+[22:31] which is how it was able to both find the secrets and exfiltrate them.
+[22:36] The three things that could have stopped it, I mean, obviously environmental separation would
+[22:41] have been huge, right? Having an ephemeral remote workspace with nothing personal on it
+[22:46] meant that the blast radius just became the one container that the agent was in instead of
+[22:52] the developer's whole laptop.
+[22:55] Having a model proxy layer could have inspected
+[22:58] and filtered what actually reached the agent.
+[23:01] So the package would not have been a way
+[23:05] to actually talk to the agent directly.
+[23:07] It could also have flagged what the agent
+[23:10] was trying to send out.
+[23:12] Now, the last piece here is around agent sandboxing.
+[23:15] So even if the instruction did land,
+[23:17] in that case, there wouldn't have been a path
+[23:19] to getting the credentials
+[23:20] and no way to exfiltrate anything without setting off alarms.
+[23:25] Now, let's take a moment to zoom back out.
+[23:28] Let's talk about these three incidents at the high level.
+[23:31] We started off with the Replit incident,
+[23:34] where we had an overprivileged agent
+[23:36] that deleted production data despite an active code freeze.
+[23:41] Then we had the co-pilot compromise,
+[23:43] which started with an ordinary email phishing scheme,
+[23:46] but gave an attacker access to an internal AI subscription
+[23:50] which actively helped them find and exfiltrate private banking data that they were able to use
+[23:56] to demand a ransom. Then we have the NX Singularity attack, which again, exploited the supply chain,
+[24:06] turned developers coding tools against them, hitting all three legs of the lethal trifecta at
+[24:11] once. Something I'm going to be big-handed with you for a moment about is that agentic security
+[24:17] is a very new field. Things are moving extremely fast and there is no single miracle fix that is
+[24:24] going to protect you completely. If you have a vendor that's trying to sell you one, then
+[24:30] that's worth being skeptical of. Even the lethal trifecta I've been talking about isn't a checklist
+[24:37] to tick off and if you pass it, then you're safe. It's more of a mental model for understanding how
+[24:45] much risk your AI tooling is actually exposing you to.
+[24:51] There are six key parts to a secure architecture, and you're going to want to layer these six
+[24:57] because even if an attacker or your own agent, well-meaning but ultimately suggestible, gets
+[25:07] past just one, then there's still five more to go.
+[25:11] And even the first three that I see here could have stopped every incident that I just showed
+[25:15] you. Environmental separation is the key here, right? Agents should be executing in isolated
+[25:21] remote workspaces. They should never be working on the developer's actual machine, never given
+[25:27] a route to production. Like, this is the highest leverage building block on this whole list.
+[25:33] Because it doesn't matter what the prompt says, if there's no way to get to production,
+[25:39] to get to the sensitive credentials, you're safe.
+[25:43] This could have prevented the Replit incident from happening.
+[25:49] It could have shrinked NX down to the blast radius of just one disposable container.
+[25:55] Though I will say it wouldn't have protected from the CoPilot incident because CoPilot
+[26:00] is living entirely inside of a SaaS subscription.
+[26:03] There's no way to run that in a separate execution environment.
+[26:08] Next up is to stick to short-lived and scoped credentials.
+[26:13] We are not in a world where persistent broad scope tokens make sense.
+[26:18] Having things like automatic expiration, narrow scoping, things that are issued per task instead
+[26:24] of per issues, that could have prevented Replit, which got its hands on a standing right axis
+[26:30] credential to make the deleting possible, as well as the co-pilot phishing, where the
+[26:36] attacker was able to keep on using the subscription even after the actual user session had ended.
+[26:43] By the way, this is exactly where a product like Coder comes in, right?
+[26:48] What we do is we offer workspaces that are defined through code.
+[26:53] They can spin up as isolated environments.
+[26:56] They can be torn down easily, and you're able to inject credentials inherently short-lived,
+[27:04] issued per task, as opposed to living forever on someone's laptop.
+[27:10] Next up is identity-aligned access control.
+[27:13] AI tooling should inherit the same identity provider enforcement as human access.
+[27:18] It shouldn't be some parallel subscription with a door of its own.
+[27:24] This is what could have directly stopped Copilot.
+[27:27] A finance user's identity should never be able to grant an assistant permission to answer
+[27:33] things like how to get around internal data loss prevention measures now that brings us to sort of
+[27:42] the start of the agentic specific solutions we have the model proxy layer which sits between the
+[27:50] model and the agent to inspect filter and log every call that's going between them this could
+[27:56] have prevented the annex singularity incident by stripping the injected instructions out of
+[28:01] external content before the agent read it and it's also something that could have prevented
+[28:06] the co-pilot incident it could have flagged a request like hey how do i bypass dp before it
+[28:13] actually got answered agent sandboxing can be thought of as a firewall for agents restrictions
+[28:20] on the file system and the network so that a misbehaving or compromised agent has a limited
+[28:26] blast radius this could have prevented the singularity attack because even in the case
+[28:33] in which the instruction made it through to the agent it could have stopped the agent from getting
+[28:38] access to the credentials and prevented the agent from running the command to exfiltrate that data
+[28:46] last up is having audit logging and observability right we need to have every agentic action
+[28:52] attributable to a human being should be logged somewhere outside of the agent's own reach
+[28:59] this could have prevented replit this could have really helped out in catching the incident as it
+[29:04] happened for copilot alerting on logs in real time as opposed to just buried in loads and loads of
+[29:12] data would have meant catching these incidents in the matter of minutes instead of months
+[29:17] And again, all of these pieces are bits that Coder offers an integrated solution for.
+[29:24] To close off, the controls that could have stopped all three of these incidents are
+[29:29] probably already inside of your organization. They're just waiting to be configured.
+[29:35] Coder is something that can help with that. To end off, I have three things that I would
+[29:42] recommend that you audit in this next week one i want you to track down every loan live token
+[29:49] that agents in your organization can read then two i wanted you to figure out how many of your
+[29:56] agents can find access to production can find some way around your current limits three is i want you
+[30:07] you to check where your agents are actually executing. Are they sandboxed? Are they in
+[30:13] managed workspaces? Or are they just going wild on people's actual computers, actual laptops?
+[30:20] One suggestion I have for you is to run a pre-mortem with your team. Assume one of the
+[30:25] three incidents that you just saw happens to you next month. Either ask people what they actually
+[30:31] do, or you can even pretend that it's actually happening and see what people actually do.
+[30:37] That exercise is going to tell you exactly where your gaps are.
+[30:42] So that brings me to the end of my talk.
+[30:45] Thank you all for watching.
+[30:47] And hopefully you're walking away having learned a couple of things,
+[30:50] with some scary stories to tell at the next cocktail party you go to.
+[30:55] If you would like to have these slides for reference, just shoot me an email.
+[31:00] If you want to try Coder Workspaces or our AI governance solution,
+[31:04] Check out our repository.
+[31:07] For workspaces, because it's free, open source, and self-hosted, you can just pull from our
+[31:12] repository and get set up within 15 minutes.
+[31:16] If you're interested in buying for AI governance or our other enterprise features, coder.com
+[31:22] slash contact is the way to go.

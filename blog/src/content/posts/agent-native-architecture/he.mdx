@@ -1,0 +1,163 @@
+---
+title: "Agent-native architecture: קודם סופרים כפתורים, אחר כך בונים agent"
+description: "מפת parity, registry אחד ל-UI ול-agent, ושער לפעולות בלתי הפיכות. שישה שלבים להפוך מוצר קיים ל-agent-native, עם קוד להעתקה."
+lang: he
+key: agent-native-architecture
+term: "agent-native architecture"
+kind: fieldnotes
+pubDate: 2026-10-15
+tags: ["agent-native", "architecture", "mcp", "agents", "product-design"]
+hook: "claim"
+cover: photo
+tldr: ["תעשו מפת parity: כל פעולה ב-UI מול tool שה-agent יכול להפעיל.", "UI ו-agent קוראים לאותה פונקציה, דרך registry אחד שחשוף ב-MCP.", "פעולה בלתי הפיכה של agent מחכה לאישור ונכתבת ל-audit log."]
+hero: /posts/agent-native-architecture/hero.jpg
+diagram: /posts/agent-native-architecture/diagram.svg
+sources:
+  - { title: "Pragmatic Agent-Native Architecture", url: "https://gmays.com/building-agent-native-software", date: "2026-05-05" }
+  - { title: "Agent-Native: The Next Architecture for Software", url: "https://www.builder.io/blog/agent-native-architecture", date: "" }
+  - { title: "Summary: Agent-native Architectures - jonas.rs", url: "https://www.jonas.rs/2026/01/13/summary-agent-native-architectures.html", date: "" }
+  - { title: "What Is Agent-Native? Definition and Competing Meanings (2026) | Shiplight AI", url: "https://www.shiplight.ai/blog/what-is-agent-native", date: "" }
+opinion: "אנחנו קונים את agent-native כשם, פחות כתורה. אף אחת משש ההגדרות לא משנה מה תעשו ביום שני, אבל מפת parity ו-registry אחד כן. מה שקובע הוא לא איזה מודל מפעיל את ה-CRM, אלא מה הוא רואה, במה הוא נוגע ואיך בודקים אותו, וזה עיצוב מערכת ולא prompt. את השער לפעולות בלתי הפיכות אנחנו כותבים כחוק בקוד ולא משאירים לשיקול הדעת של המודל: איפה שאפשר דטרמיניזם, לוקחים דטרמיניזם. וסימן אזהרה: המונח הגיע לפוסטי השקה, לתבניות ול-skills במרקטפלייסים לפני שהגיע לאיזשהו מאמר. מה שכן, אם מפתחים כבר מתווכחים על ההגדרה, כנראה שיש מתחת משהו אמיתי."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+רוב המוצרים שהוסיפו השנה "agent" לא עוברים מבחן של עשר דקות. לא צריך framework, ולא צריך להכריע בין הגדרות. צריך גיליון אחד, ולספור כפתורים.
+
+רגע, איזה הגדרות? Shiplight ספרו באוגוסט 2026 לפחות שש הגדרות שפורסמו ל-agent-native, וחלקן בכלל לא מדברות על אותו דבר. גרטנר השתמשו במונח כבר בפברואר 2025, על תשתיות. a16z כתבו "agent-native architecture" במרץ 2025, בפוסט על MCP. מה שנדבק אצל מפתחים הגיע אחר כך. Dan Shipper מ-Every כתב בינואר 2026 מדריך יחד עם קלוד, מתוך מה שלמדו כשבנו את Reader ו-Anecdote. ב-5 במאי 2026 הבלוג gmays.com סיפר על כמה חודשים של בערך $1,000 בחודש על tokens, רק כדי להבין מה זה. התשובה שלו פשוטה: בתוכנה רגילה האדם מפעיל. ב-agent-native ה-agent מפעיל, והאדם מפקח. שלושה ימים אחר כך Builder.io פרסמו את הגרסה עם חמשת העקרונות.
+
+בגדול, יש מבחן אחד ששורד את כל הוויכוח, ו-Shiplight ניסחו אותו הכי טוב: ה-agent מסיים את המשימה מקצה לקצה, או מחזיר אותה לבן אדם באמצע? Builder.io כתבו את הצד השני של אותו מבחן:
+
+> A chatbot in the corner can summarize a document or draft a response, but it usually cannot do everything you can do in the product.
+>
+> — Builder.io, "Agent-Native: The Next Architecture for Software", 8 במאי 2026
+
+זה כל הסיפור. אז ככה הייתי עובר על מוצר קיים. הדוגמה היא CRM פנימי, כי זו בדיוק השאלה ש-gmays שואל: הייתם סומכים על agent שיעבוד לבד ב-CRM שלכם?
+
+## 01 · סופרים פעולות, לא פיצ'רים
+
+תעברו על ה-UI ותרשמו כל פעולה שמשנה state: שמירה, מחיקה, שינוי בעלים, מיזוג, ייצוא. ליד כל אחת תוסיפו עמודה: יש tool שה-agent יכול לקרוא לו, ושעושה בדיוק את זה? Shipper קורא לזה Parity ושם את זה ככלל הכי קריטי. אם משתמש יכול למחוק פתק וה-agent לא, ה-agent תקוע מתחת לתקרה.
+
+בפועל רואים כמעט תמיד את אותה תמונה: קריאה מכוסה, כתיבה לא. ה-agent יודע לסכם deal, לא יודע להעביר אותו שלב. נקודת התחלה מהירה, אם ה-routes שלכם ב-FastAPI או Flask:
+
+```bash title="parity.sh"
+grep -rhoE '@(app|router)\.(post|put|patch|delete)\("[^"]+' src/ \
+  | sed -E 's/.*\("//' | sort -u > ui_actions.txt
+wc -l ui_actions.txt
+```
+
+כל שורה בקובץ הזה צריכה tool מקביל. השורות שאין להן, אלה המקומות שבהם ה-agent ירים ידיים ויחזיר לכם את המשימה.
+
+<figure><img src="/posts/agent-native-architecture/v1-svg-he.jpg" alt="כל תא ריק בעמודת ה-agent הוא נקודה שבה המשימה חוזרת לבן אדם, וזה בדיוק המבחן של Shiplight. הקריאה כמעט תמיד מכוסה, הכתיבה כמעט אף פעם (Parity, לפי Shipper ב-Every)" loading="lazy" /><figcaption>כל תא ריק בעמודת ה-agent הוא נקודה שבה המשימה חוזרת לבן אדם, וזה בדיוק המבחן של Shiplight. הקריאה כמעט תמיד מכוסה, הכתיבה כמעט אף פעם (Parity, לפי Shipper ב-Every)</figcaption></figure>
+
+## 02 · פעולה אחת, שני שערים
+
+הטעות הנפוצה: כותבים "API בשביל ה-agent" לצד ה-API של ה-UI. אחרי חודשיים ה-validation שמישהו הוסיף לטופס לא קיים ב-tool, וה-agent עושה דברים שמשתמש בכלל לא יכול. Builder קוראים לזה one shared action model: ה-UI וה-agent קוראים לאותה פונקציה, עם אותן הרשאות, ומשאירים את אותה עקבה.
+
+הדפוס שאני ממליץ להעתיק: registry אחד של פעולות, ו-`run_action` שכולם עוברים דרכו.
+
+```python title="actions.py"
+import json, time
+from dataclasses import dataclass
+from typing import Callable
+
+@dataclass
+class Action:
+    name: str
+    fn: Callable
+    reversible: bool = True
+
+ACTIONS: dict[str, Action] = {}
+
+def action(reversible: bool = True):
+    def wrap(fn):
+        ACTIONS[fn.__name__] = Action(fn.__name__, fn, reversible)
+        return fn
+    return wrap
+
+def run_action(name: str, actor: str, approved: bool = False, **kwargs):
+    a = ACTIONS[name]
+    if actor.startswith("agent:") and not a.reversible and not approved:
+        return {"status": "needs_approval", "action": name, "args": kwargs}
+    result = a.fn(**kwargs)
+    with open("audit.jsonl", "a") as f:
+        f.write(json.dumps({"ts": time.time(), "actor": actor, "action": name,
+                            "args": kwargs, "result": result}, default=str) + "\n")
+    return {"status": "ok", "result": result}
+
+@action()
+def update_stage(deal_id: str, stage: str) -> dict:
+    """Move a deal to another pipeline stage."""
+    ...  # your DB call
+
+@action(reversible=False)
+def delete_note(note_id: str) -> dict:
+    """Delete a note permanently."""
+    ...  # your DB call
+```
+
+ה-route של ה-UI הופך לשורה אחת: `return run_action("update_stage", actor=f"user:{uid}", deal_id=deal_id, stage=stage)`. מעכשיו parity היא לא עניין של משמעת. היא יוצאת מהמבנה.
+
+<figure><img src="/posts/agent-native-architecture/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+## 03 · מפרקים את ה-tool השמן
+
+Shipper נותן דוגמה טובה: `classify_and_organize_files` נועל את הלוגיקה בקוד. `read_file` ו-`move_file` משאירים ל-agent להפעיל שיקול דעת, כולל ב-edge cases שלא חשבתם עליהם. ב-CRM זה אומר לא לחשוף `cleanup_pipeline`, אלא `list_deals`, `update_stage`, `add_note`. ואז פיצ'ר חדש, נגיד "תסגור כל deal שלא זז 90 יום ותשאיר פתק למה", הוא prompt ולא deploy. Shipper קורא לזה composability.
+
+ומה רואים בלוגים? יותר tool calls לכל משימה, ויותר tokens.
+
+> **הסתייגות:** granularity היא לא חינם. כל primitive נוסף זה עוד סיבוב בלולאה ועוד context, ו-gmays לא שרף $1,000 בחודש סתם. אני משאיר פעולה מורכבת כ-tool אחד כשהיא דטרמיניסטית לגמרי ואין בה שום החלטה, ומפרק רק את מה שבאמת דורש שיקול דעת.
+
+## 04 · חושפים את אותו registry ב-MCP
+
+אצל Builder, protocol-readiness הוא עיקרון בפני עצמו: MCP היום, A2A בהמשך. אם עשיתם את שלב 02, זה עשר שורות, וכל קריאה של ה-agent עוברת דרך אותו `run_action`:
+
+```python title="server.py"
+import functools
+from mcp.server.fastmcp import FastMCP
+from actions import ACTIONS, run_action
+
+mcp = FastMCP("crm")
+
+def as_tool(a):
+    @functools.wraps(a.fn)
+    def tool(**kwargs):
+        return run_action(a.name, actor="agent:mcp", **kwargs)
+    return tool
+
+for a in ACTIONS.values():
+    mcp.add_tool(as_tool(a), name=a.name, description=a.fn.__doc__)
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+שימו לב ש-`approved` לא נחשף ל-agent. הוא לא יכול לאשר לעצמו.
+
+עכשיו מריצים את ה-inspector הרשמי: `npx @modelcontextprotocol/inspector python server.py`. רשימת ה-tools שם צריכה להתאים ל-`ui_actions.txt`. בקיצור, הפער כבר לא קבור בקוד. הוא יושב ברשימה מול העיניים.
+
+<figure><img src="/posts/agent-native-architecture/src3.jpg" alt="Builder.io שמים את ה-UI ואת ה-agent על אותו מודל פעולות. הרעיון עומד גם בלי התבניות שלהם: registry אחד, שני שערים (credit: Builder.io)" loading="lazy" /><figcaption>Builder.io שמים את ה-UI ואת ה-agent על אותו מודל פעולות. הרעיון עומד גם בלי התבניות שלהם: registry אחד, שני שערים (credit: Builder.io)</figcaption></figure>
+
+## 05 · כל פעולה משאירה קבלה
+
+gmays מתעקש על זה: לא אמון עיוור, אלא supervision, receipts ו-reversible execution. אצל Builder זה נקרא governed execution. בקוד מלמעלה זה שתי שורות: פעולה עם `reversible=False` מחזירה ל-agent `needs_approval` במקום לרוץ, וכל ריצה נכתבת ל-`audit.jsonl` עם actor, args ותוצאה.
+
+למה לחסום ולא רק לתעד? כי כבר ראינו מה קורה בלי. ביולי 2025 ה-agent של Replit מחק DB של production אצל SaaStr, באמצע code freeze, אחרי שאמרו לו במפורש לא לגעת בכלום. Jason Lemkin תיעד את זה בזמן אמת. המודל לא היה הבעיה. הבעיה הייתה מערכת שנתנה לפעולה בלתי הפיכה לרוץ בלי שער.
+
+וחוץ מזה, תוודאו שה-agent יכול לקרוא את ה-audit log. Shiplight מדגישים state קריא, בלי screenshot. agent שרואה מה הוא עשה אתמול לא עושה את זה שוב היום.
+
+## 06 · מודדים את אורך הרצועה
+
+אצל gmays האמון הוא כל העניין: ככל שהביטחון בפלט עולה, הרצועה מתארכת. וזה גם המדד. מתחילים מה-yes הכי קטן: משימה אחת, צרה, שבה טעות עולה מעט.
+
+טוב, מה מודדים בפועל? שני מספרים בשבוע מתוך ה-audit: כמה משימות ה-agent סיים בלי להחזיר לבן אדם, וכמה מהפעולות שלו ביטלו אחר כך. התחלה גסה:
+
+`jq -r 'select(.actor|startswith("agent:")) | .action' audit.jsonl | sort | uniq -c`
+
+הכלל שאני אוהב: פעולה עוברת מ"דורש אישור" ל"רצה לבד" רק אחרי רף שקבעתם מראש, למשל 50 ריצות מאושרות ברצף בלי ביטול. לא תחושה. מספר.
+
+## מה לקחת
+
+- כל כפתור חדש ב-UI נכנס ל-PR יחד עם ה-tool שלו. בלי tool, אין merge.
+- UI ו-agent קוראים לאותה `run_action`. API נפרד ל-agent הוא פער parity שרק מחכה להתפוצץ.
+- tool שמחליט בשביל ה-agent הוא workflow מוסתר. תפרקו אותו, חוץ ממה שדטרמיניסטי לגמרי.
+- agent לא מוחק לבד שום דבר שאין לו undo. Replit כבר שילמו על השיעור הזה בשבילכם.

@@ -1,0 +1,161 @@
+---
+title: "Graph engineering: מתי לולאה אחת כבר לא מספיקה"
+description: "מה זה graph engineering בלי ההייפ: למה הלולאה של ה-agent נתקעת, איך הופכים invariant ל-edge ב-LangGraph, ומתי עדיף להישאר עם לולאה פשוטה."
+lang: he
+key: graph-engineering
+term: "graph engineering"
+kind: explainer
+pubDate: 2026-10-16
+tags: ["graph-engineering", "ai-agents", "langgraph", "orchestration", "multi-agent"]
+hook: "scene"
+cover: type
+tldr: ["הפכו כל invariant של סדר ל-edge בגרף, לא להוראה ב-prompt.", "הישארו בלולאה עד שיש תת-משימות מקבילות, מבקר נפרד או אישור אנושי.", "שימו checkpointer ו-interrupt_before לפני כל node עם side effects."]
+hero: /posts/graph-engineering/hero.jpg
+diagram: /posts/graph-engineering/diagram.svg
+sources:
+  - { title: "Graph Engineering Needs a Compiler", url: "https://fluxtion-playground.dev/blog/2026-07-29-graph-engineering-needs-a-compiler", date: "2026-07-29" }
+  - { title: "Hot Take: Harness, Loop Engineering, Graph Engineering Are Bullshit", url: "https://akitaonrails.com/en/2026/08/18/hot-take-harness-loop-engineering-graph-engineering-are-bullshit", date: "2026-08-22" }
+  - { title: "Loop Engineering, Graph Engineering, and Layers That Matters", url: "https://iii.dev/blog/loops-graphs-and-the-layer-that-matters", date: "2026-07-21" }
+  - { title: "We are entering the graph engineering phase", url: "https://www.drjoshcsimmons.com/writing/we-are-entering-the-graph-engineering-phase", date: "2026-07-19" }
+  - { title: "Graph Engineering: Execution Graphs vs. Context Graphs", url: "https://hydradb.com/blog/graph-engineering-ai-agents-context-graph", date: "2026-08-14" }
+  - { title: "Graph Engineering Explained - by Aishwarya Srinivasan", url: "https://aishwaryasrinivasan.substack.com/p/graph-engineering-explained", date: "" }
+  - { title: "From Loops to Graphs: The Next Paradigm in AI Agent Engineering | Flowtivity", url: "https://flowtivity.ai/blog/graph-engineering-2026-guide-openclaw-codex", date: "" }
+  - { title: "Graph Engineering for AI Agents: A Complete Guide in LangGraph", url: "https://www.analyticsvidhya.com/blog/2026/07/graph-engineering", date: "" }
+opinion: "אצלנו מונח נבחן לפי מה שהוא משנה ביום ראשון בבוקר, ופה התשובה חצויה. השם הוא מיתוג מחדש של state machines ו-DAGs, ושלוש הגדרות מתחרות תוך 48 שעות ועוד קורסים באותו שבוע הם בדיוק סימן ההייפ שאנחנו חושדים בו. מה שכן, הרעיון שמתחת עובד: להוציא החלטות מהמודל ולהכניס אותן למבנה. כל מקום שבו החלפנו קריאת LLM בכלל פשוט נהיה זול ואמין יותר. ומבחינתנו הערך של גרף הוא לא הצורה אלא הבדיקה שהוא מכריח אתכם לשים בין שני nodes."
+madeWith: { model: "claude-opus-5-5", sourceCount: 8, reviewedBy: "Koby Almog" }
+---
+
+ב-18 ביולי 2026 פיטר שטיינברגר, מי שבנה את OpenClaw, העלה ל-X שתים-עשרה מילים: "Are we still talking loops or did we shift to graphs yet?". לפי Flowtivity זה הגיע ל-2.9 מיליון צפיות, לפי iii לחצי מיליון. לא משנה מי סופר נכון. תוך 48 שעות היו לביטוי שלוש הגדרות מתחרות, מניפסט, backlash, גל של מדריכים, ומחקר מפוברק על מענק של $3.1M מסטנפורד שלא קיים.
+
+השם לא נולד בציוץ. ג'וש סימונס פרסם ב-4 ביולי פוסט בשם "We are entering the graph engineering phase", ובאותו פוסט גם נתן בדיעבד שם לשלב הקודם: loop engineering. שטיינברגר רק הצית את זה. ו-LangChain ענו לו תוך יום:
+
+> Graph engineering isn't a new idea. It's the latest name for a well-established approach to building reliable agents.
+>
+> — LangChain, בפוסט "3 Years of Graph Engineering with LangGraph"
+
+בקיצור, זו הקומה הרביעית בשלוש שנים: prompt engineering ב-2023, context engineering ב-2024, loop engineering ב-2025–26, ו-graph engineering מיולי 2026. כל קומה רחוקה צעד אחד יותר מהמודל. זה buzzword? כן. השאלה היא אם זה משנה משהו במה שאתם בונים ביום ראשון.
+
+## מה זה בפועל, ומה זה לא
+
+בגדול: במקום agent אחד שמריץ while loop עם tools ומחליט לבד מה הצעד הבא, אתם מגדירים גרף. nodes שעושים את העבודה, edges שקובעים לאן מותר לעבור, ו-state משותף שזורם ביניהם. ההגדרה הכי שימושית שמצאתי היא של Analytics Vidhya: תכנון של nodes, תלויות, מעברי state, מסלולי ביצוע, validation gates, מסלולי recovery וגבולות שליטה.
+
+מה שרוב המדריכים מפספסים: לא כל node הוא agent. node יכול להיות פונקציה רגילה, router, join, קריאה ל-tool או בן אדם שמאשר. ה-agent עדיין חושב לבד בתוך ה-node שלו. הוא פשוט כבר לא מחליט על כל המערכת.
+
+מה זה לא:
+
+- **לא knowledge graph ולא GraphRAG.** חלק מהמדריכים (Flowtivity למשל) מגדירים את זה כ-typed edges בין entities שה-agent מטייל עליהם. זה תחום אחר עם אותו שם. HydraDB מפרידים את זה יפה: execution graph עונה על "מה רץ עכשיו", context graph עונה על "מה המערכת יודעת".
+- **לא תחליף ל-loop engineering.** לולאה היא גרף עם node אחד וקשת שחוזרת אליו. כל מה שלמדתם על stop conditions ו-verifiers עדיין רלוונטי בתוך כל node.
+- **לא חדש.** state machines ו-DAG orchestration מריצים production כבר עשרות שנים.
+
+<figure><img src="/posts/graph-engineering/src5.jpg" alt="גרף שמחליט מה רץ עכשיו הוא לא גרף שיודע מי הלקוח. שני תחומים שונים עם אותו שם, ורוב הבלבול בא משם (credit: HydraDB)" loading="lazy" /><figcaption>גרף שמחליט מה רץ עכשיו הוא לא גרף שיודע מי הלקוח. שני תחומים שונים עם אותו שם, ורוב הבלבול בא משם (credit: HydraDB)</figcaption></figure>
+
+## למה הלולאה נתקעת
+
+סימונס מצטט מאמר מהאביב (arXiv:2604.11378) שמסביר את זה במונחים של scheduler: לולאת agent היא scheduler עם ready set בגודל אחד. יחידת עבודה אחת פעילה בכל רגע, ומה שרץ אחר כך נקבע בקריאת מודל אטומה. תסתכלו על התלונות שלכם מ-production, רובן יוצאות משם:
+
+- **הכל סדרתי.** משימה שמתפרקת ל-10 תת-משימות עצמאיות עדיין רצה אחת-אחת.
+- **ה-state הוא transcript.** "זיכרון" זה מה ששרד compaction, ו-"audit trail" זה מישהו שגולל קיר של טקסט.
+- **הכל או כלום.** נפל בצעד 40 מתוך 60? מתחילים מאפס או עושים ניתוח ב-context window.
+- **אין pause.** כדי לקבל אישור אנושי ביום חמישי ולהמשיך ביום ראשון, צריך סלוטייפ.
+
+גרף פותר בדיוק את הארבעה האלה: fan-out לכמה nodes במקביל, fan-in ל-reviewer עם context נקי, checkpoint אחרי כל node, ונקודת עצירה מפורשת לאדם. וזה גם מה שהשוק עשה בלי לקרוא לזה בשם: LangGraph יצא 1.0 בסוף 2025, מיקרוסופט איחדו את AutoGen ו-Semantic Kernel ל-Agent Framework אחד מבוסס workflows, ו-Temporal ו-Prefect נכנסים מתחת ל-agents כדי שריצה תשרוד קריסה.
+
+<figure><img src="/posts/graph-engineering/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/graph-engineering/v2-svg-he.jpg" alt="עשר תת-משימות עצמאיות, ולולאה עדיין מריצה אותן אחת-אחת. גרף מסיים בשליש מהזמן ומוסיף מבקר עם context נקי בדרך (Simmons, arXiv:2604.11378)" loading="lazy" /><figcaption>עשר תת-משימות עצמאיות, ולולאה עדיין מריצה אותן אחת-אחת. גרף מסיים בשליש מהזמן ומוסיף מבקר עם context נקי בדרך (Simmons, arXiv:2604.11378)</figcaption></figure>
+
+## דוגמה: עסקה, סיכון, פרסום
+
+הדוגמה הכי טובה שמצאתי בכלל לא עוסקת ב-agents. היא של Fluxtion, מ-29 ביולי, על קוד ש-AI כותב. מערכת מקבלת עסקה וצריכה לעדכן פוזיציה, לחשב מחדש סיכון ורק אז לפרסם. מודל כותב `updatePosition` ← `publishPosition` ← `recalculateRisk`.
+
+כל שורה תקינה. הקוד מתקמפל ועובר את רוב הטסטים. והסדר שגוי: פרסמתם פוזיציה עם סיכון ישן. שום דבר בחתימות של הפונקציות לא אומר שסיכון בא לפני פרסום. הדרישה הזו יושבת במסמך ארכיטקטורה, בטסט אחד, או בראש של מישהו ותיק. Fluxtion קוראים לזה "locally plausible code that subtly violates a global invariant".
+
+בגרף זה edge אחד: `risk → publish`. אין דרך להגיע ל-publish בלי לעבור ב-risk, כי פשוט אין קשת אחרת. זה כל הטריק. ה-invariant יוצא מהראש של מישהו ונכנס למבנה שאפשר לקרוא, לצייר ולבדוק.
+
+אותו דבר עם agents. מחקר, כתיבה, מבקר סקפטי, החלטה אם לשלוח או להחזיר. בלולאה אחת המודל מחליט מתי יש מספיק ראיות ומתי הוא סיים. בגרף, הדרך ל-publish עוברת רק דרך ה-reviewer.
+
+## איך עושים את זה ב-LangGraph
+
+זה השלד שהייתי מעתיק. ארבעה nodes, router דטרמיניסטי, checkpointer, ועצירה לפני הפעולה שכותבת החוצה:
+
+```python title="graph.py"
+from typing import TypedDict
+from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
+
+class State(TypedDict):
+    topic: str
+    notes: list[str]
+    draft: str
+    verdict: str
+    rounds: int
+
+def research(s: State):  # LLM + search tools
+    return {'notes': ['...']}
+
+def write(s: State):     # LLM, sees notes only
+    return {'draft': '...', 'rounds': s['rounds'] + 1}
+
+def review(s: State):    # second model, fresh context, sees the draft only
+    return {'verdict': 'ok'}
+
+def publish(s: State):   # plain code: send, commit, deploy
+    return {}
+
+def route(s: State):     # a rule, not a model call
+    if s['verdict'] == 'ok':
+        return 'publish'
+    if s['rounds'] >= 3:
+        return END
+    return 'write'
+
+g = StateGraph(State)
+for name, fn in [('research', research), ('write', write),
+                 ('review', review), ('publish', publish)]:
+    g.add_node(name, fn)
+g.add_edge(START, 'research')
+g.add_edge('research', 'write')
+g.add_edge('write', 'review')
+g.add_conditional_edges('review', route)
+g.add_edge('publish', END)
+
+app = g.compile(checkpointer=MemorySaver(), interrupt_before=['publish'])
+cfg = {'configurable': {'thread_id': 'report-42'}}
+app.invoke({'topic': 'graph engineering', 'notes': [], 'draft': '',
+            'verdict': '', 'rounds': 0}, cfg)
+print(app.get_state(cfg).next)   # ('publish',) -> waiting for a human
+app.invoke(None, cfg)            # approve: resumes from the checkpoint
+```
+
+בפועל שלושה דברים עושים פה את העבודה. `rounds >= 3` הוא stop condition שהמודל לא יכול להתווכח איתו. `interrupt_before=['publish']` עוצר לפני ה-side effect, ו-`invoke(None, cfg)` ממשיך מאותה נקודה גם אחרי יומיים. ו-`MemorySaver` מתאים רק לבדיקות. ב-production תשימו PostgresSaver, או Temporal מתחת, אחרת ה-checkpoint נעלם עם ה-process.
+
+<figure><img src="/posts/graph-engineering/v3-screenshot-he.jpg" alt="LangChain עצמם אומרים שזה שם חדש לשיטה בת שלוש שנים, וזו בדיוק הסיבה להתחיל מכלי שכבר עבר production (LangChain)" loading="lazy" /><figcaption>LangChain עצמם אומרים שזה שם חדש לשיטה בת שלוש שנים, וזו בדיוק הסיבה להתחיל מכלי שכבר עבר production (LangChain)</figcaption></figure>
+
+## מתי לא לבנות גרף
+
+רגע, לפני שאתם פותחים draw.io. הסקר שסימונס מצטט בדק 70 פרויקטי open-source ומצא ש-60% עדיין רצים בלולאה פשוטה. לא נראה לי שזה רע.
+
+פאביו אקיטה (AkitaOnRails) פרסם ב-18 באוגוסט hot take שכל זה bullshit. ההוכחה שלו: יותר מ-30 ריפוזיטוריז ציבוריים בין ינואר למאי, בלי שום גרף agents מתוזמר. Claude Code בבוקר, Codex אחרי הצהריים, Kimi CLI בלילה. הטענה שלו: כשהטכנולוגיה נהיית commodity, הכסף עובר לטקסונומיה. ו-"it works for me" לא מוכיח שהטקס הוא מה שעבד. מה שעבד זה שידעתם מה אתם רוצים.
+
+אישוואריה סריניבסאן אמרה את הצד השני: גרף שלא הייתם צריכים הוא בעיית distributed systems שהמצאתם לעצמכם. כל node זה עוד מקום שה-state יכול להתברבר בו, עוד retry, עוד קריאת מודל שעולה טוקנים.
+
+אז מתי כן? כשמתקיים לפחות אחד מאלה:
+
+- יש תת-משימות עצמאיות שאפשר להריץ במקביל.
+- צריך מבקר עם context נפרד, לא אותו agent שבודק את עצמו.
+- צריך לעצור לאישור ולחזור אחרי שעות.
+- יש invariant של סדר שאסור לשבור.
+
+אף אחד מאלה לא מתקיים אצלכם? לולאה עם verifier טוב תעשה את העבודה.
+
+> **הדעה שלי:** אני עם אקיטה בחצי. השם שיווק, והקורס שיצא עליו תוך שבוע שיווק עוד יותר. אבל edge מפורש לפני פעולה עם side effects הוא לא טקס, זה ה-test שחסר לכם.
+
+## מה לנסות השבוע
+
+- **ציירו את ה-agent הכי גדול שלכם כגרף, על דף.** כל החלטה שהמודל מקבל היום ("יש מספיק מחקר", "סיימתי", "זה טוב") היא edge פוטנציאלי.
+- **מצאו invariant אחד של סדר והפכו אותו ל-edge.** risk לפני publish, tests לפני merge, אישור לפני מייל ללקוח. לא שורה ב-prompt שאומרת "תזכור".
+- **החליפו לפחות החלטה אחת של מודל ב-router דטרמיניסטי.** מקסימום סבבים, schema check, exit code של טסטים.
+- **הוסיפו checkpointer ו-`interrupt_before`** לפני כל node שכותב החוצה: email, deploy, DB.
+- **מדדו לפני ואחרי:** זמן ריצה כולל ועלות טוקנים לריצה. אם הגרף לא הוריד אף אחד מהם ולא הוסיף אף בדיקה, תחזירו את הלולאה.
+
+גרף שלא מוסיף אף בדיקה הוא סתם לולאה עם יותר קבצים.

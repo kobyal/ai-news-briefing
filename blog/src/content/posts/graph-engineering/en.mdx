@@ -1,0 +1,161 @@
+---
+title: "Graph engineering: when one loop stops being enough"
+description: "Graph engineering without the hype: why agent loops get stuck, how to turn an invariant into a LangGraph edge, and when a plain loop is still the better call."
+lang: en
+key: graph-engineering
+term: "graph engineering"
+kind: explainer
+pubDate: 2026-10-16
+tags: ["graph-engineering", "ai-agents", "langgraph", "orchestration", "multi-agent"]
+hook: "scene"
+cover: type
+tldr: ["Turn every ordering invariant into an edge in the graph, not an instruction in the prompt.", "Stay with a loop until you have parallel subtasks, a separate reviewer, or human approval.", "Put a checkpointer and interrupt_before in front of every node with side effects."]
+hero: /posts/graph-engineering/hero-en.jpg
+diagram: /posts/graph-engineering/diagram.svg
+sources:
+  - { title: "Graph Engineering Needs a Compiler", url: "https://fluxtion-playground.dev/blog/2026-07-29-graph-engineering-needs-a-compiler", date: "2026-07-29" }
+  - { title: "Hot Take: Harness, Loop Engineering, Graph Engineering Are Bullshit", url: "https://akitaonrails.com/en/2026/08/18/hot-take-harness-loop-engineering-graph-engineering-are-bullshit", date: "2026-08-22" }
+  - { title: "Loop Engineering, Graph Engineering, and Layers That Matters", url: "https://iii.dev/blog/loops-graphs-and-the-layer-that-matters", date: "2026-07-21" }
+  - { title: "We are entering the graph engineering phase", url: "https://www.drjoshcsimmons.com/writing/we-are-entering-the-graph-engineering-phase", date: "2026-07-19" }
+  - { title: "Graph Engineering: Execution Graphs vs. Context Graphs", url: "https://hydradb.com/blog/graph-engineering-ai-agents-context-graph", date: "2026-08-14" }
+  - { title: "Graph Engineering Explained - by Aishwarya Srinivasan", url: "https://aishwaryasrinivasan.substack.com/p/graph-engineering-explained", date: "" }
+  - { title: "From Loops to Graphs: The Next Paradigm in AI Agent Engineering | Flowtivity", url: "https://flowtivity.ai/blog/graph-engineering-2026-guide-openclaw-codex", date: "" }
+  - { title: "Graph Engineering for AI Agents: A Complete Guide in LangGraph", url: "https://www.analyticsvidhya.com/blog/2026/07/graph-engineering", date: "" }
+opinion: "We judge a term by what it changes on Monday morning, and here the answer is split. The name is a rebrand of state machines and DAGs, and three competing definitions in 48 hours plus courses the same week are exactly the hype signal we're suspicious of. That said, the idea underneath works: take decisions out of the model and put them into structure. Every place where we replaced an LLM call with a simple rule got cheaper and more reliable. For us, the value of a graph isn't its shape. It's the check it forces you to put between two nodes."
+madeWith: { model: "claude-opus-5-5", sourceCount: 8, reviewedBy: "Koby Almog" }
+---
+
+On July 18, 2026, Peter Steinberger, who built OpenClaw, posted twelve words on X: "Are we still talking loops or did we shift to graphs yet?". Flowtivity says it hit 2.9 million views; iii says half a million. It doesn't matter who counted right. Within 48 hours the phrase had three competing definitions, a manifesto, a backlash, a wave of tutorials, and a fabricated study citing a $3.1M Stanford grant that doesn't exist.
+
+The name wasn't born in the tweet. Josh Simmons published "We are entering the graph engineering phase" on July 4, and in the same post he retroactively named the previous phase: loop engineering. Steinberger just lit the fuse. LangChain replied within a day:
+
+> Graph engineering isn't a new idea. It's the latest name for a well-established approach to building reliable agents.
+>
+> — LangChain, in "3 Years of Graph Engineering with LangGraph"
+
+So this is the fourth layer in three years: prompt engineering in 2023, context engineering in 2024, loop engineering in 2025–26, and graph engineering since July 2026. Each layer sits one step further from the model. Is it a buzzword? Yes. The question is whether it changes anything about what you build on Monday.
+
+## What it is, and what it isn't
+
+Roughly: instead of one agent running a while loop with tools and deciding on its own what comes next, you define a graph. Nodes do the work, edges define where you're allowed to go, and shared state flows between them. The most useful definition I found is Analytics Vidhya's: designing nodes, dependencies, state transitions, execution paths, validation gates, recovery paths, and control boundaries.
+
+What most tutorials miss: not every node is an agent. A node can be a plain function, a router, a join, a tool call, or a human who approves. The agent still thinks for itself inside its node. It just no longer decides for the whole system.
+
+What it isn't:
+
+- **Not a knowledge graph, and not GraphRAG.** Some guides (Flowtivity, for one) define it as typed edges between entities that the agent walks. That's a different field with the same name. HydraDB separates them well: an execution graph answers "what runs now", a context graph answers "what the system knows".
+- **Not a replacement for loop engineering.** A loop is a graph with one node and an edge back to itself. Everything you learned about stop conditions and verifiers still applies inside each node.
+- **Not new.** State machines and DAG orchestration have been running production for decades.
+
+<figure><img src="/posts/graph-engineering/src5.jpg" alt="A graph that decides what runs now is not a graph that knows who the customer is. Two different fields with the same name, and that's where most of the confusion comes from (credit: HydraDB)" loading="lazy" /><figcaption>A graph that decides what runs now is not a graph that knows who the customer is. Two different fields with the same name, and that's where most of the confusion comes from (credit: HydraDB)</figcaption></figure>
+
+## Why the loop gets stuck
+
+Simmons cites a paper from this spring (arXiv:2604.11378) that frames it in scheduler terms: an agent loop is a scheduler with a ready set of size one. One unit of work is active at any moment, and what runs next is decided by an opaque model call. Look at your production complaints; most of them come from there:
+
+- **Everything is sequential.** A task that splits into 10 independent subtasks still runs them one by one.
+- **The state is a transcript.** "Memory" is whatever survived compaction, and the "audit trail" is someone scrolling a wall of text.
+- **All or nothing.** Failed at step 40 of 60? Start over, or do surgery on the context window.
+- **No pause.** Getting human approval on Friday and resuming on Monday takes duct tape.
+
+A graph solves exactly these four: fan-out to several nodes in parallel, fan-in to a reviewer with a clean context, a checkpoint after every node, and an explicit stopping point for a human. It's also what the market did without naming it: LangGraph shipped 1.0 at the end of 2025, Microsoft merged AutoGen and Semantic Kernel into a single workflow-based Agent Framework, and Temporal and Prefect are moving under agents so a run survives a crash.
+
+<figure><img src="/posts/graph-engineering/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/graph-engineering/v2-svg-en.jpg" alt="Ten independent subtasks, and a loop still runs them one by one. A graph finishes in a third of the time and adds a reviewer with a clean context along the way (Simmons, arXiv:2604.11378)" loading="lazy" /><figcaption>Ten independent subtasks, and a loop still runs them one by one. A graph finishes in a third of the time and adds a reviewer with a clean context along the way (Simmons, arXiv:2604.11378)</figcaption></figure>
+
+## Example: trade, risk, publish
+
+The best example I found isn't about agents at all. It's from Fluxtion, July 29, about code that AI writes. A system receives a trade and has to update the position, recalculate risk, and only then publish. A model writes `updatePosition` → `publishPosition` → `recalculateRisk`.
+
+Every line is valid. The code compiles and passes most tests. And the order is wrong: you published a position with stale risk. Nothing in the function signatures says risk comes before publish. That requirement lives in an architecture doc, in one test, or in the head of someone senior. Fluxtion calls it "locally plausible code that subtly violates a global invariant".
+
+In a graph it's one edge: `risk → publish`. There's no way to reach publish without going through risk, because there's simply no other edge. That's the whole trick. The invariant leaves someone's head and becomes structure you can read, draw, and check.
+
+Same with agents. Research, write, a skeptical reviewer, a decision to ship or send back. In a single loop the model decides when there's enough evidence and when it's done. In a graph, the only path to publish goes through the reviewer.
+
+## How to do it in LangGraph
+
+This is the skeleton I'd copy. Four nodes, a deterministic router, a checkpointer, and a stop before the action that writes outward:
+
+```python title="graph.py"
+from typing import TypedDict
+from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
+
+class State(TypedDict):
+    topic: str
+    notes: list[str]
+    draft: str
+    verdict: str
+    rounds: int
+
+def research(s: State):  # LLM + search tools
+    return {'notes': ['...']}
+
+def write(s: State):     # LLM, sees notes only
+    return {'draft': '...', 'rounds': s['rounds'] + 1}
+
+def review(s: State):    # second model, fresh context, sees the draft only
+    return {'verdict': 'ok'}
+
+def publish(s: State):   # plain code: send, commit, deploy
+    return {}
+
+def route(s: State):     # a rule, not a model call
+    if s['verdict'] == 'ok':
+        return 'publish'
+    if s['rounds'] >= 3:
+        return END
+    return 'write'
+
+g = StateGraph(State)
+for name, fn in [('research', research), ('write', write),
+                 ('review', review), ('publish', publish)]:
+    g.add_node(name, fn)
+g.add_edge(START, 'research')
+g.add_edge('research', 'write')
+g.add_edge('write', 'review')
+g.add_conditional_edges('review', route)
+g.add_edge('publish', END)
+
+app = g.compile(checkpointer=MemorySaver(), interrupt_before=['publish'])
+cfg = {'configurable': {'thread_id': 'report-42'}}
+app.invoke({'topic': 'graph engineering', 'notes': [], 'draft': '',
+            'verdict': '', 'rounds': 0}, cfg)
+print(app.get_state(cfg).next)   # ('publish',) -> waiting for a human
+app.invoke(None, cfg)            # approve: resumes from the checkpoint
+```
+
+Three things do the real work here. `rounds >= 3` is a stop condition the model can't argue with. `interrupt_before=['publish']` stops before the side effect, and `invoke(None, cfg)` resumes from the same point even two days later. And `MemorySaver` is for tests only. In production use PostgresSaver, or Temporal underneath, otherwise the checkpoint dies with the process.
+
+<figure><img src="/posts/graph-engineering/v3-screenshot-en.jpg" alt="LangChain themselves say it's a new name for a three-year-old approach, which is exactly why you should start from a tool that has already been through production (LangChain)" loading="lazy" /><figcaption>LangChain themselves say it's a new name for a three-year-old approach, which is exactly why you should start from a tool that has already been through production (LangChain)</figcaption></figure>
+
+## When not to build a graph
+
+Hold on before you open draw.io. The survey Simmons cites looked at 70 open-source projects and found 60% still run on a plain loop. I don't think that's bad.
+
+Fabio Akita (AkitaOnRails) posted a hot take on August 18 that all of this is bullshit. His evidence: more than 30 public repos between January and May, with no orchestrated agent graph at all. Claude Code in the morning, Codex in the afternoon, Kimi CLI at night. His argument: when the technology becomes a commodity, the money moves to taxonomy. And "it works for me" doesn't prove the ritual is what worked. What worked is that you knew what you wanted.
+
+Aishwarya Srinivasan made the other side of the point: a graph you didn't need is a distributed systems problem you invented for yourself. Every node is another place for state to get tangled, another retry, another model call that costs tokens.
+
+So when does it make sense? When at least one of these holds:
+
+- You have independent subtasks that can run in parallel.
+- You need a reviewer with its own context, not the same agent checking itself.
+- You need to stop for approval and come back hours later.
+- There's an ordering invariant you can't break.
+
+None of these apply to you? A loop with a good verifier will do the job.
+
+> **My take:** I'm halfway with Akita. The name is marketing, and the course that came out on it within a week is even more marketing. But an explicit edge before an action with side effects isn't ritual. It's the test you're missing.
+
+## What to try this week
+
+- **Draw your biggest agent as a graph, on paper.** Every decision the model makes today ("there's enough research", "I'm done", "this is good") is a potential edge.
+- **Find one ordering invariant and turn it into an edge.** Risk before publish, tests before merge, approval before emailing a customer. Not a line in the prompt that says "remember".
+- **Replace at least one model decision with a deterministic router.** Max rounds, a schema check, a test exit code.
+- **Add a checkpointer and `interrupt_before`** in front of every node that writes outward: email, deploy, DB.
+- **Measure before and after:** total runtime and token cost per run. If the graph didn't lower either one and didn't add a single check, put the loop back.
+
+A graph that adds no checks is just a loop with more files.

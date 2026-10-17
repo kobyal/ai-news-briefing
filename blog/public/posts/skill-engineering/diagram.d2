@@ -1,0 +1,15 @@
+direction: down
+user: User
+agent: Agent
+descriptions: Skill descriptions
+skill_md: SKILL.md + scripts
+hook: PreToolUse hook
+staging_db: Staging DB
+prod_db: Prod DB
+user -> agent: task
+agent -> descriptions: scan Use when...
+descriptions -> skill_md: match, load
+skill_md -> agent: instructions + allowed-tools
+agent -> hook: tool call
+hook -> staging_db: allowed
+hook -> prod_db: blocked, exit 2

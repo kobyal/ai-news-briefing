@@ -1,0 +1,228 @@
+[0:00] Hello everyone, welcome to my talk. Today we're going to be talking about how we are rebuilding CI for AI scale commit volume.
+[0:09] And this comes from a lot of experience from build and merge infrastructure that I have been working on for a decade plus at this point.
+[0:17] And kind of want to walk you through all the new bottlenecks we're seeing in software factories and also specifically for highly regulated industries and banks.
+[0:26] How does that translate? How do we keep things more compliant and auditable while being able to move fast?
+[0:32] So let's dive in.
+[0:33] My name is Gautam. I am a co-founder and CTO at Guitar and recently joined Sonar as a principal engineer after the acquisition.
+[0:42] Previous to Guitar, I was at Uber for almost a decade working on build and merge infrastructure for monorepos.
+[0:48] So everything from build, CICD, IDEs, you name it, to make sure teleports are productive.
+[0:54] And now at Qatar as part of Sonar, I'm trying to make sure that code that's
+[1:00] been checked in is verified and all the code written by agents is of high
+[1:04] quality before it goes in. So before I get started, I want to just paint a bit of
+[1:11] history picture. At Uber, we had agent scale commit volume before they were
+[1:16] agents. So what I mean by this is we had one giant monorepo and we were doing
+[1:21] like thousands of changes a day and with very long-running builds. This meant that if you just
+[1:27] kept everything serialized and merged them one at a time so as not to break your main patch,
+[1:33] you would take a really long time up to days, 20 days in this case, to make sure that everything
+[1:38] was green. And if you skipped everything and just let everyone merge to main, we would see red main
+[1:45] all the time because changes would conflict with each other and even though the CI would be green
+[1:50] on one of them combined, they might actually break.
+[1:53] So we would see like our iOS monorepo would be like red all the time, and that was not
+[1:57] productive for our developers.
+[1:59] To fix this, what we did was we made a system called Summit Queue, which we have a paper
+[2:03] on, and we tested all the likely possibilities of commits that are coming in and making sure
+[2:09] that we can like reduce the wait time so we can test these things in parallel.
+[2:14] We could also predict what could break by testing all the combinations.
+[2:18] So once we know that the PR might break, we might remote it back from the queue and let the author know that they have to go fix it before they can push it back up after repacing.
+[2:28] And finally, to keep the trunk green, only if it passes with all the combination of commits coming in, it would be let in to go directly onto the trunk.
+[2:37] So you want to make sure that the overhead was worth it for keeping our trunk green.
+[2:42] And this is still running today at Uber.
+[2:44] I'm sure now we have like merge queues that GitHub came up with and all the other code hosts,
+[2:49] but for back then there was not a system, so we developed this.
+[2:53] So the problem with this approach is currently all these queues that we have,
+[2:58] so that's either CI or review on a centralized bottleneck in the SDLC.
+[3:02] So all these queues were built for human speed,
+[3:05] and once you build it from human speed, what happens is they are not able to keep up once you go to agents
+[3:10] because humans generate changes, used to generate changes, like, a few times an hour,
+[3:15] so we could do testing and review one at a time.
+[3:19] Now, with agents, developers are writing, like, several PRs, in many in a day,
+[3:25] and they won't always wait for the queue.
+[3:27] They all want to, like, come in at the same time,
+[3:29] which means your CI and review queues are piling up and having pressure.
+[3:34] And after that, like, the patterns of software factories and background agents
+[3:37] triggering or like various workflows, suddenly you see like everything's
+[3:42] slowing down to a crawl because your bottlenecks are still going BCI in review
+[3:46] and they are over capacity in this case. So what does this mean for teams today?
+[3:53] So just to put things into perspective, our own rate of commits has almost like
+[3:59] 10x since we started guitar about two years ago and it's just like
+[4:05] unbelievable with the same size team we are still very small but able to push
+[4:09] so much more code and we even see this on the industry trends on guitar so this
+[4:14] graph shows you the number of PRs that we see that guitar reviews over time and
+[4:18] if you look at the code trajectory it's pretty exponential every month almost
+[4:23] we're growing 25% month-over-month of just the amount of PRs that we had to review
+[4:28] fixed CI and other things so this is also I think like corroborated by
+[4:32] evidence that industry players like GitHub have been putting out where they're seeing
+[4:37] staggering growth in PRs and this is now coming for every single team. If our small team is seeing
+[4:43] this, I'm sure the larger teams and banks are seeing it at a much higher degree as they are
+[4:49] going through their AI adoption journeys. So the problem I was talking about, right, so if agents
+[4:55] are opening PRs and if you make them check everything through the CI system, individually
+[5:01] they might pass but once you kind of merge them back onto main your trunk
+[5:05] might still be broken. So how do you like solve for this? Like how do you keep
+[5:08] things green at this high rate of pace? So this is very important kind of like
+[5:14] how we solve SummitQ. The changes themselves are not testing against each
+[5:19] other so there needs to be some sort of change in either the CI system as well
+[5:23] as how you architecture code and in the queues to be smarter to be able to solve this.
+[5:26] And the problem we're also seeing with everyone trying to adopt like software factories, which is having agents write all the code from the spec and then just having humans be responsible for the spec and review is that the factory line that exists today was built for human speed, as I mentioned, which means that as agents push more changes, every part of the factory line is going to be slowing down.
+[5:51] So for example, with build and test, you might have lots of rebuilds whenever computation breaks, or you might have integration tests.
+[6:00] You might have flaky tests that are not reproducible locally, and that just slows everything down because you have to retry them.
+[6:06] And it could take hours in many cases with a complex build.
+[6:10] Add to the fact that now you have review and approval.
+[6:14] So a lot of you probably already use AI to preview your code.
+[6:17] Hopefully, you're not doing every single review with humans.
+[6:21] You ideally are reviewing the AI as a first pass.
+[6:24] Now the reviewers become the queue if you don't have that system in place.
+[6:28] And even after you review, there might be some criteria you might want additionally
+[6:32] to make sure that it's approved fully.
+[6:34] Because what's happening now in the industry is a lot of folks are just rubber-stamping them
+[6:39] because they cannot keep up with the high rate of PRs.
+[6:41] They are relying on other signals now to be able to just get through.
+[6:44] So the process has to change.
+[6:46] And the other problem right now we're having is a lot of these checks are running.
+[6:50] there's a lot of records that we keep that are expiring. So like your old logs
+[6:55] don't exist as they expire out. There is no stamp of like what was actually
+[6:59] checked because there is like just an approval stamp. So there needs to be some
+[7:04] record of these things for auditability and compliance checks to happen. The other
+[7:10] issue we're seeing is that as the code volume increases the time taken for
+[7:15] repair also is adding a ton of overhead. What we see on our platform at least
+[7:21] 30% of PRs had a recorded CI failure. This is just one or more CI failures
+[7:26] which means in all these cases there is a separate round trip to go either back
+[7:30] to the developer machine or for an agent to understand the logs, root cause
+[7:35] failure, fix it, push another commit and then keep iterating till it's green and
+[7:40] this is just CI because most of the time if a human reviewer wants to look at a
+[7:45] PR, they're not going to take a look unless CI screen because that's the first line of
+[7:49] defense. So that also slows the review process because they can go in parallel because usually
+[7:55] we want to look at something once it's finalized. And every lap is now paying for a CI and review.
+[8:00] So if your review comments come in and you're doing another pass, CM&M again and it kind
+[8:06] of like repeats the cycle. So how do we make this better? What do we do to make this problem
+[8:13] more manageable as agents are pushing down more code. So we have discovered this obviously back
+[8:20] to Uber but also in Guitars team right now. The most obvious thing is of course like make your
+[8:25] CI really quick and fast which means that you may want to like remove a lot of expensive checks,
+[8:30] try to offload them to like post merge even and try to make the CI step itself really quick
+[8:36] because your repairs will be much more efficient. So you can parallelize things, you can charge,
+[8:41] you can do like caching we'll talk about some of the techniques that we have used as well
+[8:46] you also want to make sure the review is fast so not just like a deep review but you also want to
+[8:51] have maybe multiple passes that are like giving quicker signal to your developers so they're able
+[8:56] to like use them as a way to understand in what scenarios they may want to go deeper for higher
+[9:02] risk changes or maybe for like lower response even like let the ai approve and merge them
+[9:06] And for the checks that are already running in CI, if you can move them to the left, it's way cheaper to catch them.
+[9:13] And this actually is very relevant to checks that happen even past CI.
+[9:18] For example, you might have expensive regression tests or things that might fail in production.
+[9:24] Not every time it's possible to move things to the left, but as much as possible, if you can move them, it means you have less bottlenecks down the line.
+[9:31] And locally, agents have done more context anyway to fix the issue that they're facing.
+[9:35] And you also want to have policies. This is very important for regulated industries.
+[9:39] So a story we have at Back at Uber is we lost the license to operate in London because there was a glitch in the software that allowed drivers to get on the platform without all the proper checks.
+[9:52] And that was because of a feature flag change.
+[9:53] So we had to put in a process in place so that every change affecting London that was going through the STLC would need some sort of like a lineage of, okay, this is a change affect London.
+[10:05] If so, what are the controls in place?
+[10:06] And we were able to win our license back.
+[10:09] Now, a lot of you might be facing these kind of like challenges where agents just make it much harder to understand what's happening in the code.
+[10:16] So how do you ensure your policies are actually being respected?
+[10:19] So you need to have a way to enforce these rules beyond CI.
+[10:23] Just because the code compounds doesn't mean that it's following particular specifications.
+[10:28] It could be like HIPAA, it could be like DORA.
+[10:31] There's so many other policies that these agents are not going to be aware of unless your agents are enforcing it on the other end.
+[10:38] And also you want to make sure that you record that it was enforced for auditability.
+[10:44] So just a quick story about how we made our CI faster as well.
+[10:47] So we were at a baseline, I would say still fast, but very annoying when you're trying to push more code.
+[10:55] We were around 10 minutes for our CI, and we wanted to bring that down significantly.
+[11:00] So we started looking at how can we cache outputs.
+[11:03] We used Rust for our build system, so we started caching as much as possible and reusing them.
+[11:08] And we also looked at ways to reduce churn in the compiler.
+[11:11] So we added some more fixes to like ensure that the compilation part is more cacheable and is invalidated less often.
+[11:18] And by adding more fixes on top of this by sharding and by removing like these overheads,
+[11:24] we're able to bring the time of CI almost like less than a minute for incremental steps,
+[11:30] which means once the cold CI is warmed up, incremental builds are way, way quicker and we can push a ton more code.
+[11:37] The other issue is also review. So just because the CI is green, what was funny was when we were measuring our P90 time of like PRs making into production, the vast majority of time was spent in review back at Uber.
+[11:51] And even today, to be honest, most teams spend more time reviewing code and doing other kinds of testing before they are comfortable merging the code into main.
+[12:01] So this is something that needs to be addressed on top of CI as well.
+[12:06] Because right now what's happening is agents are, of course, generating code at the same time.
+[12:12] The AI agents are also finding issues on your code review system.
+[12:17] And these automated reviews are also findings that you would have to now go back and address.
+[12:21] So either you have to pull context locally for your agent or have an agent on CI,
+[12:26] iterate and fix.
+[12:28] And humans are able to review whatever is left after the AI took its first pass.
+[12:32] And this needs to be part of the equation so you're not
+[12:36] wasting precious human cycles on more and more agent-generated peers.
+[12:41] Here's an example for us.
+[12:43] We were refactoring our code base to have faster CI.
+[12:47] So we were using NextText to parallelize our tests,
+[12:51] and we had this shared database that we were spinning up
+[12:55] to make sure that we could set it up once,
+[12:57] and all our database tests would reuse it.
+[13:00] But the problem was that there were some guards
+[13:02] we didn't put in place, which meant that when CI
+[13:04] gets very busy, there is cross-contamination
+[13:08] and tests might become flaky.
+[13:10] GitHub actually is a code reviewer.
+[13:12] It caught it on our PR before we merged it,
+[13:14] so we didn't have to waste time after.
+[13:16] and Qatar also fixed the issue for us because it suggested the fix, committed it, and added the engineer as the co-author.
+[13:23] By doing this, we were able to prevent expensive mistakes before the code made it all the way into Maine.
+[13:29] The other thing that we do at Qatar, interestingly, and as we see more and more of our customers start doing,
+[13:35] is we are using policies and criteria to decide when is it appropriate to actually even approve changes.
+[13:42] There's a lot of changes that are routine, lower risk, documentation, dependency bumps,
+[13:48] of course if they're not breaking any APIs or security patches.
+[13:52] Even things like lower risk changes for internal tooling that can potentially be auto approved.
+[13:58] So Guitars supports these things out of the box and you can also add additional custom
+[14:02] rules which are plain English that you can use to gate the approval and merge on.
+[14:07] And we are seeing teams who are very AI native starting to adopt these more and more.
+[14:12] We see, I think, on our platform, the rate at which folks are adopting, like the auto-approval
+[14:17] and auto-merge grow really quickly across teams, even from large teams like 100 plus,
+[14:22] 2,000 plus developers.
+[14:24] So here's an example of approval policies.
+[14:26] So if it's a dependency bump and dock changes, we should be approving them.
+[14:30] Any changes on the sensitive stuff like payments or auth might need a human approver on top.
+[14:36] And then, of course, you don't want to have the agent who made the change approve its
+[14:40] change because that would not be zero trust. So in this case, as agents are
+[14:46] generating PRs, the PRs are getting approved. When there is a new change that
+[14:50] doesn't meet the criteria, then we would have to escalate to another approver. And
+[14:55] this can be done with your own agents of course, but also get our services out of
+[14:59] the box if you want to try. And the other problem with just relying on CI today is
+[15:06] is that just because CI is green, as I mentioned, doesn't mean the code is compliant in many cases.
+[15:11] So in this case, the CI is passing and there is some metadata that we have about it.
+[15:18] On the rerun, the flaky test is going to fail, which means that when you force push to fix that
+[15:24] thing, now the branch is pointing at another piece of code. So the problem with this is that over time,
+[15:30] most CI data is going to be expired. So unless you have a record of what happened and what was fixed,
+[15:36] you will not be able to like be compliant or be able to audit what actually happened.
+[15:41] Which is why I think things like agent trajectories and like your
+[15:46] outcomes after each push are very very important. So whatever information you can record on the PR
+[15:52] or any other system of record is going to be a source of truth as your artifacts expire.
+[15:56] So the control here is making sure that the change was approved and tested by someone
+[16:02] who did not write it.
+[16:04] If you don't have that information, it could be a problem.
+[16:07] So here's an example.
+[16:08] We have a pipeline that failed in the left and the pipeline that passed.
+[16:12] But the difference here is that if you record properly why the failure occurred when someone
+[16:17] else was able to approve it because it was a known failure mode and it was saved with
+[16:22] the change that made it in, this thing actually passes your checks versus something where you
+[16:27] don't have a record of what happened but you just blindly trust the agent pushing code because it
+[16:32] could be a test that was actually not high quality. There was no record of all the compliance checks
+[16:38] that were like recorded. So you want to make sure that on the more sensitive industries you want to
+[16:45] have all of these decisions recorded as rules or compliance checks on top of your PR in addition
+[16:50] to code review. So what are some of the kinds of records that we want to keep? So here's
+[16:57] a few that we keep on the guitar which I think are just examples. It could be different for
+[17:02] folks. So for example, which coding agent made the PR? Where did the PR originate from?
+[17:09] What was the session that originated it? And who actually started it? Could it be a trigger
+[17:15] from an automated workflow or could it be just an engineer doing prompting? And for
+[17:19] each of these like CI that run what is the commit where CI was trusted and the
+[17:24] same test report not just status and making sure that each finding has a
+[17:30] record of how it was resolved was it dismissed was it followed up was it
+[17:34] like fixed on the PR and then making sure the approval is someone apart from
+[17:38] the bot that was prompted by the same person and making sure that any
+[17:42] overrides are explicitly named so if there is a red build or like a control
+[17:47] code covered skipped, you want to make sure there's a reason for when, why that check failed,
+[17:51] and why we're okay with that in that scenario. And making sure that the code that merges actually
+[17:58] has all this and it's not like a small change on top that was merged. So all the checks are on every
+[18:02] single time. So in this case we want to make sure that agents cannot approve their own changes,
+[18:08] engineer who prompted it is also not an author, and if you have these practices in place,
+[18:14] Now we can actually start removing all these bottlenecks because the CI being faster will
+[18:20] unblock your pills so your flow is much nicer and making sure you can like move some checks left
+[18:26] will also make sure that your test load is going to be reduced quite a bit on the CI side. If you
+[18:32] can automate review for the most part and only escalate to humans for exceptional cases and
+[18:38] potentially even auto-approved low risk or internal changes, then you remove further bottlenecks and
+[18:44] then you have less that has just reaching humans for a software factory to perform to its potential.
+[18:51] And of course after every single approval and merge you want to record what happened because
+[18:57] as factories are going to ramp up, if you don't have an idea of what happened in the past,
+[19:01] that context is going to be very useful on how to like iterate and make your software better over
+[19:06] time. That's it for me. I would love for you folks to also try out guitar and see how you can improve
+[19:13] your software factories and with that thank you so much for your time.

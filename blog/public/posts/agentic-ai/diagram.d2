@@ -1,0 +1,18 @@
+direction: down
+task: Task
+planner: Model picks next step
+policy: Policy check
+human: Human gate
+tool: Tool call (own identity)
+db: DB as agent_worker
+validator: Validator
+done: Done
+task -> planner: goal
+planner -> policy: proposed step
+policy -> tool: reversible
+policy -> human: irreversible
+human -> tool: approved
+tool -> db: 5s timeout
+tool -> validator: result
+validator -> planner: failed, retry
+validator -> done: passed

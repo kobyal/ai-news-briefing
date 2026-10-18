@@ -696,6 +696,31 @@ def _add_sidedata_rows(rows: list) -> None:
                 "status": status, "note": note}
     rows.append(_ogmirror_row())
 
+    # per-story audio — 4 MP3s per story (summary+detail × EN+HE). edge-tts 403'd
+    # every EN + HE-detail clip 2026-10-11→16 (only Google-TTS HE summary survived)
+    # and nothing flagged it. Signal: share of today's audio URL fields populated.
+    def _audio_row() -> dict:
+        try:
+            day = json.loads((repo / f"docs/data/{today}.json").read_text())
+        except Exception as e:
+            return {"agent": "story-audio", "raw": "—", "json": "—", "site": "—",
+                    "status": "warn", "note": f"day JSON unreadable: {str(e)[:40]}"}
+        items = (day.get("briefing") or {}).get("news_items", [])
+        fields = ("summary_audio_url", "summary_audio_url_he", "detail_audio_url", "detail_audio_url_he")
+        want = len(items) * len(fields)
+        have = sum(1 for i in items for f in fields if i.get(f))
+        if want == 0:
+            return {"agent": "story-audio", "raw": "—", "json": "—", "site": "—",
+                    "status": "warn", "note": "no stories today"}
+        pct = have / want
+        status = "ok" if pct >= 0.95 else ("warn" if pct >= 0.7 else "error")
+        note = f"{have}/{want} MP3s"
+        if pct < 0.95:
+            note += " — check 'TLDR audio failed' in the cycle log (edge-tts 403 → upgrade edge-tts)"
+        return {"agent": "story-audio", "raw": f"{have}/{want}", "json": f"{have}/{want}", "site": "—",
+                "status": status, "note": note}
+    rows.append(_audio_row())
+
     # frontend build/sync — Next.js build + S3 sync of /story/[id] pages. Signal: build
     # log has no failure marker AND web/out was rebuilt today.
     def _frontend_row() -> dict:

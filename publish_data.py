@@ -96,6 +96,7 @@ def _generate_tldr_audio(text: str, voice: str, out_path: Path) -> bool:
         return True
     except Exception as e:
         print(f"  TLDR audio failed for voice={voice}: {e}")
+        out_path.unlink(missing_ok=True)  # don't leave a 0-byte MP3 to be synced
         return False
 
 

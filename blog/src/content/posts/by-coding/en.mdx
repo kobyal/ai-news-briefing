@@ -1,0 +1,118 @@
+---
+title: "by coding: the Neon error that moved from boot to the first query"
+description: "An agent reviewing Neon found 1.2.0 moved the missing-env error from boot to the first query. What that says about code agents write."
+lang: en
+key: by-coding
+term: "by coding"
+kind: warstory
+pubDate: 2026-10-20
+tags: ["coding-agents", "fail-fast", "regression", "testing", "mutation-testing", "neon"]
+hook: "number"
+cover: illus
+tldr: ["Check critical env vars yourself at boot. Don't count on the driver to throw", "A health check that doesn't touch the DB is lying. Add select 1 to readiness", "Run mutation testing on code the agent wrote. Coverage isn't enough"]
+hero: /posts/by-coding/hero-en.jpg
+diagram: /posts/by-coding/diagram.svg
+sources:
+  - { title: "Show HN: Agent.reviews – Where AI agents read and write reviews on tools", url: "https://agent.reviews", date: "2026-10-07" }
+  - { title: "Show HN: Mowgli – Figma for the agent era, with Claude Code and design export", url: "https://mowgli.ai", date: "2026-02-28" }
+  - { title: "Show HN: Flawd is mutation testing for the AI era", url: "https://fixture.dev/flawd", date: "2026-09-02" }
+  - { title: "Show HN: r/place for coding agents, the longer it stays up, the more you keep", url: "https://overwrite.place", date: "2026-08-10" }
+  - { title: "Show HN: The why and how of TurboPentest for the Agentic Era", url: "https://integsec.com/blog/the-genesis-of-turbopentest.com-bridging-the-gap-in-an-ai-code-explosion-era", date: "2026-04-24" }
+  - { title: "How do AI coding agents work? - by Rich Holmes", url: "https://departmentofproduct.substack.com/p/how-do-ai-coding-agents-work", date: "" }
+opinion: "We think this story isn't about Neon. It's about where the check lives. Anywhere your code trusts an external library to fail for it, something will break quietly in the next minor update. A deterministic config check at boot is three lines, and it's worth more than any clever agent trying to decode a generic error at 3 a.m. As for agent-written code: coverage doesn't impress us. A test that fails when you change the code does. Agent-written tool reviews, like the ones on agent.reviews, are no substitute for CI, but we'll read them before an upgrade."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+## 9 October: Claude Code writes a review
+
+Neon has 1,320 reviews on agent.reviews, with a 4.1 rating. What's unusual is who writes them. Not people. Coding agents like Claude Code, Codex and Cursor write them after using the tool in a real task. The site hit Show HN on 7 October 2026, and npm alone already has 11,658 reviews there.
+
+On 9 October, Claude Code left a review of Neon's driver. It wasn't just a score. It was a diff. It compared two versions of the same function, `neon()`, and found that something small disappeared between 1.1.0 and 1.2.0: the hint.
+
+I think this story is bigger than it looks. Not because of Neon. Because this is exactly the kind of bug that code written by coding agents both creates and runs into most often: a quiet change under your feet that the tests don't see.
+
+<figure><img src="/posts/by-coding/src1.jpg" alt="Agents already review the tools you pick, and that's where the Neon regression surfaced before it reached your changelog (credit: agent.reviews)" loading="lazy" /><figcaption>Agents already review the tools you pick, and that's where the Neon regression surfaced before it reached your changelog (credit: agent.reviews)</figcaption></figure>
+
+## What changed between 1.1.0 and 1.2.0
+
+Here it is from the review, word for word:
+
+> In 1.1.0, neon() with a missing connection string throws at construction with a hint that an environment variable may be unset. In 1.2.0 construction succeeds, and the first query fails with a generic message about a missing user, host or database.
+>
+> — Claude Code, review of Neon on agent.reviews, 9 October 2026
+
+In short: same mistake, an unset environment variable, but the failure point moved. In 1.1.0 the app falls over the moment you create the client, with a message telling you where to look. In 1.2.0 the client gets created quietly and the error waits for the first query. When it shows up, it's a generic message about a missing user, host or database. The env hint is gone.
+
+And this is a minor bump. If your package.json says `^1.1.0`, you got it on the next install without noticing.
+
+<figure><img src="/posts/by-coding/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/by-coding/v2-svg-en.jpg" alt="Same config mistake, but in 1.2.0 it passes boot and deploy and only fails on a user's first request (Claude Code on agent.reviews)" loading="lazy" /><figcaption>Same config mistake, but in 1.2.0 it passes boot and deploy and only fails on a user's first request (Claude Code on agent.reviews)</figcaption></figure>
+
+## What it looks like from outside
+
+Forget the agent for a moment. Think about a normal deploy with a missing env var. Say someone renamed `DATABASE_URL` in staging, or the secret didn't load.
+
+With 1.1.0: the build passes, the server tries to start and crashes. The deploy is red. Annoying, but you know what happened.
+
+With 1.2.0: the server starts. If your health check returns 200 without touching the DB, it's green. The deploy is green. Then the first request that needs the DB returns a 500 with a message about user and host. On serverless it's even more confusing: every cold start replays the same story, and the logs fill up with errors that look like a permissions problem.
+
+## The first fix everyone tries
+
+A message about a missing user, host or database sends you to the wrong place. What do you check first? The password, the role in the Neon console, whether the branch was deleted, whether the host changed. Maybe you rotate credentials, just in case.
+
+Now put a coding agent in the loop, paste it the error and tell it to fix it. It will do exactly the same thing, just faster: try a different connection string format, wrap it in a retry, maybe add a default value. Each of these fixes looks reasonable. None of them touches the problem. And a default connection string buries it one layer deeper.
+
+> **Caveat:** I don't know what Neon wanted to achieve in 1.2.0. Maybe it's deliberate lazy init, and that makes sense in edge environments. But the hint got lost along the way, and at that point it's not a design question anymore. It's just a worse error message.
+
+## The real cause: fail-fast turned fail-late
+
+The problem isn't Neon. The problem is that the app trusted an external library to validate its config. As long as the library threw in the constructor, you got that check for free. Once it stopped, nothing was left checking.
+
+This is exactly where agent-written code is weak. The agent writes `neon(process.env.DATABASE_URL!)`, with a TypeScript bang that silences the compiler, and the tests run against a `.env.test` that's always filled in. Nice coverage, zero checks on the case that actually breaks. Flawd, a mutation testing tool that hit Show HN on 2 September, says it plainly: AI-written suites reach high coverage fast, often because they mirror the structure of the code rather than its meaning. The tests run everything and check little.
+
+And wait, who caught the regression in the end? Another agent, which happened to run both versions and compare them. Not a test. Not CI.
+
+## What to check this week
+
+First, validate config yourself, at boot, and fail loudly:
+
+```ts title="db.ts"
+import { neon } from "@neondatabase/serverless";
+
+const url = process.env.DATABASE_URL;
+if (!url || !url.startsWith("postgres")) {
+  throw new Error("DATABASE_URL missing or malformed, refusing to boot");
+}
+
+export const sql = neon(url);
+
+export async function assertDbReachable() {
+  await sql`select 1`;
+}
+```
+
+Next, a test that clears the variable and makes sure startup fails. This is the test the agent won't write on its own unless you ask for it explicitly:
+
+```ts title="db.test.ts"
+import { test, expect, vi } from "vitest";
+
+test("boot fails loudly without DATABASE_URL", async () => {
+  vi.resetModules();
+  vi.stubEnv("DATABASE_URL", "");
+  await expect(import("./db")).rejects.toThrow(/DATABASE_URL/);
+  vi.unstubAllEnvs();
+});
+```
+
+And three more small things:
+
+- Call `assertDbReachable()` from the readiness probe, not just liveness. A health check that doesn't touch the DB is lying to you.
+- Pin DB drivers to an exact version, no `^`. Let Renovate or Dependabot bring each minor in its own PR, and read the changelog before you merge.
+- Run mutation testing on your config and DB code. Flawd runs locally, each mutant in a Docker container, and `--diff` limits the run to lines changed against main. `flawd handoff` packs the survivors into a file your agent reads and writes the missing tests from. In their sample run on go-chi/chi there were 217 mutants and 34 survived. About 16%, in a mature router a lot of people rely on. Run it on your code and see your number.
+
+Your agent will write better code every quarter. The question is who falls over first when something shifts under your feet: the boot, or the user.
+
+<figure><img src="/posts/by-coding/v3-strip-en.jpg" alt="Even in a mature router, about one in six planted bugs passes green. Coverage doesn't mean anyone is checking (Flawd)" loading="lazy" /><figcaption>Even in a mature router, about one in six planted bugs passes green. Coverage doesn't mean anyone is checking (Flawd)</figcaption></figure>
+
+

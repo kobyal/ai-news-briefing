@@ -1,0 +1,118 @@
+---
+title: "by coding: השגיאה של Neon שזזה מה-boot לשאילתה הראשונה"
+description: "agent שכתב ביקורת על Neon מצא ש-1.2.0 העבירה את השגיאה על env חסר מה-boot לשאילתה הראשונה. מה זה אומר על קוד שכותבים agents."
+lang: he
+key: by-coding
+term: "by coding"
+kind: warstory
+pubDate: 2026-10-20
+tags: ["coding-agents", "fail-fast", "regression", "testing", "mutation-testing", "neon"]
+hook: "number"
+cover: illus
+tldr: ["בדקו env קריטיים בעצמכם ב-boot, אל תסמכו על הדרייבר שיזרוק", "health check שלא נוגע ב-DB משקר. תוסיפו select 1 ל-readiness", "תריצו mutation testing על קוד שה-agent כתב, coverage לא מספיק"]
+hero: /posts/by-coding/hero.jpg
+diagram: /posts/by-coding/diagram.svg
+sources:
+  - { title: "Show HN: Agent.reviews – Where AI agents read and write reviews on tools", url: "https://agent.reviews", date: "2026-10-07" }
+  - { title: "Show HN: Mowgli – Figma for the agent era, with Claude Code and design export", url: "https://mowgli.ai", date: "2026-02-28" }
+  - { title: "Show HN: Flawd is mutation testing for the AI era", url: "https://fixture.dev/flawd", date: "2026-09-02" }
+  - { title: "Show HN: r/place for coding agents, the longer it stays up, the more you keep", url: "https://overwrite.place", date: "2026-08-10" }
+  - { title: "Show HN: The why and how of TurboPentest for the Agentic Era", url: "https://integsec.com/blog/the-genesis-of-turbopentest.com-bridging-the-gap-in-an-ai-code-explosion-era", date: "2026-04-24" }
+  - { title: "How do AI coding agents work? - by Rich Holmes", url: "https://departmentofproduct.substack.com/p/how-do-ai-coding-agents-work", date: "" }
+opinion: "לדעתנו הסיפור הזה הוא לא על Neon, אלא על איפה הבדיקה יושבת. בכל מקום שהקוד שלכם סומך על ספרייה חיצונית שתיפול בשבילו, משהו יישבר בשקט בעדכון ה-minor הבא. בדיקת קונפיגורציה דטרמיניסטית ב-boot היא שלוש שורות, והיא שווה יותר מכל agent חכם שינסה לפענח שגיאה כללית בשלוש בלילה. ולגבי קוד שכתבו agents: coverage לא מרשים אותנו, מה שמרשים אותנו זה טסט שנכשל כשמשנים את הקוד. ביקורות שכותבים agents על כלים, כמו ב-agent.reviews, הן לא תחליף ל-CI, אבל אנחנו נקרא אותן לפני upgrade."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+## 9 באוקטובר: Claude Code כותב ביקורת
+
+1,320 ביקורות. זה מה שיש ל-Neon ב-agent.reviews, עם דירוג 4.1. ומה שמיוחד שם: את הביקורות לא כותבים אנשים. כותבים אותן coding agents, כמו Claude Code, Codex ו-Cursor, אחרי שהשתמשו בכלי בתוך משימה אמיתית. האתר עלה ל-Show HN ב-7 באוקטובר 2026, ול-npm לבד יש שם כבר 11,658 ביקורות.
+
+ב-9 באוקטובר Claude Code השאיר שם ביקורת על הדרייבר של Neon. לא ציון וזהו, אלא diff. הוא השווה שתי גרסאות של אותה פונקציה, `neon()`, ומצא שבין 1.1.0 ל-1.2.0 נעלם משהו קטן: הרמז.
+
+לדעתי הסיפור הזה גדול יותר ממה שנראה. לא בגלל Neon. כי זה בדיוק סוג הבאג שקוד by coding agents גם מייצר וגם נתקל בו הכי הרבה: שינוי שקט מתחת לרגליים, שהטסטים לא רואים.
+
+<figure><img src="/posts/by-coding/src1.jpg" alt="agents כבר כותבים ביקורות על הכלים שאתם בוחרים, ושם צצה הרגרסיה של Neon לפני שהגיעה ל-changelog שלכם (credit: agent.reviews)" loading="lazy" /><figcaption>agents כבר כותבים ביקורות על הכלים שאתם בוחרים, ושם צצה הרגרסיה של Neon לפני שהגיעה ל-changelog שלכם (credit: agent.reviews)</figcaption></figure>
+
+## מה השתנה בין 1.1.0 ל-1.2.0
+
+ככה זה כתוב בביקורת, מילה במילה:
+
+> In 1.1.0, neon() with a missing connection string throws at construction with a hint that an environment variable may be unset. In 1.2.0 construction succeeds, and the first query fails with a generic message about a missing user, host or database.
+>
+> — Claude Code, ביקורת על Neon ב-agent.reviews, 9 באוקטובר 2026
+
+בגדול: אותה טעות, משתנה סביבה שלא הוגדר, אבל נקודת הנפילה זזה. ב-1.1.0 האפליקציה נופלת ברגע שיוצרים את ה-client, עם הודעה שאומרת לכם איפה לחפש. ב-1.2.0 ה-client נוצר בשקט, והטעות מחכה לשאילתה הראשונה. שם היא מגיעה עם הודעה כללית על user, host או database חסרים. הרמז על ה-env נעלם.
+
+וזו קפיצת minor. מי שמחזיק `^1.1.0` ב-package.json קיבל אותה ב-install הבא בלי לשים לב.
+
+<figure><img src="/posts/by-coding/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/by-coding/v2-svg-he.jpg" alt="אותה טעות קונפיגורציה, אבל ב-1.2.0 היא עוברת boot ו-deploy ונופלת רק בבקשה הראשונה של משתמש (Claude Code ב-agent.reviews)" loading="lazy" /><figcaption>אותה טעות קונפיגורציה, אבל ב-1.2.0 היא עוברת boot ו-deploy ונופלת רק בבקשה הראשונה של משתמש (Claude Code ב-agent.reviews)</figcaption></figure>
+
+## איך זה נראה מבחוץ
+
+עזבו רגע את ה-agent. תחשבו מה קורה ב-deploy רגיל עם env חסר. נגיד מישהו שינה שם ל-`DATABASE_URL` בסביבת staging, או שה-secret לא נטען.
+
+עם 1.1.0: ה-build עובר, השרת מנסה לעלות ונופל. ה-deploy אדום. מעצבן, אבל אתם יודעים מה קרה.
+
+עם 1.2.0: השרת עולה. אם ה-health check שלכם מחזיר 200 בלי לגעת ב-DB, הוא ירוק. ה-deploy ירוק. ואז הבקשה הראשונה שצריכה DB מחזירה 500, עם הודעה שמדברת על user ו-host. ב-serverless זה עוד יותר מבלבל, כי כל cold start חוזר על אותו סיפור, והלוגים מתמלאים בשגיאות שנראות כמו בעיית הרשאות.
+
+## התיקון הראשון שכולם ינסו
+
+הודעה על user, host או database חסרים שולחת אתכם למקום הלא נכון. מה בודקים קודם? את הסיסמה, את ה-role ב-console של Neon, אם ה-branch נמחק, אם ה-host השתנה. אולי מסובבים credentials, ליתר ביטחון.
+
+עכשיו תשימו בלופ coding agent, תדביקו לו את השגיאה ותגידו לו לתקן. הוא יעשה בדיוק את אותו דבר, רק מהר יותר: ינסה פורמט אחר ל-connection string, יעטוף ב-retry, אולי יוסיף ערך default. כל תיקון כזה נראה סביר. אף אחד מהם לא נוגע בבעיה. ו-default ל-connection string אפילו קובר אותה עוד שכבה.
+
+> **הסתייגות:** אני לא יודע מה Neon רצו להשיג ב-1.2.0. אולי זה lazy init מכוון, ויש לזה היגיון בסביבות edge. אבל הרמז הלך לאיבוד בדרך, ופה זה כבר לא עניין של עיצוב, זו פשוט הודעת שגיאה גרועה יותר.
+
+## הסיבה האמיתית: fail-fast שהפך ל-fail-late
+
+הבעיה היא לא Neon. הבעיה היא שהאפליקציה סמכה על ספרייה חיצונית שתבדוק בשבילה קונפיגורציה. כל עוד הספרייה זרקה בבנאי, קיבלתם את הבדיקה בחינם. ברגע שהיא הפסיקה, לא נשאר שום דבר שבודק.
+
+וזה בדיוק המקום שבו קוד שכתב agent חלש. ה-agent כותב `neon(process.env.DATABASE_URL!)`, עם סימן קריאה של TypeScript שמשתיק את הקומפיילר, והטסטים רצים עם `.env.test` שתמיד מלא. Coverage יפה, אפס בדיקה של המקרה שבאמת נשבר. Flawd, כלי mutation testing שעלה ל-Show HN ב-2 בספטמבר, אומר את זה ישר: suites שנכתבו עם AI מגיעים ל-coverage גבוה מהר, הרבה פעמים כי הם מחקים את המבנה של הקוד ולא את המשמעות שלו. הטסטים מריצים הכול ובודקים מעט.
+
+ורגע, מי תפס את הרגרסיה בסוף? agent אחר, שבמקרה הריץ את שתי הגרסאות והשווה. לא טסט. לא CI.
+
+## מה לבדוק אצלכם השבוע
+
+קודם כל, תבדקו קונפיגורציה בעצמכם, ב-boot, ותיפלו בקול:
+
+```ts title="db.ts"
+import { neon } from "@neondatabase/serverless";
+
+const url = process.env.DATABASE_URL;
+if (!url || !url.startsWith("postgres")) {
+  throw new Error("DATABASE_URL missing or malformed, refusing to boot");
+}
+
+export const sql = neon(url);
+
+export async function assertDbReachable() {
+  await sql`select 1`;
+}
+```
+
+חוץ מזה, טסט שמוחק את המשתנה ומוודא שהעלייה נכשלת. זה הטסט שה-agent לא יכתוב לבד אם לא תבקשו ממנו במפורש:
+
+```ts title="db.test.ts"
+import { test, expect, vi } from "vitest";
+
+test("boot fails loudly without DATABASE_URL", async () => {
+  vi.resetModules();
+  vi.stubEnv("DATABASE_URL", "");
+  await expect(import("./db")).rejects.toThrow(/DATABASE_URL/);
+  vi.unstubAllEnvs();
+});
+```
+
+ועוד שלושה דברים קטנים:
+
+- תקראו ל-`assertDbReachable()` מה-readiness probe, לא רק מה-liveness. health check שלא נוגע ב-DB משקר לכם.
+- על דרייבר של DB עושים pin לגרסה מדויקת, בלי `^`. תנו ל-Renovate או Dependabot להביא כל minor ב-PR נפרד, ותקראו את ה-changelog לפני merge.
+- תריצו mutation testing על קוד ה-config וה-DB. Flawd רץ מקומית, כל mutant בקונטיינר Docker, ועם `--diff` אפשר להגביל את הריצה לשורות שהשתנו מול main. `flawd handoff` אורז את השורדים לקובץ שה-agent שלכם קורא וכותב ממנו את הטסטים החסרים. בהרצה לדוגמה שלהם על go-chi/chi יצאו 217 mutants, ו-34 שרדו. בערך 16%, ב-router בוגר שהרבה אנשים סומכים עליו. תריצו אצלכם, ותראו את המספר שלכם.
+
+ה-agent שלכם יכתוב קוד טוב יותר כל רבעון. השאלה היא מי נופל ראשון כשמשהו זז מתחת לרגליים: ה-boot, או המשתמש.
+
+<figure><img src="/posts/by-coding/v3-strip-he.jpg" alt="גם ב-router בוגר, בערך אחד מכל שישה באגים מושתלים עובר ירוק. coverage לא אומר שמישהו בודק (Flawd)" loading="lazy" /><figcaption>גם ב-router בוגר, בערך אחד מכל שישה באגים מושתלים עובר ירוק. coverage לא אומר שמישהו בודק (Flawd)</figcaption></figure>
+
+

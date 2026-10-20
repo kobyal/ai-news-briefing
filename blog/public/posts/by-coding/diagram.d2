@@ -1,0 +1,16 @@
+direction: down
+env: DATABASE_URL unset
+v110: neon() 1.1.0
+v120: neon() 1.2.0
+throw110: Throws at construction with env hint
+boot: Server boots
+deploy: Deploy green
+query: First query
+generic: Generic error about user, host or database
+env -> v110: old version
+env -> v120: new version
+v110 -> throw110: fails fast
+v120 -> boot: client created silently
+boot -> deploy: health check 200
+deploy -> query: first real request
+query -> generic: fails late

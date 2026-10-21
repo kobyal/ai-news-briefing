@@ -1,0 +1,351 @@
+[0:00] Jadaya Reviewer
+[0:07] My name is Jadaya, and I joined Cursor early in 2025
+[0:19] as the longest-tenured engineer working on our agent harness.
+[0:23] And recently, I came along to SpaceX
+[0:27] SpaceX as part of the acquisition of Cursor.
+[0:30] So today I want to talk to you all about how the agent harness has evolved to where we
+[0:35] are today and where I think things are going.
+[0:40] And there's a motivating question that I have for us to answer today, which is, is the agent
+[0:46] harness dead?
+[0:49] So let's get started.
+[0:55] a more natural and flowing version of that script which reads like a cohesive conference
+[0:59] talk rather than a series of short points.
+[1:02] Oops.
+[1:03] Just making sure everyone's still got their slop detectors on before lunch.
+[1:07] No, for real.
+[1:09] So the story starts in early 2023 when Prompt Engineer was the hottest title out there.
+[1:17] By mid 2025, that had evolved to Context Engineer, someone who programmatically puts the best
+[1:24] context for the model together on the fly.
+[1:28] And then only at the beginning of this year
+[1:30] did the industry land on the term agent harness
+[1:32] and harness engineering to describe work that my team and I
+[1:36] have been doing for a while.
+[1:40] So what's in an agent harness?
+[1:43] The harness is like the eyes and the hands for the model.
+[1:48] It wraps around the model, steers it,
+[1:50] and connects it to the world.
+[1:53] Users connect to our harness through apps.
+[1:56] And then the harness connects the model to computers
+[1:59] and also to third-party services like MCPs.
+[2:02] I like to divide the harness into two layers, the runtime
+[2:06] and the context and orchestration layers.
+[2:10] The runtime is kind of like the foundation of the harness.
+[2:14] It controls where the core agent loop runs
+[2:17] and how state is stored so that work can resume.
+[2:21] Building this foundation is a lot like traditional software
+[2:24] engineering.
+[2:27] And then the context and orchestration layers
+[2:29] are kind of like the Wild West.
+[2:31] This is what a lot of people refer
+[2:33] to when they talk about the harness.
+[2:36] These parts of the harness control which models are called
+[2:39] when and what context they see.
+[2:44] That includes things like prompts and tools, of course,
+[2:47] but also memory, compaction, and a bunch of tricks
+[2:51] you might not know that we do to make the agent behave
+[2:53] in the way that we want.
+[2:55] So this is the area that I primarily work in.
+[2:59] In the new year, we kind of hit peak harness.
+[3:03] Cursor announced that we had created a browser entirely
+[3:06] from scratch using a new long-running harness
+[3:09] called Grindswarm.
+[3:12] This was a multi-model harness that orchestrated a lot of agents
+[3:17] and a lot of machines, and it was very expensive to run.
+[3:22] It actually took down Cursor maybe once or twice
+[3:25] to get this demo.
+[3:28] Now, like anything in the world of agents,
+[3:32] it only took a few months of peak harness for people online
+[3:36] to start saying that the harness was dead.
+[3:40] Tariq from Anthropic talked about how they had killed much
+[3:44] of the system prompt from Cloud Code.
+[3:46] Gary Tan from YC thought that the harness would fade away
+[3:51] and only skills would matter.
+[3:54] Even myself and my colleague, Stefan,
+[3:56] we wrote about how we had removed all these guardrails
+[3:59] that we had in Cursor to patch over gaps
+[4:02] in the model's intelligence.
+[4:04] We used to have things like a small model just
+[4:07] to apply code edits to a file because the frontier models
+[4:10] weren't good at this.
+[4:11] We also had all sorts of coding-specific instructions
+[4:14] like how to explore the code base and how to check your work.
+[4:19] So if all these people were saying the harness is dead,
+[4:23] they were saying that smarter models are what killed it.
+[4:28] And there's a lot of evidence for that.
+[4:31] I want you all to think about a very simple harness
+[4:35] where the model only has access to the shell
+[4:37] and to all of my secrets.
+[4:39] Please don't screenshot this slide, by the way.
+[4:40] This one's off limits.
+[4:41] So who here thinks that this really simple harness would do just as well on coding evals
+[4:50] as a more sophisticated one?
+[4:53] Maybe some hands.
+[4:54] Who thinks it would?
+[4:55] Raise your hand if you think it would.
+[4:58] A few hands.
+[4:59] Most of you know.
+[5:00] So a few recent studies tried to investigate exactly that question.
+[5:06] The first one out of UC Berkeley tried seven different frontier models on a series of harnesses
+[5:11] including Pi, Codex, and Cloud Code.
+[5:14] And what they found, particularly on the newer, smarter models,
+[5:18] is that the choice of harness did not actually
+[5:21] make a difference significantly in the score on SweetBench Lite.
+[5:26] And then another study from Apple and EPFL
+[5:29] found similarly that a dedicated MLE harness did not
+[5:33] make a big difference on an MLE bench.
+[5:36] So what is going on here?
+[5:39] Is it actually true that the harness is dead?
+[5:41] Are they right?
+[5:42] Here's what I think that the evidence shows.
+[5:45] A fancy harness in this day and age
+[5:47] no longer adds coding intelligence.
+[5:49] I think that is true.
+[5:52] I know that's surprising.
+[5:54] But these things that we used to do in the harness
+[5:57] to patch over gaps in the raw coding muscle memory
+[6:00] of the model, like teaching it how
+[6:01] to explore the code base, how to work persistently
+[6:05] for a very long time with things like slash goal,
+[6:08] how to run tests to check your work,
+[6:10] The model has natively absorbed these skills.
+[6:16] So why is this happening?
+[6:20] It turns out the harness is actually
+[6:23] making itself obsolete through what I call the data flywheel.
+[6:27] So in this process, the harness brings
+[6:30] harder and harder coding tasks within reach.
+[6:34] At that point, more users can productively
+[6:36] attempt those tasks with agents.
+[6:38] That means more coding data is shared with the labs.
+[6:41] And eventually, the models learn natively
+[6:44] how to do these skills well.
+[6:47] Eventually, the models get so good
+[6:50] that the harness can actually delete the things it needed
+[6:53] to do to make those tasks work in the first place.
+[6:58] It's a very interesting process.
+[7:00] So that's how you get people saying that the harness is dead.
+[7:04] And if the models are good enough to code well in any harness,
+[7:07] then why should you care?
+[7:08] Does it really matter which harness you use?
+[7:12] Is the harness really dead?
+[7:14] I say no, and there's two reasons why.
+[7:18] First of all, and I'm going to go into both these points,
+[7:21] the harness actually opens the new frontier of tasks
+[7:24] for the model to solve.
+[7:26] And then second, there are some tasks
+[7:29] or some parts of the harness, especially outside the context
+[7:31] layer, which the model cannot absorb.
+[7:34] So to first talk about how the harness unlocks the next frontier,
+[7:38] I want to talk about GrokBot.
+[7:41] Who here has tried GrokBot?
+[7:42] Can I see some hands?
+[7:44] Awesome.
+[7:45] Let's go.
+[7:46] That's great.
+[7:47] So for those of you who haven't, GrokBot
+[7:49] is our autonomous colleague who gets work done for you,
+[7:53] not just coding, but all kinds of knowledge work.
+[7:56] And I really recommend you try it.
+[7:58] I'm not going to sell too much, but it's
+[7:59] a groundbreaking new product because it's already
+[8:01] created a new category.
+[8:03] Let's just talk about the harness, though.
+[8:05] So GrokBot has a new kind of harness
+[8:08] that operates not based off of one-off chats,
+[8:11] but long-lived coordinator bots that orchestrate a fleet
+[8:15] of worker agents.
+[8:17] You can kind of think of it like hiring a high-powered lawyer
+[8:20] who deals with you directly and own strategy,
+[8:25] but they farm out their tasks to a team of paralegals.
+[8:29] It's like that.
+[8:32] Now, something interesting about the Grokbot harness
+[8:36] is I mentioned how in Cursor we have found ourselves
+[8:39] removing things from the harness, removing prompting,
+[8:41] removing guardrails as the models got smarter.
+[8:43] But curiously, in GrokBot, we've actually
+[8:46] found ourselves putting back a lot of these things,
+[8:48] adding new prompting, adding new guardrails.
+[8:50] And that's because there's a lot of new tasks
+[8:53] in this new way of working, in the new domains
+[8:56] that GrokBot is meant to solve, that the models have not
+[8:59] nailed yet.
+[9:02] To give a few examples of those kind of things,
+[9:04] just a few things that we're focused on right now
+[9:05] comes to GrokBot.
+[9:07] There's key website flows like making slide decks
+[9:10] and booking travel, communication.
+[9:12] An autonomous colleague needs to keep you up to date
+[9:14] on what it's been doing without overwhelming you.
+[9:17] Acting versus asking is another big one.
+[9:19] GrokBot can do a lot of things which are kind of risky
+[9:23] in some sense, like emailing your colleagues.
+[9:24] You want to be able to do that, but you only
+[9:26] want it to do it in the way that you intended.
+[9:28] And then, of course, learning over time the way
+[9:30] that you work through memories is another big focus.
+[9:35] So those of you who might have pushed the boundaries with coding agents might have noticed that none of these tasks are new.
+[9:42] But for GrokBot, they're much more important because everybody is needing them in some way.
+[9:48] And right now in GrokBot, it is the harness that is making these tasks feasible.
+[9:53] Of course, the model is a big part of that, but the harness is helping bring them in within reach.
+[9:57] So going back to our data flywheel, GrokBot, that example, lets us fill in the last arrow
+[10:06] in our cycle, which is when a capability like coding gets commoditized by the model, it's
+[10:13] actually the harness which unlocks a new frontier for the model to then solve and kicks off
+[10:20] that flywheel again.
+[10:22] So that might look like taking on new tasks outside of the coding domain, as we just saw
+[10:30] with Crock-Bot, or it could just mean taking on tasks in the software engineering job beyond
+[10:35] pure coding.
+[10:36] I'm sure some of you here are pretty senior in your software careers, and you might know
+[10:39] the more senior you get, the less coding you're actually doing.
+[10:42] So there's a lot of other things in the job that matter.
+[10:44] This is the core idea that I would like you to understand, this flywheel and how the model
+[10:49] and the Harness together drive it.
+[10:53] One more example of how the Harness can unlock new frontiers
+[10:58] is some of you may have heard of this idea of the software
+[11:01] factory, where you have multiple agents coordinating together
+[11:05] to solve the full software development lifecycle.
+[11:09] Now, this is far from a solved vision,
+[11:12] but there's a lot of innovation happening
+[11:16] across the industry at the Harness.
+[11:18] To give an example of how this might manifest internally,
+[11:21] we have a lot of channels where someone might report a bug
+[11:24] to that channel.
+[11:25] And then an automation immediately
+[11:27] auto triages that bug.
+[11:28] Then it might kick off a cloud agent
+[11:30] to try to fix the bug.
+[11:31] And that agent will use our tooling
+[11:32] to show before and after videos to prove that it's fixed.
+[11:36] And then once that fix is deployed or is merged
+[11:39] and starts deploying, we have our Rollouts product,
+[11:42] which kicks off another agent to watch in production
+[11:44] for any issues.
+[11:48] So you can think of all this as almost like a meta harness, which is orchestrating many
+[11:55] agents together.
+[11:56] That's how I would like you to think about this.
+[12:00] So that's the first reason that you should care about the harness, because a frontier
+[12:03] harness is needed to be at the frontier of agentic tasks.
+[12:07] And then the next reason is there are some parts of the harness that the model can't absorb.
+[12:12] So let's talk about those.
+[12:16] First of all, there is the infrastructure and runtime
+[12:18] needed to make an autonomous colleague reliable.
+[12:22] Over the past year plus, we've gone from agents
+[12:24] that work on a typical task for minutes to hours to days
+[12:28] and even longer.
+[12:30] And there's just no way that this can
+[12:32] work on one person's laptop, which might go to sleep.
+[12:36] It has to be running in the cloud if you really
+[12:38] want an autonomous colleague.
+[12:43] And then next, we have trust and security.
+[12:45] Yes, like we saw before, a simple harness with just
+[12:48] bash and all your API keys in a file
+[12:52] can solve coding tasks.
+[12:53] But you probably don't want to give all your API keys
+[12:56] in a file to the model.
+[12:58] Or if you're OK with that, I'm sure
+[12:59] that your head of security would have something to say.
+[13:03] So this is obviously really important.
+[13:05] Companies where we want to have permissions that
+[13:07] are scoped down to specific agents and specific people.
+[13:10] But it's also important to have guardrails for anyone
+[13:12] who doesn't want to wake up one morning
+[13:14] to a really catastrophic action or to a $10,000 APIP.
+[13:18] Right?
+[13:21] And then finally, there's efficiency.
+[13:24] If you think back to those two studies
+[13:26] I showed where the choice of harness
+[13:28] did not make a significant difference in eval scores,
+[13:31] both of those studies actually found
+[13:33] that there was a significant difference in cost per task.
+[13:38] I have personally been focused over the past month
+[13:40] on optimizing the efficiency of the GrokBot harness.
+[13:43] Now, through tweaking variables like cache hit rate,
+[13:47] improving that, token efficiency, model mix,
+[13:51] we were able to bring down the costs and the speed of GrokBot
+[13:54] significantly for users without any hit to quality.
+[13:57] Users have really, really been appreciating this.
+[14:00] It's been awesome to see.
+[14:02] Now, it could be an entire different talk
+[14:05] about how we did this.
+[14:06] But the key takeaway here is that the more and more
+[14:09] that you use agents to do your work, the more it matters,
+[14:12] the more valuable it will be for you
+[14:13] to have the most efficient harness.
+[14:18] So by now, you might be convinced
+[14:19] that the harness still matters.
+[14:21] Then you might be asking, what's next?
+[14:24] Here's a few trends that I'm anticipating.
+[14:27] First of all, that flywheel is speeding up.
+[14:30] And right now, we've entered a new age
+[14:32] where the product is once again moving faster than the model.
+[14:35] That means that the harness is going to get more messy
+[14:38] before it gets cleaned up.
+[14:39] There's going to be more things shipped.
+[14:41] So because of this, we're expecting
+[14:43] people to build their harnesses, design them
+[14:46] so it's easier to ship and unship new features.
+[14:50] One way we're already seeing that manifest
+[14:52] is with both GrockBot and other similar products,
+[14:54] less and less of the harness inner workings
+[14:56] are being exposed to the user.
+[14:57] Some of you may have heard of Hiram's Law,
+[14:59] which says that anything that you expose to users,
+[15:02] they will come to depend on.
+[15:05] Now, obviously, there are trade-offs
+[15:07] to giving users less visibility into what's happening.
+[15:11] But one advantage is that there's less change management
+[15:14] to deal with, and you can iterate much faster.
+[15:18] Now, another way that we've been seeing this trend manifest
+[15:22] is a bigger focus on designing primitives for agents.
+[15:26] Primitives are like building block interfaces
+[15:28] that can be composed and extended into powerful features.
+[15:32] When you have primitives, you can add new features
+[15:35] without making things more complicated for the agent.
+[15:37] And you can remove features without having
+[15:39] to do a complicated refactor in your code base.
+[15:41] It's just good engineering.
+[15:43] One example across our agent harnesses of a primitive
+[15:46] we've added is called subscriptions.
+[15:49] Agents need a way to wake up in response to events.
+[15:51] Those might be someone posting in Slack,
+[15:54] CI going red on a PR that the agent cares about,
+[15:57] or just a certain time of day.
+[16:00] Now, rather than having one separate integration,
+[16:03] or having separate integrations for each
+[16:04] of these things, we have one framework and one tool
+[16:07] that the model can use, or the agent can use,
+[16:09] to subscribe to an event.
+[16:12] And then another cool thing that we do,
+[16:14] I mentioned earlier that we have these deterministic guard
+[16:17] rails to patch over bad behaviors in the model.
+[16:20] That might be, for example, if GrokBot doesn't respond
+[16:23] to the user fast enough, and we might give it a little nudge
+[16:26] and say, hey, the user's waiting on you.
+[16:28] Now, we'd rather not do these things.
+[16:31] They're kind of like hacks.
+[16:32] But we would rather fix them now than wait
+[16:34] for the next model checkpoint to get released.
+[16:36] So in order to make our code base be less messy
+[16:40] and have less of a worse time iterating the future,
+[16:43] we track all these things, which we call shims centrally.
+[16:46] And every time the model uses one, it gets logged.
+[16:48] So now we have a bot who watches this dashboard.
+[16:51] And whenever a shim stops firing, that model or that agent
+[16:53] will put up a PR and say, this shim can be cleaned up.
+[16:58] Another thing that I think is next for the harness
+[17:00] is it is moving up to a higher level of abstraction.
+[17:04] Yesterday's generation of harnesses
+[17:06] were built from composing a bunch of LLM calls.
+[17:08] Now the new harnesses we're seeing,
+[17:10] like GrokBot and the software factory,
+[17:12] are using agents as the core building block.
+[17:15] And then finally, I predict that within six months,
+[17:19] 90% of agent work is going to run off the laptop.
+[17:22] This is already where things are going.
+[17:23] And I think there's just no way that this is not necessary in
+[17:28] in order to have truly autonomous agents who can really work with us in the way that we want.
+[17:36] So, is the harness dead?
+[17:39] The parts that made it smarter at coding, yes, that is the flywheel at work.
+[17:45] That is the flywheel at work.
+[17:47] But the harness, as we saw, is how the agents can unlock the next frontier of work.
+[17:53] then also the trust, the efficiency, the infrastructure that the harness brings,
+[17:58] those things are not going anywhere. So yesterday's harness may be dead, but long
+[18:04] live the agent harness of tomorrow. Thank you.

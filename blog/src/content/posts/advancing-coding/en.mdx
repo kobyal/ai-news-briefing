@@ -1,0 +1,142 @@
+---
+title: "Advancing coding: migrating COBOL with an agent without losing a cent"
+description: "COBOL migration with an agent in six steps: golden master, an AGENTS.md contract, byte-level diff, and high reasoning effort only for what failed."
+lang: en
+key: advancing-coding
+term: "advancing coding"
+kind: fieldnotes
+pubDate: 2026-10-21
+tags: ["cobol", "legacy-migration", "coding-agents", "evals", "golden-master", "openai"]
+hook: "claim"
+cover: photo
+tldr: ["Record golden outputs from the old program before the agent writes a line", "In AGENTS.md: Decimal only, explicit ROUND_HALF_UP, golden/ read-only", "Low effort for every case, high effort only for what failed the diff"]
+hero: /posts/advancing-coding/hero-en.jpg
+diagram: /posts/advancing-coding/diagram.svg
+sources:
+  - { title: "Advancing coding in low‑resource programming languages", url: "https://openai.com/index/low-resource-programming-languages", date: "2026-10-20" }
+  - { title: "Advancing coding in low‑resource programming languages", url: "https://openai.com/index/low-resource-programming-languages/?shem=dsdf,sharefoc,agadiscoversdl,,sh/x/discover/m1/4", date: "2026-10-20" }
+  - { title: "From Copilot to agents: The history of AI coding", url: "https://www.coderabbit.ai/blog/a-very-brief-history-of-ai-coding-from-copilot-to-next-gen-agents", date: "" }
+  - { title: "How do AI coding agents work? - by Rich Holmes", url: "https://departmentofproduct.substack.com/p/how-do-ai-coding-agents-work", date: "" }
+  - { title: "10 things I learned from burning myself out with AI coding agents", url: "https://arstechnica.com/information-technology/2026/01/10-things-i-learned-from-burning-myself-out-with-ai-coding-agents", date: "" }
+  - { title: "What are AI Agents?- Agents in Artificial Intelligence Explained - AWS", url: "https://aws.amazon.com/what-is/ai-agents", date: "" }
+opinion: "We think the real story in OpenAI's post isn't 97.9%. It's that their eval measures behavior preservation, not code quality. That's exactly what we believe: verification beats generation, and a loop that checks itself is worth more than a better first draft. Legacy migration is the clearest case for it, because there's an old program that gives the right answer every time, for free. What's left for you is building the harness: what the agent sees, what it must not touch and when it stops. If your team spends more time on the prompt than on the golden set, you're investing in the wrong side."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+The model is no longer the hard part of a COBOL migration. The hard part is your golden set.
+
+On October 20, OpenAI reported that GPT-6.1 Sol migrates COBOL programs to another language with 86.6% accuracy at low reasoning effort, and 97.9% at high. The previous generation, GPT-5.6 Sol, scored 5.4% on the same eval. That's a real jump, and the model is also 39% cheaper. But look at what they actually measured. Not whether the new code is clean. They measured whether it behaves exactly like the old code. If you don't have a machine that answers that question, their 97.9% does nothing for you.
+
+And COBOL isn't going anywhere. According to IBM, which OpenAI cites, it still runs behind more than 40% of online banking systems, 80% of in-person credit card transactions and 95% of ATM transactions. Anyone who has worked at a bank, an insurer or a government office has seen it up close.
+
+So here's how I'd run a migration like this with an agent, whether that's Claude Code, Codex or whatever you have in-house. The running example is one batch program that calculates interest, `INTCALC.cbl`, moving to Python.
+
+## 01 · Pick one program, not a system
+
+Scope first. Not "we'll migrate the core." Take one batch program that reads a file and writes a file, with no CICS screens and no embedded SQL. Those come later, once you have a method.
+
+Here's how to find candidates: `grep -L -E "EXEC (CICS|SQL)" src/*.cbl | xargs wc -l | sort -n | head -20`. You get a list of programs with no external dependencies, smallest to largest. I'd start somewhere in the middle of the list. The smallest program usually doesn't do anything interesting, so you won't learn anything from it.
+
+Wait, why start from behavior and not from the code? OpenAI put it best:
+
+> Documentation may be incomplete, original developers may have left the company, and important business rules may only exist in code.
+>
+> OpenAI, "Advancing coding in low-resource programming languages", Oct 20, 2026
+
+In short, the code is the spec, and there is no other spec.
+
+<figure><img src="/posts/advancing-coding/src2.jpg" alt="OpenAI's eval checks whether the new code behaves like the old code, not whether it's pretty, and that's the same eval you need to build (credit: OpenAI)" loading="lazy" /><figcaption>OpenAI's eval checks whether the new code behaves like the old code, not whether it's pretty, and that's the same eval you need to build (credit: OpenAI)</figcaption></figure>
+
+## 02 · Record the behavior before touching a line
+
+This is called a golden master, and it's an old technique from the legacy world, long before LLMs. You run the old program on lots of inputs, save the output, and from then on that output is the truth.
+
+The inputs: a week of real batch files after anonymization, plus a hand-built set of edge cases. Zero, a negative value, the maximum value the PIC can hold, and overflow. Overflow? Yes. A `PIC 9(5)` field that receives 123456 stores 23456, silently, if there's no `ON SIZE ERROR`. You need to preserve that behavior. If you want to fix it, you decide that explicitly, in a separate ticket.
+
+```bash title="record_golden.sh"
+set -euo pipefail
+cobc -x -o legacy/intcalc src/INTCALC.cbl
+for f in golden/cases/*.dat; do
+  ./legacy/intcalc < "$f" > "${f%.dat}.out"
+done
+ls golden/cases/*.out | wc -l
+```
+
+One catch: GnuCOBOL on Linux is not a mainframe. EBCDIC vs. ASCII changes sort order, and packed decimals (`COMP-3`) can behave differently. If you have access, record the `.out` files on the real machine and pull them into the repo. I think 300 input/output pairs is a reasonable minimum for one program.
+
+<figure><img src="/posts/advancing-coding/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## 03 · Give the agent a contract, not a history
+
+The agent doesn't need to know why someone added that condition in 1994. It needs rules it can check. Put one file at the repo root, `AGENTS.md`, or `CLAUDE.md` if you're on Claude Code:
+
+```markdown title="AGENTS.md"
+- Never edit anything under golden/.
+- Money is Decimal, never float.
+- PIC S9(7)V99 -> Decimal, quantize to 0.01.
+- COBOL ROUNDED -> ROUND_HALF_UP. No ROUNDED -> ROUND_DOWN (truncate).
+- Output is fixed-width. Keep leading zeros and trailing spaces.
+- Done means `python3 golden_diff.py` exits 0. Not before.
+```
+
+The rounding line is worth its weight in gold. In Python, the `decimal` context rounds with `ROUND_HALF_EVEN` by default, which is banker's rounding. COBOL with `ROUNDED` rounds half up, and without `ROUNDED` it just truncates. So 2.345 comes out as 2.34 in Python and 2.35 in COBOL. That's one cent, and once you multiply it by a million records a night, you have a problem.
+
+The first line of the file matters just as much. A stuck agent looks for the shortest path to exit 0, and sometimes that path is updating the `.out` files. So run `chmod -R a-w golden/` before it starts.
+
+## 04 · The agent runs against a diff, not a hunch
+
+This is basically what OpenAI's eval does: run, compare, count. On your side it looks like this:
+
+```python title="golden_diff.py"
+import json, pathlib, subprocess, sys
+
+CASES = pathlib.Path("golden/cases")
+NEW = ["python3", "-m", "intcalc"]
+
+cases = sorted(CASES.glob("*.dat"))
+fails = []
+for case in cases:
+    expected = case.with_suffix(".out").read_bytes()
+    r = subprocess.run(NEW, input=case.read_bytes(), capture_output=True, timeout=30)
+    if r.returncode != 0 or r.stdout != expected:
+        fails.append(case.name)
+
+passed = len(cases) - len(fails)
+print(json.dumps({"cases": len(cases), "passed": passed,
+                  "rate": round(passed / max(len(cases), 1), 3),
+                  "fails": fails[:20]}))
+sys.exit(1 if fails else 0)
+```
+
+The output is one line of JSON, for example `{"cases": 300, "passed": 261, "rate": 0.87, ...}`. The agent reads it, opens the first failure, fixes it and runs again. The comparison is byte-level, on purpose. In a financial system, "almost identical" is a bug.
+
+Benj Edwards of Ars Technica has built 50 projects with Claude Code and Opus 4.5 since November 2025, and compared the experience to a 3D printer: something comes out, but it isn't production-ready. Roughly speaking, the diff is what separates "something came out" from "ready."
+
+## 05 · Low effort for everything, high effort only for what failed
+
+Now the money. According to OpenAI, the model closes 86.6% at low effort and reaches 97.9% at high. There's no reason to pay for high effort on the whole program. Run a cheap first pass, and send only the failed cases to the expensive one:
+
+```bash title="escalate.sh"
+python3 golden_diff.py | jq -r '.fails[]' > failing.txt
+codex exec -c model_reasoning_effort=high \
+  "Make these golden cases pass: $(paste -sd' ' failing.txt). Do not touch golden/."
+```
+
+The same logic works when picking a model. On MultiLangBench, where the model builds a SQLite-compatible engine from scratch in 20 languages, GPT-6 Luna reached 40.3% at about 78% lower API cost, versus 87.4% for GPT-6 Astra. Cheap is nice, but if half the cases fail, you'll pay the difference in extra rounds.
+
+> **Caveat:** These are OpenAI's numbers, on the eval they built and the programs they chose. I don't know your COBOL, and neither do they. Treat 86.6% as a reference point for your first pass, not a promise.
+
+<figure><img src="/posts/advancing-coding/v2-svg-en.jpg" alt="Run everything cheap and escalate only what failed: 86.6% closes at low effort, and only 2.1% reaches a human (OpenAI)" loading="lazy" /><figcaption>Run everything cheap and escalate only what failed: 86.6% closes at low effort, and only 2.1% reaches a human (OpenAI)</figcaption></figure>
+
+## 06 · Measure pass rate, and what it cost
+
+For each program, log one row: how many cases, first-pass pass rate, final pass rate, how many rounds it took and how many dollars it cost. You can see the cost with `/cost` in Claude Code and `/status` in Codex. After ten programs you'll have a real number: what it costs to migrate 1,000 lines of COBOL at your shop. That's the number you bring to management, not the benchmark.
+
+What's left after high effort can't be measured automatically. That 2.1% is exactly the business rules nobody remembers anymore. A human has to read them, ideally with someone who knows the system sitting next to them.
+
+## Takeaways
+
+- A golden set before the first line of code. Without a golden set it isn't a migration, it's a rewrite.
+- Decimal and rounding rules written in AGENTS.md, with `ROUND_HALF_UP` spelled out.
+- Low effort for everything, high effort only for failures, and a human only for the last 2%.
+- `golden/` is read-only. An agent that's allowed to touch the answers will find them.

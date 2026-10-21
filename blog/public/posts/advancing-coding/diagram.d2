@@ -1,0 +1,19 @@
+direction: down
+inputs: "Recorded batch inputs"
+legacy: "Legacy COBOL binary"
+golden: "golden/*.out (read-only)"
+agent_low: "Agent, low effort"
+newcode: "New Python module"
+diff: "golden_diff.py"
+agent_high: "Agent, high effort"
+human: "Human review"
+done: "Merge"
+inputs -> legacy: replay
+legacy -> golden: record once
+agent_low -> newcode: write
+newcode -> diff: run all cases
+golden -> diff: expected bytes
+diff -> done: exit 0
+diff -> agent_high: failing cases
+agent_high -> newcode: fix
+agent_high -> human: still failing

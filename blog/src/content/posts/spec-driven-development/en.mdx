@@ -1,0 +1,102 @@
+---
+title: "Spec-driven development: you edit the spec, not the code"
+description: "What spec-driven development is, why it isn't waterfall, how spec, design and tasks work, and how one spec line yields two documents with the same name"
+lang: en
+key: spec-driven-development
+term: "spec-driven development"
+kind: explainer
+pubDate: 2026-10-22
+tags: ["spec-driven-development", "ai-coding", "agents", "kiro", "openspec", "requirements"]
+hook: "scene"
+cover: type
+tldr: ["Write requirements in EARS (WHEN/IF ... THE SYSTEM SHALL), so every requirement is a test", "Any task over two days gets a spec, a design and tasks before the agent touches code", "Fixed code by hand? Update the spec in the same commit, or it's lying"]
+hero: /posts/spec-driven-development/hero-en.jpg
+diagram: /posts/spec-driven-development/diagram.svg
+sources:
+  - { title: "Spec Driven Development Isn't Waterfall", url: "https://brooker.co.za/blog/2026/04/09/waterfall-vs-spec.html", date: "2026-05-28" }
+  - { title: "Formal Methods for Spec-Driven Development: Catching Requirement Conflicts", url: "https://blog.fizzbee.ai/formal-methods-for-spec-driven-development-catching-requirement-conflicts-as-products-evolve", date: "2026-10-21" }
+  - { title: "Learnings from a No-Code Lib: Keep the Spec Driven Development Triangle in Sync", url: "https://www.dbreunig.com/2026/03/04/the-spec-driven-development-triangle.html", date: "2026-03-04" }
+  - { title: "Stop AI from Wrecking Your Codebase with Spec-Driven Development", url: "https://guibai.dev/a/7656050265522913280", date: "2026-07-03" }
+opinion: "We think SDD is mostly old-school requirements engineering with an agent in the loop, and that's fine. Our test is whether it changes what you do on Monday morning, and here the answer is yes: the spec gets reviewed before the code is written. What we don't buy is a spec without tests. Everywhere we've replaced model judgment with a deterministic rule, it came out cheaper and more reliable, and EARS requirements with conformance tests are exactly that. Markdown on its own is a prompt with git history."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+On January 8, 2026, Drew Breunig pushed a library to GitHub without a single line of code. It's called whenwords. It turns a Unix timestamp into something a human can read, like "5 hours ago" or "about 12". The repo holds three things. A markdown file that describes what the library does. About 750 conformance tests in YAML, in "this input, this output" form. And an `install.md` with one paragraph you paste into your agent, along with the language you want and where to save it. Your agent writes the code on your side.
+
+This was a few weeks after Opus 4.5 shipped, and it caught on: more than 1,000 stars, and a nod from Karpathy. On March 3, at the MLOps Community Coding Agents conference, Breunig got on stage and explained where he got it wrong. We'll get to that.
+
+This is spec-driven development, or SDD, in its cleanest form. You bring a spec (what, why, sometimes how) and tests, and the agent produces the code. Nobody coined the name. It just stuck in 2025, when AWS's Kiro and GitHub's Spec Kit built a full workflow around it.
+
+## Not waterfall, not a long prompt
+
+The most common criticism: we're back to waterfall, just with markdown. Marc Brooker from AWS, who talks about Kiro on every podcast that has him, answered that in April. In his view you don't write the spec up front and freeze it. You just work one level higher. A living, versioned file in git, and the code is derived from it.
+
+> In specification driven development, the specification is the thing being iterated on, rather than the implementation.
+> — Marc Brooker, "Spec Driven Development Isn't Waterfall"
+
+In practice the loop stays the same. You learn a requirement from users, change things, get feedback. The difference is what you edit: the spec, not the diff. And according to Brooker the loop actually gets faster, because the agent turns a spec change into code in minutes.
+
+What it isn't: a long prompt. A prompt disappears when the conversation ends. A spec lives in the repo, has history, and the agent in the next session reads it from scratch. That's the whole difference.
+
+## Three files, then archive
+
+The frontend team at Guming (古茗) published their setup in June, and it's fairly representative of what most tools do. Three documents per change:
+
+- **spec**: what we're building, the acceptance criteria, and above all what must not be touched.
+- **design**: the technical approach. You write the decision once, and the agent doesn't reinvent it every session.
+- **tasks**: small pieces, each one testable on its own.
+
+They use OpenSpec, which gives you four commands: `/opsx propose` drafts the change, `apply` runs the tasks, `sync` updates the spec after changes, and `archive` closes the change. Archive is the step people skip, and it matters most. Every closed change becomes context for the next session, with the decisions made and the landmines already found. Kiro has the same idea, with `requirements.md`, `design.md` and `tasks.md` under `.kiro/specs/`.
+
+On top of that they have two enforcement layers. `AGENTS.md` for stable rules, like folder structure and areas that are off-limits. And hooks for rules you can't trust the model to remember. For example, a PostToolUse hook that rejects any file with a hardcoded Chinese string, because everything has to go through i18n. Their rule of thumb: a task longer than two days justifies a spec. Anything shorter, write a prompt and move on.
+
+<figure><img src="/posts/spec-driven-development/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## One spec line, two documents named A
+
+On October 20, FizzBee published an example anyone who has written a PRD will recognize. A documents app: you create a document with a unique name, you delete it. The PM asks for a trash bin. The spec change is one modified line and one added line. Here's the new version, with our fix at the end:
+
+```markdown title="specs/documents/spec.md"
+
+<figure><img src="/posts/spec-driven-development/v1-svg-en.jpg" alt="Two requirements that each make sense, four steps, and a state the system can't be in. An agent will implement it faithfully (FizzBee)" loading="lazy" /><figcaption>Two requirements that each make sense, four steps, and a state the system can't be in. An agent will implement it faithfully (FizzBee)</figcaption></figure>
+
+## Requirements: documents (v2)
+
+R1: THE SYSTEM SHALL allow a user to create a document with a name.
+R2: IF a user creates a document with a name already used by another document,
+    THEN THE SYSTEM SHALL reject the request.
+R3: WHEN a user deletes a document, THE SYSTEM SHALL move it to the trash.
+R4: WHEN a user restores a document from the trash,
+    THE SYSTEM SHALL restore it as it was before deletion.
+R5: IF a user restores a document whose name is now used by an active document,
+    THEN THE SYSTEM SHALL reject the restore and name the blocking document.
+
+## Out of scope
+- emptying the trash
+- permanent delete
+```
+
+Read R1 through R4. Each requirement makes sense on its own. Now run it in your head: create A, delete it to the trash, create a new A (R2 allows it, the name is free), and restore the old A. R4 says restore it exactly as it was. R2 says names are unique. Both can't hold at once. R5 is just one of two possible product decisions. The other: names in the trash still count as taken, and you fix R2 instead.
+
+FizzBee write that a few lines of formal spec find this in seconds, in a single-user CRUD app with no concurrency. Their point: what justifies formal checking isn't how complex the system is, but how many requirements touch each other. And an agent handed R1 through R4? It will implement R4 faithfully, and you'll find out in production.
+
+## The triangle that drifts apart quietly
+
+So where did Breunig go wrong with whenwords? He presented it as a straight line: spec and tests go in, code comes out. In the talk he drew a triangle instead. Spec, tests and code, and each side pulls the other two. The agent hits an edge case the spec didn't cover, someone fixes the code directly, and from that moment the spec is lying. Nobody notices, because the tests are still green.
+
+He built a PoC that keeps all three in sync, and that's also what `/opsx sync` tries to do. Without it, SDD decays into a folder of stale markdown that no agent should trust.
+
+> **My take:** I don't buy a code-less library as the default. What held whenwords together was the 750 tests, not the markdown. To me a spec is worth exactly as much as the tests derived from it.
+
+<figure><img src="/posts/spec-driven-development/src3.jpg" alt="SDD is a triangle, not a line: if only the code moves, the spec and tests already describe a different system (credit: Drew Breunig)" loading="lazy" /><figcaption>SDD is a triangle, not a line: if only the code moves, the spec and tests already describe a different system (credit: Drew Breunig)</figcaption></figure>
+
+## What to try this week
+
+1. Pick one task that will take more than two days. Not a single-file refactor, a feature.
+2. Write the requirements in EARS format, like the example: `WHEN ... THE SYSTEM SHALL`, `IF ... THEN`. It forces every requirement to be something you can test.
+3. Add an Out of scope section and a list of files that must not be touched. That's what stops the agent from widening the change.
+4. Install OpenSpec (`npm install -g @fission-ai/openspec`, then `openspec init` in the repo), or open a spec in Kiro, and run propose, apply and archive once end to end.
+5. For every requirement, at least one whenwords-style test: input and expected output, in YAML. The agent runs them before it says "done".
+6. Before merge, ask a second model: "Find two requirements here that can't both hold." It's not a model checker, but it's cheap and catches the classics.
+
+And if your spec hasn't moved since the code moved, you don't have a spec. You have documentation.

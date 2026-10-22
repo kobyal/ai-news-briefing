@@ -1,0 +1,268 @@
+[0:00] We are Felipe and Francesco. We come to talk to you about the compound value of
+[0:21] of building Monzo's in-house agents using LLMs.
+[0:26] So, what is Monzo?
+[0:28] We are a bank, digital bank, trying to make money work for everyone.
+[0:33] To give you a size of the problem for coding agents,
+[0:36] we have our teams of engineers maintaining over 3,000 backend services,
+[0:41] around 13,000 data warehouse models,
+[0:45] and dozens and dozens of ML predictors.
+[0:48] So we do all sorts of things like deciding on credit, deciding on financial crime, and
+[0:54] doing very complex use cases both for the app, the back-end, and data.
+[1:00] So I'm pretty sure by, even by today, but outside of the conference you have heard a
+[1:05] lot of success cases of companies adopting AI agents for coding.
+[1:11] In fact, there was a conference a couple of weeks ago here in New York, and this article
+[1:17] came out talking about the state of the tech industry in 2026.
+[1:22] And there is this, hopefully, jokingly quote from X,
+[1:27] saying that if you're not building your own AI coding harness,
+[1:30] are you even a serious tech company?
+[1:32] So some food for thought, right?
+[1:35] Then, inside of Monzo, in January 2026,
+[1:40] this Slack channel went viral.
+[1:42] Agent Chip.
+[1:44] And hopefully it can...
+[1:45] Oh, no, what happened?
+[1:46] Can I do this?
+[1:47] It's all right.
+[1:49] So hopefully I can bring your attention
+[1:50] to this little emoji here.
+[1:52] Really cute.
+[1:53] We love it.
+[1:54] This became really, really vital inside of the company
+[1:56] for a really good reason.
+[1:58] You can give it any prompt directly
+[2:01] by just reacting with the little emoji to the message,
+[2:05] and it will pick it up as a prompt.
+[2:09] So that evolved.
+[2:11] We doubled down, and that became an always available teammate
+[2:14] inside our Slack and whole environment.
+[2:17] To give you a few examples, it does feel like a coworker.
+[2:20] It's just there.
+[2:22] You can always add agent chip and get it
+[2:24] to do something for you, answer a question,
+[2:26] find out something about some architecture,
+[2:29] or just have a chat with you.
+[2:30] But I don't think he likes it so much.
+[2:34] It can also do code reviews.
+[2:36] So like a very senior engineer, he
+[2:39] will just tell you, it looks good to me,
+[2:40] and go on your merry way.
+[2:43] And you can also assign linear tasks as well.
+[2:46] So you can give a ticket, and it will just get into it.
+[2:51] So all of this is good and well.
+[2:55] Forward into today, Agentship offers over 10%
+[3:00] of all merged PRs across tech.
+[3:02] So that's data, machine learning, that's
+[3:05] backend engineering app, et cetera.
+[3:07] Also runs more than 1,800 tasks per day, which is a lot.
+[3:13] and is being actively starting to be adopted by business users as well.
+[3:19] So it's not just coding and tech.
+[3:21] It's also trying to answer business questions, writing queries,
+[3:24] or self-serving anything that a business user may need.
+[3:29] So, again, you've heard many success stories
+[3:31] about companies adopting AI coding agents, but so what?
+[3:37] What are we trying to share today?
+[3:40] Are we saying that we want to brag that we built CloudTag
+[3:44] six months before Anthropic released it?
+[3:47] We could be.
+[3:48] That's not the focus of today's talk.
+[3:51] We want to share the secret sauce of what makes Agentship
+[3:56] a successful product, and it's LLMs.
+[4:00] But actually, LLMs, in this case,
+[4:02] stands for lots of little multipliers.
+[4:06] We believe that what enabled us to build Agentship
+[4:09] so quickly and so in a valuable way is a very strong platform at Monzo.
+[4:15] So when we say that this went viral and you could write a prompt, react and profit,
+[4:22] actually this comes from a number of capabilities we already had.
+[4:26] So alerting, monitoring, integrations with third parties,
+[4:31] such as the ones Francesco mentioned,
+[4:33] a staging environment that allows us to test easily,
+[4:35] queuing abstractions, easy deployment, database abstractions, and a number of other things I could be mentioning here.
+[4:44] So first and foremost, what we have in our platform is what allowed AgentChip to be successful.
+[4:51] But this does not stop there.
+[4:53] We saw, even before AgentChip as a remote agent existed,
+[4:58] we started to invest in supporting AI coding agents, even in local environments.
+[5:04] So one of the first things we did was develop an MCP gateway that allowed easy access to a set of knowledge sources and internal tools and some of the services that Francesco mentioned.
+[5:16] So this is roughly how the architecture looks like.
+[5:20] We have the things we want to connect as the internal services and knowledge sources.
+[5:24] And we put that behind the MCP server that we built to get the deterministic behavior,
+[5:31] choosing what are the things we want to expose to the agents.
+[5:35] And then we manage also authorization, authentication for the number of different agents.
+[5:41] Again, this started in the world of local coding agents that wanted to connect.
+[5:47] And by now, probably everyone has heard in multiple sessions that the more context
+[5:52] and the more data we are able to give safely to our agents, the better.
+[5:59] After that, we built the agent orchestration system,
+[6:02] which is exactly what powers agent chip behind the scenes
+[6:05] and makes it work in a sandbox and with very strict tools and permissions.
+[6:10] So if we go back to our diagram,
+[6:13] the whole architecture for the MCP server basically condenses into this box,
+[6:19] And this is where we connect the rest of the agent chip architecture.
+[6:24] So we have remote agents running inside a sandbox in an isolated namespace.
+[6:31] And then the orchestration system triggers and then reads and gets this information from that.
+[6:37] The main idea here is, and again, this is coming across in multiple providers and labs and so on,
+[6:45] is that we want to separate this from the rest of our infrastructure in production. Again,
+[6:51] we are a bank, we live in a regulated environment, so we want to make sure that the non-determinism
+[6:57] from the agents is controlled. But at the same time, we want to have an environment where we can
+[7:04] let it run loose and develop. And again, if we explore this to give you a bit more under the
+[7:09] the hood visibility of what is going on.
+[7:11] So in this isolated namespace, multiple pods
+[7:15] come up with sandboxes that the agents are running on.
+[7:20] The agent image is where we define the exact tools
+[7:24] the agents will have as access.
+[7:26] So things like the environment, the CLIs,
+[7:29] and the authentication, and the authorization
+[7:31] that, again, we get from the gateway itself.
+[7:36] The proxy is what allows us to connect to both the exterior
+[7:41] world.
+[7:41] So that is how, for instance, Aging Chip
+[7:43] is able to connect to our code, to our repositories,
+[7:46] and work with that.
+[7:48] But of course, we only get the egress
+[7:50] that we choose to do, choose to give it.
+[7:54] So that is how we make sure that it's very controlled
+[7:57] and deliberately giving access to the things we
+[8:01] want it to be able to see.
+[8:02] And finally, the little blue-green box there
+[8:05] is where the agent itself is running.
+[8:08] So that box inside the box inside the box
+[8:11] is where the non-determinism happens,
+[8:13] and it's where the agent can perform everything that it wants.
+[8:17] So this is how the whole diagram looks like,
+[8:20] when we are able to give our MCP server access to everything
+[8:25] that we care about for the agent.
+[8:28] We are able to safely give it access to our data,
+[8:31] and the agent orchestration system
+[8:33] handles everything that's around it.
+[8:37] With this as building blocks, any use cases that come after it
+[8:41] are much, much easier to be built on top of.
+[8:45] So as Francesco mentioned, this we can connect Slack to,
+[8:49] and then we can connect GitHub, and then we connect linear.
+[8:52] And then I just use a different color
+[8:54] to show this is the more than 3,000 services
+[8:58] that we can be connecting to this as a building block.
+[9:01] So in the same fashion that we had multiple things
+[9:05] in our platform that enabled us to build
+[9:07] agentship and get value out of it,
+[9:10] now that agentship is also a building block,
+[9:13] the multiple parts of our bank can also
+[9:15] leverage it to create other use cases.
+[9:19] So we start to see these building blocks
+[9:21] enabled us to not only get more product features internally,
+[9:26] but to drive concrete business outcomes.
+[9:29] We observed a higher breadth and volume of tasks
+[9:33] that engineers are able to run, as you can expect,
+[9:35] because then we don't need people to be babysitting
+[9:39] their agents all the time.
+[9:40] They can use their coding assistant for specific tasks,
+[9:45] but they can also delegate to remote agents.
+[9:48] We can automate routine processes much better.
+[9:50] So that allows humans to focus on the higher value problems
+[9:54] where the ambiguity lies, particularly.
+[9:57] Some examples of these that we are able to do.
+[10:00] This is Agent Chip working in incident mode
+[10:04] and leveraging the MCP to get very relevant data.
+[10:08] So what happens here is whenever we identify and trigger
+[10:11] a new incident, Agent Chip joins the channel
+[10:14] and is able to start an investigation,
+[10:16] understanding logs, understanding traces,
+[10:19] being able to connect to that exact service, and of course,
+[10:22] the code itself to see what's going on
+[10:24] to help the human with a very high signal.
+[10:28] We don't want the agent to be saying a lot of things
+[10:31] during an incident and testing hypothesis life.
+[10:34] We want it to maintain high signal,
+[10:36] and we give the humans also control of how much
+[10:39] agent chip we'll be able to support there.
+[10:42] We can continue to use it on Slack,
+[10:44] but not only by triggering it by mentioning it,
+[10:47] but also in what we call ask channels.
+[10:50] It's basically squad to squad interaction inside Monzo.
+[10:54] A squad needs to have some context on a backend service,
+[10:57] on a product development, on the roadmap.
+[11:00] And Agent Chip can also, since it can connect
+[11:02] to our knowledge sources, it's able to draft a response
+[11:06] for the human in the loop to get us reference and support
+[11:10] there.
+[11:10] Maybe the response will be enough,
+[11:13] and Agent Chip can just solve that ask ticket by itself.
+[11:17] Sometimes it will ask for more context,
+[11:20] and the human in the loop can be tagged
+[11:22] and come in to support more.
+[11:26] Something that we're doing very recently that's
+[11:28] been creating a lot of value is also
+[11:30] triaging data quality alerts and checking for back-end changes
+[11:35] that can create problems.
+[11:36] So basically, we call it Agentship on Call.
+[11:39] And it observes the failures that we have
+[11:42] and triggers an investigation automatically.
+[11:45] This is the reactive version of it.
+[11:47] But what if the errors never happened in the first place?
+[11:51] We created, based on this, the proactive version
+[11:54] that monitors back-end changes and identifies
+[11:58] which are the potential outcomes that that can
+[12:01] have for our data, even before the data is processed
+[12:04] in the next batch execution.
+[12:07] So again, all of these are examples
+[12:10] of how our technology team is using it.
+[12:12] But even better than that, we've
+[12:14] observed a lower barrier for non-specialists in the company
+[12:18] to contribute to our systems.
+[12:20] With a very quick entry point for Agent Chip on Slack,
+[12:23] non-specialists can, based on product feedback,
+[12:26] based on ideas, based on discussions they are having,
+[12:30] just call Agent Chip, get a draft that works
+[12:34] that is already tested in staging,
+[12:36] and then, and only then, involve an engineer
+[12:39] to make sure we get the changes reviewed
+[12:41] and deployed properly.
+[12:43] So this doesn't change the rigor
+[12:46] to which we develop software at Monzo,
+[12:49] But this does allow a number of non-specialists
+[12:52] to also start contributing more closely to the team.
+[12:57] You can be thinking now, the market is moving fast.
+[13:01] We are hearing a lot of exciting developments
+[13:05] and new products and new features coming
+[13:08] from multiple companies here in the conference and otherwise.
+[13:13] What makes us believe that Agentship continues
+[13:16] to be a valuable thing at this point in 2026
+[13:19] and moving forward.
+[13:21] As I said, and I like to reiterate,
+[13:25] Agentship being composable, it is now a new building block
+[13:30] that we have in our platform.
+[13:31] So it very quickly enables new use cases
+[13:35] for agentic implementation at Monzo,
+[13:38] now that we can connect it very safely with all our security
+[13:42] requirements and all our backend and platform
+[13:44] requirements at the same time.
+[13:46] Our platform is provider-agnostic by definition.
+[13:50] So if we come back to the diagram,
+[13:52] the little blue-slash-green agent box there
+[13:55] can be very easily swapped for any model.
+[13:59] We can dynamically choose which model best
+[14:02] fits the purposes that we have.
+[14:04] So we are not specifically tied to any provider by definition.
+[14:08] And that gives us flexibility to understand which ones will
+[14:13] fit Monzo's needs the best.
+[14:17] And finally, we are continuing to move to cover a bigger
+[14:20] development window.
+[14:21] So even if we stop development today,
+[14:24] this would already be valuable.
+[14:26] But we can cover a much broader sense in terms of we draft
+[14:30] changes in the back end.
+[14:32] We draft changes in the app.
+[14:33] We can test these changes in a staging environment,
+[14:36] cover the data tests.
+[14:38] Who knows?
+[14:39] Maybe even predictors on the other side.
+[14:41] So when remote agents are able to do this end to end,
+[14:45] we can understand and integrate our systems much better.
+[14:49] So again, the market is moving.
+[14:51] Doesn't mean that we are necessarily
+[14:55] married to agentship until the end.
+[14:59] But these and other aspects of it
+[15:01] make us strongly believe that it is a very strong part
+[15:05] of our internal platform now.
+[15:07] And the key takeaway that I want you all to take from
+[15:11] is how can you benefit from LLMs, but not the traditional LLMs,
+[15:16] but the lots of data multipliers that you and your team
+[15:19] can use to leverage value.
+[15:21] Thank you.

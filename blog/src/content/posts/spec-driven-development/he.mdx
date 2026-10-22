@@ -1,0 +1,102 @@
+---
+title: "Spec-driven development: ה-spec הוא מה שעורכים, לא הקוד"
+description: "מה זה spec-driven development, למה זה לא waterfall, איך עובדים עם spec, design ו-tasks, ואיך שורה אחת ב-spec יוצרת שני מסמכים עם אותו שם"
+lang: he
+key: spec-driven-development
+term: "spec-driven development"
+kind: explainer
+pubDate: 2026-10-22
+tags: ["spec-driven-development", "ai-coding", "agents", "kiro", "openspec", "requirements"]
+hook: "scene"
+cover: type
+tldr: ["תכתבו דרישות ב-EARS (WHEN/IF ... THE SYSTEM SHALL), ככה כל דרישה היא בדיקה", "משימה של יותר מיומיים מקבלת spec, design ו-tasks לפני שה-agent נוגע בקוד", "תיקנתם קוד ידנית? תעדכנו את ה-spec באותו commit, אחרת הוא משקר"]
+hero: /posts/spec-driven-development/hero.jpg
+diagram: /posts/spec-driven-development/diagram.svg
+sources:
+  - { title: "Spec Driven Development Isn't Waterfall", url: "https://brooker.co.za/blog/2026/04/09/waterfall-vs-spec.html", date: "2026-05-28" }
+  - { title: "Formal Methods for Spec-Driven Development: Catching Requirement Conflicts", url: "https://blog.fizzbee.ai/formal-methods-for-spec-driven-development-catching-requirement-conflicts-as-products-evolve", date: "2026-10-21" }
+  - { title: "Learnings from a No-Code Lib: Keep the Spec Driven Development Triangle in Sync", url: "https://www.dbreunig.com/2026/03/04/the-spec-driven-development-triangle.html", date: "2026-03-04" }
+  - { title: "Stop AI from Wrecking Your Codebase with Spec-Driven Development", url: "https://guibai.dev/a/7656050265522913280", date: "2026-07-03" }
+opinion: "אנחנו חושבים ש-SDD הוא בעיקר requirements engineering ישן עם agent בלולאה, וזה בסדר גמור. המבחן שלנו הוא אם זה משנה מה עושים ביום ראשון בבוקר, וכאן התשובה כן: ה-spec עובר review לפני שהקוד נכתב. מה שאנחנו לא קונים זה spec בלי בדיקות. בכל מקום שהחלפנו שיפוט של מודל בכלל דטרמיניסטי, זה יצא זול ואמין יותר, ודרישות ב-EARS עם conformance tests הן בדיוק זה. markdown לבד הוא prompt עם היסטוריה ב-git."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+ב-8 בינואר 2026 דרו ברוניג העלה ל-GitHub ספרייה בלי שורת קוד אחת. קוראים לה whenwords. היא הופכת Unix timestamp למשהו שבן אדם קורא, כמו "לפני חמש שעות" או "בערך 12". בריפו יש שלושה דברים. קובץ markdown שמתאר מה הספרייה עושה. בערך 750 בדיקות conformance ב-YAML, בסגנון "קלט כזה, פלט כזה". וקובץ `install.md` עם פסקה אחת שמדביקים ל-agent שלכם, עם השפה שאתם רוצים ואיפה לשמור. את הקוד ה-agent כותב אצלכם.
+
+זה היה כמה שבועות אחרי ש-Opus 4.5 יצא, וזה תפס: יותר מ-1,000 כוכבים, וקרפאתי פרגן. ב-3 במרץ, בכנס Coding Agents של MLOps Community, ברוניג עלה לבמה והסביר איפה הוא טעה. נגיע לזה.
+
+זה spec-driven development, או SDD, בגרסה הכי נקייה שלו. מביאים spec (מה, למה, לפעמים איך) ובדיקות, וה-agent מוציא קוד. אף אחד לא המציא את השם, הוא פשוט נדבק ב-2025, כש-Kiro של AWS ו-Spec Kit של GitHub בנו workflow שלם סביבו.
+
+## זה לא waterfall, וזה לא prompt ארוך
+
+הביקורת הכי נפוצה: חזרנו ל-waterfall, רק עם markdown. מארק ברוקר מ-AWS, שמדבר על Kiro בכל פודקאסט שמזמין אותו, ענה על זה באפריל. לדבריו לא כותבים את ה-spec מראש ומקפיאים אותו. פשוט עובדים רמה אחת מעל. קובץ חי, עם גרסאות, ב-git, והקוד נגזר ממנו.
+
+> In specification driven development, the specification is the thing being iterated on, rather than the implementation.
+> — Marc Brooker, "Spec Driven Development Isn't Waterfall"
+
+בפועל המחזור לא משתנה. מגלים דרישה מהמשתמשים, משנים, מקבלים feedback. ההבדל הוא מה אתם עורכים: את ה-spec, לא את ה-diff. ולפי ברוקר המחזור רק נהיה מהיר יותר, כי ה-agent הופך שינוי ב-spec לקוד תוך דקות.
+
+ומה זה לא: זה לא prompt ארוך. prompt נעלם כשהשיחה נגמרת. spec יושב בריפו, יש לו היסטוריה, וה-agent בסשן הבא קורא אותו מאפס. זה כל ההבדל.
+
+## שלושה קבצים, ואז archive
+
+צוות ה-frontend של Guming (古茗) פרסם ביוני את ה-setup שלהם, והוא די מייצג את מה שרוב הכלים עושים. שלושה מסמכים לכל שינוי:
+
+- **spec**: מה בונים, מה ה-acceptance criteria, ובעיקר במה אסור לגעת.
+- **design**: הגישה הטכנית. כותבים את ההחלטה פעם אחת, וה-agent לא ממציא אותה מחדש בכל סשן.
+- **tasks**: חתיכות קטנות, שאת כל אחת מהן אפשר לבדוק לבד.
+
+הם עובדים עם OpenSpec, שנותן ארבע פקודות: `/opsx propose` מייצר טיוטה, `apply` מריץ את ה-tasks, `sync` מעדכן את ה-spec אחרי שינויים, ו-`archive` סוגר את השינוי. ה-archive הוא החלק שאנשים מדלגים עליו, והוא הכי חשוב. כל שינוי שנסגר נהיה context לסשן הבא, עם ההחלטות והמוקשים שכבר גילו. ב-Kiro זה אותו רעיון, עם `requirements.md`, `design.md` ו-`tasks.md` תחת `.kiro/specs/`.
+
+מעל זה יש להם שתי שכבות אכיפה. `AGENTS.md` לחוקים יציבים, כמו מבנה תיקיות ואזורים שלא נוגעים בהם. ו-Hooks לחוקים שאי אפשר לסמוך על המודל שיזכור. למשל PostToolUse hook שדוחה כל קובץ עם מחרוזת סינית hardcoded, כי הכל צריך לעבור דרך i18n. כלל האצבע שלהם: משימה של יותר מיומיים מצדיקה spec. פחות מזה, תכתבו prompt ותמשיכו הלאה.
+
+<figure><img src="/posts/spec-driven-development/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+## שורה אחת ב-spec, ושני מסמכים בשם A
+
+ב-20 באוקטובר FizzBee פרסמו דוגמה שכל מי שכתב PRD מכיר. אפליקציית מסמכים: יוצרים מסמך עם שם ייחודי, מוחקים. ה-PM מבקש סל מחזור. השינוי ב-spec הוא שורה אחת ששונתה ושורה אחת שנוספה. הנה הגרסה החדשה, עם תיקון שלנו בסוף:
+
+```markdown title="specs/documents/spec.md"
+
+<figure><img src="/posts/spec-driven-development/v1-svg-he.jpg" alt="שתי דרישות שכל אחת מהן הגיונית, ארבעה צעדים, ומצב שהמערכת לא יכולה להיות בו. agent יממש את זה בנאמנות (FizzBee)" loading="lazy" /><figcaption>שתי דרישות שכל אחת מהן הגיונית, ארבעה צעדים, ומצב שהמערכת לא יכולה להיות בו. agent יממש את זה בנאמנות (FizzBee)</figcaption></figure>
+
+## Requirements: documents (v2)
+
+R1: THE SYSTEM SHALL allow a user to create a document with a name.
+R2: IF a user creates a document with a name already used by another document,
+    THEN THE SYSTEM SHALL reject the request.
+R3: WHEN a user deletes a document, THE SYSTEM SHALL move it to the trash.
+R4: WHEN a user restores a document from the trash,
+    THE SYSTEM SHALL restore it as it was before deletion.
+R5: IF a user restores a document whose name is now used by an active document,
+    THEN THE SYSTEM SHALL reject the restore and name the blocking document.
+
+## Out of scope
+- emptying the trash
+- permanent delete
+```
+
+תעברו על R1 עד R4. כל דרישה לבד הגיונית. עכשיו תריצו בראש: יוצרים את A, מוחקים אותו לסל, יוצרים A חדש (R2 מרשה, השם פנוי), ומשחזרים את A הישן. R4 אומר לשחזר בדיוק כמו שהיה. R2 אומר ששמות ייחודיים. שניהם לא יכולים להתקיים ביחד. R5 היא רק אחת משתי החלטות מוצר אפשריות. השנייה: שמות בסל עדיין נחשבים תפוסים, ואז מתקנים את R2.
+
+FizzBee כותבים שכמה שורות של spec פורמלי מוצאות את זה בשניות, באפליקציית CRUD עם משתמש אחד ובלי concurrency. הנקודה שלהם: מה שמצדיק בדיקה פורמלית זה לא כמה המערכת מסובכת, אלא כמה דרישות נוגעות אחת בשנייה. ו-agent שמקבל את R1 עד R4? הוא יממש את R4 בנאמנות, ותגלו את זה בפרודקשן.
+
+## המשולש שמתפרק בשקט
+
+אז איפה ברוניג טעה עם whenwords? הוא הציג את זה כקו ישר: spec ובדיקות נכנסים, קוד יוצא. בהרצאה הוא כבר צייר משולש. spec, בדיקות וקוד, וכל צלע מזיזה את השתיים האחרות. ה-agent נתקל במקרה קצה שה-spec לא כיסה, מישהו מתקן את הקוד ישירות, ומהרגע הזה ה-spec משקר. אף אחד לא שם לב, כי הבדיקות עדיין ירוקות.
+
+הוא בנה PoC שמחזיק את שלושתם מסונכרנים, וזה גם מה ש-`/opsx sync` מנסה לעשות. בלי זה, SDD מתדרדר לתיקייה של markdown ישן שאף agent לא אמור להאמין לו.
+
+> **הדעה שלי:** אני לא קונה ספרייה בלי קוד כברירת מחדל. מה שהחזיק את whenwords זה 750 הבדיקות, לא ה-markdown. בעיני spec שווה בדיוק כמו הבדיקות שנגזרות ממנו.
+
+<figure><img src="/posts/spec-driven-development/src3.jpg" alt="SDD הוא משולש ולא קו: אם רק הקוד זז, ה-spec והבדיקות כבר מתארים מערכת אחרת (credit: Drew Breunig)" loading="lazy" /><figcaption>SDD הוא משולש ולא קו: אם רק הקוד זז, ה-spec והבדיקות כבר מתארים מערכת אחרת (credit: Drew Breunig)</figcaption></figure>
+
+## מה לנסות השבוע
+
+1. תבחרו משימה אחת שתיקח יותר מיומיים. לא refactor של קובץ, פיצ'ר.
+2. תכתבו את הדרישות בפורמט EARS, כמו בדוגמה: `WHEN ... THE SYSTEM SHALL`, `IF ... THEN`. זה מכריח כל דרישה להיות משהו שאפשר לבדוק.
+3. תוסיפו סעיף Out of scope ורשימת קבצים שאסור לגעת בהם. זה מה שעוצר את ה-agent מלהרחיב את השינוי.
+4. תתקינו OpenSpec (`npm install -g @fission-ai/openspec`, ואז `openspec init` בריפו), או תפתחו spec ב-Kiro, ותריצו propose, apply ו-archive פעם אחת מקצה לקצה.
+5. לכל דרישה, לפחות בדיקה אחת בסגנון whenwords: קלט ופלט צפוי, ב-YAML. ה-agent מריץ אותן לפני שהוא אומר "סיימתי".
+6. לפני merge, תבקשו ממודל שני: "תמצא שתי דרישות פה שלא יכולות להתקיים ביחד". זה לא model checker, אבל זה זול ותופס את הקלאסיקות.
+
+ואם ה-spec שלכם לא זז מאז שהקוד זז, אין לכם spec. יש לכם תיעוד.

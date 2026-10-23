@@ -1,0 +1,336 @@
+[0:00] Thank you for joining this session. It's a bit of an emotional one. My name is Nathanel and I'm a
+[0:20] non-evaluator. It's been a lot of time since the last agent I've been shipping without any
+[0:28] evaluation and today I want to tell you the story how I quit this addiction of
+[0:34] shipping an agent without any evaluation so I'm working at Air Canada so compared
+[0:41] to the previous talk it's more like focus on specific business I joined Air Canada
+[0:47] in June of this year and Air Canada is a huge company we work in operation
+[0:53] corporate commercial and loyalty each of those segments have their own challenges
+[0:58] So my team is in charge of delivering AI solutions for all of those.
+[1:04] And the problem when we tackle a task or we create an agent for a task that is so specific
+[1:12] we don't have any public benchmark we can rely on.
+[1:15] And that's the main, main problem we are trying to address in this presentation.
+[1:21] More importantly, it's not that we don't have a benchmark, it's we are data scientists
+[1:27] that can build agents, or AI engineers that can build agents.
+[1:30] But we are not domain experts.
+[1:33] And those domain experts sit in different business units.
+[1:36] And they are very busy in their own task.
+[1:39] And we have limited access to that.
+[1:40] So both of those things went together
+[1:44] in a situation where it's very hard for us
+[1:46] to build any evaluation or any benchmark for our task.
+[1:52] So before going to Air Canada, I was
+[1:54] working for a different company.
+[1:59] And the task was to build a Q&A system for telecommunication
+[2:04] engineer.
+[2:05] So I don't know if you're familiar with the domain.
+[2:07] Telecommunication is a huge domain.
+[2:09] There is about 10,000 documents, a lot of vendor
+[2:13] documents on top of that.
+[2:15] There's a logic to know which document you should found
+[2:18] in order to answer the question.
+[2:19] So it's a bit of a complex task.
+[2:22] And in 2024, everybody wanted to build rags,
+[2:25] so we started to do that.
+[2:27] On LinkedIn, it's super easy.
+[2:31] It's not.
+[2:31] So the thing is, when we tackled this project,
+[2:36] the same problem as Air Canada, we
+[2:38] don't have access to experts.
+[2:40] We have limited access to experts.
+[2:42] And we couldn't actually grade the answer ourselves.
+[2:47] So that's the plan I want to talk today.
+[2:50] Funny enough, we were in competition with other teams.
+[2:54] Two external, one internal.
+[2:56] It's not like in parallel, but in sequence.
+[2:59] And our solution actually worked.
+[3:02] What worked is actually delivering the value.
+[3:05] The people lacked the solution, actually used it.
+[3:10] But to be honest, I don't know why we actually made it work
+[3:13] compared to the other team.
+[3:15] So today, I'm just going to show what I actually did,
+[3:18] or my team actually did to make it work.
+[3:23] So they all have the same documents, same task,
+[3:25] everything is the same, but our solution somehow works.
+[3:29] So for those that are familiar with RAGS,
+[3:33] the principle is to ask a question to the system.
+[3:38] The system found the relevant documents.
+[3:40] Based on this relevant document, formulate an answer.
+[3:43] It's something that exists for a long time now.
+[3:46] And for those that actually tried it,
+[3:48] if you found the right page or the right documents,
+[3:51] 90% of the time you have actually the right answer.
+[3:54] So the challenge to find the right documents,
+[3:57] at least in this task.
+[4:00] So we created a very complex pipeline
+[4:03] that gets complexified over time.
+[4:06] If you found publication back in the time,
+[4:09] everybody has an amazing technique
+[4:11] to improve the solution.
+[4:13] We tried them.
+[4:15] It actually didn't improve the solution.
+[4:17] So on paper, it worked for them for the publication,
+[4:20] but for us, it didn't really help.
+[4:22] And more importantly, when we add complexity,
+[4:25] we found that we break something else.
+[4:27] So something that used to work now is not working anymore.
+[4:30] And that's actually the real problem.
+[4:32] So we can add and we can get more ideas
+[4:35] on going to solving the different problems.
+[4:38] But we keep breaking things over and over.
+[4:44] So complexity doesn't always help.
+[4:47] And the other problem is this one.
+[4:49] We can change an agent in a few minutes,
+[4:51] add a certain layer of query writing or whatever,
+[4:56] reasoning step.
+[4:58] But to grade that, we had those crazy meetings
+[5:01] once a week with experts.
+[5:03] We put a giant screen with five different chatbots,
+[5:07] ask the same question to all of them,
+[5:09] and ask the expert to grade them.
+[5:11] I prefer this one, I prefer this one.
+[5:14] And funny enough, they're not always agreeing.
+[5:17] It's very hard when you put two experts in the room,
+[5:20] you get three opinions.
+[5:22] So that's the problem we were facing.
+[5:25] So our budget was we can try one solution a week,
+[5:28] and this was not enough to go fast.
+[5:33] So before going further, the process was the following.
+[5:38] We asked a question, the agent answered.
+[5:40] We ask the expert to read.
+[5:42] Sometimes they don't know the answer.
+[5:43] They have to look up.
+[5:44] It takes a lot of time.
+[5:47] And we had the budget of one trial a week.
+[5:52] So there is nothing new here.
+[5:54] This abiding that is well known is we reverse the problem.
+[5:58] So we start with a page.
+[6:00] We ask an LLM to write a question about this page,
+[6:03] which is an easy task.
+[6:06] We ask the agent to search for this answer
+[6:09] And compared to what the agent found,
+[6:12] compared to the page that has been used to generate the question,
+[6:17] we can actually use code to grade that.
+[6:19] And no longer opinions, no longer anything.
+[6:22] We can automate this task.
+[6:24] And that allows us to go much, much faster.
+[6:28] So for those that work in rags, there
+[6:31] is plenty of implementation of this thing.
+[6:33] I didn't invent it.
+[6:34] I just found it very, very smart.
+[6:38] And it stick to me, like, why this principle
+[6:43] cannot be applied to other tasks?
+[6:45] So the impact of that is we went from one evaluation a week
+[6:48] to dozens a day, and we start to see the accuracy
+[6:52] or the grading from the expert going up and up,
+[6:55] and actually removing a lot of complexity help.
+[6:58] Like, we didn't need a lot of those.
+[7:00] And focusing on the right embedding model,
+[7:03] the right chunking, the right alpha in the BM25,
+[7:06] is the right thing to do.
+[7:09] And we saw the accuracy increasing over weeks.
+[7:15] So I don't know why we succeeded,
+[7:17] but I'm pretty sure the other team didn't have any test set.
+[7:20] So they were using this kind of long loop with expert,
+[7:23] maybe a much more expert than we had access to.
+[7:26] But we had this test set.
+[7:31] And my learning from this back in 2024 is,
+[7:35] If you can't grade the agent, you can't make it better.
+[7:39] So that stick to me until this day,
+[7:42] has been two years now.
+[7:44] And I want to go back to Air Canada now,
+[7:47] where we have a different project.
+[7:50] So in 2026, the project is about analyzing
+[7:57] supplier contract.
+[7:59] So you can imagine Air Canada has a lot of suppliers.
+[8:01] We get a lot of this contract.
+[8:03] There is experts looking at them one by one,
+[8:06] checking each of those clauses,
+[8:09] and they have to analyze it and provide the feedback.
+[8:12] Like this clause is not compliant.
+[8:13] This clause needs to be rewritten.
+[8:15] There's a lot of work to do that.
+[8:18] It's a very long task and very costly,
+[8:20] because if we need some supplier to deliver right now,
+[8:25] and we don't, then it causes a lot of delay in the chain.
+[8:29] And if we miss a clause, it's also very costly
+[8:32] because at the end of the day, it can backfire to us.
+[8:35] So it's a tricky problem.
+[8:38] And they came to me, I mean to the data science team,
+[8:43] to build an agent that can actually do that for them.
+[8:46] So can we automatize this task?
+[8:49] And obviously, there is a lot of documents, a lot of rules,
+[8:53] a lot of things to consider when you do that.
+[8:56] Experts are super busy.
+[8:58] You can imagine the price of a lawyer by hardware.
+[9:02] And there is no benchmark for that.
+[9:03] We cannot go on the web and find documents,
+[9:07] found an existing benchmark we can apply.
+[9:10] So go back to the same problem as I was in 2024.
+[9:16] Cycles were super slow, and we knew
+[9:18] that we want to be there in a shape where we can go fast
+[9:23] and try and try and try.
+[9:28] And I knew that if we land to this situation,
+[9:30] we can have a better trajectory in terms of accuracy.
+[9:34] And that was the challenge for this project.
+[9:38] So the problem is creating the answer from documents
+[9:41] is a well-known and defined thing in the rags.
+[9:44] But for this specific project, there
+[9:46] is no guy in the world that says, hey, you should use this
+[9:48] technique, you should use this technique.
+[9:51] So we tried to think how we can reapply the same mechanism
+[9:55] from what I learned on RAG to this specific project.
+[9:59] And we have plenty of projects at Air Canada.
+[10:01] So we're using the same concept of getting the answer first
+[10:05] and then try the agent to find it back.
+[10:08] So going into the details, it's a bit simplified,
+[10:12] but actually the agent has four steps.
+[10:15] We need to spot the clause in the contract.
+[10:18] We need to find the relevant documents
+[10:21] to support an amendment.
+[10:23] We need to write the amendment.
+[10:26] And then at the end, there's a classification system
+[10:28] that tells you should we keep it or not, this amendment.
+[10:32] So the first step, for example, spot,
+[10:34] is classifying all the sections of the contract
+[10:37] into specific domains.
+[10:39] And then found if there's a defect or there's
+[10:42] a change to be done in this section.
+[10:46] So we did have this trick from the rank,
+[10:48] so we know how to find the document.
+[10:49] So this is covered.
+[10:52] But for the other section of the agent, we didn't have anything.
+[10:59] So I'm going to present five different techniques
+[11:01] that we use in this project, or we try to use in this project,
+[11:05] that is trying to address this specific problem.
+[11:09] My goal is not to show off.
+[11:12] My goal is to get you inspired in how to reapply
+[11:15] those techniques in your own challenges.
+[11:20] So the first one is to use past decision and answer,
+[11:22] so you can achieve past contract
+[11:24] compared with the one that has been changed.
+[11:29] The second one is to choose something you're looking for,
+[11:33] write the contract around or generate the contract.
+[11:35] The third one is take a good contract
+[11:38] that has been signed and break it.
+[11:42] The fourth one is about things that should not change,
+[11:45] no matter what you do, you should not get more flags.
+[11:48] And the fifth one is actually the most powerful, it's very hard, it's to turn an example into many using the concept of templates.
+[11:57] So immediately we jump into this approach.
+[12:02] We ask the expert to provide us the original contract, the one that has been signed,
+[12:08] we're going to take that, do a diff like you do in the code, compare what has been changed,
+[12:14] and the agent should provide the same exact flags.
+[12:17] That would be perfect.
+[12:19] However, for many reasons,
+[12:21] our team does not keep all the contract.
+[12:26] They don't keep the original one,
+[12:28] they just keep the last one,
+[12:29] they don't have all the versioning of the contracts.
+[12:31] Sometimes it goes into negotiation,
+[12:32] there is a lot of things.
+[12:34] So we could not have any of those pairs of contracts,
+[12:36] so this thing doesn't work.
+[12:42] Okay, second one.
+[12:43] We took a rule, so that's changing a bit the topic.
+[12:48] Instead of creating flags or creating an agent that can provide flags, we start from rules.
+[12:55] And the rule is, for example, we have the cap above $1 million.
+[13:01] So that's every contract at Air Canada should follow this rule, or many of those in specific domains.
+[13:07] So you know the rule, you create a clause without breaking this rule and generate the
+[13:14] contract around and you should find the rule back, the flag, which is breaking the rule.
+[13:21] So that's simple.
+[13:22] It doesn't require a lot of work.
+[13:25] A lot of things can be generated.
+[13:27] The problem is you need to know the rules.
+[13:29] So lucky enough, we could actually get some of those from either the expert or the documentation
+[13:35] their head but cannot guarantee the coverage of everything. So we came up with our own rules.
+[13:43] So we generated at the end 275 tests that we know can run and we know the answer. Similar
+[13:51] to the RUG, we inverted the problem, we planted the problem and we tried to fund it back.
+[13:59] Another one, which is very hard, actually.
+[14:03] We took an example of a contract that has been signed.
+[14:06] We move a clause, and the agent is supposed to say, hey, there's something missing here.
+[14:13] It's a very hard task because some supplier has different templates, have different kind
+[14:19] of content, knowing what should be in what contract, we carry a bit of thinking.
+[14:25] And we mix those with existing contracts that should not show any flags.
+[14:29] So that's the most powerful approach that we had today.
+[14:33] Using this approach we can generate a lot of contracts and at the end of the day we
+[14:36] found that our agents are missing most of the clothes that have been removed.
+[14:42] So that's a very, very strong benchmark.
+[14:46] OK, fourth technique.
+[14:51] You change something that should not affect the agent, or should not change anything in
+[14:57] the result.
+[14:58] For example, the name of the supplier, the address of the supplier, something that should
+[15:02] not have any impact on the number of flags.
+[15:08] You can reorder the clause, so some randomness should also lead to the same results.
+[15:13] And you can run the same contract again and again.
+[15:16] All of those are things that we check to make sure that the output is consistent over all
+[15:22] of those.
+[15:23] In this example too, everything can be checked using code.
+[15:28] You don't need to do any LLM as a judge.
+[15:30] The previous speaker showed that it's a very hard task.
+[15:33] So we stay away from LLM as a judge as much as possible.
+[15:38] The fifth one, it's the concept of templates.
+[15:45] Our experts have different kind of templates with blanks.
+[15:47] So I don't know if you ever write a contract.
+[15:50] Those blanks should be filled by the expert.
+[15:53] And instead of trying to fill them, we generate an array for each of those blanks to be filled
+[16:01] with.
+[16:02] So that allows us to generate plenty of contracts.
+[16:04] Some tuples break some rules, some tuples don't.
+[16:08] We know that.
+[16:09] And so we know what actually should be flagged as a breach or not.
+[16:14] Again, this is a code check. We don't need to have any LLM involved.
+[16:18] The good thing with this one is our experts already use templates, so we can reuse them to generate some contracts.
+[16:28] The cycle was a bit slower in this case, so four weeks to get a feedback, and we can get a script to run and get the evaluation back in five minutes.
+[16:39] So I just want to highlight one point.
+[16:42] And we went through all of those kind of categories of grading at the bottom.
+[16:49] Exact match or code are very fast.
+[16:51] As soon as we step into LLM as a judge, it can be very fancy, it can be very useful.
+[16:57] It's so hard.
+[16:58] We got so much noise from the LLM as a judge compared to the noise with the agent that
+[17:04] we're building.
+[17:05] this problem is actually almost as hard as solving the right problem. So finding the
+[17:11] right prompt or the right RNS for the LLM as a judge is a very hard task. There is some
+[17:16] padding. You can do task, you can do fact checking, you can do a bunch of stuff, but
+[17:22] actually it requires so much work and we could not find the right one for this project.
+[17:27] There is plenty of other techniques. I won't go over all of them. For example, trajectory.
+[17:33] you have another project that's required the agent
+[17:36] to hit some endpoints.
+[17:38] So trajectory, you can,
+[17:41] you know what the endpoint should be in some order.
+[17:44] You generate a story about it.
+[17:45] You ask an LLM to fill, to use the agent
+[17:48] and look at the trace to see if the trajectory is correct.
+[17:52] A test to SQL, you might already know it.
+[17:55] Doesn't matter what your agent is.
+[17:57] If you know how to pick the answer,
+[17:59] if you know what you're looking for,
+[18:01] And I showed a couple of examples.
+[18:04] Generate the input and then try to find it.
+[18:07] Doesn't apply to everything.
+[18:09] And sometimes we had to re-engineer our solution
+[18:12] to fit this padding.
+[18:13] Even if we move away slightly from the original design
+[18:17] of the solution, the original design
+[18:20] we could not evaluate it, we switched to something
+[18:22] that we can actually evaluate because of that.
+[18:25] One thing to highlight is not the end of the day, you generate a test, you get a better
+[18:34] agent, you get some real feedback, so experts can provide some feedback, and we don't use
+[18:40] this feedback to fix the agent.
+[18:43] We use this feedback to generate better tests, better prompts, better ideas how to remove
+[18:49] closes, etc., etc., and one loop at a time.
+[18:55] That can be done by Arise.
+[18:56] There is a lot of tools there.
+[18:58] Thanks for the invitation.
+[19:01] And that's my conclusion slide.
+[19:02] Write the answer first.
+[19:04] I think I explained that.
+[19:10] When you generate those tests, it's not enough to know if you can ship the product.
+[19:14] It's just a starting point.
+[19:16] It's a tool to help and support the developer.
+[19:18] It's not the go-no-go for the solution.
+[19:23] So I hope you like this presentation.
+[19:27] I know that the 24-hour chip is the hardest one
+[19:30] if you want to quit releasing agent without evaluation.
+[19:35] And I would be happy to support you
+[19:38] and have your own feedback.
+[19:40] Thank you very much.
+[19:48] Thank you.

@@ -1,0 +1,431 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "title": "איך בונים agent ל-Code Review מבוסס AI",
+ "subtitle": "מה Greptile, שעוברים דרכה כ-1% מה-pull requests ב-GitHub, ממליצה לחברות שבונות review agent בעצמן: מ-webhook פשוט ועד ניתוב בין מודלים",
+ "meta": [
+  "Daksh Gupta (Greptile) · AI Engineer · 26.10.2026",
+  "משך: כ-18 דקות · YouTube",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Daksh Gupta",
+ "topics": [
+  "AI Code Review",
+  "Coding Agents",
+  "Model Routing",
+  "Autonomous Testing"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זו הרצאה קצרה (כ-18 דקות) מכנס AI Engineer בניו יורק, מ-Expo Session שהתקיים ב-13 באוקטובר 2026. המרצה הוא Daksh Gupta, מייסד-שותף ב-Greptile, חברה שבונה agents שעושים review ובדיקות ל-pull requests עם הקשר מלא של ה-codebase. לדבריו כ-1% מכל ה-PRs ב-GitHub עוברים דרכם, בין היתר ב-NVIDIA וב-Coinbase. כשהם פוגשים חברה שהצרכים שלה ספציפיים מדי בשביל המוצר, הם עוזרים לה לבנות agent משלה בחינם. ההרצאה מסכמת את מה שהם אומרים לחברות כאלה.\n\nהטענה המרכזית: את הגרסה הנאיבית (sandbox, agent ו-webhook מ-GitHub) אפשר לבנות ביום אחד, והיא תפספס באגים, לא תבין את ה-codebase, תעלה 3–25 דולר ל-PR ותציף את ה-PR ב-nitpicks. מכאן ההרצאה עוברת על סדרה של תיקונים: פרומפט ממוקד, dataset של PRs שגרמו לתקלות, model inversion (review במודל אחר מזה שכתב את הקוד), codebase context ו-living wiki, בדיקות end-to-end עם computer use, וניתוב רוב הטוקנים למודלים זולים. כדאי לזכור שההרצאה מגיעה מספק מסחרי שמוכר בדיוק את המוצר הזה."
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות המרכזיות עם timestamps, ומה לא נאמר."
+    ],
+    [
+     "2. נקודת המוצא: ",
+     "הגרסה הפשוטה ומה נשבר בה."
+    ],
+    [
+     "3. פרומפט ו-dataset היסטורי: ",
+     "איך לצמצם nitpicks ואיך למדוד שלא פספסתם באגים."
+    ],
+    [
+     "4. Model inversion: ",
+     "לעשות review לקוד של Claude עם GPT, ולהפך."
+    ],
+    [
+     "5. Codebase context: ",
+     "למה grep לא מספיק, ומה תפקידם של docs, tickets ו-living wiki."
+    ],
+    [
+     "6. בדיקות אוטונומיות: ",
+     "dev box, flow map ו-computer use."
+    ],
+    [
+     "7. מודלים זולים: ",
+     "חלוקה לתתי-משימות וניתוב בין מודלים."
+    ],
+    [
+     "8–9. ",
+     "צעדים מעשיים, שאלות פתוחות ומילון מונחים."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך נוצר אוטומטית מהתמליל ומהשקפים של ההקלטה. שמות ומונחים עלולים להשתבש בתמלול האוטומטי (ASR). למשל שם החברה מופיע בתמליל גם כ-Scriptile וכ-Reptile, ו-Claude מופיע כ-cloud. הציטוטים מועתקים מילה במילה ונבדקו מול ה-timestamp שלהם. לא נוסף מידע ממקורות חיצוניים."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "ההרצאה בנויה כמתכון. מתחילים מ-agent נאיבי שמחובר ל-webhook של PR, ומוסיפים שכבות אחת אחרי השנייה. כל שכבה פותרת כשל מסוים של הגרסה הקודמת: פספוס באגים, חוסר הקשר, עלות או רעש. החוט שעובר לאורך כל ההרצאה הוא מדידה. באגים קטסטרופליים נדירים, ולכן בלי dataset אי אפשר לדעת אם שינוי בפרומפט או החלפת מודל פגעו באיכות."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "הגרסה הנאיבית נבנית ביום ונכשלת בארבעה מקומות: ",
+     "היא מפספסת באגים, לא מבינה את ה-codebase, עולה \"between $3 and up to $25 per pull request\" ומייצרת nitpicks. בנוסף, כל הרצה חוזרת על אותו PR מוצאת באגים חדשים [3:01], [4:31]."
+    ],
+    [
+     "nitpicks הם לא רק מטרד, הם מקלקלים את הקוד: ",
+     "coding agents מטפלים בכל הערת review בלי סינון, והתוצאה היא קוד defensive בצורה מוגזמת [4:31]."
+    ],
+    [
+     "הפרומפט הוא הצעד הזול הראשון: ",
+     "קטלוג של סוגי באגים שהופק מתקלות עבר בארגון, והגדרה מפורשת של מה נחשב nitpick ושאין לחפש אותו [6:02]."
+    ],
+    [
+     "אי אפשר למדוד היעדר של באגים: ",
+     "רק כ-1 מכל 1,000 PRs מכיל באג קטסטרופלי, ולכן צריך dataset של PRs היסטוריים שגרמו לתקלות ולהריץ עליו כל גרסה של ה-agent [6:02], [7:32]."
+    ],
+    [
+     "Model inversion מעלה את שיעור הגילוי בכ-10%: ",
+     "מודלים של Claude ושל GPT נכשלים בדרכים שונות, ומודל שעושה review לקוד של עצמו נוטה לפספס את אותן טעויות [9:04], [10:34]."
+    ],
+    [
+     "grep לא פותר את בעיית ה-codebase context: ",
+     "הוא לא מדויק ויקר. Greptile בונה knowledge base מאונדקס ו-living wiki שמאחד קוד, telemetry, docs ו-tickets [10:34], [12:06], [13:37]."
+    ],
+    [
+     "UI צריך להריץ, לא רק לקרוא: ",
+     "sandbox עם כל ה-dependencies, flow map ו-computer use, כדי למצוא למשל כפתור שמוסתר ב-iPhone [13:37], [15:09]."
+    ],
+    [
+     "כ-20% מהעבודה הולך ל-frontier models וכל השאר למודלים קטנים: ",
+     "ב-Greptile יש 20 תתי-משימות, ולכל אחת מהן מודלים שנבחרו במיוחד. החלפה פשוטה של משימות קלות מביאה, לדבריו, 70–80% מהתועלת [15:09], [16:39]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "אין מספרי בסיס: ",
+     "לא נאמר מה שיעור הגילוי המוחלט של ה-agent, ולא ברור אם ה-10% של model inversion הם שיפור יחסי או נקודות אחוז."
+    ],
+    [
+     "אין עלות אחרי האופטימיזציה: ",
+     "נאמר שהעלות יורדת \"quite drastically\", אבל לא ניתן מספר. המספר היחיד הוא 3–20 דולר ל-PR לפני ניתוב המודלים."
+    ],
+    [
+     "שיעור false positives לא נמדד: ",
+     "הוא מופיע בשקף כבעיה, אבל אין נתון או שיטת מדידה."
+    ],
+    [
+     "טענות לא מגובות: ",
+     "\"פי שלושה יותר\" שגיאות off-by-one ב-Claude מפנה למחקר מהרצאה קודמת שלו. הטענה ש\"single digit percentage points of GDP growth\" מקורם ב-inference נאמרה בלי מקור."
+    ],
+    [
+     "אין שמות מודלים: ",
+     "לא נאמר אילו מודלים קטנים או אילו מודלי computer use הם משתמשים בפועל. גם \"Jav or the Decisions API\" כנראה שובש בתמלול ולא ברור למה הכוונה."
+    ],
+    [
+     "מקור עם אינטרס: ",
+     "המרצה מוכר את החלופה המסחרית לכל מה שמתואר, ומסיים בכך שהמוצר שלהם \"free in comparison\"."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. נקודת המוצא: sandbox, agent ו-webhook"
+  },
+  {
+   "kind": "image",
+   "file": "k_003.jpg",
+   "caption": "השקף Why Greptile: שלוש יכולות (Codebase context, It runs your code, The right model for each task) מתנקזות ל-Review + test the pull request",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Gupta פותח בשלושה דברים שלדבריו לקוחות אוהבים ב-Greptile, וכל אחד מהם מקבל בהמשך פרק משלו. הראשון הוא codebase context: לפני שהיו חברת code validation הם עסקו מ-2023 בלימוד מודלים להבין codebases גדולים. השני הוא הרצת הקוד ב-sandbox \"dependency-rich\". השלישי הוא הקצאה יעילה של inference, כלומר המודל הנכון ותקציב ה-inference הנכון לכל תת-משימה [1:30].\n\nהבעיה שההרצאה מנסה לפתור היא צוואר הבקבוק של review ו-validation. בארגון יש הרבה vibe coding, גם של מהנדסים (\"some of them a little too close to the sun\") וגם של אנשי שיווק [1:30]."
+  },
+  {
+   "kind": "image",
+   "file": "k_004.jpg",
+   "caption": "השקף You can build this in a day: הגרסה הבסיסית של review agent",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "המתכון הבסיסי [3:01]: sandbox (ספק מסחרי או Firecracker), agent בתוכו (Codex או Claude Code), ו-webhook מ-GitHub או GitLab ששולח את תוכן ה-PR כשהוא נפתח. הפרומפט הוא בסגנון \"review this\", והתשובה חוזרת דרך ה-review APIs של GitHub. הוא ממליץ כבר כאן להישאר model independent ולהשתמש ב-harness בקוד פתוח כמו OpenCode או Pi. הסיבה מתבררת בפרק 4.\n\nמה נשבר בגרסה הזאת [3:01]–[6:02]:\n\nבאגים מתפספסים, ובאגים הם \"fractally infinite\". חסר הקשר: ה-agent לא מבין ספריות פנימיות או ארגונים שיש להם אלפי repos עוד מ-\"microservices apocalypse of the 2010s\". העלות היא 3–25 דולר ל-PR, ו-\"Very quietly, they got very expensive\". יש nitpicks, כלומר הערות נכונות טכנית אבל קטנוניות, והן גורמות נזק כפול: לבני אדם הן כמו הילד שצעק זאב, ול-coding agents, ש-\"are not discerning. They're going to look at review comments just to address all of them\", הן גורמות לכתוב קוד defensive מוגזם [4:31]. ולבסוף, כל הרצה חוזרת על אותו PR מוצאת באגים חדשים."
+  },
+  {
+   "kind": "h1",
+   "text": "3. פרומפט ממוקד ו-dataset של PRs היסטוריים"
+  },
+  {
+   "kind": "body",
+   "text": "התיקון הראשון, וה-low hanging fruit [6:02], הוא הפרומפט. יש בו שני כיוונים. הראשון: לחפש סוגי באגים ספציפיים. עושים data science פנימי על outages ו-incidents מהעבר, מזהים לאילו סוגי באגים הארגון נוטה ובונים מהם קטלוג. השני: להגדיר במפורש מה זה nitpick ולהורות לא לחפש כאלה, למשל \"למה אין שלוש שכבות הגנה\" או הערות על error handling שאינו מושלם.\n\nכאן מתגלה הבעיה: שינוי קטן בפרומפט משנה בצורה דרמטית את מספר ההערות, ואין דרך לדעת אם בדרך התפספס באג. לפי הנתונים של Greptile, רק \"one out of every 1,000 pull requests\" מכיל באג קטסטרופלי [6:02]. לכן גרסה גרועה של ה-agent יכולה לרוץ זמן רב בלי שאיש ישים לב."
+  },
+  {
+   "kind": "quote",
+   "text": "The validation agents, or really any reviewer or tester, can tell you about the presence of bugs, but it unfortunately can't tell you about the absence of bugs.",
+   "by": "— Daksh Gupta [6:02]"
+  },
+  {
+   "kind": "image",
+   "file": "k_005.jpg",
+   "caption": "לולאת ההערכה: Historical PRs with known bugs, ואז Run the review agent, ואז Compare with the known bugs, עם חץ חוזר ל-Tune the prompt. בכותרת המשנה: Different bug types. The same evaluation",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "התיקון השני הוא dataset של PRs שגרמו בעבר ל-outages ול-incidents. מריצים עליו כל גרסה של ה-agent ובודקים באיזו תדירות הוא תופס את הבאגים הידועים [7:32]. זה קל יותר לארגונים שמתעדים כל תקלה. יש שתי מגבלות. הראשונה: סוגי הבאגים משתנים לאורך זמן, ולכן ה-dataset צריך להתעדכן כל הזמן. השנייה: \"about 80% or 90% of your bugs will be just repeats of prior mistakes\" [7:32], אבל ככל שה-coding agents משתפרים הם יוצרים טעויות חדשות שה-dataset לא מכסה. Gupta מציין שזה היתרון של Greptile: corpus גדול של PRs מחברות רבות. ועדיין, לדבריו, אפשר להגיע רחוק גם עם הנתונים הפנימיים של ארגון אחד."
+  },
+  {
+   "kind": "h1",
+   "text": "4. Model inversion: מחבר אחד, reviewer אחר"
+  },
+  {
+   "kind": "image",
+   "file": "k_006.jpg",
+   "caption": "Different author, different reviewer: קוד שנכתב ב-Claude עובר דרך Model inverter ל-reviewer מסוג GPT / Codex, וקוד שנכתב ב-GPT / Codex עובר ל-reviewer מסוג Claude",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "הממצא מגיע מהמחקר שהציג בהרצאה קודמת שלו ב-AI Engineer בסן פרנסיסקו: מודלים ממשפחות שונות מייצרים סוגים שונים של באגים. לדבריו, מודלים של Claude נוטים בערך פי שלושה יותר לשגיאות שבתמליל נקראות \"one-off errors\" (סביר שהכוונה ל-off-by-one), ומודלי GPT נוטים הרבה יותר ל-auth bypass. הוא מייחס את זה ל-post-training [9:04]. מודל שעושה review לקוד שכתב בעצמו \"fail in the same ways during review that they do during code generation\".\n\nהמימוש פשוט ב-80% מהמקרים, כי ה-agents משאירים טביעת אצבע: Codex נותן לבראנץ' שם בפורמט codex/branch-name, ו-Claude מוסיף co-author בתיאור ה-PR ובהודעת ה-commit. ב-20% הנותרים, למשל בראנץ' שנוצר ידנית, צריך heuristics, קטלוג פנימי של הכלים שכל אחד משתמש בהם או telemetry ממכונות הפיתוח [9:04], [10:34]. התוצאה: \"We found that there's a 10% higher catch rate if you flip models\" [10:34]. השקף מנסח זאת כ-\"~10% higher bug catch rate in our research\". Gupta מדגיש שבהקשר של incidents ו-outages, עשרה אחוזים זה הרבה."
+  },
+  {
+   "kind": "h1",
+   "text": "5. Codebase context, docs, tickets ו-living wiki"
+  },
+  {
+   "kind": "image",
+   "file": "k_009.jpg",
+   "caption": "Codebase context: The diff is only one part of the path. Changed code ב-Repo A עובר דרך Service ומגיע ל-Auth check ב-Repo B. בתחתית: False positives + missed bugs",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "Gupta חולק על התפיסה ש-grep פותר את כל בעיית ה-codebase context: \"One, GREP is extremely imprecise. And second, it's very expensive\" [10:34]. לדבריו, ב-trace של coding agent רוב הטוקנים הולכים על אותו רצף של grep, file read ו-cache write. הוא גם רומז ש\"there's perhaps some adverse incentives\" אצל מי שמקבל תשלום לפי טוקן.\n\nהחלופה של Greptile היא knowledge base פנימי. סורקים את כל ה-codebase, מקטלגים כל חלק ומאנדקסים אותו: למשל \"this is authentication\", איך זה עובד, מה ה-flows, דיאגרמה של ה-flows וכל הקבצים המעורבים [12:06]. הדוגמה שלו היא auth bypass. כדי לזהות אותו צריך לדעת אם קטע קוד רץ בסביבה מאומתת, וזה מידע שלא נמצא ב-diff. זה בדיוק מה שהשקף מראה: הבדיקה עצמה נמצאת ב-repo אחר."
+  },
+  {
+   "kind": "image",
+   "file": "k_010.jpg",
+   "caption": "Two pieces of context: Docs + tickets (Jira, Linear, docs) מחוברים דרך MCP gateway ל-Review agent",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "מעבר לבאגים, קוד יכול להיות נכון ועדיין לא לעשות את מה שהמחבר התכוון. Gupta מביא כדוגמה את הטרנד של שימוש ב-Slack כ-IDE: הודעה של משפט או שניים משאירה הרבה עמימות [12:06]. שני סוגי ההקשר שלדבריו חשובים במיוחד הם docs ו-tickets (Jira, Linear, Confluence, Notion), כי הם נושאים את ה-tribal knowledge שמפתחים לא שמים לב שהם משתמשים בו. השקף מראה שהחיבור עובר דרך MCP gateway, פרט שלא נאמר בהרצאה עצמה.\n\nהפתרון של Greptile הוא living wiki: \"a sort of world model of how your company works\". ה-wiki מאחד את הקוד, production telemetry, logs, ה-roadmap מהתיעוד וה-tickets מ-Linear. הוא מספק ל-agent הקשר וגם מכוון את החיפושים שלו בקוד, כך ש-\"it will never read a file that it didn't need to read\" [13:37]."
+  },
+  {
+   "kind": "h1",
+   "text": "6. בדיקות אוטונומיות עם computer use"
+  },
+  {
+   "kind": "image",
+   "file": "k_011.jpg",
+   "caption": "Does the button work on an iPhone?: מ-PR branch ל-Dev server, משם ל-Browser agent (localhost:3000, mobile viewport, כפתור Continue) שמייצר Bug report. בתחתית: Click through the flow",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "הדוגמה המרכזית: אפשר לקרוא את כל קובצי ה-React שהשתנו ולא למצוא בעיה, ובכל זאת אחרי ה-render הכפתור מוסתר ב-iPhone [13:37]. Greptile בונה sandboxes עם כל ה-dependencies, שהם מכונות וירטואליות שניתן להגדיר באופן מלא. הם מרימים בהן את ה-stack של הלקוח, וה-agent בודק אותו end to end עם computer use. לדבריו computer use השתפר מאוד בדור החדש של מודלי GPT ו-Opus: \"For the first time, I think end to end QA is nearly solved\" [15:09].\n\nכדי שזה יעבוד צריך שני דברים (השקף Two things to build). הראשון הוא dev box: build script פשוט מספיק כדי שה-agent ירים את האפליקציה עם ה-dependencies של בראנץ' ה-PR. השני הוא flow map: מיפוי מקוד ל-flows, למשל Auth code ל-Sign-in flow ו-Checkout code ל-Purchase flow. הוא מציין שזה אחד החלקים הקשים, ושיש להם צוות forward-deployed engineers שעוזר ללקוחות בהקמה, \"unless, of course, you have very good dev boxes already, in which case, congratulations on working at Stripe\" [15:09]. מודלי vision משמשים לזהות בעיות כמו כפתור שקיים טכנית אבל לא נראה, או שלא מופיע ב-first fold."
+  },
+  {
+   "kind": "h1",
+   "text": "7. מודלים זולים לרוב תתי-המשימות"
+  },
+  {
+   "kind": "image",
+   "file": "k_014.jpg",
+   "caption": "A model for each subtask: PR diff עובר ל-Plan review, ומשם לשלוש תתי-משימות: Find context (Small model), Test user flows (Browser agent) ו-Analyze bugs (Frontier model). כולן מתנקזות ל-Submit review",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "גם אחרי כל התיקונים העלות נשארת \"anywhere from $3 to $15 to $20\" ל-PR [15:09]. Gupta עדיין רואה ב-frontier models מודלים חזקים יותר מהמודלים בקוד פתוח, אם כי \"the rubber band is tightening\". אצלם כ-20% מהעבודה הולך ל-frontier models, למשימות הקריטיות: ניתוח באגים, תהליך ה-review וההגשה. את ה-long tail, כלומר exploration ו-file reads, הם מעבירים למודלים קטנים, ול-flows של UI הם משתמשים במודל computer use קל [15:09], [16:39].\n\nבפועל יש להם \"20 different subtasks\", לכל אחת מהן סט מודלים ספציפי, וצוות מחקר קטן שמכייל את הבחירה כל הזמן. לדבריו, ארגון שרק מחליף משימות פשוטות במודלים פשוטים יגיע ל-\"70% or 80% of the way there\" [16:39]. גם כאן חוזרת האזהרה: בלי dataset טוב קל להחליף sub-agents במודלים זולים יותר בלי לשים לב לירידה ביכולת לתפוס באגים, עד שמגיע incident.\n\nהשקף Fewer irrelevant file reads מתאר עוד טכניקה: Candidate files עוברים דרך Cheap model שמסנן אותם, רק ה-Relevant context מגיע ל-Frontier model, וה-frontier model עושה את ה-review וההסקה. כך מגינים על ה-cache של ה-frontier model, שלדבריו הוא \"your most expensive and most scarce resource\". הוא מזכיר גם re-ranking בעזרת decision model, אבל שמות הכלים שובשו בתמלול (\"Jav or the Decisions API\") ולא ברור למה הכוונה. הערה על המספור: בשקף מופיע \"5. Cheaper models\", ואילו בתיאור הסרטון זה Fix 6. גם בדיבור עצמו המרצה מתלבט בספירה."
+  },
+  {
+   "kind": "h1",
+   "text": "8. מה לעשות עכשיו"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "להתחיל מה-baseline, אבל לא להישאר בו: ",
+     "sandbox, harness בקוד פתוח שלא תלוי במודל (OpenCode או Pi) ו-webhook ל-PRs. זה יום עבודה, וכדאי לבנות אותו כך שיהיה קל להחליף מודל."
+    ],
+    [
+     "לבנות eval לפני שמכיילים את הפרומפט: ",
+     "לאסוף PRs שגרמו ל-incidents ולהריץ עליהם כל גרסה של ה-agent. בלי זה כל שינוי בפרומפט הוא ניחוש."
+    ],
+    [
+     "לכתוב לפרומפט קטלוג באגים ורשימת nitpicks אסורים: ",
+     "לגזור אותם מה-postmortems של הארגון."
+    ],
+    [
+     "להפעיל model inversion: ",
+     "לזהות את ה-agent שכתב את הקוד לפי שם הבראנץ' ושורת ה-co-author, ולשלוח את ה-review למשפחת מודלים אחרת."
+    ],
+    [
+     "לחבר docs ו-tickets ל-agent: ",
+     "Jira, Linear, Confluence או Notion, למשל דרך MCP gateway כמו בשקף, כדי שיבין את הכוונה ולא רק את ה-diff."
+    ],
+    [
+     "לבחון אם יש לכם dev box ו-flow map: ",
+     "זה התנאי לבדיקות UI אוטונומיות, ולפי המרצה החלק הקשה ביותר להקמה."
+    ],
+    [
+     "לפצל את העבודה לתתי-משימות ולנתב אותן: ",
+     "מודל זול לסינון קבצים ולמציאת הקשר, frontier model רק לניתוח וגם זה עם בדיקה מול ה-dataset."
+    ],
+    [
+     "למי שבוחר ספק ולא בונה בעצמו: ",
+     "להשתמש ברשימה הזאת כקריטריונים: האם הספק עושה model inversion, מריץ את הקוד, מודד מול באגים היסטוריים ומסנן nitpicks."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "למה זה חשוב"
+   ],
+   "rows": [
+    [
+     "האם ה-10% של model inversion הם שיפור יחסי או מוחלט, ועל איזה dataset זה נמדד?",
+     "בלי זה קשה לדעת אם שווה לבנות זיהוי של המחבר ולהחזיק מנויים לשני ספקי מודלים."
+    ],
+    [
+     "כמה עולה PR אחרי ניתוב המודלים?",
+     "העלות לפני האופטימיזציה הייתה 3–25 דולר, ואחריה נאמר רק \"drastically\", בלי מספר."
+    ],
+    [
+     "איך מודדים false positives ו-nitpicks?",
+     "ה-dataset ההיסטורי מודד רק recall. שיעור הרעש, שלדבריו מזיק לקוד, נשאר בלי מדד."
+    ],
+    [
+     "איך מעדכנים את ה-dataset כש-agents מייצרים סוגי באגים חדשים?",
+     "המרצה עצמו מציין שזו המגבלה העיקרית לארגון בודד."
+    ],
+    [
+     "איך מזהים את המודל שכתב את הקוד ב-20% שאין בהם טביעת אצבע?",
+     "שם בראנץ' ושורת co-author נשברים בקלות, ו-telemetry ממכונות מפתחים מעלה שאלות של פרטיות ותפעול."
+    ],
+    [
+     "אילו מודלים קטנים ומודלי computer use עובדים בפועל?",
+     "לא נמסרו שמות מודלים, ולכן קשה לשחזר את ארכיטקטורת הניתוב."
+    ]
+   ],
+   "widths": [
+    3.2,
+    3.2
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "9. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "Sandbox",
+     "סביבת הרצה מבודדת (למשל VM מבוסס Firecracker) שבה ה-agent קורא ומריץ קוד"
+    ],
+    [
+     "Harness",
+     "שכבת התוכנה שמפעילה את המודל ככלי עבודה (OpenCode, Pi, Claude Code, Codex)"
+    ],
+    [
+     "Webhook",
+     "קריאה אוטומטית מ-GitHub או GitLab למערכת חיצונית כשנפתח PR"
+    ],
+    [
+     "Nitpick",
+     "הערת review נכונה טכנית אבל קטנונית, שמייצרת רעש וקוד defensive מיותר"
+    ],
+    [
+     "Model inversion",
+     "review לקוד באמצעות משפחת מודלים שונה מזו שכתבה אותו"
+    ],
+    [
+     "Off-by-one",
+     "שגיאת גבול של אחד באינדקס או בלולאה (בתמליל: one-off errors)"
+    ],
+    [
+     "Auth bypass",
+     "מסלול בקוד שעוקף בדיקת הרשאות או אימות"
+    ],
+    [
+     "Codebase context",
+     "הבנה של ה-codebase מעבר ל-diff: תלויות, flows ו-repos אחרים"
+    ],
+    [
+     "RAG",
+     "שליפה של קטעי מידע רלוונטיים והזנתם למודל כהקשר"
+    ],
+    [
+     "Living wiki",
+     "בסיס ידע שמתעדכן כל הזמן ומאחד קוד, telemetry, docs ו-tickets"
+    ],
+    [
+     "MCP gateway",
+     "שער שמחבר מקורות כמו Jira ו-Linear ל-agent דרך Model Context Protocol (מופיע בשקף)"
+    ],
+    [
+     "Computer use",
+     "יכולת של מודל להפעיל ממשק גרפי (לחיצות, הקלדה) ולבדוק אותו ויזואלית"
+    ],
+    [
+     "Dev box",
+     "סביבת פיתוח שאפשר להרים אוטומטית עם כל ה-dependencies של בראנץ' ה-PR"
+    ],
+    [
+     "Flow map",
+     "מיפוי מאזורי קוד ל-user flows שצריך לבדוק (למשל Checkout code ל-Purchase flow)"
+    ],
+    [
+     "Frontier model",
+     "המודלים המובילים והיקרים ביותר, שמשמשים כאן רק למשימות הקריטיות"
+    ],
+    [
+     "Re-ranking",
+     "דירוג מחדש של מועמדים להקשר כדי שרק הרלוונטיים ייכנסו למודל היקר"
+    ],
+    [
+     "Forward-deployed engineers",
+     "מהנדסים של הספק שעובדים אצל הלקוח על ההטמעה"
+    ]
+   ],
+   "widths": [
+    1.6,
+    4.8
+   ]
+  }
+ ]
+}

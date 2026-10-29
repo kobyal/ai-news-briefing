@@ -1,0 +1,396 @@
+[0:00] I am pretty excited to be here and talk about who verifies the software factory.
+[0:18] Before we get started, can you give me a quick show of hands, raise your hand if your coding
+[0:23] agent has opened any pull request in the last one week.
+[0:29] everyone, thanks. And keep your hands raised up if you have merged pull requests and reviewed
+[0:35] every line of code that was merged.
+[0:38] Oh, I do see a few people, that's excellent. So, what I'm going to talk about is the gap
+[0:43] between the two camps, merging requests without reviewing manually and merging requests after
+[0:53] doing some reviews.
+[0:54] So my name is Manish Kapoor and I lead the product and solution, developer relations
+[0:59] team at Sonar. And I'm excited to be here with my guest speaker, Addy Osmani from Anthropic.
+[1:10] Addy has been, had been at Google for about 14 years. Most of you probably know him and
+[1:15] he's written lots and lots of content and articles. I learn a lot from Addy. So I'm
+[1:20] I'm really fortunate to have him here stand next to me and
+[1:23] share his wisdom with all of us here today.
+[1:26] He recently joined Anthropic.
+[1:29] And Adi, so congratulations on your role at Anthropic.
+[1:33] Would you like to tell the team what you're working on at Anthropic,
+[1:36] what your role is?
+[1:37] Yeah, sure.
+[1:37] So I'm responsible for making sure that you all have a really great developer
+[1:41] experience building with Cloud Code.
+[1:43] And anytime that we discover there are opportunities to make it even smoother,
+[1:47] we bring that right back into the product.
+[1:48] We ship a couple of times every single day,
+[1:51] and so we're very interested in trying
+[1:52] to make sure that you have the best possible experience
+[1:54] as often as possible.
+[1:56] Cool.
+[1:56] Thank you.
+[1:57] All right.
+[1:58] So let's start with some problem and context setting slide.
+[2:02] There are two numbers on the slide.
+[2:04] CircleCI analyzed 28 million CI workflows this year,
+[2:09] and they noticed that the throughput jumped by about 59%.
+[2:13] But yet, three in 10 attempts to merge that code
+[2:17] to production are failing. And this is a stat from one independent stat from CircleCI.
+[2:25] And I think I've seen the same trend for most of our customers that I speak to every day.
+[2:30] This is a quote from Addy, a software factory is harnessing loops at scale. This resonated
+[2:36] quite a bit from me. And if you have not read that article, you can look it up. It's pretty
+[2:41] educational article and talking about future, how the future will look like in terms of
+[2:46] of software factories.
+[2:49] So Adi, would you like to expand on what you were thinking
+[2:51] when you wrote this article about soft loops
+[2:53] and harnessing the loops at scale?
+[2:55] Yeah, absolutely.
+[2:56] So a lot of folks here have probably
+[2:57] heard this term software factories.
+[2:59] And there's two types of factories
+[3:01] that are least worth keeping in mind.
+[3:03] Software factories, harnessing loops at scale.
+[3:05] A lights on factory is one where you have agents that
+[3:08] are helping you with planning, building, checking, and shipping
+[3:13] code again and again.
+[3:14] but you as a person still apply your judgment and taste
+[3:18] inside the picture.
+[3:19] And then we have a dark software factory,
+[3:21] which is a little bit closer to how a car factory with robotics
+[3:26] might be working, where it's constantly doing the work.
+[3:28] So it's scoping, building, checking,
+[3:31] and you as the person move down further
+[3:34] to thinking about intent.
+[3:35] And you're pulled in where they're really
+[3:37] the greatest of exceptions to the case.
+[3:39] But that's sort of what I was thinking.
+[3:40] I think a lot of teams are somewhere on this spectrum.
+[3:44] and are on this journey to figure out
+[3:45] how do I get further and further into automation
+[3:48] in a way that I can trust it?
+[3:50] Cool.
+[3:51] So AI coding is now basically a solved problem.
+[3:55] We all know agents are there.
+[3:57] 85% of the organizations are already using coding agents.
+[4:00] It will go to 95% and very soon to 100%.
+[4:05] 76% of the developers that generate AI code,
+[4:08] they are saying that code is being produced at a speed
+[4:12] that it's impossible for them to verify it.
+[4:14] So they are spending more and more time reviewing the code.
+[4:17] So what do you think is the most pressing question
+[4:20] that engineering leaders have right now?
+[4:23] So I think that teams have gotten better working with agents
+[4:26] over the last year.
+[4:27] Models, harnesses have also gotten better.
+[4:30] And what I see a lot of leaders being interested in
+[4:32] is how do we enable you to ship code faster with confidence?
+[4:38] And that confidence piece is very important.
+[4:40] Agents can now generate ways for you
+[4:42] to check your code much more cheaply than ever before.
+[4:45] And if you think about the things that enabled us
+[4:47] to call good code high quality, those
+[4:51] were things like good tests, benchmarks, specs, anything
+[4:57] that gives us confidence.
+[4:58] So agents are able to help us generate
+[5:00] that a little bit more easily these days,
+[5:01] a little bit more quickly.
+[5:02] We can, of course, refine those things.
+[5:04] But I think that those checks are
+[5:06] one of the most important things we should be spending
+[5:08] our time on these days.
+[5:10] If you are hoping to get the best quality output
+[5:13] from your agents, you need to give your agents a way
+[5:16] to verify that the work is correct.
+[5:18] If you've got that in place and you
+[5:20] can make sure that the code is both correct and complete,
+[5:24] that can easily two to three by the quality of your outcomes.
+[5:27] Yep, yep.
+[5:28] Absolutely right.
+[5:29] Spot on.
+[5:29] I think code confidence, we have been running an ad,
+[5:32] code confidence is scarce.
+[5:34] And you really need to build it up now
+[5:36] that the coding problem is solved.
+[5:38] So I actually, yesterday night, so this might be a surprise question for you.
+[5:42] Yesterday night I read a post from Anthropic and
+[5:46] I encourage all of you to read it.
+[5:47] It talks about the scale at which Anthropic is operating.
+[5:50] They are merging about 30,000 code changes every single day.
+[5:54] They used to do about 3,000 or so, 2,500 or so code changes just a few months back.
+[6:00] They have scaled from 2,500 code changes to 30,000 code changes per day.
+[6:05] That is mind boggling.
+[6:07] So, Adi, what does code review look like at Anthropic and with the Cloud
+[6:12] Code team that you're working with?
+[6:13] Yeah, these are great questions.
+[6:14] So we were merging about 2,500 changes all the way back in May.
+[6:19] And even for our recent refresh of Cloud.ai,
+[6:22] we put out a case study saying that we kind of three-byed the performance of it.
+[6:26] That was accomplished by merging about 3,000 pro requests in a very short
+[6:29] space of time with engineers, product, designers,
+[6:32] a number of different functions contributing to it.
+[6:35] So our workflow for being able to get verification and code review in place
+[6:40] is that we first of all have Claude do a first pass review.
+[6:44] What's very important in there is making sure that it has a way to actually
+[6:47] try the experience out similar to a real user.
+[6:50] So that can mean end to end tasks, opening up the experience,
+[6:54] checking it in a browser, running any tools, doing any linting,
+[6:57] doing any other checks that are necessary to build up that confidence.
+[7:01] People usually ask us, okay, well, what happens if you discover
+[7:05] a bug or a gap in functionality.
+[7:07] Well, we have hooks that will then go and run on any edits.
+[7:11] They will study the diffs and allow
+[7:13] us to get this loop in place where we are correcting the PR
+[7:16] as quickly as possible.
+[7:18] So we have Cloud Code doing the review.
+[7:21] We have a code review product that you can also check out.
+[7:24] That's pretty good.
+[7:25] And the idea there is we're trying to automate code review
+[7:28] as much as possible.
+[7:29] This is something that we use ourselves.
+[7:31] And increasingly, what's important
+[7:33] is for your teams to be thinking about how can you cod,
+[7:36] we talk about taste and judgment so much these days, right?
+[7:40] It's important for you to be trying to codify what you
+[7:42] consider best practice and taste in your team's shared,
+[7:46] like Claw.md, agents.md, anywhere where the agent can then
+[7:50] consult during code review.
+[7:52] And then people are responsible for checking
+[7:54] on the agent's evidence.
+[7:55] So how do we know?
+[7:57] If I'm building out a piece of UI that's
+[8:00] going to be used by a user in the browser,
+[8:03] I want to make sure that it's tested in the browser,
+[8:05] maybe generated me a video of that experience,
+[8:08] where it's been clicking around and gives me confidence, well,
+[8:10] OK, well, this works.
+[8:11] If I care about the mobile or desktop experience,
+[8:13] maybe it generates me screenshots or videos of that.
+[8:16] But basically, you want to get to a place where the agent's
+[8:18] giving you as much verification evidence as possible.
+[8:21] Cool.
+[8:21] Yeah, verification is key.
+[8:23] I think you need to verify everything
+[8:24] that the software factories will produce.
+[8:27] And that's what we are going to talk about today.
+[8:29] So, these stats by the way are from the state of code survey report that
+[8:34] will be coming out very soon from Sonar.
+[8:37] We surveyed about more than 1,000 developers and
+[8:40] we found some interesting data which will give us insights as to what's happening
+[8:44] in the industry today and where we are headed.
+[8:46] So 84% say AI gets features and fixes to production faster.
+[8:52] The pull requests are getting larger and more complex.
+[8:56] And yet only 31% more code is reaching the production without review.
+[9:02] So that's a little bit of a scary fact, particularly for
+[9:06] production applications in the regulated industries, in the machine critical
+[9:10] applications, where you absolutely need to make sure that you have to verify that
+[9:17] code and you're confident in the code that is being shipped.
+[9:20] So where are the next gains going to come from, Adi?
+[9:23] I think the next gains are going to come from a combination
+[9:26] of us really nailing verification,
+[9:29] as well as model quality.
+[9:30] But models are already, like if you take a look at Opus 5.5,
+[9:33] model quality has already gotten to a place where
+[9:35] it's pretty good.
+[9:37] And I would say that us being able to share best practices
+[9:39] about that verification step is going
+[9:41] to become increasingly more important.
+[9:43] Because if you tell people, yeah, just verify the work,
+[9:45] their next question is, what does that even mean?
+[9:48] And so I think that the conversation
+[9:50] needs to evolve into specifically what kinds of tests
+[9:52] are useful.
+[9:53] We lean a lot on end-to-end tests, property tests,
+[9:56] any visual verification tests, things
+[9:58] that can help us just get that confidence to merge those changes
+[10:01] in automatically.
+[10:02] Cool.
+[10:03] You mentioned light factories want to go dark,
+[10:05] and that's the direction we are headed.
+[10:08] Our survey results show that today, 5% of the companies
+[10:11] are using software factories.
+[10:13] It will get to 34%.
+[10:15] And surprisingly, 39% in the financial services.
+[10:18] How many of you are using software factories today?
+[10:19] Just curious.
+[10:22] a handful of you, and how many are planning to use software factories by next year?
+[10:26] Yeah, that's a good question.
+[10:30] How do you define a software factory?
+[10:31] Would you like to take that question?
+[10:32] Yeah, yeah, sure.
+[10:33] So we talked about a definition of software factories just a little bit earlier.
+[10:37] A software factory is basically loops at scale.
+[10:39] And when we think about this, it's all about what end of the spectrum are you at
+[10:43] in terms of how much people are still involved in the process.
+[10:47] The more that the agents are able to generate verification and give you confidence,
+[10:51] the more that you can get to that place where you go dark.
+[10:54] And I think that most people are still somewhere
+[10:56] in that spectrum and are not quite as this data shows
+[10:59] at that dark point just yet.
+[11:00] Yep.
+[11:00] Just to add to what Adi said, I think software factory,
+[11:03] think of it like a production line
+[11:05] where you start defining the intent and your specifications.
+[11:09] Then you start writing the code.
+[11:10] So it's an assembly line where each of these software
+[11:13] development lifecycle steps happen.
+[11:15] And automating them at scale where there's pretty much
+[11:19] in a dark factory there would be no lights on, it's autonomously working,
+[11:24] fully autonomously working.
+[11:25] A light factory is where people are involved in the process at every step,
+[11:31] or most steps, whereas a dark factory the goal would be to turn off the lights and
+[11:35] let the factory run independently 24 by 7.
+[11:38] All right, so you talked about verification.
+[11:41] I'll talk a little bit about what we think at Sonar about verification.
+[11:46] If you saw a keynote earlier today from our CEO, he talked about verification should be
+[11:50] multi-layered.
+[11:51] We absolutely 100 percent believe that each company should adopt a zero trust multi-layered
+[11:57] verification approach and verification should be done in every loop.
+[12:02] Whether you are operating inside the agentic loop or whether you are working inside the
+[12:05] CI verification loop or whether you doing code maintenance.
+[12:09] In each and every loop, it is important to verify the output of the factories or the
+[12:13] the agents that code that the agents are producing.
+[12:17] So we look at it in terms of layers and think of it like,
+[12:22] you know, there's first layer which is a deterministic layer which catches
+[12:27] bugs, security issues, things like SQL injection, buffer of bugs,
+[12:32] and all of those are caught.
+[12:33] And then there's a second layer where agentic review happens, where agents are
+[12:37] used to like Adi was talking about, agents review that code.
+[12:41] And in that agentic review, they catch logic and intent issues,
+[12:45] which the deterministic layer is not well suited to catch.
+[12:49] So we use each layer is targeted at catching a specific types of issues.
+[12:54] And then the third layer could be a software supply chain security layer,
+[12:57] where you look at all the CVEs, all your malware detection happens,
+[13:02] all your malicious package detection happens,
+[13:05] all of that happens in the third layer.
+[13:06] So it's a layered approach where each layer is tuned and
+[13:10] optimized to catch a certain type of issue.
+[13:13] So we absolutely recommend doing a multi-layered verification.
+[13:16] Oops.
+[13:19] So there's another stat here.
+[13:21] 28% companies have approved agents and shared controls,
+[13:27] and very few shared controls.
+[13:29] And 5% are operating software factories autonomously.
+[13:33] What are your thoughts there, Adi, in terms of?
+[13:37] So I've talked to so many companies where a couple of months ago,
+[13:40] one of their biggest worries was they were allowing their engineering teams to go off
+[13:43] and play around with agents.
+[13:45] And they got to a place where there were hundreds, thousands of agents in some cases,
+[13:49] and they just didn't know what they were doing.
+[13:51] Like, what are these agents actually doing?
+[13:52] They're touching all of our systems, accessing all kinds of data.
+[13:55] Maybe they're deploying to production.
+[13:57] And so a lot of enterprises think about concerns like agent identity and
+[14:03] telemetry and being able to track what's actually happening.
+[14:06] And I'd say that the three biggest things for a lot of companies
+[14:08] are how do we think about control,
+[14:10] how do you think about permissions,
+[14:11] and how do we think about the sandbox?
+[14:13] How are we making sure that the agent isn't jumping out
+[14:15] of the sandbox and doing things that it shouldn't be doing?
+[14:17] Yeah.
+[14:18] At Sonar, we call it guide rails.
+[14:20] So instead of guard rails, we're
+[14:21] thinking of calling it as guide rails,
+[14:23] where we guide the agents to follow the rail tracks,
+[14:27] a specific path to take and prevent them
+[14:30] from going out of bounds, or so to say,
+[14:32] going out of the sandbox, like Addy was saying.
+[14:34] So it's very, very important to have guide rails for an agent and
+[14:37] govern the agents that you're working with.
+[14:41] So let's, we're coming to a close now.
+[14:44] As my timer is telling me we just have a few minutes left.
+[14:47] Let's get into a lightning round.
+[14:49] One sentence response for each of these questions.
+[14:52] And you have seen the questions already on the slide, so.
+[14:54] Can these be long sentences?
+[14:56] They can be as long as the time permits.
+[14:58] Perfect.
+[14:59] Light or dark factory for most teams by end of 2027, yes or no?
+[15:03] I think we're going to see light factories with some dark corners.
+[15:06] I don't think we're going to get to everybody in this room using dark factories
+[15:09] entirely, but it's going to be something close to that.
+[15:12] I would guess Anthropic would do it this year or next year.
+[15:20] All right.
+[15:21] Second question.
+[15:22] Should agent written code be labeled in the PR?
+[15:26] I personally think it should.
+[15:27] Historically, we have felt a great deal of ownership around our code,
+[15:31] pride around the fact that, hey, I wrote this thing.
+[15:33] I'm putting my name on it.
+[15:35] And at Anthropic, we think about this a little bit differently.
+[15:38] We've evolved to the point where we don't really mind so much
+[15:41] if Claude is labeled as, hey, I'm the one that wrote this thing.
+[15:45] Because we're a little bit more focused on the outcomes
+[15:47] and making sure that the code, the features, what we're shipping
+[15:50] to users is the right thing.
+[15:52] And so I personally think it's fine for the code
+[15:55] to be written, labeled as coming from an agent.
+[15:58] And that can also help us with things like figuring out, OK,
+[16:00] Well, if the agent wrote it, what are some of the constraints
+[16:02] and extra checks that we need to keep in place?
+[16:04] I have the same point of you, Adi.
+[16:06] I think in the short run, at least in the foreseeable six
+[16:09] to nine months, we should label the PRs
+[16:12] till we are confident enough in our factories.
+[16:14] We do want to know and track it.
+[16:16] And it's also important for the financial customers here
+[16:18] in terms of auditability.
+[16:21] If you label it, you know who's writing the code,
+[16:24] because we are, at the end of the day, still accountable.
+[16:26] Yeah, absolutely.
+[16:27] Accountability is the most important part here.
+[16:29] We still label, who is the owner for this change?
+[16:32] I might have kicked off a quad run to complete a piece of work,
+[16:35] but I'm still on the hook.
+[16:37] If something goes wrong, I have to go and fix it.
+[16:39] Yep, yep, key point.
+[16:40] Yep.
+[16:41] The next question, actually I'll improvise it here
+[16:43] because this is a leadership session.
+[16:45] One skill a junior developer or leaders
+[16:48] should build on this year?
+[16:51] I think that you should push your teams, if you're a leader,
+[16:53] you should push your teams to really think hard about what
+[16:56] verification means.
+[16:57] How are you already approaching things like testing?
+[17:00] What is the gap between that and you getting to a place
+[17:03] where you're very comfortable with the agents being
+[17:05] able to sign off on the code being good enough
+[17:07] to merge on their own?
+[17:09] And so figuring that out, if you're a junior,
+[17:11] it's the other side of that, like actually getting
+[17:13] more experience in the different flavors of tests,
+[17:15] whether it's end-to-end tests, property tests, et cetera.
+[17:18] Yeah.
+[17:19] And the last, you're actually not following the rules.
+[17:22] You're going beyond one sentence, but that's cool.
+[17:23] We have only 30 seconds left.
+[17:28] I'm fine.
+[17:28] We can go a minute over, I'm sure.
+[17:30] The agent opened the PR.
+[17:32] It is safe to merge when?
+[17:35] You have full confidence nothing's going to go wrong,
+[17:37] or that you've mitigated that as much as possible.
+[17:39] Love it.
+[17:40] All right.
+[17:42] Here's my last slide, and then we'll wrap it up.
+[17:44] So what separates teams that are shipping fast but not
+[17:49] shipping blind?
+[17:50] I think there are three key takeaways for you.
+[17:52] Writing code is the fastest part and that is solved.
+[17:55] Strong review and verification for all teams is what will help you maintain that
+[17:59] speed.
+[18:00] Fast to write is not fast to ship.
+[18:03] You have to basically count what is getting merged,
+[18:05] looked at what is getting merged and make sure it doesn't escape the sandbox and
+[18:09] the things like that before it gets into the production.
+[18:11] Verify everything and autonomy is earned.
+[18:14] You will get to software factories very soon if not next year.
+[18:19] You need to put an independent automated verification inside each loop of your factory.
+[18:24] Make sure that you can trust the output that the factory is producing.
+[18:28] With that, I'll wrap it up.
+[18:30] Thanks for attending our talk today, a conversation with Adi.
+[18:34] Again, Adi, I appreciate you taking the time and joining us here in this conversation.
+[18:37] Thanks for having me.
+[18:38] Visit us at the big red booth, the Sonar booth in the expo hall if you have any
+[18:42] further questions or would like to talk about it.
+[18:45] Thank you again.
+[18:49] Thank you.

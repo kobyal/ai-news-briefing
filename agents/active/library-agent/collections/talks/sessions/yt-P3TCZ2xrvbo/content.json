@@ -1,0 +1,576 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "title": "מה Claude Code יודע לעשות ועוד לא ניסיתם",
+ "subtitle": "כ-40 יכולות של Claude Code ב-54 דקות: מהגדרות שעושים פעם אחת, דרך קיצורים יומיומיים ונקודות הרחבה, ועד שימושים שאינם קוד",
+ "meta": [
+  "Gui Ferreira · NDC Conferences · 28.10.2026",
+  "משך: כ-54 דקות · YouTube",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Gui Ferreira",
+ "topics": [
+  "Claude Code",
+  "Developer Productivity",
+  "Context Management",
+  "AI Agents"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זו הרצאה מ-NDC Oslo 2026. Gui Ferreira (בשקופית: Guilherme \"Gui\" Ferreira) הוא מהנדס תוכנה ומדריך שמעביר סדנאות Claude Code, ומציג את עצמו כמי שאינו קשור ל-Anthropic. הוא לא מלמד את הבסיס. ההרצאה בנויה כ-rapid-fire של כ-40 יכולות שהוא עצמו משתמש בהן ביומיום, ומיועדת למי שכבר הריץ Claude Code לפחות פעם אחת.\n\nהטענה המרכזית שלו: רוב המפתחים פותחים את Claude, מקבלים מיד קפיצה גדולה בפרודוקטיביות ונעצרים שם, אחרי שלמדו בערך 10–20 אחוז מהכלי. הערך האמיתי נמצא בפרטים הקטנים: CLAUDE.md רזה, ניהול context יזום, hooks במקום הוראות טקסטואליות, skills כחבילות יכולת, ושימוש ב-Claude Code גם למשימות שאינן קוד. היעד שהוא מציב לקהל צנוע: לצאת מהחדר עם שניים-שלושה דברים לנסות ביום שני."
+  },
+  {
+   "kind": "image",
+   "file": "k_001.jpg",
+   "caption": "שקופית הפתיחה: Guilherme \"Gui\" Ferreira, Software Engineer Educator, עם קישורים לאתר, ל-YouTube ולרשתות החברתיות שלו",
+   "width": 5.6
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות המרכזיות, כל אחת עם חותמת זמן, וגם מה לא נאמר בהרצאה."
+    ],
+    [
+     "2. ארבעה דליים: ",
+     "מבנה ההרצאה ואיפה מריצים את Claude."
+    ],
+    [
+     "3. Setup: ",
+     "CLAUDE.md, קבצי settings, ‏deny ו-status line."
+    ],
+    [
+     "4. Daily workflow: ",
+     "טבלת קיצורים ופקודות, ניהול context, ‏remote control, ‏voice ועבודה במקביל."
+    ],
+    [
+     "5. The Platform Layer: ",
+     "‏hooks, ‏skills, ה-skills המובנים, ‏‎.mcp.json ו-headless mode."
+    ],
+    [
+     "6. Beyond Code: ",
+     "סיכום רבעוני, ארגון תיקיית ההורדות, Obsidian ותוכנית ריצה."
+    ],
+    [
+     "7–8. פעולות ומילון: ",
+     "מה לעשות מחר בבוקר, שאלות פתוחות ומילון מונחים."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך הופק אוטומטית מהתמלול ומהשקופיות של ההקלטה. תמלול אוטומטי (ASR) עלול לשבש שמות ומונחים, למשל \"cloud\" במקום Claude או \"/ptw\" במקום ‎/btw, ובמקומות כאלה המסמך מציין את אי-הוודאות. הציטוטים מועתקים מהתמלול מילה במילה ונבדקו מול חותמת הזמן שלהם. לא נוסף שום מידע ממקורות חיצוניים."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "Ferreira מחלק את ההרצאה לארבעה \"דליים\": הגדרות חד-פעמיות, זרימת העבודה היומית, שכבת ההרחבה ושימושים מחוץ לקוד. רוב הזמן מוקדש לדלי השני. החוט המקשר בין כולם הוא ניהול context ועלות: כל טוקן שנכנס ל-context בלי צורך פוגע באיכות של האיטרציות הבאות ומייקר אותן."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "CLAUDE.md ארוך מזיק: ",
+     "לפי מחקר של ETH Zurich שהוא מצטט, CLAUDE.md ארוך ומפורט מוריד ביצועים בכ-3% ומעלה עלויות בכ-20%. המלצתו: לנקות לפי שלוש שאלות, או להריץ ‎/doctor שעושה זאת אוטומטית [6:13]."
+    ],
+    [
+     "חסמו גישה לסודות ב-settings.json: ",
+     "בלי permissions.deny, ‏Claude שמנסה לפתור באג עלול לקרוא קבצי secrets ומשתני סביבה, והמפתחות יישלחו ל-Anthropic [10:49]."
+    ],
+    [
+     "ערכו את התוכנית ישירות במקום להתווכח עליה: ",
+     "‏Ctrl+G פותח את ה-plan כקובץ markdown בעורך. אחרי השמירה Claude ממשיך מהגרסה הערוכה [13:59]."
+    ],
+    [
+     "Rewind עדיף על refactor: ",
+     "‏Esc כפול או ‎/rewind מחזירים אחורה, כך שכיוון שננטש לא נשאר ב-context ולא מזהם אותו [17:04]."
+    ],
+    [
+     "הריצו ‎/context על session ריק: ",
+     "כך רואים כמה context תופסים skills ו-MCPs שאינכם צריכים. אם מדובר בכ-8% בהתחלה, כדאי לנקות [23:13]."
+    ],
+    [
+     "‏Compaction יזום: ",
+     "הוא מבצע ‎/compact בעצמו בסוף כל שלב בפיצ'ר. את סף ה-40% (\"dump zone\") הוא מציג כדעה רווחת ולא כממצא מוכח [24:45]."
+    ],
+    [
+     "Hooks במקום הוראות ב-CLAUDE.md: ",
+     "‏PostToolUse hook שמריץ טסטים ו-linter פועל בכל פעם, לא עולה טוקנים, והפידבק שלו חוזר לשיחה [40:09]."
+    ],
+    [
+     "Skill הוא חבילה ולא רק prompt: ",
+     "בתיקייה אפשר לשים סקריפטים ותיעוד, לפני שכותבים skill משלכם כדאי לנסות את ‎/simplify, ‏‎/batch ו-‎/loop המובנים [41:42]."
+    ],
+    [
+     "Claude Code כעוזר אישי: ",
+     "ארגון 1,626 פריטים בתיקיית ההורדות, ‏vault של Obsidian, ושני skills שמושכים ריצות מ-Strava ובונים תוכנית אימונים שבועית [47:48]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "המחקר לא מצוטט במדויק: ",
+     "Ferreira מייחס ל-ETH Zurich את המספרים 3% ו-20% בלי שם מאמר, בלי גודל מדגם ובלי לפרט על אילו משימות נמדד."
+    ],
+    [
+     "סף ה-40%: ",
+     "‏\"dump zone\" מוצג במפורש כדעה ללא מחקר שתומך בו. אין נתון משלו."
+    ],
+    [
+     "אין מספרי עלות: ",
+     "הוא ממליץ לעקוב אחרי עלות ל-session, אבל לא מציג אף נתון עלות אמיתי מהעבודה שלו."
+    ],
+    [
+     "סיכוני remote control: ",
+     "אין התייחסות לאבטחה או להרשאות כשמאשרים פעולות מהטלפון."
+    ],
+    [
+     "מגבלות deny: ",
+     "לא נאמר מה permissions.deny לא מכסה, ולא כיצד לבדוק שהוא אכן אוכף את מה שהוגדר."
+    ],
+    [
+     "זמינות ויציבות: ",
+     "לא צוין אילו פקודות (‎/goal, ‏‎/focus, ‏claude agents) ניסיוניות או תלויות גרסה. גם לא היו הדגמות חיות, רק צילומי מסך."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. ארבעה דליים ואיפה מריצים את Claude"
+  },
+  {
+   "kind": "image",
+   "file": "k_002.jpg",
+   "caption": "שקופית \"Four buckets\": ‏01 Setup ‏(Configure once, benefit forever), ‏02 Daily Workflow ‏(Shortcuts hiding in plain sight), ‏03 The Platform Layer ‏(Extension points you never ran), ‏04 Beyond Code ‏(Break your mental model)",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "הפתיחה ממקמת את הבעיה: ביום שישי שלפני ההרצאה ספר Ferreira ‏\"104 slash commands\" [0:00] זמינות כברירת מחדל, והקצב גבוה מכדי לעקוב אחריו. הוא מאבחן את המשתמש הטיפוסי כמי שקיבל קפיצה מהירה בפרודוקטיביות \"and you just learn 10 to 20 percent of it\" [0:00].\n\nאת Claude אפשר להריץ ב-terminal, כהרחבה ב-IDE או כאפליקציית desktop. הוא עצמו עובד ב-terminal, כי זה מהיר יותר וכי \"usually the experimental features come there first\" [3:03]. לדבריו רוב מה שהוא מציג עובד בכל הסביבות."
+  },
+  {
+   "kind": "image",
+   "file": "k_003.jpg",
+   "caption": "\"Meet Claude where you already work\": בחירת סביבת ההרצה (terminal, ‏IDE, ‏desktop) לצד צילום של מסך הפתיחה של Claude Code ב-terminal",
+   "width": 5.6
+  },
+  {
+   "kind": "h1",
+   "text": "3. Setup — מגדירים פעם אחת, נהנים לתמיד"
+  },
+  {
+   "kind": "image",
+   "file": "k_004.jpg",
+   "caption": "שקף מעבר לפרק 01: ‏\"Setup Stuff — Configure once, benefit forever\"",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "הצעד הראשון למי שחוזר מכלי אחר הוא ‎/import עם שם הכלי. הפקודה מייבאת MCP servers, קבצי תצורה ו-sub-agents מ-Codex או Cursor [4:36]. הצורך בה נובע מכך שאין סטנדרט משותף לכלים, והבולט שבהבדלים הוא ש-CLAUDE.md נקרא AGENTS.md בכלים אחרים.\n\nלגבי CLAUDE.md, Ferreira מודה שבשנה שעברה היה ממליץ לדחוס לקובץ כל מה שאפשר, ושזו הייתה טעות. הבעיה הראשונה היא כפילות: אותו מידע מופיע ב-README וב-CLAUDE.md, וה-agent מתבלבל. הפתרון הוא import עם @ ונתיב לקובץ, למשל כללי צוות או schema. הבעיה השנייה היא אורך הקובץ:"
+  },
+  {
+   "kind": "quote",
+   "text": "eth Zurich proved that the performance when you have a long and descriptive cloud.md tends to drop in 3% and your costs will increase in 20%",
+   "by": "— Gui Ferreira [6:13]"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "שלוש שאלות לכל הוראה ב-CLAUDE.md: ",
+     "(1) האם צריך אותה בכל משימה? (2) אם היא ספציפית, למשל הרצת performance tests, האם להעביר אותה ל-skill? כלל לשפה או לסיומת קובץ עובר ל-‎.claude/rules. (3) האם ה-agent יכול להבין את זה לבד? מבנה תיקיות, למשל, ממילא יתיישן ויסטה מהמציאות [7:45]."
+    ],
+    [
+     "‏/doctor עושה את הניקוי: ",
+     "מעבר לבדיקת התקנה, כשמריצים אותו בתוך פרויקט הוא מפעיל את שלוש השאלות על CLAUDE.md, מסמן כפילויות ומציע מה להעביר ל-skills [7:45]."
+    ],
+    [
+     "שלוש שכבות של CLAUDE.md: ",
+     "הקובץ המשותף לצוות. CLAUDE.local.md שנמצא ב-gitignore, להעדפות אישיות כמו TDD. ו-‎~/.claude/CLAUDE.md בפרופיל המשתמש, להוראות שחלות על כל session, למשל שפת שיחה [9:16]."
+    ],
+    [
+     "permissions.deny ב-settings.json: ",
+     "רשימת קבצים ופקודות bash ש-Claude לא יקרא ולא יריץ. לדבריו, בלי זה ייתכן ש-\"your keys are going over the wire through Anthropic\" [10:49]."
+    ],
+    [
+     "Theme ו-status line: ",
+     "‏theme משנה את התצוגה, אבל העיקר הוא status line: לוח מחוונים שמציג פרויקט, branch, מודל ואחוז ניצול של context window. נוצר בשיחה עם ‎/statusline, ש-Claude הופך לסקריפט [12:23]."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "4. Daily workflow — קיצורים שמסתתרים לעין כל"
+  },
+  {
+   "kind": "image",
+   "file": "k_005.jpg",
+   "caption": "\"Edit the plan as a document\": ‏Shift+Tab נכנס ל-plan mode, ‏Claude מנסח את הגישה, ‏Ctrl+G פותח אותה בעורך, ו-Claude ממשיך לפי הגרסה הערוכה",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "זה החלק הארוך בהרצאה. הרעיון המרכזי: לא לנהל משא ומתן עם Claude על פרטים קטנים בתוכנית. ‏Ctrl+G פותח את ה-plan בעורך, ולדבריו זה \"It's like a shared Google Doc with Claude.\" [13:59]. כדי לצמצם הנחות סמויות, הוא מבקש מ-Claude לראיין אותו דרך כלי ה-AskUserQuestion: ‏\"hey Claude, interview me and don't stop until we clarify every single thing.\" [15:32]. כשכיוון מתברר כשגוי, rewind עדיף על בקשת refactor, כי הקוד שנזנח לא נשאר ב-context: ‏\"It's like taking one step back to then take two steps forward.\" [17:04]. בטבלה מרוכזים הקיצורים והפקודות שהוצגו:"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "פקודה / קיצור",
+    "מה זה עושה ומתי",
+    "זמן"
+   ],
+   "rows": [
+    [
+     "Shift+Tab → Ctrl+G",
+     "‏plan mode, ואחריו עריכת התוכנית כ-markdown בעורך",
+     "13:59"
+    ],
+    [
+     "\"interview me\"",
+     "‏Claude שואל שאלות דרך AskUserQuestion עד שכל הנקודות מובהרות",
+     "15:32"
+    ],
+    [
+     "Esc Esc / ‎/rewind",
+     "חזרה להודעה קודמת ותיקון ה-prompt, בלי להשאיר שאריות ב-context",
+     "17:04"
+    ],
+    [
+     "‎/model + effort",
+     "החלפת מודל ורמת reasoning לכל ה-thread. בתמלול נשמע גם \"Fable\" לצד Sonnet, ‏Opus ו-Haiku (שם לא ודאי)",
+     "18:35"
+    ],
+    [
+     "ultrathink",
+     "‏max effort ל-prompt אחד בלבד, ואחריו חזרה לרמה הקודמת",
+     "18:35"
+    ],
+    [
+     "Ctrl+S",
+     "שומר בצד (stash) prompt שעוד לא נשלח כדי לענות ל-Claude, ומחזיר אותו אחר כך",
+     "20:10"
+    ],
+    [
+     "‎/btw",
+     "שאלת צד בזמן שהמשימה רצה, בלי לזהם את ה-context (בתמלול: \"/ptw\")",
+     "21:42"
+    ],
+    [
+     "עלות ל-session",
+     "פילוח לפי מודל, כולל sub-agents. שם הפקודה בתמלול לא ברור (\"status\")",
+     "21:42"
+    ],
+    [
+     "‎/context",
+     "להריץ על session ריק כדי לאבחן כמה context תופסים skills ו-MCPs",
+     "23:13"
+    ],
+    [
+     "‎/compact",
+     "‏compaction יזום בסוף כל שלב, ולא רק אוטומטית כשה-context מתמלא",
+     "24:45"
+    ],
+    [
+     "‎/memory",
+     "בדיקת הזיכרונות שנשמרו וקידום העדפות שימושיות ל-CLAUDE.md",
+     "27:49"
+    ],
+    [
+     "!",
+     "מריץ פקודת bash ישירות בלי reasoning. הפלט נכנס ל-context",
+     "27:49"
+    ],
+    [
+     "‎/diff",
+     "חלונית שמציגה את הקבצים והשורות ש-Claude שינה",
+     "29:21"
+    ],
+    [
+     "‎/voice",
+     "הכתבה קולית: לוחצים על רווח ומדברים",
+     "32:33"
+    ],
+    [
+     "Ctrl+V (גם ב-Mac)",
+     "הדבקת צילום מסך ל-terminal. ‏Cmd+V לא עובד",
+     "34:06"
+    ],
+    [
+     "‎/color, ‏‎/rename",
+     "צבע ושם לכל שיחה כשעובדים במקביל ב-worktrees",
+     "35:36"
+    ],
+    [
+     "‎/goal",
+     "מטרה עם קריטריון אימות. ‏Claude עובד בלולאה עד שהבדיקה עוברת",
+     "35:36"
+    ],
+    [
+     "‎/focus",
+     "מציג רק את ה-prompt ואת התוצאה הסופית, בלי הודעות הביניים",
+     "37:07"
+    ],
+    [
+     "claude agents",
+     "תצוגה של כל ה-agents: מי רץ, מי מחכה לתשובה ומי סיים",
+     "38:38"
+    ]
+   ],
+   "widths": [
+    1.6,
+    4.2,
+    0.7
+   ]
+  },
+  {
+   "kind": "quote",
+   "text": "I'm not aware of any study that proves this. But there's this idea that once you get to the 40% of the context window, you get into the dump zone.",
+   "by": "— Gui Ferreira [24:45]"
+  },
+  {
+   "kind": "body",
+   "text": "שתי יכולות שינו לו את אופן העבודה, ולא רק חסכו זמן. הראשונה היא remote control: ‏\"If you've never tried remote control, you should.\" [29:21]. הוא שולח משימה ארוכה, יוצא (לאסוף את אביו מבית החולים, או לטיול), וממשיך מהאפליקציה בטלפון. ה-push notifications מבקשות אישור או פידבק ומודיעות כשהעבודה הסתיימה. השנייה היא voice. כשמדברים בקול, לדבריו, \"your brain works in a different way\" [32:33], כמו שקורה כשמסבירים בעיה לעמית.\n\nלעבודה במקביל הוא משלב כמה כלים: ‏git worktrees כדי לעבוד על feature, ‏code review ותיקון באג באותו repo בו-זמנית; צבע ושם לכל שיחה; ‏‎/goal עם תנאי עצירה מדיד; ו-‎/focus. דוגמת ה-‎/goal שלו היא API שמפיק חשבוניות, עם טסט שקורא ל-API ומשווה את ה-PDF שחוזר לדוגמה. כך לא צריך \"babysitting in every single step\" [37:07]."
+  },
+  {
+   "kind": "h1",
+   "text": "5. The Platform Layer — נקודות הרחבה שלא הרצתם"
+  },
+  {
+   "kind": "image",
+   "file": "k_007.jpg",
+   "caption": "\"Catch mistakes sooner, not later & save some money too\": שקופית ה-hooks בפרק 03, ‏The Platform Layer",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "ההבחנה המרכזית בפרק היא בין הוראה לבין אכיפה. כשכותבים ב-CLAUDE.md ‏\"always run the tests\", ‏Claude צריך להחליט לבצע את זה, וזה לא תמיד קורה. ‏PostToolUse hook שמריץ טסטים ו-linter רץ בכל פעם, והפלט שלו חוזר לשיחה, כך ש-Claude מתקן לפני שהוא מכריז שסיים. יש לזה גם יתרון כספי: ‏\"Because running this instruction, this bash command yourself, doesn't cost anything in terms of tokens.\" [40:09].\n\nגם על skills הוא מציע להסתכל אחרת: ‏\"Because a skill is so much more than a skill.md. The skill.md is just entry points.\" [41:42]. ‏skill היא תיקייה שאפשר לשים בה סקריפטים (Python, ‏PowerShell) וקובצי markdown שמסבירים איך להשתמש בהם. דוגמה: סקריפטי תיקון שיושבים היום בדף Confluence יכולים להפוך ל-skill."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "‏‎/batch: ",
+     "מפצל refactor או migration גדולים בין כמה sub-agents שעובדים במקביל [41:42]. בתמלול נשמע \"slash patch\"."
+    ],
+    [
+     "‏‎/simplify: ",
+     "ה-skill האהוב עליו. מטפל בכפילויות ובקוד שקשה לתחזק. לדבריו, Anthropic משתמשת בו בפיתוח המוצר עצמו, ולכן כדאי לנסות אותו לפני שכותבים skill של refactor משלכם [43:13]."
+    ],
+    [
+     "‏‎/loop: ",
+     "בדיקה חוזרת, למשל כל חמש דקות לבדוק אם ה-deploy ב-GitHub Actions עבר, במקום לרענן את הדף ידנית [43:13]."
+    ],
+    [
+     "‏‎.mcp.json בפרויקט: ",
+     "הגדרת ה-MCPs ב-repo ולא בפרופיל המשתמש. הקובץ נכנס ל-commit, כך שכל הצוות מקבל את אותם MCPs ואפשר לבדוק בו אילו מהם באמת בשימוש [44:45]."
+    ],
+    [
+     "Headless mode: ",
+     "‏claude -p (או ‎--print) מאפשר להוסיף reasoning לסקריפטים קיימים, כולל piping פנימה והחוצה, במסגרת המנוי [44:45]."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "6. Beyond Code — Claude כעוזר אישי"
+  },
+  {
+   "kind": "image",
+   "file": "k_009.jpg",
+   "caption": "\"Recap your week\": ‏Claude Code ב-terminal עם השאלה \"What did I ship last week?\". דוגמה לשימוש בהיסטוריית העבודה לסיכום תקופתי",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "לדבריו Claude Cowork הוא שילוב של Claude Code ו-Claude.ai עם ממשק ידידותי יותר, אבל מפתחים יכולים להסתפק ב-Claude Code. הוא מציג ארבע דוגמאות:\n\nסיכום רבעוני להערכת ביצועים. אם העבודה נעשתה עם Claude, אפשר לשאול אותו מה נבנה, ולהפוך את זה ל-skill בפרופיל המשתמש שמופעל כל רבעון [47:48]. ארגון תיקיית ההורדות. היו בה 1,626 פריטים, ‏Claude מיין אותם לתיקיות, וכך ההחלטה מה למחוק נעשתה קלה: קוד כבר נמצא ב-GitHub, צילומי מסך ו-installers נמחקים, ומסמכים נבדקים ידנית [49:18]. Obsidian: ‏vault של markdown שאפשר לעבוד עליו עם Claude Code כדי לסכם פגישות, להציף משימות לחודש הבא ולקשר בין פתקים, כשהנתונים נשארים בשליטתו ואינם תלויים בכלי מסוים [50:49]. ותוכנית ריצה: בגלל מחלה כרונית נאמר לו בעבר שאסור לו לרוץ. הוא גילה שהבעיה היא ריצה לא עקבית, ובנה שני skills: אחד מושך כל יום את הריצות מ-Strava ל-vault, והשני בונה כל שבוע תוכנית שמונעת עומס יתר [52:21]."
+  },
+  {
+   "kind": "h1",
+   "text": "7. מה עושים ביום שני"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "להריץ ‎/insights: ",
+     "זו ההמלצה שסוגרת את ההרצאה, \"Slash Insights will tell you a lot about the way that you use Quoth.\" [53:53] (‏Quoth הוא שיבוש תמלול של Claude)."
+    ],
+    [
+     "לנקות את CLAUDE.md: ",
+     "להריץ ‎/doctor בפרויקט, להעביר הוראות נקודתיות ל-skills ול-rules, ולהשתמש ב-@import במקום לשכפל תוכן."
+    ],
+    [
+     "לחסום סודות: ",
+     "להוסיף permissions.deny ב-‎.claude/settings.json לקבצי env, ‏secrets וכדומה."
+    ],
+    [
+     "לבנות status line: ",
+     "שמציג מודל, ‏branch ואחוז context."
+    ],
+    [
+     "לאבחן session ריק: ",
+     "‏‎/context בתחילת עבודה. אם יותר מכמה אחוזים תפוסים כבר בהתחלה, לבדוק אילו skills ו-MCPs תופסים אותם."
+    ],
+    [
+     "להעביר בדיקות ל-hook: ",
+     "‏PostToolUse שמריץ טסטים ו-linter, במקום הוראה ב-CLAUDE.md."
+    ],
+    [
+     "לנסות skills מובנים: ",
+     "‏‎/simplify, ‏‎/batch ו-‎/loop לפני שכותבים skill משלכם."
+    ]
+   ]
+  },
+  {
+   "kind": "image",
+   "file": "k_010.jpg",
+   "caption": "שקופית הסיום \"Thank you. Let's keep in touch.\" עם הפקודה ‎/insights ופרטי הקשר של הדובר",
+   "width": 5.6
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "למה היא חשובה"
+   ],
+   "rows": [
+    [
+     "מה בדיוק מדד מחקר ETH Zurich?",
+     "המספרים (‎-3% ביצועים, ‏+20% עלות) מצוטטים בלי מקור מלא ובלי לפרט על אילו משימות נמדדו"
+    ],
+    [
+     "האם ה-dump zone של 40% אמיתי?",
+     "הדובר עצמו מציין שאין מחקר שתומך בכך, ולכן זה לא בסיס טוב לכלל אצבע"
+    ],
+    [
+     "עד כמה permissions.deny אוכף?",
+     "לא נאמר אם הוא חוסם גם גישה עקיפה, למשל דרך סקריפט או כלי אחר"
+    ],
+    [
+     "אילו פקודות יציבות?",
+     "‏‎/goal, ‏‎/focus, ‏claude agents ו-‎/diff הוצגו כחדשות. לא צוינו גרסה או זמינות"
+    ],
+    [
+     "אבטחה ב-remote control",
+     "אישור פעולות מהטלפון ללא סקירה של ה-diff לא נדון"
+    ]
+   ],
+   "widths": [
+    2.4,
+    4.0
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "8. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "CLAUDE.md / CLAUDE.local.md",
+     "קובץ הוראות שנטען לכל session. גרסת local נשמרת ב-gitignore וגרסת ‎~/.claude חלה על כל הפרויקטים"
+    ],
+    [
+     "AGENTS.md",
+     "המקבילה ל-CLAUDE.md בכלים אחרים כמו Codex"
+    ],
+    [
+     "permissions.deny",
+     "רשימה ב-settings.json של קבצים ופקודות ש-Claude לא ייגש אליהם"
+    ],
+    [
+     "status line",
+     "שורת מצב קבועה ב-terminal שמציגה מודל, ‏branch ואחוז context"
+    ],
+    [
+     "plan mode",
+     "מצב שבו Claude חוקר ומנסח תוכנית לפני שהוא כותב קוד"
+    ],
+    [
+     "rewind",
+     "חזרה להודעה קודמת בשיחה ומחיקת מה שבא אחריה מה-context"
+    ],
+    [
+     "effort level / ultrathink",
+     "רמת ה-reasoning של המודל. ‏ultrathink מפעיל max effort ל-prompt אחד"
+    ],
+    [
+     "context window",
+     "חלון ההקשר שהמודל רואה. כשהוא מתמלא, האיכות יורדת והעלות עולה"
+    ],
+    [
+     "compaction",
+     "החלפת היסטוריית השיחה בסיכום שלה כדי לפנות context"
+    ],
+    [
+     "dump zone",
+     "השם הלא-פורמלי לטווח שמעל כ-40% ניצול context, שבו לפי דעה רווחת האיכות יורדת"
+    ],
+    [
+     "memory",
+     "העדפות ש-Claude שומר אוטומטית. כדאי לבדוק אותן מדי פעם"
+    ],
+    [
+     "worktree",
+     "תיקיית עבודה נוספת של git לאותו repo, לעבודה על כמה branches במקביל"
+    ],
+    [
+     "hook (PostToolUse)",
+     "פקודה שרצה אוטומטית אחרי שימוש בכלי, והפלט שלה חוזר לשיחה"
+    ],
+    [
+     "skill",
+     "תיקייה עם SKILL.md, סקריפטים ותיעוד, שמגדירה יכולת ש-Claude מפעיל לפי צורך"
+    ],
+    [
+     "sub-agent",
+     "‏agent משני ש-Claude מפעיל, לפעמים עם מודל אחר"
+    ],
+    [
+     "MCP / .mcp.json",
+     "פרוטוקול לחיבור כלים חיצוניים. הקובץ מגדיר אותם ברמת הפרויקט"
+    ],
+    [
+     "headless mode (-p)",
+     "הרצה לא אינטראקטיבית של Claude מתוך סקריפט"
+    ],
+    [
+     "remote control",
+     "המשך של session מקומי מהאפליקציה בטלפון"
+    ]
+   ],
+   "widths": [
+    1.8,
+    4.6
+   ]
+  }
+ ]
+}

@@ -1,0 +1,414 @@
+{
+ "lang": "he",
+ "rtl": true,
+ "title": "אנחנו סומכים על AI agents שנשברים כל יום",
+ "subtitle": "ארבעה פערים בין שימוש יומיומי ב-agents לבין הרצתם בפרודקשן, ודמו של Temporal: תשלום ששורד את קריסת ה-workers באמצע",
+ "meta": [
+  "Shy Ruparel (Temporal) · AI Engineer · 29.10.2026",
+  "משך: כ-22 דקות · YouTube",
+  "סיכום אוטומטי — AI Briefing (aibriefing.dev)"
+ ],
+ "speakers": "Shy Ruparel",
+ "topics": [
+  "Durable Execution",
+  "Agent Reliability",
+  "Temporal",
+  "Fintech"
+ ],
+ "blocks": [
+  {
+   "kind": "h1",
+   "text": "על המסמך הזה"
+  },
+  {
+   "kind": "body",
+   "text": "זו הרצאה של Shy Ruparel, developer advocate ב-Temporal, מכנס AI Engineer. לפי השקפים היא נערכה בניו יורק ב-13 באוקטובר 2026 כ-Expo Session. ההרצאה בנויה על דוח State of Development השנתי של Temporal (השנה השנייה שלו), שסקר 554 מהנדסים ומובילי הנדסה שעובדים עם AI agents. רובם ותיקים: 48.4% עם 11 שנות ניסיון ומעלה, ועוד כשליש עם 6 עד 10 שנים.\n\nהטענה המרכזית: agents נכשלים כל יום גם אצל צוותים שסומכים עליהם, ואי אפשר לצמצם את זה לאפס. לכן המטרה היא שכישלון לא יעלה כלום. לפי הדובר, הדרך לשם היא durable execution, כלומר הרשומה שבה מתבצע debugging היא אותה רשומה שממנה המערכת מתאוששת. הדמו מראה workflow של תשלום עם מודל מקומי. ה-workers נהרגים פעמיים באמצע, ושום tool call לא רץ פעמיים."
+  },
+  {
+   "kind": "h3",
+   "text": "איך לקרוא את המסמך"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "1. תקציר מנהלים: ",
+     "הטענות המרכזיות עם המספרים, ומה לא נאמר."
+    ],
+    [
+     "2–5. ארבעת הפערים: ",
+     "שימוש מול פרודקשן, אמון מול מציאות, prototype מול enterprise, לראות מול להתאושש. כל פער עם הגרף שלו מהדוח."
+    ],
+    [
+     "6. הדמו ו-durable execution: ",
+     "workflow של תשלום בתשעה שלבים, הריגת workers, וקריאה של ה-event history."
+    ],
+    [
+     "7. מה הדמו פתר ומי בפרודקשן: ",
+     "state כשדות, retry כ-policy, ה-AI כיועץ מוגבל, וכן OpenAI Codex ו-Replit."
+    ],
+    [
+     "8. מסקנות ושאלות פתוחות: ",
+     "מה כדאי לבדוק במערכת שלכם."
+    ],
+    [
+     "9. מילון מונחים: ",
+     "המונחים באנגלית ומה הם אומרים."
+    ]
+   ]
+  },
+  {
+   "kind": "callout",
+   "label": "הערת מקור",
+   "text": "המסמך הופק אוטומטית מתמליל ההקלטה ומהשקפים שלה. שמות ומונחים עלולים להשתבש בתמלול האוטומטי (ASR), ובמקומות כאלה ציינו את אי-הוודאות. הציטוטים מועתקים מילה במילה ונבדקו מול חותמת הזמן שלהם. לא נוסף מידע ממקורות חיצוניים."
+  },
+  {
+   "kind": "pagebreak"
+  },
+  {
+   "kind": "h1",
+   "text": "1. תקציר מנהלים"
+  },
+  {
+   "kind": "body",
+   "text": "Ruparel פותח בתחום הפיננסים. הוא מצטט דוח agentic AI של מה שנשמע בתמליל כמו KPMC, וכנראה מדובר ב-KPMG: 94% מחברות ה-fintech אומרות ש-AI הוא חלק מרכזי בפעילות שלהן, ו-62% מאבדות זמן או הכנסות בגלל בעיות אמינות [0:00]. בפיננסים העבודה בנויה מ-workflows ארוכים (loan origination, KYC/AML, fraud review, תשלומים) שנמשכים כמה ימים, עוברים בכמה מערכות ומערבים כסף אמיתי [1:31]. משם הוא עובר לנתוני הסקר של Temporal."
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "השימוש היומיומי הוכפל, הפרודקשן לא: ",
+     "80.8% משתמשים ב-agents מדי יום (לעומת 47.3% לפני שנה), אבל רק 49.1% מריצים אותם בפרודקשן או אומרים שהם core לאופן שבו הם משחררים קוד [3:04]."
+    ],
+    [
+     "אמון גבוה, תקלות יומיות: ",
+     "85.5% סומכים על הפלט של ה-agent לפחות במידה מסוימת. במקביל, 41.1% נתקלים בתקלות פעם ביום או יותר, ו-16.4% כל שעה או ברציפות [4:35]."
+    ],
+    [
+     "ניסיון לא פותר את הבעיה: ",
+     "צוותים שמגדירים את עצמם מצליחים נתקלים בתקלות בתדירות שעתית או יומית בסיכוי גבוה פי 1.7. מספר ה-agents לא נמצא במתאם עם תדירות התקלות [6:06]."
+    ],
+    [
+     "חברות גדולות איטיות פי כמה: ",
+     "51.3% מגיעים מ-prototype ל-production-ready תוך שעות או פחות. בחברות עם 5,001+ עובדים 18.5% אומרים שזה לוקח חודשים, לעומת 5.5% בשאר [7:39]."
+    ],
+    [
+     "החסם הוא state, לא המודל: ",
+     "tracking state across services מוביל עם 35.7%, ואחריו isolating and debugging עם 30.9%. 22.2% מאבדים התקדמות בגלל קריסות [9:09]."
+    ],
+    [
+     "observability לא מספיקה: ",
+     "רק 13% בטוחים מאוד שהם מסוגלים לצפות ב-AI workflows ולעשות להם debugging בקנה מידה, ומקור העזרה מספר אחת כש-agent נשבר הוא YouTube (47.3%) [9:09]."
+    ],
+    [
+     "durable execution כפתרון: ",
+     "בדמו כל activity של AI רצה פעם אחת. אישור האדם ואישור הבנק הגיעו כ-signals בזמן שלא רץ אף worker, וה-workflow המשיך מהצעד האחרון שהצליח [16:51]."
+    ],
+    [
+     "שבעה חסמים, workflow אחד: ",
+     "לפי הדובר הדמו טיפל ב-state, debugging, עלות, retries, approval, עבודה ארוכה ו-crash recovery [18:25]."
+    ],
+    [
+     "לקוחות בפרודקשן: ",
+     "לפי הדובר OpenAI Codex ו-Replit Agent רצים על Temporal [19:57]."
+    ]
+   ]
+  },
+  {
+   "kind": "h3",
+   "text": "מה לא נאמר"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "אין מספרי ביצועים לשחזור: ",
+     "לא נאמר תוך כמה זמן worker חדש מתאושש. בדמו החי ההתאוששות נתקעה, והדובר עבר לסרטון מוקלט [15:19]."
+    ],
+    [
+     "אין מחיר: ",
+     "לא דובר על עלות התשתית של Temporal, על ה-overhead של שמירת event history או על latency."
+    ],
+    [
+     "ההסבר להצלחה הוא ניחוש: ",
+     "הממצא על פי 1.7 אצל צוותים מצליחים מוסבר כהשערה (אולי הם פשוט מחפשים יותר תקלות), והדובר אומר במפורש שצריך לבדוק את זה."
+    ],
+    [
+     "החודשים בחברות גדולות לא פורקו: ",
+     "הדובר מייחס אותם ל-auditability ולאמון, אבל אומר שהסקר לא מפרק את הנתון."
+    ],
+    [
+     "אבטחה נדחתה להרצאה אחרת: ",
+     "40% מציינים אבטחה כחסם לאוטונומיה, והנושא הופנה להרצאה של Temporal ו-Keycard מיום ה-workshops."
+    ],
+    [
+     "השוואת state management לא רציפה: ",
+     "27% שתיארו state management כשביר הגיעו מסקר אחר עם שאלה אחרת, ולכן אין כאן קו מגמה."
+    ],
+    [
+     "אין חלופות: ",
+     "לא הוזכרו כלי durable execution אחרים, ולא הוצג מקרה שבו הגישה לא מתאימה."
+    ]
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "2. פער 1: שימוש מול פרודקשן"
+  },
+  {
+   "kind": "image",
+   "file": "k_003.jpg",
+   "caption": "How teams use agents today: רק AI assistants 25.5%, ניסויים 25.5%, running in production 27.3%, core to how we ship 21.8%",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "השימוש היומיומי עלה מ-47.3% בסקר של 2025 ל-80.8% היום. אבל כשבודקים מה הצוותים עושים בפועל, רק מחצית מעבירים agents לפרודקשן. בשקף, 27.3% מריצים בפרודקשן ו-21.8% אומרים שה-agents הם core לאופן שבו הם משחררים, יחד 49.1%. החצי השני עדיין מתנסה (25.5%) או משתמש רק ב-assistants (25.5%) [3:04].\n\nהדובר מתאר את זה כפער של כ-30 נקודות: \"So far fewer people in production than actually using them daily. And something seems to keep breaking on the way to production\" [3:04]."
+  },
+  {
+   "kind": "h1",
+   "text": "3. פער 2: אמון מול מציאות"
+  },
+  {
+   "kind": "image",
+   "file": "k_005.jpg",
+   "caption": "How often do your agents have issues: ברציפות 9.0%, כל שעה 7.4%, מדי יום 24.7%, שבועי 28.7%, חודשי 11.7%, רבעוני 6.1%, כמה פעמים בשנה 9.6%, לא בפרודקשן 2.7%",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "רבע מהנשאלים סומכים על הפלט של ה-agent כמעט לחלוטין, רובם סומכים במידה מסוימת, וכמעט אף אחד לא חושד בו. סך הכול 85.5% סומכים לפחות במידה מסוימת. הדובר מעיר שהוא עצמו בקטגוריה החשדנית [4:35]. במקביל, העמודות הוורודות בגרף (ברציפות, כל שעה, מדי יום) מסתכמות ב-41.1%. אחד מכל שישה נתקל בתקלה כל שעה.\n\nהממצא המפתיע ביותר: צוותים שמגדירים את עצמם מצליחים נתקלים בתקלות שעתיות או יומיות בסיכוי גבוה פי 1.7, ולפי הדוח אין מתאם בין מספר ה-agents לתדירות התקלות. ההשערה של Temporal היא שצוותים כאלה פשוט מחפשים תקלות טוב יותר [6:06]."
+  },
+  {
+   "kind": "quote",
+   "text": "So the goal isn't zero failures when we're using agents in production. It's just how do we make it so these failures don't cost us anything?",
+   "by": "— Shy Ruparel [6:06]"
+  },
+  {
+   "kind": "h1",
+   "text": "4. פער 3: prototype מול enterprise"
+  },
+  {
+   "kind": "image",
+   "file": "k_008.jpg",
+   "caption": "Prototype to production-ready code: מיידי 6.5%, דקות 20.4%, שעות 24.4%, ימים 25.8%, שבועות 15.3%, חודשים 6.7%, רבעונים ושנים 0.4% כל אחד",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "51.3% מעבירים prototype של AI לקוד production-ready תוך שעות או מהר יותר, כלומר בקצב של סטארטאפ. בחברות גדולות התמונה שונה: לפי השקף \"It takes months\", 18.5% מהחברות עם 5,001+ עובדים מדווחים על חודשים, לעומת 5.5% בכל השאר [7:39]. בתמליל זה מנוסח כאחד מכל חמישה מול אחד מכל עשרים.\n\nלפי הדובר אלה בעיקר בנקים, חברות ביטוח וחברות תשלומים, שצריכות approvals, audit trails ומערכות שלא מאבדות תשלום. בעיניו לשם הולכים החודשים, אבל הוא מודה שזו פרשנות שלו: \"My read is that's where the five months are going into the auditability and the trust of all of those things. And the survey doesn't break that down\" [7:39]."
+  },
+  {
+   "kind": "h1",
+   "text": "5. פער 4: לראות מול להתאושש"
+  },
+  {
+   "kind": "image",
+   "file": "k_011.jpg",
+   "caption": "What limits your team's productivity: tracking state 35.7%, debugging 30.9%, עלויות token/compute 30.7%, קוד שלא קשור ללוגיקה העסקית 29.4%, קוד retries/timeouts 28.8%, human approvals 27.8%, long-running workflows 27.4%, אובדן התקדמות מקריסות 22.2%",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "המודלים לא נמצאים בשני המקומות הראשונים ברשימת החסמים. tracking state across services מוביל עם 35.7%, ואחריו isolating and debugging issues עם 30.9%. בנוסף, 22.2% מאבדים עבודה ונאלצים לחזור עליה בגלל קריסות והפעלות מחדש [9:09]. בסקר אחר מהשנה שעברה 27% תיארו את ה-state management שלהם כשביר, והשנה הוא החסם מספר אחת. הדובר מדגיש שאלה סקרים שונים עם שאלות שונות, ולכן אי אפשר לדבר על קו מגמה. ובכל זאת: \"State got more important as agents got more real\" [9:09].\n\nאפשר לראות את התקלה ועדיין לא להתאושש ממנה. ל-observability יש traces, logs וכלי LLM observability, אבל לפי הדובר \"Observability right now just tells you your agent failed\" [9:09]. רק 13% בטוחים מאוד שהם מסוגלים לצפות ב-AI workflows ולעשות להם debugging בקנה מידה. ובמילים שלו: \"the gap between seeing and recovering is a person reading a trace at 2 a.m. in the morning and then fixing their state by hand\" [9:09]."
+  },
+  {
+   "kind": "image",
+   "file": "k_012.jpg",
+   "caption": "When an agent breaks, where do you look for help: YouTube 47.3%, כלי AI 37.2%, קהילה פרטית 36.8%, מקורות אקדמיים 33.8%, קבוצת צ'אט 31.4%, GitHub 30.3%, X 29.2%, עמיתים 25.6%",
+   "width": 5.6
+  },
+  {
+   "kind": "h1",
+   "text": "6. הדמו ו-durable execution"
+  },
+  {
+   "kind": "image",
+   "file": "k_016.jpg",
+   "caption": "שקף הדמו Kill every worker. Approve anyway: הפעלת payout של $2,500 לנמען חדש בסכום חריג, ה-agent חוקר וכותב brief, עצירת workers עד שאין אף אחד, אישור בלי worker רץ, הפעלת worker והמשך",
+   "width": 5.6
+  },
+  {
+   "kind": "body",
+   "text": "ה-workflow כולל תשעה שלבים: validate, reserve funds, FX quote, חקירת הונאה על ידי agent, brief לאדם, אישור אנושי (human in the loop) והגשה לבנק. בדמו רץ LLM מקומי על הלפטופ. בתמליל השם נשמע כמו \"QN36B9B\", וכנראה מדובר במודל ממשפחת Qwen, אבל השם המדויק לא ודאי. בתמליל נשמע גם \"$25,000\", אבל בשקף ובדמו עצמו הסכום הוא $2,500 [10:46].\n\nבמערכת רגילה, אחרי קריסה הכסף נשאר שמור במערכת הבנק בלי payout, ה-brief אובד לפני שמגיע למאשר, וצריך לשלם שוב על tokens כדי ליצור אותו מחדש. כל ה-state יושב בזיכרון של התהליך. לכן כותבים קוד recovery, טבלאות state, לוגיקת retry ו-reconciliation jobs. זה קוד שלא קשור ללוגיקה העסקית, ו-30% מהנשאלים מתלוננים עליו [12:18]. ההגדרה שהדובר נותן: \"So durable execution is a temporal concept that code essentially should run to completion, even when the process doesn't.\" [12:18]"
+  },
+  {
+   "kind": "image",
+   "file": "k_014.jpg",
+   "caption": "Every step, recorded. Including the AI: ה-timeline של Temporal מריצת ה-payout. כל צעד, כולל ה-tool calls של ה-agent, הוא activity עם תוצאה שמורה, והפס הצהוב הוא ההמתנה לאישור אנושי",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "החלוקה בארכיטקטורה: קוד ה-workflow מחליט מה הצעד הבא, והוא deterministic. כל מה שאינו deterministic או שיש לו side effects, כמו קריאת LLM, tool call או קריאה ל-API של הבנק, רץ בתוך activity. אישור או דחייה של האדם מגיעים כ-signal ונשמרים ב-history כמו כל דבר אחר, גם כשאף worker לא רץ. ה-history יושב ב-Temporal service, ולכן worker חדש ממשיך מהצעד האחרון שהצליח. activity שהייתה באמצע ריצה בזמן הקריסה מורצת שוב, וכל מה שלפניה נשמר [13:48]. לפי הדוח כ-80% אומרים שעלות מגבילה את השימוש שלהם ב-agents: 24.7% אומרים שזה גורם גדול ו-55.1% שזה גורם במידה מסוימת.\n\nבדמו החי ה-worker לא חזר בזמן, והדובר עבר לסרטון מוקלט של אותו תרחיש [15:19]. ב-event history שמוצג בסרטון כל activity של AI רצה פעם אחת וניסתה פעם אחת. אישור האדם וההגשה לבנק הגיעו כשלא רץ אף worker, ושניהם עובדו על workers חדשים: \"zero workers, the payout waited, the approval landed, and we didn't have to rerun anything from the beginning\" [16:51]."
+  },
+  {
+   "kind": "image",
+   "file": "k_018.jpg",
+   "caption": "מסך הדמו: payout-transient בממשק של Temporal, עם פרטי הריצה ו-timeline של ה-activities אחרי שה-workers הופעלו מחדש",
+   "width": 6.3
+  },
+  {
+   "kind": "h1",
+   "text": "7. מה הדמו פתר ומי בפרודקשן"
+  },
+  {
+   "kind": "image",
+   "file": "k_020.jpg",
+   "caption": "State is fields on the workflow: מחלקת PayoutWorkflowImpl עם שדות status, approvalTier, aiBrief ו-approval, וההערה No state table. Rebuilt from history on every worker",
+   "width": 6.3
+  },
+  {
+   "kind": "body",
+   "text": "הדובר עבר על שבעה חסמים מהסקר ועל המענה שהדמו נתן לכל אחד [18:25]:\n\nState: ב-workflow ה-state הוא שדות רגילים, בלי database ובלי cache שנבנו במיוחד. אחרי קריסה ה-replay בונה אותם מחדש בדיוק. עלות: ה-agent רץ פעם אחת וה-tool calls נשמרו, כך שלא נשרפו tokens נוספים. Retries: \"Retrys themselves were a policy, not a loop\" [18:25]. ה-retry policy מוגדר פעם אחת בקונפיגורציה וחל על כל הקריאות, ואין לולאת retry בקוד. Approval ועבודה ארוכה: את הטיימר של האישור האנושי אפשר להגדיר לכל משך, אפילו שנה, באותו קוד. Crash recovery: לא נכתב קוד recovery. Debugging: ה-history שבו מתבצע debugging ב-UI הוא אותו history שה-worker מריץ ב-replay, ולפי הדובר זה מה שסוגר את פער 4 [19:57].\n\nהעיקרון שהדובר הציג כשקף החשוב ביותר לקהל: ה-agent רק מייעץ, וה-workflow הוא שאחראי על הכסף ועל ה-state."
+  },
+  {
+   "kind": "quote",
+   "text": "And if the model had failed, the payout would have continued without the brief. A model outage wouldn't have degraded anything.",
+   "by": "— Shy Ruparel [18:25]"
+  },
+  {
+   "kind": "h1",
+   "text": "8. מסקנות ומה לעשות הלאה"
+  },
+  {
+   "kind": "bullets",
+   "items": [
+    [
+     "לתכנן לכישלון, לא לאפס תקלות: ",
+     "לבדוק מה עולה כל קריסה של agent אצלכם: tokens שנשרפים שוב, כסף שנשאר שמור, עבודה ידנית בלילה."
+    ],
+    [
+     "להפריד בין החלטה לביצוע: ",
+     "קוד orchestration שהוא deterministic, וכל קריאת LLM, tool call או API חיצוני כיחידה נפרדת עם תוצאה שנשמרת."
+    ],
+    [
+     "ה-agent מייעץ, ה-workflow אחראי: ",
+     "לתכנן כך שכשל של המודל יפגע באיכות (למשל אין brief) ולא יעצור את התהליך העסקי."
+    ],
+    [
+     "אישור אנושי כאירוע שנשמר: ",
+     "approval צריך להישמר גם כשאין תהליך פעיל, ולא לחיות בזיכרון."
+    ],
+    [
+     "retry כ-policy: ",
+     "להחליף לולאות retry ידניות בהגדרה אחת. לפי הדובר, פלט גרוע של מודל הוא פשוט עוד activity failure: \"Bad model output is just an activity failure, so similar retry policy as well.\" [19:57]"
+    ],
+    [
+     "לאחד observability ו-recovery: ",
+     "אם ה-traces וה-state נשמרים בשתי רשומות שמתרחקות זו מזו, מישהו יצטרך לחבר ביניהן ידנית."
+    ],
+    [
+     "לקרוא את הדוח המלא: ",
+     "State of Development של Temporal (temporal.io) מכיל את כל המספרים שהוצגו."
+    ]
+   ]
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "שאלה פתוחה",
+    "למה זה חשוב"
+   ],
+   "rows": [
+    [
+     "כמה זמן לוקח ל-worker חדש להתאושש, ומה ה-overhead של replay על history ארוך?",
+     "בדמו החי ההתאוששות התעכבה, ולא הוצגו מספרים"
+    ],
+    [
+     "למה צוותים מצליחים מדווחים על יותר תקלות?",
+     "ההסבר (מחפשים יותר) הוא השערה שעדיין לא נבדקה"
+    ],
+    [
+     "לאן בדיוק הולכים החודשים בחברות גדולות?",
+     "הסקר לא מפרק את הנתון, וההסבר של auditability הוא פרשנות של הדובר"
+    ],
+    [
+     "איך מטפלים בכשל אבטחה של agent אוטונומי?",
+     "40% מציינים אבטחה כחסם, והנושא הופנה להרצאה אחרת"
+    ],
+    [
+     "מה העלות התפעולית של Temporal מול כתיבת recovery בעצמכם?",
+     "לא הוצגה השוואה של עלות או latency"
+    ]
+   ],
+   "widths": [
+    3.2,
+    3.0
+   ]
+  },
+  {
+   "kind": "h1",
+   "text": "9. מילון מונחים"
+  },
+  {
+   "kind": "table",
+   "headers": [
+    "מונח",
+    "משמעות"
+   ],
+   "rows": [
+    [
+     "Durable execution",
+     "הרצת קוד עד הסוף גם כשהתהליך שמריץ אותו קורס. ה-state וההתקדמות נשמרים ב-event history"
+    ],
+    [
+     "Workflow",
+     "קוד ה-orchestration ב-Temporal. הוא deterministic ומחליט מה הצעד הבא"
+    ],
+    [
+     "Activity",
+     "צעד עם side effects או שאינו deterministic (קריאת LLM, tool call, API של בנק), שהתוצאה שלו נשמרת"
+    ],
+    [
+     "Signal",
+     "אירוע חיצוני, למשל אישור אנושי, שנשמר ב-history גם כשאין worker פעיל"
+    ],
+    [
+     "Worker",
+     "התהליך שמריץ בפועל את קוד ה-workflow וה-activities. אפשר להחליף אותו אחרי קריסה"
+    ],
+    [
+     "Event history",
+     "רשומה של כל הצעדים ותוצאותיהם. משמשת גם ל-debugging וגם ל-replay"
+    ],
+    [
+     "Replay",
+     "בנייה מחדש של ה-state של ה-workflow מתוך ה-history על worker חדש"
+    ],
+    [
+     "Retry policy",
+     "הגדרה אחת של ניסיונות חוזרים שחלה על כל הקריאות, במקום לולאה בקוד"
+    ],
+    [
+     "Human in the loop",
+     "שלב שבו אדם מאשר או דוחה לפני שהתהליך ממשיך"
+    ],
+    [
+     "Agentic loop",
+     "לולאה שבה המודל בוחר tool calls, למשל שליפת פרופיל לקוח, ובסוף מנסח brief"
+    ],
+    [
+     "Observability",
+     "traces, logs וכלי ניטור שמראים שמשהו נכשל, אבל לא משחזרים את המצב"
+    ],
+    [
+     "KYC / AML",
+     "הכרת לקוח ומניעת הלבנת הון, תהליכים פיננסיים ארוכים שמוזכרים כדוגמה"
+    ],
+    [
+     "FX quote",
+     "הצעת מחיר להמרת מטבע, אחד משלבי ה-payout בדמו"
+    ],
+    [
+     "Production-ready",
+     "קוד שמוכן לשימוש לקוחות אמיתיים, להבדיל מ-prototype"
+    ]
+   ],
+   "widths": [
+    1.6,
+    4.6
+   ]
+  }
+ ]
+}

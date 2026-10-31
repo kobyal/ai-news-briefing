@@ -1,0 +1,460 @@
+[0:00] .
+[0:07] Hi, everyone.
+[0:13] I'm Shy.
+[0:14] I'm a developer advocate at Temporal.
+[0:16] I cannot see anyone in the room.
+[0:18] So if you boo me or want to throw tomatoes or something,
+[0:21] I will have no idea.
+[0:23] Oop.
+[0:27] Clickers are difficult.
+[0:29] There we go.
+[0:33] I guess I'm not using a clicker today.
+[0:34] So agents, they are everywhere.
+[0:37] I'm guessing if you are in this room, you are probably building an agent or shipping an agent.
+[0:42] Does that sound about right?
+[0:43] Yeah?
+[0:44] So last year, KPMC conducted a survey, and they figured out that we have seen $3 trillion
+[0:51] in terms of corporate productivity games in 2025, and that's from their agentic AI report.
+[0:58] And from that $3 trillion, it's really financial services that are leading the way here.
+[1:04] So 94% of fintech are saying that AI is core to how their businesses operate.
+[1:10] And they've decided that AI isn't just a side project, but it's part of the business now.
+[1:15] This is how we operate.
+[1:17] And 62% of those teams lose measurable time or revenue to reliability issues.
+[1:24] So deciding that AI is something we're doing isn't necessarily the same as shipping it.
+[1:31] There's definitely still a gap between those two things there.
+[1:34] Now, to break it down, part of this is the shape of the work.
+[1:38] Finance runs on long-running workflows, not on individual models.
+[1:44] For some examples of their process, you can think of loan origination, KYC and AML, fraud review, paying people.
+[1:51] Each of these processes spans multiple days, multiple systems, and usually multiple people.
+[1:58] So there's many, many steps.
+[2:00] There's many, many systems, and there's real money involved.
+[2:03] So they can't mess anything up.
+[2:05] And now imagine that we're going to go ahead and put an agent into the middle of that process.
+[2:11] So at Temporal, we wanted to understand how things are actually going.
+[2:15] So we conducted a survey.
+[2:17] This is our second year running this survey, the State of Development Survey.
+[2:20] We surveyed 554 engineers and engineering leaders who are actively using AI agents right now.
+[2:26] Every number on this slide deck is either from that report or it'll be qualified in the bottom left from the report that I'm pulling it from.
+[2:34] So to start things off, we can take a look at the demographic of that survey.
+[2:38] 48.4% have 11 plus years of experience working in industry, so we're not talking about hobbyists.
+[2:45] And then another third of that segment also has six to 10 years.
+[2:49] So none of these people are hobbyists.
+[2:50] They're all professionals working every day.
+[2:54] It's a mix of engineers, AI engineers, data engineers, platform teams, IT leaders.
+[2:59] Two-thirds of them were from the U.S., a third of them were from the U.K. and EMEA.
+[3:04] And what we found is four gaps.
+[3:06] I promised you all that this talk was about gaps in the title.
+[3:09] And the data shows that there are four major gaps.
+[3:12] And I wanted to walk through each of them and then close with kind of one big idea.
+[3:16] So let's go into gap one, and that's the gap between usage versus production.
+[3:21] So daily agent use from our 2025 version of this survey had us at about 47.3% of the folks that we talked to were using agents daily.
+[3:31] Today, nearly a year later, we've doubled that to 80.8% of users are using agents in their day-to-day.
+[3:39] Now, using agents isn't necessarily the same thing as shipping agents.
+[3:45] And so if we take a look at those teams again and ask them what they're doing, about half
+[3:50] of them are running those agents in production.
+[3:53] Or they say that those agents are core to how they ship.
+[3:55] And then the other half of that is still experimenting or still only really using assistants.
+[4:02] So we've got 49.1% of the folks that we talk to, half of the folks that we talk to are
+[4:07] are running agents in production,
+[4:09] or saying that those agents are core to how things ship.
+[4:13] So that's a huge gap, right?
+[4:15] That's a 30% gap between 80% of the people
+[4:17] are using agents every day, and 50%, 49.1%,
+[4:21] are actually shipping them and using them in production.
+[4:24] So far fewer people in production
+[4:26] than actually using them daily.
+[4:28] And something seems to keep breaking on the way
+[4:30] to production, and let's talk about what that is.
+[4:33] And that brings us to gap number two, which
+[4:35] is trust versus reality.
+[4:37] Now, one of the things we asked folks in this survey
+[4:40] was how much do you actually trust your agent output?
+[4:42] And trust is really high, actually.
+[4:44] I'm really impressed by this number.
+[4:46] A quarter of the folks that we surveyed
+[4:48] trusted the agent output almost completely.
+[4:51] Most people trusted it somewhat.
+[4:53] And almost no one distrusted it.
+[4:55] I did not get asked to participate in this survey
+[4:58] because I'm in that complete somewhat distrust category
+[5:01] myself.
+[5:01] So I'm actually really surprised by this number from that survey.
+[5:06] Yeah, 85.5% trust agent output, at least somewhat.
+[5:10] And that's going to be an important number.
+[5:12] Let's come back to that 85.5 in a little bit.
+[5:15] So we also asked, how often do your agents have issues?
+[5:20] The pink bars are daily or worse.
+[5:22] And that's a lot of pink for a number
+[5:24] that 85% of people trust.
+[5:26] That's a lot more pink than I would
+[5:28] expect for an 85% trust rating.
+[5:32] 41.1% of those folks hit those agent issues daily
+[5:36] or more.
+[5:36] So that's four in 10 of the people that we talk to see issues
+[5:39] every day.
+[5:40] And then 16.4 hit them every hour.
+[5:42] So one in six of the people that we surveyed
+[5:45] were getting an agent issue every hour.
+[5:47] And then that brings us back to that trust, that 85.5%
+[5:50] gap versus the 41.1% system breaking.
+[5:55] So we trust the output and the system,
+[5:58] but it still breaks every day.
+[6:00] Both of those things are true at the same time.
+[6:02] And getting good at agents doesn't seem to make this go away.
+[6:06] You can't skill your way out of this.
+[6:10] We were seeing teams that call themselves successful
+[6:13] were actually 1.7 more times likely to hit issues
+[6:17] continuously, so be in that hourly or daily category.
+[6:21] And it's not because they've run more agents, right?
+[6:23] The report found that agent count and issue frequency
+[6:25] aren't actually correlated in any way.
+[6:28] I'm guessing, and the team at Temporal
+[6:30] we're guessing that maybe those folks are just looking harder
+[6:32] for issues, and so they're finding those issues some more.
+[6:35] That's definitely something we need to dig into a little more
+[6:38] when we do next year's version of this survey.
+[6:40] But the important, I guess, takeaway
+[6:42] is that even with how much you trust your agents,
+[6:44] failure isn't going away.
+[6:46] You have to account for it.
+[6:47] You have to plan for it.
+[6:48] So the goal isn't zero failures when we're
+[6:51] using agents in production.
+[6:52] It's just how do we make it so these failures don't cost us
+[6:55] anything?
+[6:56] Now, a really interesting stat is saying
+[6:58] that 40% of the teams that we talked to
+[7:01] says security is truly the thing that is blocking them
+[7:03] from autonomous agents.
+[7:05] And that's its own talk.
+[7:06] Mason from the Temporal team and Kim from the Keycard team
+[7:09] actually gave a talk about this yesterday on the workshop day.
+[7:12] So I'm going to defer to the recording of that talk
+[7:14] rather than go into it myself as well.
+[7:18] And let's jump into that third gap, the prototype
+[7:21] that we were probably all seeing and working on last year
+[7:24] versus the enterprise deployment.
+[7:25] You know, customers are actually touching it.
+[7:27] that prototype to production ready code system.
+[7:30] And most teams going from an AI prototype
+[7:32] want to go to production ready code really fast.
+[7:35] We're seeing it in like really low numbers.
+[7:39] 51.3% are able to get an AI prototype
+[7:43] to production ready in hours or faster.
+[7:47] That's like startup speed, right?
+[7:48] That's traditional startup speed.
+[7:50] This falls apart though if you work somewhere big.
+[7:53] So if you work somewhere 5,000 plus employees,
+[7:56] it tends to take months.
+[7:57] And the data breaks down at that point.
+[7:59] The biggest companies, about one in five, says it takes months.
+[8:02] Everywhere else, it's about one in 20
+[8:04] saying that it takes months to get an AI agent deployed
+[8:07] into production.
+[8:09] So big companies are shipping at very different speeds.
+[8:12] We're using the same tools at very different speeds.
+[8:15] Half are shipping in hours.
+[8:16] And then at these large companies,
+[8:18] we're doing it one in five, taking five months.
+[8:21] Big companies, regulated work.
+[8:23] We're talking about banks.
+[8:24] We're talking about insurers.
+[8:26] We're talking about payment companies.
+[8:27] I'm guessing there's a lot of those in the room right now.
+[8:30] And those companies all need something really,
+[8:32] need a bunch of things that are really important, right?
+[8:34] They need approvals, they need audit trails,
+[8:36] they need systems that will not lose a payment.
+[8:39] My read is that's where the five months are going
+[8:41] into the auditability and the trust of all of those things.
+[8:44] And the survey doesn't break that down, right?
+[8:46] But it's not bureaucracy for its own sake,
+[8:48] or at least I hope it's not.
+[8:49] I hope it's bureaucracy for something productive
+[8:52] and like getting to that reliability bar.
+[8:55] Which brings us to that last reliability gap,
+[8:59] seeing versus recovering.
+[9:00] And this is one of the ones that was in the title, right?
+[9:03] So we asked, what limits your team's productivity?
+[9:06] Number one is tracking state, and number two is debugging.
+[9:09] The models aren't in the top two at all.
+[9:13] 35.7% were saying tracking state across service
+[9:18] is their top blocker.
+[9:19] And then 30.9% says that it's isolating and debugging issues.
+[9:24] 22.2% of that survey are losing progress and redoing work
+[9:28] because of crashes and restarts.
+[9:30] So that's one in five losing work.
+[9:32] And then last year, in a different survey,
+[9:36] 27% called their state management fragile.
+[9:39] This year, it's the number one blocker.
+[9:40] Different surveys, different questions.
+[9:43] So it's not a trend line.
+[9:44] But the story is consistent.
+[9:46] State got more important as agents got more real.
+[9:50] And one of the wildest responses that we got
+[9:52] was when an agent breaks, where do you go for help?
+[9:55] And the number one answer to that being YouTube
+[9:58] is kind of wild to me.
+[9:59] I don't really code with YouTube.
+[10:01] And so this is very different from me
+[10:04] and the way that I build things.
+[10:07] But that's what debugging looks like when your system can't
+[10:09] tell you what happened, is you end up going to YouTube
+[10:12] and trying to find someone that can.
+[10:14] Observability right now just tells you your agent failed.
+[10:17] Most teams have that, right?
+[10:18] Traces, logs, LLM observability tools.
+[10:21] But reliability means that failure doesn't cost you anything.
+[10:28] Only 13% of the people that we talked to were very confident that they can observe and debug AI workflows at scale.
+[10:35] And then 22% of the people that we talked to lose progress because of crashes.
+[10:39] And so the gap between seeing and recovering is a person reading a trace at 2 a.m. in the morning and then fixing their state by hand.
+[10:46] And that's not realistic, right?
+[10:48] Like, that's not a realistic thing to expect,
+[10:50] is someone fixing things at 2 a.m. in the morning.
+[10:53] So I want to show a quick little demo, right,
+[10:55] of what this looks like.
+[10:56] And I'm going to move $25,000.
+[10:59] This is a synthetic customer,
+[11:01] but it's a real temporal workflow.
+[11:03] It's a real LLM running on this laptop.
+[11:04] I have QN36B9B running on this laptop right now.
+[11:09] And I'll show you a demo of what we're about to go through.
+[11:12] But basically, we're running a payout workflow.
+[11:14] So this is going to be a nine-stage workflow,
+[11:16] which is going to be much shorter than I think it would be in production.
+[11:21] Money is going to move.
+[11:22] The money is going to look kind of weird.
+[11:25] And so an agent is going to jump in and is going to do a fraud investigation.
+[11:28] The agent is going to just take a look at the transaction and decide,
+[11:31] do we need to escalate this to a human being or is this good to just wave it through?
+[11:36] And then we're going to have a human in the loop that actually makes the decision
+[11:38] and decides whether or not to make the final call of this transaction getting approved or not.
+[11:44] We're going to validate the request, reserve the funds, check in with the FX quote, and
+[11:48] those funds will be reserved.
+[11:50] So the real estate will exist in another system.
+[11:54] And then I'm going to go ahead and kill, sorry, and we're going to have that agent do the
+[11:58] real work, do those tool calls, and then I'm going to kill the process.
+[12:02] So I'm going to just tell the worker to die.
+[12:03] I'm going to stop the worker.
+[12:05] And so our process will die.
+[12:07] And that could be for any reason, right?
+[12:08] It could be a timeout.
+[12:09] It could be a deploy error.
+[12:11] We could run out of memory.
+[12:12] I'm going to just intentionally kill it to simulate a worker crash, and we'll see what
+[12:15] we lose.
+[12:18] What we would lose traditionally is that the funds would be reserved with no payouts,
+[12:23] and a brief would get produced that never actually makes its way to the approver, so
+[12:26] we're going to have to re-spend our LLM tokens traditionally to regenerate that AI draft or
+[12:32] summary for the check.
+[12:34] In that tickle, in like a traditional stack, all of that is going to live in process memory,
+[12:38] and when that worker crashes, it's all gone.
+[12:41] And so the reserve funds are still reserved.
+[12:43] It's just not in our system.
+[12:44] It's in the bank system.
+[12:46] So traditionally, we'd have to write recovery code.
+[12:48] We'd have to build state tables.
+[12:49] We'd have to build retry logic.
+[12:51] We'd have to create reconciliation jobs.
+[12:53] And that's all code that's unrelated to the core business
+[12:55] logic that I'm building to just do a payment transaction.
+[12:58] And that's something that 30% of our respondents complained
+[13:01] about, is that they're building all of this code
+[13:03] unrelated to business logic.
+[13:06] Or you could use a platform that remembers you.
+[13:08] And that's where durable execution comes in.
+[13:11] So durable execution is a temporal concept
+[13:14] that code essentially should run to completion,
+[13:16] even when the process doesn't.
+[13:17] We know that crashes happen, but with temporal state
+[13:20] survives, progress survives, and every step
+[13:24] is recorded in an event history that looks like this.
+[13:27] And so we've also recorded the AI in this state.
+[13:30] So there's a timeline that we'll see in a second live
+[13:32] that's a run from the payout demo that we're
+[13:34] going to run in a second.
+[13:36] Each of those steps, each of those AI steps,
+[13:38] choosing the investigation, the tool calls
+[13:40] that the agentic loop is going to make for the lookup
+[13:43] of the customer and then drafting the brief,
+[13:45] each of those is its own individual activity
+[13:47] with a recorded result.
+[13:48] And the yellow bar is going to be our essentially activity
+[13:52] waiting for human approval.
+[13:55] The workflow code is deciding what's next,
+[13:57] and it's deterministic.
+[13:59] Anything non-deterministic or side-effecting like the LLM
+[14:01] is going to be run in an activity.
+[14:03] So a tool call or a bank API call is going to be an activity.
+[14:07] And then the person, when they approve or reject the transaction,
+[14:09] is going to be an event, too.
+[14:11] It's a signal, is what we call them in temporals,
+[14:13] which is recorded in history like everything else
+[14:16] is recorded in the temporal history.
+[14:17] Even though the worker is not running,
+[14:19] that signal is still going to get captured and get processed.
+[14:21] So when the worker dies, another worker
+[14:23] is able to resume from the last previous success.
+[14:28] Yeah, and the history lives in the temporal service.
+[14:30] And we're not running our LLM tool calls multiple times.
+[14:33] So we're not wasting tokens on multiple tool calls.
+[14:36] We're going to retain the agent's work and not redo it.
+[14:40] If the call was mid-flight while the worker died,
+[14:42] we would retry that activity.
+[14:43] But everything before that is kept.
+[14:47] And that matters.
+[14:48] Eight in 10 people say that cost limits
+[14:50] how they use their agents.
+[14:51] So being able to hold onto the agent's memory
+[14:54] is really helpful.
+[14:55] Rerunning an agent after every cache
+[14:57] is a lot of money that you're burning right there.
+[14:59] So let's go into the quick demo.
+[15:01] And yeah, so this is my payment transfer.
+[15:08] So I'm going to go ahead and set it to $2,500.
+[15:10] I'm going to say that it's a new recipient.
+[15:12] I'm going to say it's an unusual amount for this customer.
+[15:15] And just to make sure that our AI flags it as something
+[15:18] that needs an investigation, we're
+[15:19] going to go ahead and set the customer record to say
+[15:21] that there's an unresolved account alert.
+[15:23] I'm going to go ahead and start this job, which
+[15:25] is going to trigger this new workflow.
+[15:26] And you can see down here in the timeline,
+[15:28] all of those nine steps that we talked about are happening.
+[15:31] So we're going to reserve our funds, validate.
+[15:33] The AI is doing an agentic loop and deciding,
+[15:35] OK, we're going to look at the customer profile,
+[15:37] we're going to look at the payouts,
+[15:38] and then we're going to draft a brief for a human being
+[15:42] to review.
+[15:42] So I've got an approve or reject button
+[15:44] that I can click right here.
+[15:46] But before I click them, like I said,
+[15:48] I'm going to intentionally kill my workers.
+[15:50] I'm just going to hit stop.
+[15:52] And you can see that there are no workers running at this point.
+[15:54] So I'm going to go ahead and approve my transaction.
+[15:58] And we can see the approval gets logged as a signal.
+[16:01] Now traditionally, that would be something that just gets lost.
+[16:05] We'll get a timeout in a second, but that's not really a big deal.
+[16:08] Because we're going to have a retry policy that'll handle this automatically.
+[16:11] So as soon as I return on my worker, it's just going to pick up that signal and
+[16:15] resume the behavior and continue on from that last successful event.
+[16:18] So we'll start a worker.
+[16:19] This will take a second.
+[16:24] Of course, it takes a little longer when I'm demoing it live.
+[16:27] Usually it's instantaneous.
+[16:28] Let me just go ahead and give it a refresh.
+[16:34] You know what?
+[16:35] I have a video for just this scenario, so we can go ahead and just skip straight forward
+[16:38] in the video and see what it's like if the video plays.
+[16:44] Yeah.
+[16:45] Let me see if I can skip to the middle of this.
+[16:51] Oh, it's in the other tab.
+[16:56] What am I doing?
+[17:02] So I'm going to approve while the worker is dead.
+[17:04] And then I'm going to go ahead and resume the worker right
+[17:06] below.
+[17:07] And it should go ahead and just pick things up and resume.
+[17:12] So the agent is going to investigate, write the brief,
+[17:15] and then I give the approval.
+[17:17] And then I can go ahead and crash the worker again
+[17:19] while we're waiting for the bank to approve the transaction
+[17:21] or mark that it was completed.
+[17:23] Again, the signal logs.
+[17:24] And then whenever I turn the worker back on,
+[17:25] it's going to pick it up and rerun again.
+[17:30] So this is what happened according to the event history.
+[17:32] And let me full screen that again for y'all.
+[17:35] Oh.
+[17:37] There we go.
+[17:39] So reading from top to bottom, each of our AI activities
+[17:42] ran once.
+[17:43] They attempted once.
+[17:43] They worked once.
+[17:45] And they didn't run again.
+[17:46] We didn't rerun that workflow.
+[17:47] We didn't re-spend those tokens.
+[17:49] We just ran it once, and so we got that one-time cost.
+[17:52] Our approval signal came through while there were no workers
+[17:55] running.
+[17:56] And then our bank submission also came through while no workers were running.
+[18:00] And both of those things happened on new workers.
+[18:02] We stopped the workers each time, and then we got new workers that just picked things
+[18:05] up.
+[18:06] So zero workers, the payout waited, the approval landed, and we didn't have to rerun anything
+[18:11] from the beginning.
+[18:12] So what are the full list of what those engineering leaders are saying slow them down?
+[18:20] Our demo just handled seven of the top use cases right there that they gave us for problems.
+[18:25] So state, debugging, cost, retries, approval, long running work, and crash recovery.
+[18:30] And we can take a look at the code for each of them.
+[18:32] So state management in Temporal is the number one blocker.
+[18:36] Or sorry, was the number one blocker in that survey.
+[18:38] In a workflow, state is just fields.
+[18:40] It's plain variables.
+[18:41] There's no database that I built.
+[18:42] There's no cache.
+[18:43] After a crash, the replay just rebuilt them exactly.
+[18:47] Our LLM calls would cost us normally for multiple runs.
+[18:52] In this run, the agent, we maintained the state,
+[18:55] so we only ran it once.
+[18:56] The tool run was held, was sustained,
+[18:58] so we didn't need to spend any new tokens.
+[19:00] Retrys themselves were a policy, not a loop.
+[19:03] We declared the retry policy in our configuration once,
+[19:08] and then it applied to every single call in that transaction.
+[19:11] There's no loop anywhere in that code.
+[19:13] This is probably the most important slide for the room.
+[19:19] So the agent itself gave us advice.
+[19:21] The workflow itself owned the money and the state.
+[19:24] And the AI had a really bounded attempt to jump in.
+[19:29] And if the model had failed, the payout
+[19:30] would have continued without the brief.
+[19:32] A model outage wouldn't have degraded anything.
+[19:34] We had our human approval.
+[19:36] And we could have set that timer for as long as we wanted.
+[19:39] And it would have been the same code.
+[19:41] We could have waited for a year and resumed that worker,
+[19:43] and it would have been fine.
+[19:45] And then I didn't write any crash recovery code.
+[19:47] That was all built into Temporal.
+[19:51] So debugging.
+[19:52] In most stacks, observability and recovery
+[19:54] are two separate records that drift apart,
+[19:57] and then a human brings them together.
+[19:58] Here, we were able to have the history
+[20:00] that we debugged in the UI be the same history
+[20:02] that our worker replays, which closed gap four.
+[20:05] So we had seven blockers, and we solved them with one workflow.
+[20:09] And this isn't just a demo.
+[20:11] So there are people using this stuff in production for real
+[20:13] right now.
+[20:14] OpenAI's codex runs on Temporal.
+[20:16] The coding agent that you use a lot of the day
+[20:18] is running on Temporal.
+[20:20] Replit runs their Replit agents on Temporal.
+[20:22] Their engineering team says it's a bad user experience
+[20:24] when the agent gets super far into something
+[20:26] and then hits a catastrophic error.
+[20:28] And that's just what we watched not happen.
+[20:33] And I'm going to skip through this,
+[20:35] because I know I'm running out of time.
+[20:37] So from the AI engineer's side, you write the prompt,
+[20:39] You run it, and if the output's bad, you throw it away,
+[20:42] and then temporal retries it for you.
+[20:44] Bad model output is just an activity failure,
+[20:46] so similar retry policy as well.
+[20:50] So back to the four gaps.
+[20:51] One record, close them all.
+[20:54] And just to skip through what those four gaps were again
+[20:58] and re-summarize that, yeah, reliability and observability
+[21:02] were just one record.
+[21:03] And so every number of this talk that I mentioned
+[21:07] is in that temporal I.O. report state of development.
+[21:09] I'll leave that up screen if anyone wants to take a photo
+[21:11] and come check it out.
+[21:12] And there's a bunch of us that will
+[21:13] be at the Temporal booth running this demo live,
+[21:16] if anyone wants to come see it or say hi.
+[21:18] So yeah, that's my talk.

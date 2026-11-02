@@ -1,0 +1,137 @@
+---
+title: "Agentic Operating: איך מתפעלים עם agents, בלי לקנות מערכת הפעלה"
+description: "מערכת ההפעלה האגנטית היא לא מוצר. זה runbook שמודל מריץ. שישה צעדים להפעיל לולאה אחת עם agents, מהרשאות ועד מדידה."
+lang: he
+key: agentic-operating
+term: "agentic operating"
+kind: fieldnotes
+pubDate: 2026-11-02
+tags: ["agents", "operations", "claude-code", "devops", "agentic-ai"]
+hook: "claim"
+cover: photo
+tldr: ["כתבו .claude/settings.json עם deny על push, delete וקבצי סודות.", "הזיכרון של ה-agent בקובץ OPS_LOG, ושיחה חדשה לכל ריצה.", "שום PR של agent בלי טסט שנכשל לפני ועובר אחרי."]
+hero: /posts/agentic-operating/hero.jpg
+diagram: /posts/agentic-operating/diagram.svg
+sources:
+  - { title: "Idea: Autonomous agents coordinating changes across data platforms", url: "https://medium.com/@priyank_47489/the-idea-of-an-agentic-operating-system-for-data-platforms-270dcad109cc", date: "2026-03-29" }
+  - { title: "Legora is building the agentic operating system for legal work", url: "https://openai.com/index/legora-agentic-operating-system-for-legal-work", date: "2026-10-28" }
+  - { title: "Agentic AI Explained: A Guide for the Enterprise | C3 AI", url: "https://c3.ai/blog/agentic-ai-explained", date: "" }
+opinion: "אנחנו לא חושבים ש-agentic operating system היא קטגוריה. זה שם ששלוש חברות שונות הדביקו לשלושה דברים שונים, וכשמונח מופיע ב-tagline של מוצר לפני שהוא מופיע במאמר, אנחנו חושדים. מה שכן אמיתי זו דרך העבודה: לולאה אחת, הרשאות צרות, זיכרון מחוץ לשיחה ושער אימות. המיומנות של 2026 היא לא ה-prompt אלא המערכת סביב המודל: מה הוא רואה, במה הוא נוגע, איך בודקים אותו ומתי מאפסים אותו. ובכל מקום שאפשר להחליף קריאה למודל בכלל דטרמיניסטי, תחליפו. זה יוצא זול יותר ויציב יותר."
+madeWith: { model: "claude-opus-5-5", sourceCount: 3, reviewedBy: "Koby Almog" }
+---
+
+"agentic operating system" זה לא מערכת הפעלה, וזה גם לא מוצר. זה runbook שנתתם למודל להריץ, עם זיכרון בצד והרשאות מוגדרות. כל השאר שיווק.
+
+ובכל זאת השם נדבק. ב-28 באוקטובר OpenAI פרסמו case study על Legora, סטארטאפ משטוקהולם שקם ב-2023. המנכ"ל, מקס יונסטרנד, קורא למוצר שלו "the agentic operating system for legal work". שבעה חודשים לפני כן, ב-29 במרץ, פריאנק מלוויה כתב במדיום על Agentic OS לפלטפורמות דאטה. ב-C3 קוראים בערך ככה לשכבת ה-orchestration שלהם. שלושה דברים שונים לגמרי, ואותו שם.
+
+רגע, אז מה כן משותף להם? דרך עבודה. ה-agents עושים את הצעדים, אתם מגדירים את הגבולות, ומישהו בודק מה יצא. והמספר הכי מעניין בכתבה על Legora בכלל לא קשור לעורכי דין. הוא על צוות ה-engineering שלהם: מ-bug report לתיקון עובד "בערך בחמש דקות", כש-coding agents סורקים מיליוני שורות לוגים ובודקים כמה הסברים במקביל.
+
+מה זה agentic AI כבר הסבירו AWS ו-Aerospike, ואנדרו נג דחף את המילה עוד ב-2024. על זה אני מדלג. הנה איך מתחילים לתפעל ככה בפועל: לולאה אחת, צעד אחרי צעד.
+
+## 01 · בוחרים לולאה אחת, לא תהליך שלם
+
+טעות שראיתי בכמה צוותים: "נעביר את ה-on-call ל-agents". זו לא לולאה, זו משאלה.
+
+לולאה טובה חוזרת כמה פעמים בשבוע, יש לה טריגר ברור וסוף שאפשר לבדוק. ב-Legora זה bug report → fix. אצל פריאנק זה שינוי schema בטבלה אחת, ומה צריך להשתנות בעקבותיו ב-pipelines וב-dashboards. אצלכם זה יכול להיות CI אדום על main, או alert שצריך triage.
+
+מה עושים: כותבים שורה אחת, עם טריגר, סוף ומי מאשר.
+
+`טריגר: issue חדש ב-Sentry עם environment=production. סוף: PR עם טסט שנכשל לפני התיקון ועובר אחריו. מאשר: מי שב-on-call.`
+
+מה רואים: baseline. תוציאו מה-Jira את 10 הבאגים האחרונים מ-prod ותחשבו חציון בין created ל-resolved. בלי המספר הזה אין לכם מול מה להשוות בצעד 06.
+
+<figure><img src="/posts/agentic-operating/src2.jpg" alt="גם Legora, שמוכרת מערכת הפעלה, מתחילה בפנים מלולאה אחת: מבאג לתיקון בערך בחמש דקות (credit: OpenAI)" loading="lazy" /><figcaption>גם Legora, שמוכרת מערכת הפעלה, מתחילה בפנים מלולאה אחת: מבאג לתיקון בערך בחמש דקות (credit: OpenAI)</figcaption></figure>
+
+## 02 · כותבים חוזה: מה ה-agent רואה ובמה הוא נוגע
+
+ביולי 2025 agent של Replit מחק את ה-database של production אצל ג'ייסון למקין מ-SaaStr, באמצע code freeze מוצהר. אחר כך הוא כתב שהוא נכנס לפאניקה. כולם צחקו על הניסוח. אבל הבעיה לא הייתה המודל. הבעיה הייתה שהיו לו הרשאות כתיבה ל-prod.
+
+הכלל: קריאה רחבה, כתיבה צרה. לוגים, ה-repo, replica לקריאה בלבד: כן. credentials של prod, `kubectl delete`, push: לא. בקלוד קוד זה קובץ אחד ב-repo:
+
+```json title=".claude/settings.json"
+{
+  "permissions": {
+    "allow": [
+      "Read(./logs/**)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(npm test:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./secrets/**)",
+      "Bash(git push:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(rm -rf:*)"
+    ]
+  }
+}
+```
+
+deny גובר על allow, אז מתחילים לכתוב מה-deny. מה שלא ברשימה, בסשן אינטראקטיבי קלוד שואל לפני, וב-`claude -p` זה פשוט נחסם. תריצו `/permissions` בתוך סשן ותוודאו שהכללים נטענו. ואת ה-push? אתם עושים, בצעד 05.
+
+<figure><img src="/posts/agentic-operating/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+## 03 · מוציאים את הזיכרון מהשיחה
+
+פריאנק ניסח את זה הכי טוב: רוב המערכות מחזיקות context דרך היסטוריית השיחה, וזה עובד לצ'אט אבל לא לתשתית. לפתרון שלו הוא קורא Agentic Brain, זיכרון קבוע על שינויים קודמים, תלויות ופעולות שכבר נעשו.
+
+לא צריך בשביל זה מוצר. צריך קובץ. כל ריצה של הלולאה קוראת אותו בהתחלה ומוסיפה רשומה בסוף:
+
+```markdown title="OPS_LOG.md"
+## 2026-11-02 · Sentry PROJ-4812 · TypeError in checkout
+- נבדק: cache-miss (נשלל: הבאג חוזר גם עם cache מלא)
+- נבדק: race-condition (אושר: שתי בקשות על אותו cart)
+- תוקן: PR #1931, טסט test_concurrent_cart
+- לא לנסות שוב: להגדיל timeout. לא קשור.
+```
+
+ותפתחו שיחה חדשה לכל ריצה. שיחה ארוכה עולה יותר בכל הודעה וגם עונה פחות טוב. בגדול, זה ההבדל בין agent שצובר ניסיון לבין agent שמתברבר באותה השערה בפעם הרביעית.
+
+## 04 · מריצים כמה השערות במקביל
+
+זה הצעד שבאמת שונה מאיך שעבדנו עד עכשיו. ה-CTO של Legora, ג'ייקוב לאוריצן:
+
+> "We can explore 20 solutions at the same time and, within days, pick the one we know will be the best."
+
+הוא מדבר על פיתוח פיצ'רים, אבל זה עובד בדיוק אותו דבר בתקלות. במקום שלושה מהנדסים שבודקים שלוש סיבות אפשריות במשך שעות, יש שלושה agents, כל אחד עם השערה אחת. הטריק הטכני הוא git worktree, כדי שלא ידרכו אחד לשני על הקבצים:
+
+```bash title="fanout.sh"
+#!/usr/bin/env bash
+BUG="$1"
+for h in cache-miss race-condition bad-migration; do
+  git worktree add "../fix-$h" -b "fix/$h"
+  ( cd "../fix-$h" && claude -p "Bug: $BUG. Hypothesis: $h.
+    Read OPS_LOG.md first. Prove or disprove it from ./logs.
+    If proven: write a failing test, then the fix.
+    First line of FINDINGS.md: VERDICT: PROVEN or VERDICT: DISPROVEN." \
+    > "../fix-$h.log" 2>&1 ) &
+done
+wait
+grep -l "^VERDICT: PROVEN" ../fix-*/FINDINGS.md
+```
+
+מה רואים: שלושה קבצי FINDINGS.md. בדרך כלל שניים שוללים ואחד מאשר, ולפעמים אף אחד, שזה גם מידע. שלוש ריצות שורפות פי 3 טוקנים. מול שלושה מהנדסים לכמה שעות, זה עדיין די משתלם. אחר כך `git worktree remove` על כל מה שנשלל.
+
+<figure><img src="/posts/agentic-operating/v2-svg-he.jpg" alt="שלוש השערות במקביל עולות פי 3 בטוקנים ושתיים מהן נשללות. זה המחיר של לא לנחש, והוא עדיין זול משלושה מהנדסים (Legora, OpenAI)" loading="lazy" /><figcaption>שלוש השערות במקביל עולות פי 3 בטוקנים ושתיים מהן נשללות. זה המחיר של לא לנחש, והוא עדיין זול משלושה מהנדסים (Legora, OpenAI)</figcaption></figure>
+
+## 05 · שער אימות לפני שמשהו מתקרב ל-prod
+
+agent שכתב תיקון עוד לא תיקן כלום. השער אצלי פשוט: טסט שנכשל על main ועובר על הענף. אם ה-agent לא הצליח לכתוב טסט שנכשל, הוא לא הבין את הבאג, ולא משנה כמה יפה התיקון נראה.
+
+בפועל ב-GitHub: Settings → Branches → branch protection על main, עם Require a pull request before merging, Required approvals = 1, ו-Require status checks to pass. את ה-push אתם עושים, רק מהענף שעבר: `git push -u origin fix/race-condition && gh pr create --fill`. CI רץ, בן אדם לוחץ merge. עם ה-deny מצעד 02, ל-agent אין איך לעקוף את זה גם אם ממש ירצה.
+
+## 06 · מודדים זמן, לא תחושה
+
+אחרי שבועיים חוזרים ל-baseline מצעד 01. אותו חישוב בדיוק: חציון מ-created ל-resolved, רק על באגים שעברו בלולאה. ועוד שני מספרים: כמה PRs של agents נכנסו בלי שינוי ידני, וכמה פעמים השער מצעד 05 עצר משהו. אם השער אף פעם לא עוצר כלום, כנראה שהוא לא בודק כלום.
+
+> **הסתייגות:** אני לא קונה את החמש דקות כיעד. זה case study שספק המודל כתב על לקוח שלו, ובטקסט המקורי כתוב sometimes, והמילה הזאת מסתירה הרבה. תמדדו את החציון שלכם מול החציון שלכם. זה המספר היחיד שמעניין.
+
+כלל אצבע שלי: אם אחרי שבועיים פחות מחצי מה-PRs נכנסים בלי תיקון ידני, הלולאה לא בנויה נכון. ובדרך כלל חסר context, לא מודל. תוסיפו ל-OPS_LOG ול-allow לפני שאתם מחליפים לאופוס.
+
+## מה לקחת
+
+- לולאה אחת עם טריגר וסוף, ומספר baseline לפני שמתחילים.
+- deny לפני allow. קריאה רחבה, כתיבה צרה, ואת ה-push עושים אתם.
+- זיכרון בקובץ, שיחה חדשה לכל ריצה.
+- אין PR בלי טסט שנכשל לפני ועובר אחרי.

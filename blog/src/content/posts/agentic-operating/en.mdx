@@ -1,0 +1,137 @@
+---
+title: "Agentic operating: how to run ops with agents without buying an operating system"
+description: "The agentic operating system isn't a product. It's a runbook a model runs. Six steps to run one loop with agents, from permissions to measurement."
+lang: en
+key: agentic-operating
+term: "agentic operating"
+kind: fieldnotes
+pubDate: 2026-11-02
+tags: ["agents", "operations", "claude-code", "devops", "agentic-ai"]
+hook: "claim"
+cover: photo
+tldr: ["Write .claude/settings.json with deny rules on push, delete, and secret files.", "Keep the agent's memory in an OPS_LOG file, and start a fresh conversation for every run.", "No agent PR gets in without a test that fails before the fix and passes after."]
+hero: /posts/agentic-operating/hero-en.jpg
+diagram: /posts/agentic-operating/diagram.svg
+sources:
+  - { title: "Idea: Autonomous agents coordinating changes across data platforms", url: "https://medium.com/@priyank_47489/the-idea-of-an-agentic-operating-system-for-data-platforms-270dcad109cc", date: "2026-03-29" }
+  - { title: "Legora is building the agentic operating system for legal work", url: "https://openai.com/index/legora-agentic-operating-system-for-legal-work", date: "2026-10-28" }
+  - { title: "Agentic AI Explained: A Guide for the Enterprise | C3 AI", url: "https://c3.ai/blog/agentic-ai-explained", date: "" }
+opinion: "We don't think the agentic operating system is a category. Three different companies put the same name on three different things, and when a term shows up in a product tagline before it shows up in a paper, we get suspicious. The way of working is real, though: one loop, narrow permissions, memory outside the conversation, and a verification gate. The key skill in 2026 isn't the prompt. It's the system around the model: what it sees, what it touches, how you check it, and when you reset it. And wherever you can replace a model call with a deterministic rule, do it. That's cheaper and more stable."
+madeWith: { model: "claude-opus-5-5", sourceCount: 3, reviewedBy: "Koby Almog" }
+---
+
+"Agentic operating system" isn't an operating system, and it isn't a product. It's a runbook you hand to a model, plus memory on the side and defined permissions. Everything else is marketing.
+
+The name stuck anyway. On October 28, OpenAI published a case study on Legora, a Stockholm startup founded in 2023. Its CEO, Max Junestrand, calls the product "the agentic operating system for legal work". Seven months earlier, on March 29, Priyank Malviya wrote on Medium about an Agentic OS for data platforms. C3 uses roughly the same name for its orchestration layer. That's three completely different things under one name.
+
+So what do they share? A way of working. Agents take the steps, you set the boundaries, and someone checks the output. The most interesting number in the Legora piece has nothing to do with lawyers. It's about their engineering team: from bug report to working fix in "about five minutes", with coding agents scanning millions of log lines and testing several explanations in parallel.
+
+AWS and Aerospike have already explained what agentic AI is, and Andrew Ng was pushing the word back in 2024. I'll skip that part. This post covers how to start operating this way: one loop, built step by step.
+
+## 01 · Pick one loop, not a whole process
+
+I've seen several teams make the same mistake: "we'll hand on-call over to agents." That isn't a loop. It's a wish.
+
+A good loop repeats several times a week, has a clear trigger, and ends in a state you can check. At Legora it's bug report → fix. For Priyank it's a schema change in one table and whatever has to change downstream in pipelines and dashboards. For you it might be red CI on main, or an alert that needs triage.
+
+What to do: write one line with a trigger, an end state, and an approver.
+
+`Trigger: new Sentry issue with environment=production. End: a PR with a test that fails before the fix and passes after. Approver: whoever is on call.`
+
+What to check: get a baseline. Pull the last 10 prod bugs from Jira and compute the median time from created to resolved. Without that number, you have nothing to compare against in step 06.
+
+<figure><img src="/posts/agentic-operating/src2.jpg" alt="Legora sells an operating system, but internally it starts with one loop: bug to fix in about five minutes (credit: OpenAI)" loading="lazy" /><figcaption>Legora sells an operating system, but internally it starts with one loop: bug to fix in about five minutes (credit: OpenAI)</figcaption></figure>
+
+## 02 · Write a contract: what the agent can see and what it can touch
+
+In July 2025, a Replit agent deleted the production database of SaaStr's Jason Lemkin in the middle of a declared code freeze. Afterward it wrote that it had panicked. Everyone laughed at the wording. But the model wasn't the problem. The problem was that it had write access to prod.
+
+The rule is read wide, write narrow. Logs, the repo, and a read-only replica are allowed. Prod credentials, `kubectl delete`, and push are not. In Claude Code, that's one file in the repo:
+
+```json title=".claude/settings.json"
+{
+  "permissions": {
+    "allow": [
+      "Read(./logs/**)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(npm test:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./secrets/**)",
+      "Bash(git push:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(rm -rf:*)"
+    ]
+  }
+}
+```
+
+Deny wins over allow, so write the deny list first. For anything that isn't on either list, Claude asks before acting in an interactive session, and under `claude -p` the action is simply blocked. Run `/permissions` inside a session to confirm the rules loaded. The push is your job, in step 05.
+
+<figure><img src="/posts/agentic-operating/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## 03 · Move memory out of the conversation
+
+Priyank put it best: most systems keep context in the conversation history, which works for chat but not for infrastructure. He calls his answer an Agentic Brain, a persistent memory of past changes, dependencies, and actions already taken.
+
+You don't need a product for this. You need a file. Every run of the loop reads it at the start and appends an entry at the end:
+
+```markdown title="OPS_LOG.md"
+## 2026-11-02 · Sentry PROJ-4812 · TypeError in checkout
+- Checked: cache-miss (ruled out: bug reproduces with a warm cache)
+- Checked: race-condition (confirmed: two requests on the same cart)
+- Fixed: PR #1931, test test_concurrent_cart
+- Don't retry: raising the timeout. Unrelated.
+```
+
+Also start a new conversation for every run. A long conversation costs more with every message and gives worse answers. Roughly, that's the difference between an agent that builds up experience and one that chases the same hypothesis for the fourth time.
+
+## 04 · Run several hypotheses in parallel
+
+This step is the real change from how we've worked until now. Here's Legora's CTO, Jacob Lauritzen:
+
+> "We can explore 20 solutions at the same time and, within days, pick the one we know will be the best."
+
+He's talking about feature development, but it works the same way for incidents. Instead of three engineers spending hours on three possible causes, you run three agents with one hypothesis each. The technical trick is git worktree, which keeps them from stepping on each other's files:
+
+```bash title="fanout.sh"
+#!/usr/bin/env bash
+BUG="$1"
+for h in cache-miss race-condition bad-migration; do
+  git worktree add "../fix-$h" -b "fix/$h"
+  ( cd "../fix-$h" && claude -p "Bug: $BUG. Hypothesis: $h.
+    Read OPS_LOG.md first. Prove or disprove it from ./logs.
+    If proven: write a failing test, then the fix.
+    First line of FINDINGS.md: VERDICT: PROVEN or VERDICT: DISPROVEN." \
+    > "../fix-$h.log" 2>&1 ) &
+done
+wait
+grep -l "^VERDICT: PROVEN" ../fix-*/FINDINGS.md
+```
+
+What to check: you get three FINDINGS.md files. Usually two disprove their hypothesis and one confirms it. Sometimes none confirm, and that tells you something too. Three runs burn 3x the tokens. Compared with three engineers for a few hours, that's still a good deal. Afterward, run `git worktree remove` on every branch that was ruled out.
+
+<figure><img src="/posts/agentic-operating/v2-svg-en.jpg" alt="Three parallel hypotheses cost 3x the tokens, and two get ruled out. That's the price of not guessing, and it's still cheaper than three engineers (Legora, OpenAI)" loading="lazy" /><figcaption>Three parallel hypotheses cost 3x the tokens, and two get ruled out. That's the price of not guessing, and it's still cheaper than three engineers (Legora, OpenAI)</figcaption></figure>
+
+## 05 · Add a verification gate before anything gets near prod
+
+An agent that wrote a fix hasn't fixed anything yet. My gate is simple: a test that fails on main and passes on the branch. If the agent couldn't write a failing test, it didn't understand the bug, however good the fix looks.
+
+On GitHub, that means Settings → Branches → branch protection on main, with Require a pull request before merging, Required approvals = 1, and Require status checks to pass. You do the push, and only from the branch that passed: `git push -u origin fix/race-condition && gh pr create --fill`. CI runs, and a human clicks merge. With the deny list from step 02, the agent has no way around this even if it tries.
+
+## 06 · Measure time, not feelings
+
+After two weeks, go back to the baseline from step 01 and run the same calculation: median time from created to resolved, counting only bugs that went through the loop. Add two more numbers: how many agent PRs merged without manual changes, and how many times the gate from step 05 stopped something. If the gate never stops anything, it's probably not checking anything.
+
+> **Caveat:** I don't buy five minutes as a target. This is a case study the model vendor wrote about its own customer, and the original text says "sometimes", which hides a lot. Compare your median against your own baseline median. That's the only number that matters.
+
+My rule of thumb: if fewer than half the PRs merge without a manual fix after two weeks, the loop isn't built right. Usually the missing piece is context, not the model. Add to OPS_LOG and to the allow list before you switch to Opus.
+
+## Takeaways
+
+- Pick one loop with a trigger and an end state, and record a baseline number before you start.
+- Write deny before allow. Read wide, write narrow, and do the push yourself.
+- Keep memory in a file, and start a fresh conversation for every run.
+- No PR without a test that fails before the fix and passes after.

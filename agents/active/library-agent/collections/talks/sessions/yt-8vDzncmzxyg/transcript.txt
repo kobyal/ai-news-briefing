@@ -1,0 +1,335 @@
+[0:00] I am Kilian from Sonar. And if you're unfamiliar with Sonar, we are an independent code verification
+[0:18] platform. And what I'm going to be talking about today is how to move verification into the agentic
+[0:24] coding loop.
+[0:26] I mean, as we know, everybody has been doing this
+[0:30] the past couple of years.
+[0:31] It's accelerated the pace.
+[0:33] And every time you start a new agentic session in your IDE,
+[0:38] it is like starting from scratch.
+[0:39] It is like a new hired employee into your project.
+[0:42] It does not know your existing project conventions.
+[0:45] It does not know your coding guidelines.
+[0:48] It does not know any architecture rules
+[0:51] that you have predefined for it.
+[0:52] And that can be a problem because what it has to do then
+[0:57] is when it's assigned a feature, it
+[0:59] has to go look around for context.
+[1:02] If you say, hey, build out a new API endpoint,
+[1:05] it has to go and determine how existing API endpoints work
+[1:10] in your code.
+[1:11] And that process can, it's a bit of a roll of the dice.
+[1:17] It can acquire that context quickly,
+[1:18] or it can search around all over your repository.
+[1:23] And that takes time, and that takes tokens.
+[1:26] And this is a very fixable problem.
+[1:28] And if you have issues in your code base,
+[1:32] as I'm sorry to break it to you, every code base does,
+[1:37] unfortunately, it's highly likely that these issues
+[1:40] will be replicated and these patterns repeated
+[1:43] by whichever agent you're using.
+[1:44] And not if, but when that agent introduces new issues,
+[1:51] if it's not caught, the ability to maintain the quality
+[1:55] of your code is almost impossible to do.
+[1:59] So our solution to that is Sonar Vortex.
+[2:03] I'm going to show you that here in a little bit.
+[2:06] What it is, it is a plug-in that connects
+[2:09] to whatever coding agent you use.
+[2:12] And this is so the agent knows about your project
+[2:15] before it even begins to code.
+[2:17] And it is able to verify itself deterministically
+[2:21] to make sure that it's introducing no new issues
+[2:24] into your code base.
+[2:25] So I recorded a coding agent writing a small feature
+[2:30] a little bit ago.
+[2:31] And it was able to do so in under two minutes.
+[2:33] But unfortunately, even though I had instructed it
+[2:36] to build out a test suite for itself,
+[2:38] it introduced a security issue that Sona Vortex
+[2:41] was able to catch and force the agent
+[2:43] to continue iterating upon itself until it was fixed.
+[2:48] So the issue ended up being, and we'll see this here
+[2:52] momentarily, is that it wrote, it
+[2:55] was to unzip a log file into a temp file.
+[2:58] But unfortunately, the permissions
+[3:00] that it sent for that temp file were not explicit.
+[3:04] And that type of issue is hard to write tests for.
+[3:08] It's hard to catch.
+[3:09] And it's usually the type of thing that a senior reviewer
+[3:13] would only catch if they're explicitly looking for it,
+[3:15] if at all.
+[3:16] And then let's say that they do catch it.
+[3:18] Now it has to be sent back for a developer or an agent
+[3:21] to rework again and repush and rereview and reanalyze.
+[3:26] And that burns time and money.
+[3:28] And it causes a lot of frustration for everyone involved.
+[3:32] So the frustration in that process
+[3:37] is not just my opinion.
+[3:39] That is from data that we've pulled.
+[3:42] Sonar surveyed over 1,100 developers
+[3:45] and found that 96% of them do not fully trust AI-generated
+[3:51] code.
+[3:52] But how many of those do you think actually fully verified
+[3:56] the code before pushing it?
+[3:58] It was less than half.
+[3:59] It was 48% of those.
+[4:01] So that boggles my mind, personally.
+[4:05] That terrifies me that we are just blindly setting off code
+[4:09] into production without verifying it.
+[4:13] But like I said, the agents write quickly,
+[4:19] rework slows you down, and if you catch it at the PR,
+[4:23] you're already behind where you need to be.
+[4:27] But a quick animation to kind of demonstrate what I'm talking
+[4:30] about here is, as I mentioned, SonarVortex.
+[4:34] One of the goals that we are doing
+[4:36] is we are making your coding agents more efficient,
+[4:40] in addition to providing guardrails for them.
+[4:42] But this little ball here is your coding agent, which, as I
+[4:46] said, it writes a lot of code really, really fast.
+[4:49] Faster than humans can keep up with,
+[4:51] faster than we are able to review manually.
+[4:54] Unfortunately, as I said, when it starts out,
+[4:59] this grid is your code base.
+[5:01] Every square is a file.
+[5:02] It has to go searching around.
+[5:04] Every time it moves, it's checking a new file.
+[5:07] And that bar at the bottom is tokens,
+[5:10] which is your money and time spent on just looking around.
+[5:14] And when it gets something wrong,
+[5:16] you get to find out at the pull request.
+[5:19] The review fails, and the work goes back to the agent
+[5:22] for another round.
+[5:23] And it continues to iterate itself,
+[5:25] and you've got to keep pinging your senior engineer.
+[5:27] And then he's mad at you, and then nobody has a good time.
+[5:31] Before it writes anything, with Sonar Vortex now,
+[5:35] it is going to get the coding guidelines for your project
+[5:39] and a map of how the code connects.
+[5:43] So it will pull in things like your architecture guidelines.
+[5:47] It will pull in things like what the approved libraries
+[5:51] for your applications are, what your coding standards are
+[5:55] for a given project.
+[5:56] And these are all things you get to set for yourself.
+[6:01] So now you can see here it goes straight to the right files.
+[6:03] It does not burn excess tokens.
+[6:05] It does not burn excess context.
+[6:08] And as it works, Sonar Cube checks its code.
+[6:12] So your agent, the edits that it makes with its own tools,
+[6:16] every time it uses them, it triggers a quick check.
+[6:20] And before it ends its turn, it's
+[6:21] told to run a deeper check for even deeper security issues
+[6:26] for cross-filed data flow.
+[6:28] And you see here that issue goes back to the agent,
+[6:31] and the agent fixes its own code,
+[6:33] and then Vortex checks it again.
+[6:36] And this all works with all of the agents
+[6:38] that people are currently using right now,
+[6:41] be that Cloud Code, Codex, Anti-Gravity,
+[6:45] whatever you want to use.
+[6:47] And if you have any custom agents designed
+[6:49] or using any open source ones or any of the non-major players,
+[6:53] we have MCP clients that are very configurable for you
+[6:56] to use at your own desire for that.
+[7:00] So essentially, what I want you to take away from this
+[7:03] is that Vortex is something that you can just plug in easily
+[7:07] to your agent.
+[7:07] It is built on top of the CLI and MCP tools that we provide it.
+[7:13] And it brings Sonar Cube into the agent
+[7:16] so that the agent knows your project before it writes.
+[7:19] I'm going to pause it, or I'm going to move back
+[7:21] before I miss it.
+[7:23] And what we found is that it spends 36% fewer tokens
+[7:27] on average, especially on tasks like refactoring
+[7:30] existing code bases.
+[7:31] People who use it have a 44% reduction in production outages.
+[7:36] And we have a very low false positive rate as well
+[7:40] so that we don't clutter up your coding sessions.
+[7:44] So this is huge.
+[7:46] This is huge.
+[7:47] The speed that this accelerates the coding cycle to the software
+[7:53] development cycle too, we're on the new frontier
+[7:58] of being able to verify programming.
+[8:01] So to sum it all up, we want to guide the agent
+[8:05] and verify the change.
+[8:07] And we bring SonarCube's existing intelligence
+[8:10] into the mix.
+[8:12] So I'm sure at least some of you are familiar with SonarCube.
+[8:15] We've been around for almost two decades.
+[8:17] And we are traditionally a pipeline step
+[8:21] that a lot of people run that deterministically analyzes
+[8:24] for any security issues, maintainability issues,
+[8:27] any data flow issues.
+[8:29] And we build out graphs, and we dive deep into the code.
+[8:33] Now, with this knowledge already maintained
+[8:37] within our servers, we're able to provide that context
+[8:40] to an agent, so now it exists from the get go.
+[8:44] Your agent knows your project before it writes,
+[8:47] and it checks its own code as it goes.
+[8:50] Your CI already has a SonarCube scan.
+[8:52] And the Vortex reuses what that scan has learned.
+[8:56] So just a quick check on your file,
+[8:58] and it knows about the rest of your code.
+[9:01] So here, I'm going to show it to you in a real task.
+[9:06] This I actually recorded last night.
+[9:08] And what you can see from the get go,
+[9:11] and I'll be pausing and restarting it here and there.
+[9:14] The first thing that I want you to see
+[9:15] is that without having to do anything,
+[9:17] We can see SonarCube has started up in the session.
+[9:21] Our CLI is detected, and the hook system is detected as well.
+[9:24] And secrets detection is on.
+[9:26] I'm not going to dive too much into that today.
+[9:29] But secrets leakage is one of the easiest things to prevent
+[9:35] and one of the most costly for your organization.
+[9:39] Our plugin prevents secrets leaks into GitHub
+[9:43] and into agent context memories.
+[9:48] And what I want you to notice is I
+[9:49] didn't have to paste any Sonar instructions into the prompt.
+[9:53] It's just all automatically loaded.
+[9:56] And so the request that I alluded to earlier right here
+[10:00] is just basically unzipping a log file into a temp file.
+[10:06] It says, keep reusing that same file,
+[10:08] and then write a test that proves it's reused.
+[10:11] And before it writes a single line,
+[10:12] it's going to ask Sonar two things.
+[10:14] It's going to say, where does this class live?
+[10:18] And what are the Java coding guidelines for this project?
+[10:21] I think it's right here.
+[10:22] It's Sonar Context Navigation.
+[10:24] And we get this pattern, this single GC log file
+[10:27] that I told it to work on.
+[10:28] It's like it's parent and child architecture,
+[10:32] as well as existing patterns and guidelines around that.
+[10:38] As well, it says Sonar Context Guidelines Get Languages Java.
+[10:41] So we have basic guidelines that we enforce agents use when building out Java projects.
+[10:49] But if you have any custom requirements that you want your team to follow, that gets injected from the get-go.
+[10:55] And guys, I cannot emphasize enough that outside of model choice, the context in steering from the get-go that agents receive is the single greatest lever that you can manipulate for agentic performance.
+[11:11] And the more you do on the front end,
+[11:14] the less rework and steering and correcting and intervention
+[11:18] that you have to do when you're developing for yourself.
+[11:22] So instead of searching through the files one by one,
+[11:25] like in the animation, just gets that map,
+[11:28] this is the guide phase that Vortex does.
+[11:33] And so it's able to inspect the existing test,
+[11:36] see how that operates, and very quickly move on
+[11:41] into implementation.
+[11:43] Now, that just took a few seconds.
+[11:45] And obviously, this changes from feature to feature.
+[11:48] But running against this feature without Vortex
+[11:52] takes longer as this has to grep around and figure out
+[11:55] what's going on.
+[11:58] So it's running the implementation.
+[12:01] And I will very quickly point out where it actually
+[12:05] makes that temp file.
+[12:07] It adds in its own test suite.
+[12:09] So here's the test suite.
+[12:10] In the recording, I scroll up.
+[12:12] This tiny little bit right here is the temp file.
+[12:15] And I hope you guys can see.
+[12:16] It's probably really small for you in the audience.
+[12:18] But it creates that temp file right there.
+[12:21] And it's going to go ahead and check its own test result.
+[12:24] And then it will run the sonar check
+[12:26] on both of the files that it changed.
+[12:28] Right here, it says confirming the test result.
+[12:30] And it says running vortex analysis.
+[12:33] Every time a file is edited or added, Vortex analysis runs.
+[12:40] You do not have to enforce it.
+[12:42] You do not even really have to think about it.
+[12:44] It just automatically kicks in, and you can trust
+[12:48] your code gets verified.
+[12:49] If you have automated workflows set up,
+[12:52] if you run a sophisticated factory design
+[12:55] or you're building these out, this
+[12:56] is a layer of trust you need to add
+[12:59] in order to make sure that no issues are being introduced.
+[13:03] One point as well, this is not another AI checking AI.
+[13:09] And it's certainly not it checking itself.
+[13:12] That is, unfortunately, we found one of the least reliable
+[13:16] ways to ensure that issues are not being introduced.
+[13:20] Not only do agents think orthogonally
+[13:25] on the creation and review of themselves,
+[13:28] other agents are likely to miss and hallucinate
+[13:33] when reviewing existing code.
+[13:34] When you have a deterministic layer,
+[13:37] and by that I mean every time you run the analysis
+[13:40] on this code, you get the same result back.
+[13:43] That is how you are able to provide reliable,
+[13:45] governable guidance and verification
+[13:48] that is compliant and predictable.
+[13:52] Don't get me wrong, I love AI review.
+[13:54] We also have an AI reviewing tool
+[13:58] that I'm not going to talk about today.
+[13:59] It's called Guitar.
+[14:00] I ran a workshop earlier this week on that.
+[14:02] And please come by our booth later
+[14:03] if you'd love to hear more information.
+[14:05] But Sonar Vortex is a deterministic layer
+[14:08] that stacks on top of your AI coding
+[14:13] and sandwiched between another AI review as well.
+[14:17] So we're running the Vortex analysis,
+[14:21] and it is going to catch something.
+[14:24] It'll catch six findings that come back.
+[14:26] And Cloud will say two of those findings
+[14:28] are on lines that it just wrote and four
+[14:30] on preexisting code.
+[14:32] Now, we did not engineer Vortex to be super noisy.
+[14:36] We did not engineer Vortex to say, oh, you found one issue,
+[14:39] but you've got to fix three more.
+[14:41] On new code that is created, it enforces correction.
+[14:45] And that just surfaces it to you so
+[14:48] that you have it for your awareness.
+[14:49] And if in the future you'd like to fix it, you are able to.
+[14:54] One of the findings that it has is a security problem,
+[14:59] the one that I mentioned at the start of this,
+[15:01] which is that Claude put the log in the default temp
+[15:04] folder without saying who can read it.
+[15:07] And on a lot of servers, that folder is shared.
+[15:10] So Claude goes ahead and it fixes the issue here.
+[15:17] But unfortunately, and we'll see this in a second,
+[15:19] Sonar Vortex runs again and determines, hey,
+[15:24] you actually did not fix the issue.
+[15:27] Says the finding persists because the temp file is still
+[15:30] in a shared directory.
+[15:32] The first fix leaned on a Java default.
+[15:35] And on Mac and Linux, the default is already owner only.
+[15:40] But the rule that we set in, which
+[15:41] is a high bar that we set, is that the permissions
+[15:44] must be set explicitly.
+[15:46] We do not compromise when it comes to security.
+[15:49] We do not compromise when it comes to quality.
+[15:53] So finally, Clutter is able to implement these fixes.
+[15:58] And again, every time it runs, vortex analysis is initiated.
+[16:03] You do not want to let any issues into your PR,
+[16:06] because the quicker you can catch these,
+[16:11] not only does the surface area of issues get reduced,
+[16:14] but the time and money and energy for remediation decreases.
+[16:20] Now, that's it for the terminal session.
+[16:24] I'm not gonna make everyone stare
+[16:25] into a tiny prerecorded terminal session,
+[16:28] but essentially what I want everyone to take away from this
+[16:32] is that it asked sonar first.
+[16:36] When sonar flagged its fix,
+[16:38] it went further and continued to remediate itself.
+[16:41] and it will eventually hand it back at the end
+[16:45] and a deep analysis for data flow will be performed.
+[16:51] What do you get?
+[16:52] What do you get out of this?
+[16:54] You get less back and forth review,
+[16:56] and I see I have a minute left,
+[16:57] I'll finish up here in a bit.
+[16:59] You get less back and forth review,
+[17:01] you get it fixed in the moment,
+[17:03] you get more secure code,
+[17:05] you get less time and money spent on remediation,
+[17:08] And you have more time freed up for your developers
+[17:13] because of your ability to trust automating agentic workflows.
+[17:19] We have a booth downstairs.
+[17:21] I would love to talk to you guys.
+[17:22] I'll be hanging up behind the room in the back
+[17:26] to answer any questions.
+[17:27] I would love to talk with you.
+[17:28] If you're brand new to Sonar, if you're an existing Sonar
+[17:30] customer, I'd still love to hear your input and insights.
+[17:35] And that's all I have for you today.
+[17:37] Thank you very much.
+[17:38] Thank you.

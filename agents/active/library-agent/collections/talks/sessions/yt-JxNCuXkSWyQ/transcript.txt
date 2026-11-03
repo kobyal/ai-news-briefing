@@ -1,0 +1,313 @@
+[0:00] Hey everyone, thanks for coming today. My name is Sagar, I'm CEO and co-founder of Speakeasy.
+[0:18] We are an AI control plane that helps you securely scale AI within your business. So
+[0:24] what this means is we help take all the AI you have, put it on a governed path,
+[0:28] and help you authorize all the actions it's taking.
+[0:31] I'm here today to talk to you about how we could actually
+[0:36] intentionally authorize agent actions.
+[0:38] I'm going to recreate a little incident that was in the news
+[0:41] a couple of months ago, use that to talk to kind of the scenario
+[0:45] of how you can authorize actions and prevent such an incident.
+[0:49] The question of whether agents are capable at a task is long gone today.
+[0:54] The real focus in most businesses is what happens when one of them does something.
+[1:01] In most regulated industries, every action has to be attributed to someone or something
+[1:08] and some identity.
+[1:09] So that's really the core of what I wanted to talk here.
+[1:14] Let me first do a quick little animation I put together of the incident that I was talking
+[1:20] about.
+[1:21] If you remember back in April, I won't name names, but there was a startup, a founder
+[1:26] at the startup who thought he was fixing a staging environment but accidentally deleted
+[1:32] his production database.
+[1:34] I've got this fun little animation to kind of remind you of that story.
+[1:39] The summary of the story goes, as I said, the developer asks a coding agent to fix a
+[1:44] credential issue in staging.
+[1:46] This is a pretty ordinary request, ordinary afternoon.
+[1:50] The agent starts by reading the workspace and in an unrelated file, it finds a database
+[1:55] access token.
+[1:57] This is an infrastructure token with full access.
+[2:01] It decides the fix is to delete the volume and recreate it, except the volume it has
+[2:06] access to is not staging and nothing is standing between that guess and the API.
+[2:13] There's no identity on the call, no policy, no approval, and really no record at all.
+[2:19] So, in one fell swoop, we've deleted production, its backup, and all of that lived within the
+[2:28] same network boundary, so it's all gone in one instant.
+[2:31] Took about 10 seconds to kind of completely bring down the startup's whole database and
+[2:36] their backup.
+[2:37] Now, what I want to leave you with as we kind of go on to the next part of this presentation
+[2:43] is that the agent had valid credentials, but it didn't have valid intent.
+[2:49] That's the real difference between the kind of right and wrong in this situation.
+[2:56] So my argument that I'm going to make to you here is that the unchecked authority is the
+[3:00] real failure.
+[3:02] An agent can be wrong, it can miss context.
+[3:05] It's pretty well understood now.
+[3:06] You know, we've all been in that situation before.
+[3:09] But what you didn't see in that scenario is that there was no exploit, there was no jailbreak,
+[3:14] no prompt injection.
+[3:15] There was really no malicious actor.
+[3:17] There was nothing that anyone was doing intentionally to harm the system or harm the company.
+[3:23] The valid key did exactly what valid keys do.
+[3:27] The agent did what it thought it should do.
+[3:29] The failure for a regulated business is not that the mistake happened, but nothing stood
+[3:35] between the agent and its judgment and the API.
+[3:39] There were no real guardrails in place.
+[3:43] Before we get into the blueprint of how we can do better here, I wanted to give you three
+[3:48] numbers that represent how this is playing out in our industry.
+[3:52] The first, 82% of all organizations already run AI agents, no surprise probably to anyone.
+[3:58] 32% had an AI governance policy in place.
+[4:02] It's probably more surprising given the difference between the two.
+[4:06] And then finally, when a breach does happen, thanks to shadow AI of some kind, the average
+[4:10] cost is usually calculated to be about $5 million or so.
+[4:15] So that's a fun stat.
+[4:17] But essentially we can conclude that AI adoption is universal, but the control layer doesn't
+[4:23] really exist, and it's definitely not universal.
+[4:29] Before we go to looking at what a control layer for agents could be in this scenario,
+[4:35] It's actually just started what we've asked people or employees to do for as long as we've
+[4:40] known.
+[4:41] We've held people to this kind of standard as long as it's been software, SaaS software
+[4:46] of any kind.
+[4:48] The things that we hold people to are you have to sign in as yourself.
+[4:52] We ask everyone to not share passwords or keys of any kind, and you can't approve your
+[4:59] own escalation or change in permissions.
+[5:01] And we expect systems to keep track of all changes.
+[5:04] That's pretty standard, right?
+[5:05] That's all software today.
+[5:06] That's what we expect.
+[5:08] The question, if you're being audited in the regulated industry, the question that will
+[5:13] be asked is, you know, not is the model smart enough, is your agent smart enough, or using
+[5:18] the latest release, but it will just be who acted, who allowed it, and then show me the
+[5:22] record of what happened.
+[5:26] So if we're going to apply this to agents, the first thing I'll say is we don't want
+[5:31] to stop agents, right?
+[5:32] We don't want to create a block that teams are going to find a way to route around, agents
+[5:37] will work around.
+[5:38] We know that blocks don't really work.
+[5:41] The answer is creating a path to action that is meaningful and much easier than the ungoverned
+[5:47] one.
+[5:48] So we want the governed action to actually be easier than the ungoverned action.
+[5:51] Let me show you with another fun animation what that path end-to-end could look like
+[5:55] for a truly governed action.
+[6:02] So imagine you had a true control layer, a magical system of some kind that governed
+[6:08] agents on your machine and the cloud.
+[6:11] The first thing that you really care about is that it works just out of the box.
+[6:16] So you join the company, you onboard, and you want all of these policies in place.
+[6:21] So in this kind of first step of the animation, we're showing that it's something that comes
+[6:27] out of the box installed on your laptop the first day you start at this company.
+[6:32] The policy of what should happen or not happen is written once centrally.
+[6:37] It's not something a developer needs to write on their agent or their own harness.
+[6:41] It's written once and now kind of enforced at the company level.
+[6:46] For this one, let's think of a simple one.
+[6:48] We'll go with secrets on user prompts and tool requests.
+[6:52] And the action that we want is block or a quarantine.
+[6:57] We'll take the same scenario again of kind of what we did earlier, from the developer
+[7:03] accidentally deleting the database.
+[7:06] In this case, the user is putting an AWS key in, or it might even be coming from another
+[7:12] agent.
+[7:14] Before the model ever sees it, a hook fires, and this happens all in the Harness runtime.
+[7:20] So it detects that there's a key that's being sent, and the prompt is caught by a policy
+[7:25] that's evaluated by the control layer. The policy is enforced by a detector and one of
+[7:30] them matches the AWS key. So there is a concept of like an interception that happens. And
+[7:37] then as that happens, there's also a decision that's created. And all of that happens in,
+[7:43] you know, ideally we want it to be like 100 milliseconds or less. We don't want the agent
+[7:48] or the human to really change the path that they're on. So it happens very quickly. And
+[7:54] And then finally, once the interception happens, that's logged and now there's an audit of
+[8:00] that event that's happened.
+[8:04] So inspected, blocked and logged, the secret never really left the machine.
+[8:08] And in this case, the developer lost nothing but just a bad prompt.
+[8:15] Let's simplify this kind of conceptually into what's happened.
+[8:19] We will look at this as four steps that a company can model a governance architecture
+[8:25] around.
+[8:26] The first I like to call connect.
+[8:28] This is creating a door instead of having dozens of different integration points.
+[8:34] All of the calls that an agent does when it connects to external systems should go to
+[8:38] one place, something like an MCB gateway.
+[8:40] A lot of us have used those and understand those well.
+[8:44] The second is that the calls need to be resolved to a named agent or a human behind it.
+[8:51] Policy evaluation doesn't really work without identity.
+[8:54] This has to be the same identity all other enterprise software is assigned to as well.
+[8:58] So it's consistent across your organization.
+[9:01] Third, there's a decide step where you either allow, deny, quarantine, or you escalate the
+[9:09] decision.
+[9:10] And then sometimes even just warning a user is sufficient.
+[9:13] And then finally, that decision is recorded before any action is actually taken.
+[9:20] We're going to dive into a couple of these in a little bit more detail so I can give
+[9:24] you a better blueprint of how to do this for your own product or your own company.
+[9:28] The first is identity.
+[9:31] So who was on the call?
+[9:32] Who actually executed this request?
+[9:35] If we look at this kind of screen in front of us, there are two sides to it.
+[9:41] The left side is the incident that we posed, that's the log from the incident.
+[9:46] A key was found on the file, but no, there's no actor and nobody who approved it.
+[9:51] So if you're looking at this as an auditor, you're wondering who actually took the action,
+[9:56] who's responsible.
+[10:00] And to be honest, this is the default state of most systems today.
+[10:03] It was even ours until earlier this year.
+[10:06] Every principal, every agent, every user, it's all borrowed based on a person's identity.
+[10:12] This is pretty common in most companies today, running agents.
+[10:16] Even a background job is mapped to a user or there's just an anonymous kind of system
+[10:22] role that's created.
+[10:24] Even Slack assistants tend to be running as user permissions.
+[10:27] They don't necessarily have their own identity.
+[10:30] On the right is that same prompt now modeled to the lens of a control layer.
+[10:34] The agent is a principal in its own right, so it has its own identity.
+[10:39] Below that you see there is an operator who drove the action, so who was actually interacting
+[10:45] with that agent in real time.
+[10:47] In this case, it's me.
+[10:50] And that's recorded for attribution.
+[10:52] It's never used to widen access in real time.
+[10:56] And then finally, there's the authorizer.
+[10:57] So this is the human who approved the original credential setup for the agent.
+[11:02] In this case, it says Thomas, who's our CISO.
+[11:04] This is fixed for credentials lifetime.
+[11:07] So the right-hand card is what we really want for compliance.
+[11:09] This is a true log of what actually happened and how we could model it.
+[11:17] The next one is for kind of the set theory nerds in the audience, but it's how you actually
+[11:22] decide in real time whether the call succeeds or fails.
+[11:26] Let's...
+[11:27] There are kind of three parts to this.
+[11:28] The first is the one on the left, R or credentials.
+[11:33] This is the ceiling of what a human put down when they issued the key.
+[11:36] So this, again, is the thing that never gets widened.
+[11:39] It lives on the credential, and it's something you can't escalate past.
+[11:43] The second is, we call it A, it's the agent's own policy.
+[11:48] It can't hold an admin privilege or any kind of human-only scope.
+[11:52] And then finally, O is the owner's live policy.
+[11:55] So an agent can never do more than the person accountable for it who is actually driving
+[12:01] the agent.
+[12:02] was me.
+[12:03] What's interesting about modeling it this way is that the second and third A&O are read
+[12:09] on every call.
+[12:10] If you remove a permission, it's gone on the next request.
+[12:13] So it's reevaluated.
+[12:16] And if we go back to that database scenario that we started with, even if the owner could
+[12:21] delete production, an agent's scope to just staging can't.
+[12:24] And if someone gave the agent a broader policy, it can't exceed an owner who never had production
+[12:29] rights.
+[12:30] both directions you're protected.
+[12:33] Either way the call would stop.
+[12:34] And then finally an important note,
+[12:37] if an owner were to leave a company,
+[12:39] since it's connected with your enterprise identity,
+[12:41] your IDP de-provisions them,
+[12:43] and every request their agents make
+[12:45] is now denied going forward.
+[12:51] The last step in that conceptual flow
+[12:54] is recording what actually happened.
+[12:56] So on the left is again that scenario playing out,
+[13:00] On the right is what it actually leaves behind,
+[13:02] now that we have a way to kind of model the steps
+[13:04] that have happened.
+[13:06] We can see kind of in this flow,
+[13:08] as you go through the different steps,
+[13:09] there's a denial step that happens.
+[13:11] And there's a stated intent, which
+[13:13] was that the agent wanted to act on staging.
+[13:16] But the action was done on production.
+[13:18] The policy sees both sides of that.
+[13:20] So this is where compliance frameworks have generally
+[13:22] landed today.
+[13:24] Every non-read action is evaluated against policy
+[13:28] that considers the agent's stated intent,
+[13:31] not just the action that actually happened.
+[13:33] In most control systems, there's exactly one
+[13:36] of kind of five decisions that comes out of this.
+[13:39] Like we mentioned earlier, it's either allowing,
+[13:41] denying, modifying, or escalating up to a human.
+[13:45] Every evaluated action produces this kind of record
+[13:49] of what's happened, and generally,
+[13:51] a lot of systems is cryptographically bound
+[13:53] to the agent identity.
+[13:54] So, I have only one slide that's going to actually take you through how we build this
+[14:01] at Speakeasy.
+[14:02] So, I'll keep it limited to that.
+[14:05] As I mentioned earlier, we at Speakeasy, we're an AI control plane.
+[14:09] We actually put our product in between agents that people use or using autonomously and
+[14:15] the systems that they have access to.
+[14:17] So the identity comes, the identity baseline comes from your IDP, so Okta or another identity
+[14:23] provider.
+[14:24] then the policies is actually evaluated on our product, our control plane.
+[14:28] So every call, including the ones that we deny, all go through us.
+[14:34] And so we write out the audit log for our customers.
+[14:37] There's three critical decisions in this architecture.
+[14:41] The first, as you can see, is that we sit in the critical path, not beside it.
+[14:45] The record has to be of what actually happened, not what the agent reported.
+[14:50] And two, we use kind of first class identity instead of using user logins everywhere to
+[14:55] the system.
+[14:57] And then finally, we actually distribute to MDM.
+[15:00] So all of this comes working out of the box for a user.
+[15:03] They don't have to go redefine these policies on their end.
+[15:06] It's something that just works the moment they start at the company or start using an
+[15:10] agent.
+[15:11] So that's my only slide about Speakeasy, but I'm happy to talk to you more about that
+[15:16] later.
+[15:19] So that's the kind of summarize what we went through.
+[15:23] In a regulated industry, permission to act usually means kind of three things have to
+[15:27] be shown for every agent or every agent action that is taken, who the actor was, what policies
+[15:34] allowed it, and the signing of the record.
+[15:37] So knowing for a fact that this actually happened.
+[15:40] This is what we've always kind of asked employees to do at a business, and it's what we ask
+[15:45] agents to do now.
+[15:47] Valid credentials are not valid intent.
+[15:49] That's something that's really important to remember.
+[15:51] And the fix is not just saying you have a smarter model or a better agent.
+[15:56] It's actually putting together identity, policy, and record of every action that's happening.
+[16:02] So that's kind of everything I wanted to talk to you about today.
+[16:05] I'll also leave you with throwing an event tonight with friends here at TailScale, launching
+[16:12] a partnership around private, taking your MCP gateway and putting it on a private network.
+[16:18] Join us if you're here.
+[16:20] And yeah, happy to take questions.
+[16:25] Go ahead, Cameron.
+[16:30] I had one question on, say you were using an agent that is being governed by the
+[16:42] control plan that we were talking about and you disagree with the decision that it came
+[16:48] to to deny that action, how would you design that?
+[16:53] Yeah, that's a good question.
+[16:55] I think, you know, probably the first most important thing is that you do have a way
+[17:01] to see what decisions were taken.
+[17:04] So in most companies today when people are using, you know, let's just say cloud from
+[17:09] philanthropic and connected to all the systems as it's accessing these systems.
+[17:13] There's really no record of those decisions taken.
+[17:16] And so even if you disagree that, hey, this user shouldn't have been able to access, let's
+[17:20] say your CRM, you can't go back and actually say that has happened for sure.
+[17:26] Secondly, you do want a way to escalate your user when that happens so you can actually
+[17:31] decide if you want that to be passed through or not.
+[17:34] So those, I would say, they're kind of more fundamental missing pieces.
+[17:38] If you have that in place, you can always go update a policy to actually allow that
+[17:41] to happen.
+[17:42] Yeah, go ahead.
+[17:45] Although there are 56% without policies, I'm curious who's buying because a regulator
+[17:54] forced them versus something broke.
+[17:57] Like, what moves the budget?
+[17:59] Yeah, that's a good question.
+[18:00] Something we think about a lot.
+[18:02] I would say compliance is a really good driver for people to think about getting a solution
+[18:08] in place.
+[18:09] But I think the reason, what I want to leave you with is that you don't necessarily, you
+[18:15] know, buying a product is to fulfill compliance.
+[18:19] But the first thing you need to do is kind of understand what is actually happening in
+[18:23] your business first.
+[18:24] So I would say compliance is a great driver of budget when there is an incident that often
+[18:29] or raises the priority of something like this.
+[18:34] Go ahead.
+[18:35] Do you mask PII or the logs that come through your control plane?
+[18:40] We do.
+[18:41] We do everything from blocking, masking, to redacting PII.
+[18:47] What we've found in most businesses,
+[18:49] when you turn on observability
+[18:51] and you look at everything going through the agents,
+[18:53] there's a ton of PII going through.
+[18:55] So if you are going to kind of block on PII,
+[18:57] you'll probably grind your business to a halt, right?
+[19:00] It's just, it's hard for people to not use agents with PII.
+[19:05] I think the more important thing to look at
+[19:07] is what is happening to that PII.
+[19:09] So like what's the intent for the agent?
+[19:10] Is it going to post it in a public select channel,
+[19:13] send it by email, put it back into a tool call
+[19:16] to another system?
+[19:17] Those are the kind of policies we try to recommend people
+[19:21] to use observably to define rather than just kind of blocking
+[19:26] of blocking or enacting all PII together altogether.
+[19:54] It's getting a little into the details of how we deploy, but we do deploy software in a few different ways.
+[20:02] We do offer a data plane option where it runs in your own VPC, so data stays with you.
+[20:08] But the more common option that customers do is they bring their own encryption keys.
+[20:12] So we do encrypt data, but you bring your own keys so you can govern it yourself.
+[20:19] And yeah, customers often will go into kind of our product and look at what is all the
+[20:25] PII that happened, at least look at it from the perspective of like all the findings,
+[20:30] even if they're not looking at the redacted data itself.

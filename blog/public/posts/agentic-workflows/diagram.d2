@@ -1,0 +1,16 @@
+direction: down
+source: "docs-review.md"
+compile: "gh aw compile"
+lock: "docs-review.lock.yml"
+runner: "Actions runner"
+linters: "Vale + Lychee + Codespell"
+agent: "coding agent (read-only)"
+safe: "safe outputs"
+comment: "PR comment"
+source -> compile: frontmatter + prompt
+compile -> lock: Actions YAML
+lock -> runner: pull_request trigger
+runner -> linters: deterministic pass
+linters -> agent: findings as ground truth
+agent -> safe: proposed output
+safe -> comment: max 1

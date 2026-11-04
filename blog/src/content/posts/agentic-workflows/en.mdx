@@ -1,0 +1,117 @@
+---
+title: "Agentic workflows: who picks the next step"
+description: "What an agentic workflow is, how it differs from an agent, what GitHub, Elastic and Pyrefly learned, and why a 30-second keepalive wastes money."
+lang: en
+key: agentic-workflows
+term: "agentic workflows"
+kind: explainer
+pubDate: 2026-11-04
+tags: ["agentic-workflows", "github-actions", "ci", "agents", "prompt-caching"]
+hook: "scene"
+cover: type
+tldr: ["Run linters first. The LLM only checks what has no rule", "An agent in CI runs with read permissions and writes only through safe-outputs with a max", "On Claude, ping the cache every 4 minutes, not every 30 seconds"]
+hero: /posts/agentic-workflows/hero-en.jpg
+diagram: /posts/agentic-workflows/diagram.svg
+sources:
+  - { title: "What I've learned designing agentic workflows for docs", url: "https://passo.uno/agentic-workflows-for-docs", date: "2026-05-11" }
+  - { title: "GitHub Agentic Workflows are generally available", url: "https://github.blog/changelog/2026-10-28-github-agentic-workflows-generally-available", date: "2026-11-03" }
+  - { title: "Agentic Workflow's Cache Keepalive Costs 8x Too Much", url: "https://blog.mempko.com/keeping-the-kv-cache-warm-measuring-prompt-cache-eviction-across-anthropic-openai-and-google", date: "2026-07-22" }
+  - { title: "Type Checking in Agentic Workflows – Conner Nilsen – PyCon US 2026 Typing Summit", url: "https://pyrefly.org/blog/type-checking-agentic-workflows", date: "2026-06-12" }
+  - { title: "What are Agentic Workflows? | IBM", url: "https://www.ibm.com/think/topics/agentic-workflows", date: "" }
+  - { title: "What Are Agentic Workflows? | Salesforce", url: "https://www.salesforce.com/agentforce/agentic-workflows", date: "" }
+opinion: "We think agentic workflow is one of the few terms from the current wave that actually changes day-to-day work: it forces you to decide where the model judges and where it doesn't. Every place we replaced an LLM call with a rule came out cheaper and more reliable, so our default is code, and the model gets a node only when there's no other choice. The real value isn't in the draft the agent writes but in the loop that checks it: linter, test, schema, human. We don't buy the quotes about 29 hours a week and 91% of commits without seeing how they were measured. An experiment like Pyrefly's, with a success rate and a step count, is worth more to us than ten customer quotes."
+madeWith: { model: "claude-opus-5-5", sourceCount: 6, reviewedBy: "Koby Almog" }
+---
+
+May 2026. Fabrizio Ferri-Benedetti, a tech writer at Elastic, wires three boring tools into the docs CI: Vale for style, Lychee for broken links, Codespell for typos. On top of them he adds an LLM step. It pulls the right product facts from the docs MCP server and checks only what the dumb tools can't. All of this runs on GitHub Agentic Workflows, a GitHub Next project that wasn't GA yet. His verdict: "mostly works, with caveats".
+
+On October 28, GitHub made it GA. The announcement quotes Accenture: down from about 11,000 production errors a day to under 1,000, with AI writing 91% of the team's commits. Their numbers, on their team, with no word on how they measured. But they do explain why everyone brings up the term at every standup.
+
+## Where it came from, and what it isn't
+
+Andrew Ng pushed the term in March 2024, in a talk at Sequoia and a series of letters in The Batch. He proposed four patterns: reflection, tool use, planning, multi-agent. And the number that made people listen: GPT-3.5 inside a loop hit 95.1% on HumanEval, versus 67% for GPT-4 in a single attempt.
+
+In December 2024, Anthropic sharpened it in the post Building effective agents. A workflow is an LLM and tools orchestrated by code along predefined paths. An agent is a system where the model decides the path and the tools on its own.
+
+The question is who picks the next step. In a script, the code does. In an agent, the model does. In an agentic workflow, the code holds the path, and the model gets judgment only at specific nodes: classify an issue, figure out why CI failed, decide whether an API change breaks something in the docs.
+
+What it isn't: it's not "AI that works without humans". IBM and Salesforce write about "minimal human intervention". In practice, what GitHub shipped as GA is built the other way: the agent runs with read permissions, and every write to the repo goes through predefined safe outputs. One more thing: if you can write the path as if/else, it's not an agentic workflow. It's a script, and that's better.
+
+<figure><img src="/posts/agentic-workflows/v1-svg-en.jpg" alt="The difference isn't how much AI is inside, but who picks the next step. At Elastic the code picks, and the model judges at one node (Ferri-Benedetti)" loading="lazy" /><figcaption>The difference isn't how much AI is inside, but who picks the next step. At Elastic the code picks, and the model judges at one node (Ferri-Benedetti)</figcaption></figure>
+
+## What it looks like on GitHub: Markdown that compiles to YAML
+
+You write the workflow in natural language in a Markdown file, with frontmatter for the trigger, permissions and tools. `gh aw compile` turns it into regular Actions YAML, so it runs on the runners and policies your org already has. The engine is Copilot, or another coding agent you bring.
+
+```markdown title=".github/workflows/docs-review.md"
+---
+on:
+  pull_request:
+    paths: ["docs/**"]
+permissions:
+  contents: read
+  pull-requests: read
+engine: claude
+tools:
+  bash: ["vale", "lychee", "codespell"]
+safe-outputs:
+  add-comment:
+    max: 1
+---
+
+# Docs review
+
+1. Run vale, lychee and codespell on the changed files. Treat their output as ground truth.
+2. Review only the changed files for what those tools cannot catch: wrong product facts, broken steps, missing prerequisites.
+3. Do not repeat findings the tools already reported.
+4. Post one comment with at most 5 findings, each with file and line. If nothing is real, say so in one line.
+```
+
+Then:
+
+```bash title="terminal"
+gh extension install github/gh-aw
+gh aw compile
+git add .github/workflows/docs-review.md .github/workflows/docs-review.lock.yml
+```
+
+Two things in this file do most of the work. `max: 1` limits the agent to one comment, not fifteen. And line 3 of the prompt tells it not to repeat what the linters already found. Without it, you get a PR flooded with comments about commas.
+
+<figure><img src="/posts/agentic-workflows/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/agentic-workflows/src2.jpg" alt="GitHub didn't build a new platform. It put agents into the Actions you already have: same runners, same permissions (credit: GitHub Changelog)" loading="lazy" /><figcaption>GitHub didn't build a new platform. It put agents into the Actions you already have: same runners, same permissions (credit: GitHub Changelog)</figcaption></figure>
+
+## Elastic's example: dumb robots first
+
+Ferri-Benedetti explains why he mixes the two kinds:
+
+> Mixing dumb robots with smart ones […] helps reduce false positives while ensuring complete scan coverage at the same time.
+>
+> — Fabrizio Ferri-Benedetti, passo.uno, May 2026
+
+The deterministic tools give full coverage: every file, every link. The LLM filters noise and catches what has no rule. Each side closes the other's gap.
+
+So just hook every checker you have into the agent? Not quite. Conner Nilsen from the Pyrefly team presented an experiment at PyCon US 2026: agents solving tasks with and without a type checker. In a codebase with high type coverage, the success rate rose from about 80% to 84%, with fewer steps and less time. In a codebase with low coverage, no improvement. The agent started fixing imports and type signatures in neighboring code instead of solving the task.
+
+> **My take:** This is the most useful finding I read this year on agentic workflows. A noisy deterministic tool isn't more context. It's an alternative task the agent will happily do instead of yours. Before you hook a linter into a workflow, clean it until it outputs zero on main.
+
+## The pause that eats the cache
+
+Another problem you don't see in the demo. The workflow sends a request, then waits: for a build, for tests, for a human to approve. Ten minutes. The prompt cache is already dead, and the next request pays full price on a huge prefix. A cache hit costs roughly a tenth of the input price, so the difference shows.
+
+The usual fix is a keepalive: resend the same prefix every 30 seconds to refresh the TTL. mempko actually measured this, on Anthropic, OpenAI, Gemini and DeepSeek, three runs with a timestamp on every call. The result: 30 seconds is 8x too often. The right interval is about 4 minutes, which fits Anthropic's default 5-minute TTL. And on a ten-minute pause, only one provider out of four saved money with a keepalive: Anthropic. On DeepSeek it buys latency, not money. On OpenAI and Gemini it buys nothing.
+
+In short, keepalive is a per-provider decision. Workflow on Claude, waiting on a long CI? Ping every 4 minutes. On OpenAI or Gemini, skip it.
+
+<figure><img src="/posts/agentic-workflows/src4.jpg" alt="The cache goes cold within minutes, and the agent waits on the build longer than that. A 30-second keepalive pays 8x for the same result (credit: mempko)" loading="lazy" /><figcaption>The cache goes cold within minutes, and the agent waits on the build longer than that. A 30-second keepalive pays 8x for the same result (credit: mempko)</figcaption></figure>
+
+## What to try this week
+
+- Pick one task that repeats on every PR and that a human does by eye today: issue triage, CI failure analysis, docs review. Just one.
+- Write the deterministic part first. Anything a linter, schema or test can check, they check. The LLM gets only the remainder.
+- Make sure those tools output zero on main before the agent sees them. Otherwise it will work on them instead of the PR.
+- Permissions `contents: read`, and every output through `safe-outputs` with a `max`.
+- Measure in the first week: how many comments were closed as false positives, how many review minutes were saved, what a run costs.
+- Long wait in the middle and the model is Claude? Keepalive every 4 minutes. Not 30 seconds.
+
+If you can't point at the node where the model judges and say why it's there, you don't have an agentic workflow. You have an agent with YAML around it.

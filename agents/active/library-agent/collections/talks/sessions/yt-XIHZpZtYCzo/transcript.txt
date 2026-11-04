@@ -1,0 +1,303 @@
+[0:00] Good afternoon everybody. I know this is one of the last talks of the afternoon so hopefully
+[0:19] people got some energy left. My name is Nikhil. I lead forward deployed engineering here at
+[0:23] factory. And this episode of agents and infrastructure is basically came out
+[0:31] of like notes from the field. And so we really believe that Deployed
+[0:37] Engineering is part of the sensory nervous system of an engineering org.
+[0:42] And essentially it's trying to figure out for our most complex customers what's
+[0:48] difficult, what do we need to build, and use that to kind of inform our product
+[0:52] strategy.
+[0:54] And the customer in question today
+[0:57] is going to be Blackstone.
+[0:58] Some of you may have heard of them.
+[1:00] They're a tricky little large financial institution,
+[1:03] trillion dollars in assets, and kind of represent
+[1:06] this kind of like fractally complex enterprise, right,
+[1:09] where they have a lot of regulations,
+[1:14] have a lot of security constraints,
+[1:16] and are really, really opinionated
+[1:18] about how to deploy non-deterministic software
+[1:21] in their environments.
+[1:23] And it's really one of those scenarios
+[1:26] where none of our defaults worked.
+[1:28] It's kind of like they couldn't run agents in their laptop.
+[1:34] They wanted to bring their own compute and their own inference,
+[1:37] their own identity, and single tenant everywhere.
+[1:40] And I think I realize now that I should probably pause
+[1:43] and probably explain a little bit about what we're doing
+[1:45] just to make sure that in case nobody knows.
+[1:49] But we bring autonomy to software engineering.
+[1:52] We're in the business of doing that
+[1:55] by our coding agents named Droid
+[1:57] and using that to compose software factories.
+[2:00] And so you can imagine this requires a lot of permissions.
+[2:03] And that is a particularly tricky thing to do
+[2:06] when the thing we were trying to do with Blackstone
+[2:09] is basically doing delegation.
+[2:11] So you can imagine through Slack or through Jira
+[2:14] through your client of choice, basically saying,
+[2:18] assigning something to Droid.
+[2:19] And Droid is the name of our agent.
+[2:21] And so Droid going off and completing a task, saying,
+[2:25] OK, I want to assign the Jira ticket to Droid.
+[2:27] It'll come back to you with a PR.
+[2:29] But I think that things get complicated
+[2:32] when you have all these constraints of an enterprise.
+[2:36] The two fundamental questions that
+[2:38] kept coming back again and again is, who is an agent acting
+[2:42] on behalf of, and where does it run?
+[2:45] It is, especially because so many of agentic products,
+[2:49] let's say, over the last year, 18 months,
+[2:52] were able to piggyback off of our individual identities.
+[2:56] So maybe you spun up a sandbox, and it just had
+[2:59] your identity attached to it.
+[3:00] And it was able to use the permissions that
+[3:04] were attached to that sandbox.
+[3:05] But ultimately, we really think that that is,
+[3:11] was a kind of temporary idea, because ultimately,
+[3:14] agents can't just keep borrowing your identity.
+[3:17] And ultimately, they're just applications.
+[3:19] Agents are basically just slightly
+[3:22] non-deterministic applications.
+[3:23] And we don't need to reinvent the wheel here.
+[3:25] We were doing this for maybe decades of software engineering.
+[3:29] And it's about using the same systems of the past,
+[3:32] but maybe slightly repositioning them for the future.
+[3:35] And so another thing at this conference,
+[3:40] There's plenty of people offering agent sandboxes.
+[3:44] Maybe some of you want to run them in EC2 fleets.
+[3:47] And we just found that this problem of combination
+[3:51] of where does an agent run and who is running as
+[3:56] was coming up again and again and again.
+[3:59] And we found that even in the middle of our engagement
+[4:02] with Laxone, we were going to go with one of these providers.
+[4:05] But then they changed some key constraints
+[4:08] that meant that we wanted to maybe move to an EC2 machine.
+[4:10] And this just kept coming up to our customers again and again,
+[4:14] where it is like somebody wants to run it on Kubernetes,
+[4:16] somebody wants to run it on EC2, or G Cloud, or whatever it is.
+[4:20] And we just needed a way to kind of organically move our product
+[4:24] to each one of these things.
+[4:25] And in the past, we had a bring your own compute product.
+[4:32] But what we found is that just installing an agent
+[4:35] on a piece of computer was insufficient,
+[4:38] because that means that our customer still
+[4:40] needed to deal with the compute lifecycle.
+[4:42] It turns out that's a pretty complex problem.
+[4:44] So what we came up with was Open Compute.
+[4:47] Open Compute is a to-be-open-sourced project
+[4:51] that is basically trying to abstract the compute lifecycle
+[4:55] for any agent.
+[4:57] That is, we obviously build this for Droid,
+[4:59] but the idea is that this should be
+[5:01] able to work for any arbitrary agent
+[5:03] in your customer's environment.
+[5:06] And this is a really important idea for us,
+[5:09] because one of our key differentiators
+[5:12] is that we care deeply about building you
+[5:15] a custom-filled suit to deploy our product in your environment
+[5:19] on your terms.
+[5:20] So that means your security constraints
+[5:23] on the compute of choice and totally in your VPC
+[5:26] without it ever leaving your environment, right?
+[5:28] Where as much as possible is on your terms.
+[5:32] So this gets you a lot of the advantages of what
+[5:35] maybe an on-prem deployment could give you
+[5:37] without also having the pain of also having to port over
+[5:41] your control layer.
+[5:42] Like if you think about in the previous world,
+[5:43] you would have your data plane and your control plane.
+[5:46] And this is kind of an emergent idea of a compute plane
+[5:48] really needs to be spun out into its own thing for agents.
+[5:51] So what you end up with is this kind of pattern.
+[5:55] I mean, this is just an example, a simplified pattern.
+[5:58] You have maybe a client of some kind.
+[6:01] you have maybe you're delegating from a third party of some kind.
+[6:06] And you basically talk to our back end,
+[6:09] which has these two concepts of a compute gateway and a relay.
+[6:13] And the compute gateway kind of tells
+[6:18] this open compute driver to say somebody
+[6:21] wants to start a new session, which
+[6:24] spins up compute in their VPC, which
+[6:26] could be kind of your micro VM of choice.
+[6:28] It could be in EKS.
+[6:30] It could be EC2.
+[6:31] And then that sandbox is the machine that actually
+[6:36] talks to the relay, which talks to the client.
+[6:38] That was a lot of words.
+[6:39] So let's do that real slow.
+[6:41] So let's say you're an agent.
+[6:45] So let's say you're a client, which could be our CLI,
+[6:48] which could be our product.
+[6:50] It could be, frankly, one of your products.
+[6:52] And you have something that says,
+[6:55] I want to start a new agent session.
+[6:57] And so that session talks to our back end and says,
+[7:02] so that request talks to our back end and says,
+[7:05] I want to get compute to start this new session.
+[7:10] And so we go to our compute gateway,
+[7:12] which is also an abstraction of like,
+[7:14] maybe we're using open compute to get compute,
+[7:17] but maybe we're also using a sandbox.
+[7:19] So it's another abstraction to make
+[7:21] this even clearer to say, OK.
+[7:23] And now this gateway is going to say,
+[7:25] I'm going to talk to open compute,
+[7:27] which already has an open connection to the control
+[7:34] plane of the OpenCompute application in the customer's
+[7:37] VPC, and says, hey, I want to create a new computer.
+[7:42] And so what OpenCompute is going to do,
+[7:44] this controller is going to do, and is going to say,
+[7:48] I'm going to talk to this idea of a driver.
+[7:50] A driver is a wrapper for a given kind of compute.
+[7:55] So this could be, you can imagine,
+[7:56] one driver for EC2, one driver for Kubernetes,
+[8:00] where your pod lives.
+[8:01] It could also be maybe for a sandbox provider
+[8:03] like Daytona or modal.
+[8:05] So it is an abstraction that could wrap around your compute
+[8:11] layer of choice.
+[8:12] So Open Compute would talk to your driver of choice,
+[8:15] in this example, an EC2 machine, an EC2 driver,
+[8:17] and say, I want a new EC2 machine.
+[8:20] So then we spin that up.
+[8:22] And then we connect that EC2 machine that reaches out
+[8:27] to what we call our relay, which is something in our control
+[8:31] plane, and keeps an open web socket.
+[8:33] So and this is kind of actually an important idea,
+[8:35] because one thing that we hear from customers all the time
+[8:38] is that they're very kind of nervous about ingress,
+[8:41] but less nervous about egress.
+[8:43] So basically, what we promise in the system
+[8:46] is that once set up, we never need
+[8:48] to make an inward connection.
+[8:50] It's always the customer that's making an outward connection
+[8:52] and establishing WebSocket connection.
+[8:56] Excuse me.
+[8:56] So essentially, so once there's a new EC2 machine
+[9:02] that is going to be where our agent daemon starts,
+[9:07] it's going to establish a open connection to our relay.
+[9:11] And then when you have our CLI or in Slack or our web
+[9:17] application, when you send a hello world,
+[9:19] it's going to go to our relay, which is able to relay this,
+[9:23] like literally relay this information, this request,
+[9:26] to the sandbox.
+[9:28] And they are able to kind of have a back and forth.
+[9:31] And to kind of like just kind of close out this idea,
+[9:34] in this particular example, we can assume
+[9:36] that the actual LLM call could be established
+[9:40] with like a BYOK situation where, let's say, a company.
+[9:43] I mean, this is kind of only relevant for, I'd say,
+[9:45] fairly mature engineering organizations, which
+[9:48] may already have a deal with one of the labs.
+[9:50] So they can bring their own key, and you
+[9:52] can imagine a bedrock situation or something like that
+[9:55] to do your LLM calls.
+[9:56] So even that stays within sight of VPC.
+[9:58] So in this way, without having a deploying factory entirely
+[10:03] on-prem, where you need to have each one of these pieces
+[10:07] loaded in your environment, you're
+[10:09] able to get the most of what you get from that,
+[10:12] of the control of the non-deterministic part of the agent
+[10:14] loop.
+[10:15] and you're going to feel like you have full observability
+[10:18] and controllability and make sure that the blast radius
+[10:21] of anything that you think is too spicy for an agent to do
+[10:25] is going to be contained inside a customer's VPC.
+[10:28] And this is, I mean, we've seen, I'd say,
+[10:31] pretty significant success with this,
+[10:33] just because this kind of gets you really far
+[10:37] in gaining trust in a customer relationship.
+[10:42] We believe that also kind of long term,
+[10:44] that owning your sovereign is going to become a more and more important idea.
+[10:48] And I think that that's often talked about with respect to models,
+[10:51] but I think that the entire stack is something that eventually large enterprises
+[10:55] are going to want to own.
+[10:56] And so you can imagine us building out components to make it easy for a company
+[11:03] to do all of that on their own terms, which is everything from owning their own EVAS,
+[11:07] owning their own model, to owning their own compute layer,
+[11:10] to also hosting the product in their VPC, in their environments,
+[11:16] and being able to tell the entire story on their terms.
+[11:20] So basically, in a few weeks, we plan to open source this.
+[11:26] And I think that it's going to be useful for people
+[11:28] just because the abstractions have nothing to do with factory.
+[11:32] They're to do with managing compute
+[11:34] and being friendly for an agent to interact.
+[11:39] right so it is the unit of work is a computer so you can imagine all the kind
+[11:45] of classical things that you would want to do in a compute lifecycle which is
+[11:47] you know being able to pause and resume destroy and start and all of this is
+[11:54] based off of like templates that you can control in terms of you know what you
+[11:59] install and what shy you can have like basically snapshots of you know the
+[12:04] the exact requirements of your build, your containers of choice.
+[12:09] And so what you see here is kind of like the spec of what our factory compute gateway calls.
+[12:16] Like this is like the abstraction that you need to kind of confer to if you're interested in this pattern.
+[12:23] And again, a fairly standard pattern of what you do in a sandbox is to suspend or create a snapshot or to fork.
+[12:30] And especially the fork is a really important idea because you can imagine,
+[12:34] especially as fleets of agents and swarms of agents are gaining steam,
+[12:39] I think that one session delegating to another and having sub-agents and sub-agents and sub-agents,
+[12:44] this is a fractal idea, means that being able to save a snapshot, fork it,
+[12:49] and hand off a subtask of your problem to another agent is going to be a really important pattern.
+[12:56] So, yeah, snapshotting is also going to be really important.
+[12:59] And we also plan for this to be another thing that a customer can own.
+[13:05] So we've talked a lot about compute, but you can also imagine being able to save
+[13:10] snapshot in S3 or your database of choice.
+[13:14] And eventually also being able to hydrate it with secrets in your secret store of choice.
+[13:18] So giving customers the optionality to hydrate their compute layer however they want and
+[13:26] wherever they want.
+[13:27] And so, yeah, drivers are basically this idea of the different compute stories.
+[13:34] Let's see, yeah.
+[13:35] And I think that an important idea here is that this is a project to manage computers
+[13:44] and not sessions.
+[13:45] And I think that was a really important idea for us because the moment you tie in the idea
+[13:49] of a session, and by session I don't mean like a web session, I mean like a factory back
+[13:54] and forth, like a factory session, is that you get tied into, it becomes like factory
+[14:00] specific where I think that that makes it harder for a customer to feel comfortable
+[14:05] with hosting that software.
+[14:07] Whereas this is like eventually going to be open source and a totally like abstract concept
+[14:11] that they could use for products beyond factory.
+[14:16] And I think just to give an idea of like the kind of complexity that this solves, like
+[14:20] in dealing with compute lifecycle,
+[14:25] you might fire off a request saying,
+[14:28] I want to start a new session.
+[14:31] And maybe that AWS says that I received your request,
+[14:37] but it never acts with the new sandbox of sorts.
+[14:41] Maybe mid-session, one of your requests is dropped
+[14:45] and you don't get an act back.
+[14:45] Just something to manage the bookkeeping of,
+[14:49] did I start a sandbox for you?
+[14:52] What was it called?
+[14:53] How do I route requests from a given user to a given sandbox?
+[14:58] And just being able to retry to make sure that the client and the sandbox
+[15:04] understand where they are in a given conversation
+[15:06] and just do that bookkeeping for you.
+[15:09] And I think that you can imagine that this is,
+[15:13] I mean, managing arbitrary compute is a fairly complex problem.
+[15:17] I mean, one example is the fact that MicroVMs and AWS have an eight-hour session cap.
+[15:24] And one of our products is Missions, which can run for multiple days of multi-agent orchestration.
+[15:31] And so how do you save a sandbox with a snapshot and rehydrate a new one and kind of swap in place as if nothing happened?
+[15:41] It's pretty difficult problems.
+[15:43] and some of the stuff that we've had to slog through.
+[15:49] And additionally, while this has been in private preview,
+[15:53] how do we actually communicate this idea while it's not open source?
+[15:57] So versioning Terraform and sharing these Terraform packages
+[16:00] to help folks stand it up has been interesting.
+[16:05] And yeah, I think that another interesting thing
+[16:09] that came out of the way this problem was defined
+[16:12] is that if you can just kind of provide the spec to Droid
+[16:17] and just say, just make me a driver that fits the spec.
+[16:21] And it kind of like is its own test.
+[16:24] Like if something can, it's almost like a,
+[16:27] it's a very good version of test-driven
+[16:28] and spec-driven development where if it satisfies
+[16:31] this given spec, it's basically ready to go.
+[16:34] So it's very easy to kind of contribute new drivers
+[16:36] and add new kind of compute types
+[16:38] so this can just kind of keep getting more and more flexible
+[16:42] over time.
+[16:43] But yeah, I mean, ultimately just to kind of close out, agents shouldn't care where they
+[16:49] run.
+[16:50] This is, I think, something that comes up for people again and again.
+[16:54] And this is the way we solve it at Factory and how we are able to give a really high
+[17:00] level of flexibility to our deployments for our customers around the world.
+[17:05] And that's all.
+[17:06] 
+[17:12] Thank you.

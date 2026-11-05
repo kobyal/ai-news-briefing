@@ -1,0 +1,550 @@
+[0:00] I've spent my career in commercial software development.
+[0:06] I've had occasional encounters with the military or government world.
+[0:12] I remember working on a project at Lockheed way back in the day.
+[0:16] Does Lockheed still exist?
+[0:19] Yes?
+[0:20] Okay, good.
+[0:22] I'm glad I didn't sink them.
+[0:23] so some of the things that I've was hearing this morning were outside of my usual sphere of
+[0:34] concerns but much of what I heard was was spot-on and the the constraints are very similar
+[0:44] and I also solved a a long-term puzzle the way my brain works is I'll take a problem and I'll
+[0:53] stick it in the back, and I'll turn on that, and sometimes the answer comes within minutes,
+[0:59] sometimes it's months, sometimes it's years or even decades.
+[1:03] And so at the end, I'm going to reveal a refinement of an idea that I've been working on for 10 or 15 years
+[1:15] that I think I cracked this morning as a result of listening to General Whiting.
+[1:23] but I'm just going to leave that out there to make sure that you pay attention to the whole thing.
+[1:28] Is that okay?
+[1:30] By the way, if anybody has questions as we go along,
+[1:35] I'd rather have you raise your hand and ask right away
+[1:39] than sit there and wonder about it.
+[1:44] Asking questions is a form of leadership.
+[1:46] I remember being a freshman in college and we had an experimental discrete math class
+[1:56] and Professor Ken Ross, I still remember him at the whiteboard, was not being terribly clear.
+[2:05] And one day he was a little late coming in.
+[2:07] This was probably three weeks in.
+[2:09] And the whole class was there and we're sitting there and just kind of the glazed eyes,
+[2:15] everybody looking forward, trying not to make eye contact with anybody else.
+[2:21] And finally, somebody said, does anybody know what's going on?
+[2:27] And everybody said, no, no.
+[2:29] We're completely, completely close about what's going on.
+[2:33] And it was such a moment of, ah.
+[2:37] And then Ken Ross came in and we just blasted him.
+[2:42] Just like, nobody knows what's going on.
+[2:44] stop whatever you were going to lecture about please don't explain what was going and it was
+[2:50] great for everybody he ended up writing a very popular discrete math textbook and i would like
+[2:56] to say that our class really had a lot of responsibility for for that happening so um if
+[3:03] you have a question comment please uh please raise your hand we have uh mic runners ready to go go
+[3:11] around. So my name is Kent Beck. I've been coached by Gene Kim who many of you will
+[3:21] know that I ought to introduce myself in the following kind of way. I don't like
+[3:29] it but Gene says so. So I was instrumental in bringing patterns and
+[3:36] that pattern style of thinking to software development.
+[3:40] Programmer testing, programmer testing frameworks,
+[3:45] like JUnit was my original invention.
+[3:48] I refined it with Eric Gamma and it was then copied
+[3:51] a million different ways.
+[3:53] A test-driven development, which is an age-old idea.
+[3:59] I recently found a book from 1957 called
+[4:04] something like digital programming where the distinction between binary computers
+[4:14] and decimal computers had not been worked out yet, which I thought was like,
+[4:19] oh, I guess that must have been a question at some point.
+[4:23] But late in that book, it talks about how do you write programs,
+[4:27] and it talks about you go to the users and you ask them for some check items.
+[4:35] That is, give me some input-output pairs from your domain
+[4:40] and we'll make sure that the computer program matches those input-output items.
+[4:45] And I thought, that's test-driven development right there.
+[4:49] So I can't claim to have invented TDD, but I maybe rediscovered it or something like that and then refined it.
+[5:03] Extreme programming is my baby.
+[5:07] I was one of the signatories of the Agile Manifesto.
+[5:11] I wasn't just one of.
+[5:14] I was the first signatory of the Agile Manifesto alphabetically.
+[5:19] So, and then since then I've spent a lot of time coaching high potential engineers.
+[5:29] I'm deep in the augmented development world.
+[5:36] I'm working with one of the frontier labs, which is its own set of interesting constraints.
+[5:46] I mean, it's one of the first...
+[5:51] I work at the intersection of technology and sociology.
+[5:56] And this is one of the first times when it's not a press play kind of problem
+[6:04] on how a team that's building a frontier model
+[6:09] or building a sequence of frontier models,
+[6:11] how they should actually work.
+[6:12] I'm having to really think.
+[6:14] I'm having to learn a lot.
+[6:15] which I appreciate. So that's my background. I'm coming here to talk to you about craft
+[6:25] and the role of craft in an augmented development world. I always say augmented development
+[6:32] because to me this is still a human process.
+[6:36] at least so far I still have a lot to add to the decisions that the genie is making I call it the
+[6:48] genie because it grants your wishes but it ends up not being what you really wanted just as a
+[6:55] reminder that that's that's the essential relationship here I'm gonna make some requests
+[7:00] I'm going to get something back.
+[7:02] It's going to seem really cool, and then at the end of it,
+[7:06] I'm going to be a little bit disappointed.
+[7:09] So that's how we work together.
+[7:14] I wanted to say I'm not going to bury the lead.
+[7:18] The one thing I would like you to take away from is there's a tendency now
+[7:24] when people talk about augmented development,
+[7:29] where they make a statement like,
+[7:32] now that the genie,
+[7:34] they don't usually call it the genie
+[7:35] because they're not going to be that cynical.
+[7:38] Now that the genie is better at coding than humans,
+[7:43] and I'm calling a balderdash on that statement,
+[7:50] that attitude that just because Genie can create syntactically correct programs
+[7:59] doesn't mean that they're better than a programmer or even that they actually work.
+[8:08] And one of the things I always loved as an autistic person,
+[8:12] that I loved about programming is this binary red-green.
+[8:18] And, oh, that's so relaxing to be able to say, this program doesn't work.
+[8:24] I fix a bug and now it's fixed.
+[8:28] And that's the programs that we get out of augmented development oftentimes just don't work.
+[8:42] They're plausible.
+[8:44] Jeannie's really good at plausible.
+[8:46] but actually working no and uh we've all read these breathless
+[8:55] accounts of well we spent ten thousand dollars in tokens and we got a working c compiler out of it
+[9:05] how amazing is that and then you start digging and you realize that working c compiler
+[9:12] Hello World doesn't actually work. Or there were a few remaining bugs and
+[9:20] every time one of those bugs got fixed three more bugs were introduced. If you
+[9:28] dig a little bit deeper it's close to a C compiler. It's C compiler-ish but it
+[9:37] doesn't actually efficiently compile C programs that then run which seems to my
+[9:44] old-fashioned way of thinking to be the criteria we ought to be using so that
+[9:51] idea that somehow we've just replaced programmers because computers can do what
+[9:57] programmers used to do is simply wrong now maybe someday it will be less wrong
+[10:06] but today it's simply not true.
+[10:09] And that means your relationship as a programmer
+[10:14] or as a manager of programmers
+[10:16] or as a purchaser of software,
+[10:19] if there's a heavy presence of the genie
+[10:25] in the production of some software,
+[10:27] you have to take a cynical view.
+[10:30] You have to take an adversarial view and say,
+[10:33] okay, you say this works,
+[10:36] You made yourself happy, but did you make me happy?
+[10:42] How real is that?
+[10:44] How hard do I have to push?
+[10:47] So the kinds of things that you do as a programmer to make sure that a program works by construction
+[10:56] or that a certain class of bugs is simply not possible, Genie doesn't have those tricks.
+[11:02] So things that you used to be able to infer,
+[11:06] trustworthiness that you used to be able to infer,
+[11:09] you simply can't assume that that's true anymore.
+[11:15] Which, now I've been through a number of cycles.
+[11:20] One of the advantages of losing all this hair
+[11:23] was I've been through enough cycles where people said,
+[11:27] oh goody, we don't need programmers anymore.
+[11:30] And as programmers, it behooves us to think about why they keep trying to get rid of us, kind of at a strategic level.
+[11:41] But also, it's never been true.
+[11:43] You know, because computer programmers are highly technical artifacts,
+[11:53] and we'd love for, say, business people to just be able to speak in plain language to the computer
+[11:59] so that we don't need programmers anymore.
+[12:05] The business people can just state their requirements in plain language,
+[12:08] and the computer will just compute it.
+[12:10] and that of course is the high level description of COBOL,
+[12:16] but that cycle's been going over and over again,
+[12:20] and here we are at the next round of that cycle,
+[12:24] which is why I'm not worried about having a job.
+[12:27] That and because much of my job is coaching,
+[12:30] it turns out that young engineers
+[12:32] make exactly the same young engineer mistakes
+[12:36] that young engineers have been making
+[12:38] since the time of the Romans,
+[12:40] and they can use someone who comes along and says,
+[12:45] yeah, yes, you're kind of weird, but you're definitely not alone.
+[12:50] And you know what?
+[12:51] I've seen worse.
+[12:54] And that's a very soothing thing for a young, nearly overwhelmed programmer to hear.
+[13:01] So that word craft that's in the title of my talk is an interesting word, and I have
+[13:12] a mixed relationship with that word craft.
+[13:17] I've written at least three books which can all be described as craft oriented.
+[13:28] Okay, you're a programmer.
+[13:32] What is it that, like, how can you put your whole self into the act of programming?
+[13:40] And all three of those books are completely obsolete and should be thrown away at this point.
+[13:45] Which is an odd thing to feel towards the end of a career.
+[13:50] But there you have it.
+[13:52] the kinds of activities that we used to use to express craft,
+[13:59] careful naming, careful decomposition of logic
+[14:04] into little pieces that all compose together
+[14:07] to create some larger effect,
+[14:12] indentation, use of white space,
+[14:15] Optimizing program structure for human understanding.
+[14:22] Those aren't decisions.
+[14:27] Those used to be decisions that had a lot of leverage.
+[14:29] Now, they tend to have a lot of leverage over time.
+[14:33] So five years later, someone would come across some code and say,
+[14:37] oh, thank goodness, I can read and understand this,
+[14:40] and they would feel good about it.
+[14:42] those decisions don't have the same leverage that they used to have.
+[14:51] And that's just true.
+[14:52] It doesn't mean that humans don't need to understand code.
+[14:58] I think there's still a lot of leverage.
+[15:00] If I have to choose a system where the humans can read it
+[15:04] and a system where the humans can't,
+[15:06] I'd much rather have a system where the humans can read and understand about it.
+[15:10] But I also have to recognize that that reading and understanding is going to happen in the context of I've got this genie.
+[15:19] It can explain stuff to me if it's not lying to me, which is always an option.
+[15:26] But if it's not lying to me, I'm going to be able to understand this more quickly.
+[15:29] but that that detail oriented which feels so good oh my good you know I'm like how does this go
+[15:41] together and then I realize oh if I inline these things and I extract those things and I rename
+[15:46] these ah then it all becomes clear that moment felt really good to me and there's just not payoff
+[15:54] for that particular moment. Now, craft was, let me say,
+[16:05] from my perspective, that word craft was hijacked by a group of people who wanted,
+[16:15] again, this from my perspective, wanted to go in their little cave and they wanted to be
+[16:20] programmers and it was just them and the computer and they would craft themselves until they were
+[16:28] ready to be finished. And so this is the flip side of my relationship with that word craft was I
+[16:37] really hated that. Oh no, it's not done yet because I haven't finished with my craft.
+[16:44] Well, sometimes if the cost of delay is high, an ugly program that gives you feedback is
+[16:53] exactly the right thing to do.
+[16:57] Some other times if the cost of delay is low, the software is going to live for the next
+[17:04] 20 years, then absolutely that Swiss watchmaker get everything exactly right is going to pay
+[17:12] over time but the idea that as a programmer time doesn't matter compared
+[17:21] to your experience of programming I just I disagree with that strongly and I
+[17:28] didn't like what that side of programming did with that word craft
+[17:36] but we have to recognize now that craft is going to mean something different.
+[17:48] It's still a valid concern. It's still a valid discipline, but it's going to show up very
+[17:57] differently, and I'll talk as I go along more about how I see that change happening.
+[18:06] So let me draw a little bit for y'all.
+[18:18] I've noticed that if you look at my GitHub, so I've been programming augmented development
+[18:27] like back into programming hardcore every day for maybe the last 18 months.
+[18:33] I saw Gene Kim and Steve Yege give a demo, and they were so excited, I thought, I have to get back into this.
+[18:42] And I got to say, I absolutely love programming with the genie.
+[18:48] I've always had bigger ambitions than my technical skill could achieve, and now I can try ridiculously ambitious projects and make a lot of progress.
+[19:01] I didn't say accomplish them because on my GitHub you'll see that there's a name of a project
+[19:10] and then project two, project three, project four because I kept hitting the wall.
+[19:19] I kept getting to that place where I couldn't fix one bug without breaking something else.
+[19:25] And then new project, new project two, new project three.
+[19:30] Now, somehow, never occurs to me to put a one by that new project.
+[19:38] I just assume this time will be different.
+[19:41] This time I'll be able to actually get this thing completed.
+[19:45] But no, I have to release over and over and over again.
+[19:49] So here's how I've come to think about this.
+[19:56] If we look at progress, it took me a while to get to this visualization, by the way.
+[20:08] This is one of those ideas that went in the back of my head and I had to work on for a while.
+[20:11] If we look at progress on features, what we see is it goes fast at first, and then it
+[20:20] goes slower and slower and slower and slower.
+[20:23] And that's the, like, what goes into that dynamic?
+[20:30] What goes on the other axis?
+[20:34] And sometimes I call it optionality.
+[20:37] Sometimes I call it futures.
+[20:39] so it's easy to see futures versus features.
+[20:44] And then I knocked out one of my front teeth
+[20:46] and then I had to call it futures versus features
+[20:49] and it was a really terrible choice,
+[20:51] but then I got the tooth replaced, so now I'm good.
+[20:55] The vicissitudes of age.
+[20:58] So here's what happens.
+[20:59] We always start with a wide variety of things
+[21:03] that we could do, but we have no features.
+[21:07] and then we implement something and we burn some of our futures in order to
+[21:12] realize that feature. At the very least we're gonna have to maintain backwards
+[21:17] compatibility if we add the next feature which will constrain what we can do a
+[21:22] little bit or we'll decide we don't like that first feature and we'll have to take
+[21:27] it out and that again constrains a little bit what we do next. But what
+[21:32] happens next is we burn some more futures in order to get our next feature and then we burn some more
+[21:43] and then eventually we get down to the point where we have no options for change at all because
+[21:52] everything is such a big mess and then that's when I start project two or project three or project
+[21:59] for so now we've made a lot of progress in software development it used to take
+[22:06] us a hundred people ten years to get to this absolute zero state where we can't
+[22:13] make any changes without breaking something else and now with AI I can do
+[22:18] this in the privacy of my own office one person one week and I can make a
+[22:25] complete mess so that's a big productivity enhancer to get to a
+[22:33] project that can't be changed with far less in the way of investment but what's
+[22:39] the alternative what else can we do so that's what I want to create that first
+[22:48] feature it's always going to burn some futures there's nothing you can do about
+[22:54] that but now we have a moment when I was in music school there was a story about
+[23:01] Pablo Casals who was one of the greatest cellists of the 20th century and the
+[23:07] cello is a very physical instrument it's big it moves a lot of air takes a lot of
+[23:12] physical strength to play the cello and Casals had a piece that was a long run
+[23:19] of 16th notes on and on and on and on and someone asked Casals don't you get
+[23:30] tired playing all those 16th notes and he said no I rest between the notes and
+[23:40] for me as a young classical guitar major trying desperately to play fast enough
+[23:47] the idea that there was a between the notes was just mind-boggling now it
+[23:54] turns out Casals never said this the stories made up but it's such a good
+[23:58] story that I have to tell it but here we have a moment we've completed a feature
+[24:04] the genie said okay boss you know the finger guns okay boss I finished that
+[24:13] feature do you want me to implement the next thing and we all have the
+[24:16] opportunity to take a breath and say huh maybe I'm not ready and that gives us a
+[24:27] chance to add back some of the futures and maybe even a little bit more before
+[24:35] we implement the next feature and then again with the finger guns and then
+[24:42] again we can say no I'm going to I'm going to refactor what's there I'm going
+[24:50] to eliminate some duplication I'm going to optimize some of this for for
+[24:58] readability I'm going to throw away what I just did and implement it again in a
+[25:04] different way see if that turns out differently there's a lot of things that
+[25:10] you can do in that moment between features that are going to add value to
+[25:15] the project because the economic value of a project is the sum of the features
+[25:24] that it currently has and the futures all the options that for what it could
+[25:29] do next I can add value by adding to the futures and so this is the trajectory
+[25:37] that I want to create to go back and forth between adding features and
+[25:44] improving the futures of the project. Now the challenge with this is adding
+[25:51] features is a visible legible in that seeing like a state sense. Everybody can
+[25:59] see the progress they want the features the users want the features now they have
+[26:03] it, woo, thank you very much. Futures? Futures is harder to account for. You may
+[26:10] have added to the theoretical value of the software but the the fact that you
+[26:16] could make a change that you may or may not want to make seems like gilding the
+[26:24] lily. Why didn't you just implement the next feature? Well because if I just
+[26:29] implement the next feature I'm going to go down to zero and everybody hates that.
+[26:36] So this is how I think about the challenge of augmented, not just augmented development,
+[26:41] this is the challenge of software development is balancing the investment between the next
+[26:47] set of features and the futures which determine what it is that you can implement next.
+[26:55] the genie involved the whole thing ramps up the timelines are shorter the
+[27:03] opportunity cost you know if you just say yeah implement the next feature
+[27:08] you're gonna get it really fast something like it maybe that works mostly
+[27:16] and if instead you go and future-proof your software,
+[27:24] you remove the sources of error,
+[27:29] it's harder to account for that.
+[27:33] It's not written in any spec that says,
+[27:36] and this will be easier to change in the future.
+[27:40] Nobody seems to ask for that.
+[27:42] They're all looking for that project that gets finished.
+[27:46] Whereas for me, finished, like I don't want to change this software is a failure.
+[27:53] I want to write software that inspires any number of new ideas.
+[28:00] To me, that's more valuable.
+[28:03] But it's harder to write a spec for that.
+[28:05] And I'll talk, I'll get cynical about spec-driven development before this is over, I promise.
+[28:13] So this is the trajectory I'm trying to create.
+[28:19] If you step back from this as a trajectory far enough, you don't notice the back and
+[28:26] forth.
+[28:27] It just looks like the software is getting more features and more options at the same
+[28:35] time.
+[28:37] If you try to, as an implementer, try and actually implement more features and more options at
+[28:42] the same time it turns out that's a bigger problem than fits even into the
+[28:48] combined brain of the genie and the human the more effective strategies to
+[28:53] go back and forth between the two we're gonna make some progress then we're
+[28:58] gonna consolidate we're gonna make some progress and we're gonna consolidate you
+[29:01] can't wipe the knife while you're cutting you have to cut and wipe the
+[29:07] knife and cut and wipe the knife but you have to wipe the knife you know if you
+[29:13] went into a professional kitchen and you said you know you're wiping the knife
+[29:17] and it's pretty much clean already why don't you just stop wiping the knife
+[29:23] then the chef is gonna offer to use the knife on you and then wipe it so you
+[29:30] know the the commercial kitchen has developed these strategies that work out
+[29:35] well and in software development I mean one of the things about extreme
+[29:43] programming that I thought was the the biggest compliment I could have gotten
+[29:46] was this is what really good teams look like in the wild this isn't theoretical
+[29:53] this is an observation of what teams really look like and that's that was my
+[29:59] goal in extreme programming if I if I said anything creative or I said
+[30:04] anything innovative I it was definitely a mistake and I wanted to take it out I
+[30:09] wanted proven techniques but now we have this much more powerful tool that can go
+[30:20] much faster that can create opportunities for feedback faster than
+[30:28] were prepared to gather that feedback or analyze that feedback and the temptation
+[30:36] is there to just let it go full speed ahead. And for me this is dangerous.
+[30:45] Anytime I've tried fully agentic, the dark factory, the dark software factory, and
+[30:53] And the dark doesn't, it's not meant like dark, like evil.
+[30:59] I was kind of hopeful.
+[31:01] The dark software factory, like, oh, I get to finally write evil software.
+[31:05] And no, it turns out that's not what they mean at all.
+[31:08] It's just there's no human involved.
+[31:11] There's no feedback.
+[31:13] And that always goes off the rails.
+[31:16] Always.
+[31:17] It's amazing.
+[31:18] And here's the problem.
+[31:19] It's amazing while it's going off the rails.
+[31:22] the the crash is so entertaining right you're like wow how did you get this much
+[31:30] how did you do this much and and it's still complete crap but there it is so
+[31:40] the challenge for me and my personal practice for the people that i coach for the teams that i coach
+[31:46] is how do you create this space between features
+[31:49] to go back and enhance the futures
+[31:53] of the work that you're doing?
+[31:56] And to do that in this environment
+[31:59] where it's so tempting to just implement the next feature,
+[32:03] the next feature, the next feature.
+[32:11] So the comment is by pacing yourself,
+[32:14] you're giving yourself the chance to form understanding.
+[32:18] And that's exactly right.
+[32:21] The best software that I've worked on
+[32:24] is software where I tried to maximize learning,
+[32:31] which threw off software as a side effect,
+[32:36] as opposed to I'm trying to produce software
+[32:39] and sometimes accidentally I learn something
+[32:42] because I messed up.
+[32:44] Your habits, if you're trying to maximize learning, your habits look completely different.
+[32:50] The pace looks completely different.
+[32:52] You're not afraid to throw stuff away when it gets kind of messy.
+[32:56] This is one of my early experiences working with Ward Cunningham, who was my mentor when I came straight out of school.
+[33:05] The biggest piece of luck I ever had in my life.
+[33:09] Ward invented the wiki.
+[33:14] and we had developed some code.
+[33:19] It did what we wanted to, but it was late in the day.
+[33:24] We felt a little bit like, I don't know,
+[33:27] and he just reached over and turned off the computer.
+[33:30] I jumped out of my skin like, we implemented this stuff,
+[33:35] and it was kind of working,
+[33:36] and we only felt a little bit bad about it.
+[33:39] How could you destroy that?
+[33:41] so I just kind of huffed my way home and came in the next morning and we re-implemented everything
+[33:50] that we had done the entire previous afternoon in about 15 minutes and it was absolutely clear
+[33:57] and we understood it and that was that was the light bulb moment for me this is a learning
+[34:03] process that throws off software as a side effect whereas the temptation in the dark factory
+[34:10] you don't learn anything except at the end you learn how unreliable the genie really is.
+[34:18] But we already knew that.
+[34:20] So why is it that I need to keep learning that?
+[34:23] I don't know.
+[34:26] So that's what I'm trying to create.
+[34:29] This trajectory where futures and features go together in a little bit back and forth.
+[34:38] something I've heard echoes of earlier in the day is a distinction that I want to make that
+[34:48] it's it's coming back this is again one of these advantages slash disadvantages of experiences
+[34:59] is you see stuff and you go like, this again, okay.
+[35:04] And this is the distinction between one-shot development and iterative development.
+[35:13] Sorry about that.
+[35:14] Iterative development.
+[35:17] Sometimes my mouth gets a little ahead of my brain,
+[35:20] or maybe it's the other way around, but here we are.
+[35:23] There is such a temptation in spec-driven development to go down the path of I'm going to write a spec and the genie is going to produce the software and if the spec is good enough, the software is going to be good enough.
+[35:42] And there's a word for that.
+[35:47] That's exactly waterfall development, where it didn't work.
+[35:52] It never worked.
+[35:54] If you go back to the original Winston Royce paper about the waterfall,
+[35:59] there's a diagram with the waterfall.
+[36:03] And it says right there on that page, of course this doesn't work
+[36:09] because decisions you make later are going to inform decisions that you made earlier.
+[36:14] So the next page has waterfall going down and feedback coming up.
+[36:23] But the power of an image is everybody looked at that waterfall and thought,
+[36:29] wouldn't that be awesome?
+[36:31] If I could just write a spec that was good enough,
+[36:34] and then the software would be finished.
+[36:37] And that's what stuck.
+[36:39] That's how careful you have to be when you're explaining things.
+[36:45] What about formal methods?
+[36:48] Great question.
+[36:50] I have enjoyed, so when I was in graduate school,
+[36:54] I was in music school and computer science school every other year,
+[36:59] and I just ended on the wrong year.
+[37:02] So I'm on stage here during the day instead of in the evening.
+[37:06] It feels good to be in a music venue though.
+[37:12] I was a TA for the proof of program correctness class.
+[37:18] So I have those patterns baked into my head and I use them informally all the time to
+[37:26] do some data flow analysis or control flow analysis and define some invariants and so
+[37:33] on but I hadn't done formal proofs until maybe a year ago and a friend introduced me to lean and
+[37:42] lean with the genie and I tried it out. The challenge I have with formal methods is twofold.
+[37:53] One, it still feels like a one-shot process.
+[37:58] I have some formal specification and I want to prove some properties of it.
+[38:06] And I do a whole bunch of work and I prove the properties.
+[38:10] What happens if I change one element?
+[38:14] Oh, I got to wind back.
+[38:16] And even if it's faster because I have the genie helping,
+[38:19] it's still a drag on my ability to change and I want to encourage, I want to build systems
+[38:31] that encourage change instead of discourage change. So that's my first one. And the second
+[38:38] one is even with formal methods, there's still a gap between this mathematical model and
+[38:45] implementation. Okay I can have some formal specification, I can derive some
+[38:50] properties, I can prove those properties hold for this formal specification and
+[38:55] now I want to turn that into a running program. There's still a gap in that
+[39:02] derivation of the program from the formal specification and I don't know how to
+[39:11] bridge that okay I want to turn that into C code I want to turn that into C++ or arm 64 you can you
+[39:20] can program an assembly language now it's so cool it's so I mean that's where I started my dad and
+[39:28] I soldering together a 6800 machine you can do that now you can just say well okay implement
+[39:36] this data structure and do it in x86 assembly I will come some it's amazing
+[39:45] figuring out all the different ways I can torture the genie is just so entertaining okay let me make
+[39:55] this even harder and more awkward so the the second part of the to finish that thought about formal
+[40:05] methods the second part is that bridge that that gap between here's a
+[40:10] specification and here's an implementation that matches that
+[40:13] specification as far as I can tell is something that that hasn't been fully
+[40:19] bridged now the good news is you can get to low defect densities with a
+[40:29] combination of examples automated tests carefully chosen and foolproofing of the
+[40:39] design if if you work at those two things pretty hard you can get software
+[40:46] that is trustworthy unfortunately the genie wants to make shortcuts it
+[40:52] It doesn't want to foolproof the design, and it will do things that subvert the intentions
+[41:00] of test cases.
+[41:03] You have to watch for returning constants.
+[41:06] You have to watch for just all of the nasty things that you can imagine that a 14-year-old
+[41:13] programmer would do just to say, yeah, it works, boss.
+[41:18] So it is possible to write, though, trustworthy program with the genie.
+[41:26] Ah, so I got into that.
+[41:29] One shot versus iterative.
+[41:32] So are you making some software that has value deployed in the world that you then change,
+[41:41] and now it has more value in the world that you then change,
+[41:44] and now it has more value in the world?
+[41:47] that's one paradigm versus the I'm going to write a spec and the specs going to be so good that the
+[41:53] software is going to be good. Oh it's not I'm going to write more of a spec and a bigger spec
+[42:00] and a until the spec is big enough and complicated enough that the software is correct. And
+[42:10] And there's times to do both.
+[42:14] If I'm writing a little app, one shot is fine.
+[42:19] If I'm writing as I am a virtual machine for a graph database with an embedded programming
+[42:25] language, that's not good enough.
+[42:28] It's going to have to be something where I have some software, it has some value, I see
+[42:35] a way to improve it, and so on.
+[42:39] The people who are getting really excited about Spectre of a development just reminds
+[42:45] me it doesn't sound like they've ever had a billion users.
+[42:51] Because the kinds of things that you have to do if you have a really large installed
+[42:55] base and a lot of traffic to change software like one shot and then oh no never mind.
+[43:04] Let me one shot it again.
+[43:05] That's just never going to work because you've got, you have continuity problems, you have
+[43:13] data migration problems.
+[43:16] You're better off assuming that you're going to be iterative all along the way.
+[43:24] Now I said that I was going to show you an update of a diagram.
+[43:32] And I'm excited because anytime I get one of these, I have a puzzle and I can finally solve it, then I'm a very happy person.
+[43:46] So us programmers, I'm a programmer mostly, and so that's the way I speak.
+[43:58] If we want to look at what we do, there's this sequence where as a programmer you put
+[44:09] in a certain amount of effort and then you have a new, say a new feature that you can
+[44:19] deliver to your customers.
+[44:21] And that's output.
+[44:24] And then the customers use that feature and their behavior changes.
+[44:31] After all, if we produce software and nobody's behavior changes in any kind of way, we didn't
+[44:38] need to produce the software.
+[44:41] And that's outcome.
+[44:43] And one of the big changes in my life was moving to the web and being able to observe
+[44:53] what customers actually do with the software.
+[44:56] Before then, you had software on a CD, you'd send it out.
+[45:02] Are people using my new features?
+[45:04] I don't know.
+[45:05] There was no way of knowing.
+[45:06] So just being able to observe outcomes was a big step forward.
+[45:12] How much of what we did was wasted effort?
+[45:15] Because nobody used the feature at all.
+[45:18] but here's what i learned today is outcome for the customers the people using the software
+[45:29] leads to and i used to use the word impact but i love this word mission
+[45:36] leads to changes in our accomplishment of the mission.
+[45:46] And the mission is shared between the people making the program
+[45:51] and the people using the program.
+[45:55] And here's where we get to the tyranny of metrics.
+[45:59] People will be amazed.
+[46:00] The genie produced 200,000 lines of code.
+[46:03] code.
+[46:05] That's a measure of effort.
+[46:06] It has nothing to do with the mission.
+[46:10] And whether the mission is making enough money for my next yacht or I don't have a yacht,
+[46:18] just using that as an illustrative example, or making the country safer, the fact that
+[46:25] we've generated 200,000 lines of code is irrelevant.
+[46:29] 200,000 lines is not 10 times as much as 20,000 lines.
+[46:34] From the mission perspective, it's just irrelevant.
+[46:39] And yet, it's the easiest thing to measure.
+[46:43] And so we look for our keys under the lamppost.
+[46:48] And the genie is able to produce so much output
+[46:53] with so little effort,
+[46:55] it's easy to see that as productivity because after all productivity the very
+[47:03] definition of productivity is the ratio of output to input and whether it's lines
+[47:12] of code which we've known was balderdash for a very very long time and somehow
+[47:19] it's back PR count you anything which is a measure of effort or a measure of
+[47:30] output is per definition not a measure of mission a problem with measuring
+[47:37] mission is it's hard to do oftentimes value from the mission is bursty like
+[47:47] Like you don't see it until a crisis happens and then you realize that you're ready for the crisis.
+[47:53] So it's hard to measure from the level of the mission, but that's what actually matters.
+[48:04] So the fact that the genie can give you a lot of effort and now I can just spin up 10 genies and now I have 10 times as much effort.
+[48:15] Yeah, but it doesn't matter.
+[48:17] It doesn't mean that we're making progress on what really matters to people.
+[48:23] And the earlier in this cycle you measure, the more likely you are to see Goodhart's law.
+[48:35] You know, when a measure becomes a goal, it ceases to be a measure.
+[48:41] I think Goodhart was an optimist.
+[48:44] It's not just that the measure ceases to be a measure.
+[48:48] It's that people will twist the entire system out of shape.
+[48:54] They'll make it worse in order to get better measures.
+[48:59] So it's not that you just lose visibility by turning measures into goals.
+[49:04] It's you lose progress on the mission by doing that.
+[49:10] The later in this cycle you go, the harder it is to attribute, hey, the mission is now 7% better and I own 0.075% of that.
+[49:26] It's hard to say what you did versus what he did versus what she did, like which of us deserves the credit.
+[49:35] And this is the challenge.
+[49:37] we had from earlier today, how do you incentivize progress on the mission?
+[49:47] And I'll close with just a few words about this.
+[49:50] I've had the great good fortune of having a few of my ideas spread out in the world of software development.
+[49:59] And what I know about that process is you have to find an expression of what you're trying to accomplish, of the mission.
+[50:15] You have to find an expression of the mission that speaks to people's heads and their hearts.
+[50:21] And then you have to repeat it.
+[50:24] And repeat it.
+[50:27] And repeat it.
+[50:28] And that repetition, that not getting bored with telling the story of how software development can be over and over again is part of the skill of leadership.
+[50:42] To tell that same story for the thousandth time as if it's brand new.
+[50:48] And then someday, somebody will come to you and say to you, I have this great idea.
+[50:54] and they'll tell you your idea without realizing it was you,
+[51:01] without giving you any credit whatsoever,
+[51:03] and that's the moment that you've succeeded as a leader.
+[51:07] And I think we have these tools that have the capability of transforming
+[51:12] the value we create in the world, and that's the challenge,
+[51:16] is finding those missions into which the tools fit for human purposes.
+[51:24] and I'm looking forward to finding out what comes out next,
+[51:30] to doing my little bit to shape what that is
+[51:33] and to seeing what it is that you do
+[51:35] that also shapes the future.
+[51:37] Thank you so much for your time and attention.

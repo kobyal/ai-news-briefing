@@ -1,0 +1,16 @@
+direction: down
+dev: Developer
+harness: Agent harness
+server: llama-server (--jinja)
+model: GGUF model Q4_K_M
+check: Tool-call schema check
+shell: Sandboxed shell (no network)
+verifier: Task verifier
+dev -> harness: task
+harness -> server: prompt + tools schema
+server -> model: inference
+model -> check: tool call JSON
+check -> shell: valid
+check -> harness: invalid, retry
+shell -> verifier: run tests
+verifier -> harness: reward 0 or 1

@@ -1,0 +1,133 @@
+---
+title: "38% with no internet: what breaks when you run a coding agent on a local model"
+description: "Antigma ran 8 open models on 89 Terminal-Bench tasks with no network. The 27B hit 38%; the 4B broke on tool calls. Here's what to check."
+lang: en
+key: offline-coding
+term: "offline coding"
+kind: warstory
+pubDate: 2026-11-05
+tags: ["offline-coding", "local-llm", "coding-agents", "llama-cpp", "terminal-bench", "air-gapped"]
+hook: "number"
+cover: illus
+tldr: ["Measure invalid tool calls over 50 requests before you pick a local model.", "Run llama-server with --jinja and check that tool calls come back as valid JSON.", "Expect the level top models had 6–8 months ago, not today's."]
+hero: /posts/offline-coding/hero-en.jpg
+diagram: /posts/offline-coding/diagram.svg
+sources:
+  - { title: "Open-weight 27B hits 38% on Terminal-Bench 2.0 (Opus 4.1 hit 38% in Aug 2025)", url: "https://antigma.ai/blog/2026/04/24/offline-coding-models", date: "2026-04-28" }
+  - { title: "From Copilot to agents: The history of AI coding", url: "https://www.coderabbit.ai/blog/a-very-brief-history-of-ai-coding-from-copilot-to-next-gen-agents", date: "" }
+  - { title: "Building an Offline AI Coding Agent: Three-Model Architecture, Context OS, and the Plan.MD Pipeline", url: "https://www.elixirdata.co/blog/building-an-offline-ai-coding-agent", date: "" }
+  - { title: "Coding Agents: What They Are and How They Work | Snowflake", url: "https://www.snowflake.com/en/artificial-intelligence/agents/coding-agents", date: "" }
+  - { title: "What are AI Agents?- Agents in Artificial Intelligence Explained - AWS", url: "https://aws.amazon.com/what-is/ai-agents", date: "" }
+opinion: "We think offline coding now passes the Monday-morning test: a team in a regulated org or on a disconnected network can start a real project today, not an experiment. But we don't buy the 38% as parity. It's where the top models were 6–8 months ago, and you feel it on long tasks. What we do take from this: in a disconnected environment, anything you can turn into a deterministic check — a tool-call schema, tests, a plan a human approves — is worth more than a bigger model. Verification beats generation everywhere, and offline is simply the place where there's no cloud to hide that."
+madeWith: { model: "claude-opus-5-5", sourceCount: 5, reviewedBy: "Koby Almog" }
+---
+
+## 38% on 89 tasks
+
+38%. That's the pass rate a 27B open-weight model scored on Terminal-Bench 2.0, running locally on a single workstation. Anthropic's Opus 4.1 posted the same number in August 2025. So in April 2026, code that isn't allowed to leave the network got what the top cloud models offered 6–8 months earlier.
+
+The story comes from Antigma, a company building a coding agent called Ante. They published it on April 24, 2026, and the setup is documented down to the commit: `terminal-bench-2.git @ 69671fb`, 89 tasks, the same harness in every run. A task only counts as passed if the verifier returns `reward == 1.0`. So 38% is roughly 34 tasks out of 89.
+
+They tested eight models: Qwen 3.6-27B, Qwen 3.5-27B, Qwen 3.5-35B, Gemma-4-31B, Gemma-4-26B-A4B, GLM-4.6V-Flash, Qwen 3.5-9B and Gemma-4-E4B-it. All the GGUF files came from unsloth on Hugging Face, quantized to `Q4_K_M` or `UD-Q4_K_M`, and inference ran on `llama.cpp`. No cloud, no API key.
+
+<figure><img src="/posts/offline-coding/src1.jpg" alt="Same harness, same suite, only the GGUF file changes, so any gap in the table belongs to the model, not the setup (credit: Antigma)" loading="lazy" /><figcaption>Same harness, same suite, only the GGUF file changes, so any gap in the table belongs to the model, not the setup (credit: Antigma)</figcaption></figure>
+
+## The run that failed: a 4B that can't call tools
+
+Two models didn't make the main table at all. GLM-4.6V-Flash and Gemma-4-E4B-it both stayed under 20%. About the 4B, they write that the run was unstable, with "frequent invalid tool calls".
+
+Why is that the most important detail in the whole post? Because it isn't a "the model isn't smart enough to fix the bug" failure. It's a contract failure. The agent expects JSON in a specific shape so it can run a command in the terminal, and the model returns something the harness can't execute. In a 30-step task, every step is a bet on the format, and the task dies long before the model reaches the logic.
+
+That's what offline coding looks like when it breaks. Not a bad answer, but a loop that gets stuck.
+
+<figure><img src="/posts/offline-coding/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/offline-coding/v2-chart-en.jpg" alt="Below 27B it's not a gradual decline but a cliff: the 4B got stuck on invalid tool calls (Antigma)" loading="lazy" /><figcaption>Below 27B it's not a gradual decline but a cliff: the 4B got stuck on invalid tool calls (Antigma)</figcaption></figure>
+
+## From the outside it looks like Opus
+
+The headline that went around was "Open-weight 27B hits 38% on Terminal-Bench 2.0", and if you only read that, you'd think it's parity. Antigma themselves are more careful:
+
+> And for teams that cannot send code and data to external APIs — regulated environments, air-gapped deployments, customer-data-sensitive workflows, or offline laptops — the gap is finally small enough that "run it locally" is a serious engineering option rather than a thought experiment.
+> — Antigma, April 2026
+
+A few lines earlier they say outright that these models are "not at parity with today's best hosted models". They compare it to going from the arcade to the SNES: Street Fighter II at home was less smooth, and people played it for hours because it was always there. The analogy holds. The 38% isn't today's Claude. It's roughly what the cloud had half a year ago, except now it runs on your own GPU.
+
+<figure><img src="/posts/offline-coding/v3-svg-en.jpg" alt="The headline compares to Opus, but it's the Opus of August 2025. Offline buys availability, not today's model (Antigma)" loading="lazy" /><figcaption>The headline compares to Opus, but it's the Opus of August 2025. Offline buys availability, not today's model (Antigma)</figcaption></figure>
+
+## The first fix everyone tries
+
+A team gets an air-gap requirement, downloads a model, wires it into the IDE, and the results disappoint. The first reaction is almost always to swap the model. Bigger if there's GPU to spare, smaller if the machine is choking. And meanwhile, retry again and again with more corrections stuffed into the prompt.
+
+ElixirData, who built an agent that runs entirely inside a disconnected network, have a name for this: the Frustration Loop. Generate code, review it, find it doesn't fit the codebase, regenerate with corrections, review again, and in the end either accept heavily rewritten output or give up. In the cloud you can hide this behind a stronger model. Offline there's nowhere to run.
+
+## The real cause: what the model sees and what it's allowed to do
+
+ElixirData write that the constraint actually forced discipline on them. What drives code quality is less the model and more the context it receives and the plan it works from. Their number: 120x fewer tokens when moving from file-by-file grep to a structured index of the codebase. On a local model, with a limited context window and every token costing time on a single GPU, that's not an optimization. It's the difference between a task that finishes and one that doesn't.
+
+They split the work across three models, Planner, Generator and Completer, and in the middle sits Plan.MD: a document a human reads and approves before a single line of code is written. According to ElixirData, it's the artifact with the most impact on the outcome in the whole system.
+
+Now go back to Antigma's run and the picture fits. The harness was fixed, the suite was fixed, and the gap between 38% and under 20% ran through the model's ability to honor the harness contract. A model that can't emit a valid tool call never reaches the point where good context could help it.
+
+> **My take:** I'd start with the harness, not the model. Qwen changed versions between two rows of the same table, and you'll swap your model again in two months. The tests you write against the contract stay.
+
+## What to check before you pick a model
+
+First, serve the model the way Antigma did: `llama.cpp`, a Q4_K_M GGUF file, and `--jinja` so the model's chat template handles tool calling:
+
+```bash title="serve.sh"
+llama-server -m ./models/model-Q4_K_M.gguf --jinja -c 32768 -ngl 99 --port 8080
+```
+
+Then, before running a full benchmark, measure the contract. This script sends 50 requests with a single tool to `llama-server`'s OpenAI-compatible endpoint and counts how often it got back something your harness couldn't execute:
+
+```python title="toolcall_check.py"
+import json, sys, urllib.request
+
+URL = "http://localhost:8080/v1/chat/completions"
+TOOLS = [{
+    "type": "function",
+    "function": {
+        "name": "run_shell",
+        "description": "Run a shell command in the repo",
+        "parameters": {
+            "type": "object",
+            "properties": {"cmd": {"type": "string"}},
+            "required": ["cmd"],
+        },
+    },
+}]
+PROMPT = "List the Python files in the current directory, then count their lines."
+N = int(sys.argv[1]) if len(sys.argv) > 1 else 50
+
+bad = 0
+for i in range(N):
+    body = json.dumps({
+        "messages": [{"role": "user", "content": PROMPT}],
+        "tools": TOOLS,
+        "temperature": 0.7,
+    }).encode()
+    req = urllib.request.Request(URL, body, {"Content-Type": "application/json"})
+    msg = json.load(urllib.request.urlopen(req, timeout=300))["choices"][0]["message"]
+    try:
+        call = msg["tool_calls"][0]["function"]
+        assert call["name"] == "run_shell"
+        args = json.loads(call["arguments"])
+        assert isinstance(args.get("cmd"), str) and args["cmd"].strip()
+    except (KeyError, IndexError, TypeError, ValueError, AssertionError):
+        bad += 1
+        print(f"#{i}: invalid -> {str(msg)[:120]}")
+
+print(f"invalid tool calls: {bad}/{N} ({bad / N:.0%})")
+sys.exit(1 if bad else 0)
+```
+
+In practice, here's what I'd verify this week:
+
+- **0 invalid out of 50.** Sounds strict, but in a 30-step task even a 3% format error rate gives a real chance something breaks midway. A model that can't meet this doesn't make the list.
+- **The same harness for every model.** Like Antigma: swap only the GGUF file, otherwise you're comparing setups, not models.
+- **Ten to twenty Terminal-Bench 2.0 tasks on your own hardware** before you commit. The 38% was on someone else's GPU.
+- **The network is actually closed.** Run the whole stack in a container with `--network none`. If something tries to pull a tokenizer or template from Hugging Face at runtime, better to find out now than inside the air-gap.
+- **Plan.MD before code** for any task that touches more than one file. A human approves a plan in a minute, and the local model skips ten rounds of the Frustration Loop.
+
+Bottom line: a model that can't hold 50 tool calls without an error won't hold 89 tasks, no matter how many parameters are in its name.

@@ -179,7 +179,7 @@ echo " push=$DO_PUSH"
 #
 # These lines exist so the NEXT slow run is diagnosable from the log alone
 # instead of by digging through `pmset -g log`.
-_PWR="$(pmset -g ps 2>/dev/null | head -1 | sed 's/^Now drawing from //; s/['\''"]//g')"
+_PWR="$(pmset -g ps 2>/dev/null | sed -n '1{s/^Now drawing from //; s/['"'"'"]//g; p;}' || true)"  # no head -1: a SIGPIPE on this pipe (exit 141 under pipefail) killed the 2026-11-06 run before step 1
 _SCHED_WAKE="$(pmset -g sched 2>/dev/null | grep -ci 'repeat' || true)"
 _LAST_WAKE="$(pmset -g log 2>/dev/null | grep -E '\sWake\s+(DarkWake to FullWake|from)' | tail -1 | cut -c1-19)"
 echo " power=${_PWR:-unknown}  repeat-wake-configured=${_SCHED_WAKE:-0}  last-full-wake=${_LAST_WAKE:-unknown}"
@@ -469,7 +469,10 @@ fi
 # 2026-05-12 after that exact afternoon incident — see
 # memory/feedback_same_day_static_pages.md. Gated on DO_PUSH because the
 # build + 30MB S3 sync + /* invalidation aren't useful for local-only
-# --no-push dev runs. fail-soft on build/sync errors so email still ships.
+# --no-push dev runs. Build/sync/data-upload failures ABORT the run (exit 1)
+# before commit + email: a "Done" email for a briefing that never went live
+# is worse than no email (2026-10-31: Mac slept mid-sync, email shipped, site
+# stayed on the previous day). The 05:00 UTC health-check flags the stale day.
 if [ "$DO_PUSH" -eq 1 ]; then
   echo
   echo "[3c/6] Rebuilding Next.js + syncing /story/[id]/ to S3..."
@@ -485,9 +488,14 @@ if [ "$DO_PUSH" -eq 1 ]; then
     # isn't on S3 yet (that skew made pages hang on "Loading…" during the ~8-min
     # sync window). THEN the full sync (with --delete) flips the HTML + removes
     # stale files — by which point every new chunk already exists on S3.
-    aws s3 sync web/out/_next "s3://${S3_BUCKET}/_next" \
+    # --size-only (2026-11-06): every `next build` rewrites all ~62k files with
+    # fresh mtimes, so the default size+mtime compare re-PUT the whole bucket
+    # daily — 2.4M Tier-1 requests = $11.92 of October's $14.29 S3 bill. Hashed
+    # _next/ chunks get new names when they change; HTML that changes content
+    # almost always changes size. Today's new story pages are new keys anyway.
+    aws s3 sync web/out/_next "s3://${S3_BUCKET}/_next" --size-only \
       --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 || true
-    if aws s3 sync web/out "s3://${S3_BUCKET}" --delete \
+    if aws s3 sync web/out "s3://${S3_BUCKET}" --delete --size-only \
          --exclude "data/*" --exclude "audio/*" --exclude "img/*" --exclude "library-assets/*" \
          --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1; then
       # ── ATOMIC DATA PUBLISH ────────────────────────────────────────────────
@@ -506,7 +514,7 @@ if [ "$DO_PUSH" -eq 1 ]; then
             --content-type "application/json" --cache-control "public, max-age=300, s-maxage=300" \
             --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 \
             && echo "  ✓ ${_dst} published" \
-            || echo "  ⚠ ${_dst} upload failed"
+            || { echo "ERROR: ${_dst} upload failed — aborting before commit + email (site NOT updated)" >&2; exit 1; }
         fi
       done
       aws cloudfront create-invalidation --distribution-id "$CF_DIST" \
@@ -538,10 +546,12 @@ print('\n'.join(random.sample(ids, min(5,len(ids)))))" 2>/dev/null || true)
         echo "  ✓ health check passed (${#check_urls[@]} URLs → 200)"
       fi
     else
-      echo "  ⚠ S3 sync failed (frontend not deployed — story pages may 404)"
+      echo "ERROR: S3 sync failed — aborting before commit + email (site NOT updated; re-run the sync + data publish from [3c/6])" >&2
+      exit 1
     fi
   else
-    echo "  ⚠ npm run build failed — see $WEB_BUILD_LOG"
+    echo "ERROR: npm run build failed — see $WEB_BUILD_LOG — aborting before commit + email (site NOT updated)" >&2
+    exit 1
   fi
 fi
 

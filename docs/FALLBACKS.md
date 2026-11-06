@@ -10,7 +10,7 @@ counts so you know which paths are actually keeping the pipeline alive.
 
 | Service | Primary | Chain on failure | Tracked? | Evidence |
 |---------|---------|------------------|----------|----------|
-| Tavily search | `TAVILY_API_KEY` | `TAVILY_API_KEY2` → `TAVILY_API_KEY3` → DuckDuckGo | ✓ | `agents/active/tavily-news-agent/.../searcher.py` |
+| Tavily search | `TAVILY_API_KEY` | `TAVILY_API_KEY2` → `TAVILY_API_KEY3` → Serper (if `SERPER_API_KEY`) → DuckDuckGo | ✓ | `agents/active/tavily-news-agent/.../searcher.py` |
 | Jina Reader | `JINA_API_KEY` | `JINA_API_KEY2` → unauthenticated → Firecrawl → local cache | ✓ | `shared/article_reader.py` |
 | Firecrawl | `FIRECRAWL_API_KEY` | local cache → `failed` (gradient image fallback in UI) | partial | `shared/article_reader.py` |
 | Anthropic API | `ANTHROPIC_API_KEY` | SDK retry (429/500/502/503/529 × 3, 5s/15s/30s backoff) — single key | n/a | `agents/active/merger-agent/.../pipeline.py::_agent` |
@@ -20,11 +20,9 @@ counts so you know which paths are actually keeping the pipeline alive.
 | xAI API | `XAI_API_KEY` | retry only — agent disabled in CI anyway | n/a | single key |
 | Google Gemini (ADK) | `GOOGLE_API_KEY` | `GOOGLE_API_KEY2` (kobytest) — fresh subprocess on quota error → SDK retry only after | ✓ | `agents/active/adk-news-agent/run.py::_run_with_fallback` |
 | Exa search | `EXA_API_KEY` | `EXA_API_KEY2` → empty result | not yet | `agents/inactive/exa-news-agent/.../pipeline.py` |
-| NewsAPI | `NEWSAPI_KEY` | `NEWSAPI_KEY2` → empty result | not yet | `agents/inactive/newsapi-agent/.../pipeline.py` |
 | YouTube Data API | `YOUTUBE_API_KEY` (kobyal) | `YOUTUBE_API_KEY2` (kobytest) on 403/429 → skip | ✓ | `agents/active/youtube-news-agent/.../pipeline.py::_yt_get`, `publish_data.py::_yt_search` |
 | Twitter scrape | cookies (`TWITTER_AUTH_TOKEN` + `TWITTER_CT0`) | xAI agent (if re-enabled) → empty section | partial (logs cookie failure) | `agents/active/twitter-agent/...` |
 | Reddit (via Arctic Shift) | unauthenticated `arctic-shift.photon-reddit.com` | retry → empty `reddit_posts` | no | `agents/active/rss-news-agent/.../feeds.py` |
-| DeepL | `DEEPL_API_KEY` | skip — Reddit/X stay English in `publish_data.py` output | no | `publish_data.py::_translate_deepl` |
 
 ## Details — how each chain works
 
@@ -36,7 +34,8 @@ Flow, see `agents/active/tavily-news-agent/tavily_news_agent/searcher.py`:
 2. On quota / rate-limit error (`limit` / `quota` / `429` / `insufficient` in message),
    `_switch_to_backup()` advances to the next key and retries immediately.
 3. After all backups exhausted and 2 regular retries with 3 s + 8 s backoff,
-   falls back to DuckDuckGo News (`_ddg_search`).
+   falls back to Serper Google News (`_serper_search`, only when `SERPER_API_KEY`
+   is set — 2,500 free queries at serper.dev) and then DuckDuckGo News (`_ddg_search`).
 4. Every rotation calls `fallback_tracker.track("tavily", from_key, to_key, reason)`.
 
 Recent reality: `TAVILY_API_KEY` exhausted at 101% on most days (auto-rotates
@@ -56,8 +55,9 @@ Flow, see `shared/article_reader.py::_fetch_jina`:
 6. If still nothing, mark `source="failed"` — the UI shows a gradient placeholder
    for the image instead of a broken `<img>`.
 
-Rotation events tracked. Today both Jina keys 403 on Bearer headers; the
-unauthenticated path is what's actually keeping article enrichment alive.
+Rotation events tracked. Both Jina keys are out of balance (402) by decision
+(2026-11-06) — the unauthenticated path reads ~30 of ~43 articles/day and
+Firecrawl (key re-synced 2026-11-06, 1,000 free credits/month) takes the rest.
 
 ### Firecrawl
 
@@ -162,38 +162,18 @@ Flow, see `agents/active/rss-news-agent/rss_news_agent/feeds.py`:
 3. On non-200, the affected subreddit returns 0 posts; other subreddits and
    the rest of RSS continue.
 
-### Exa / NewsAPI (two keys, no tracker yet)
+### Exa (two keys, no tracker yet)
 
-Both agents accept `KEY` and `KEY2` env vars and retry on quota errors.
+The parked Exa agent accepts `KEY` and `KEY2` env vars and retry on quota errors.
 Recent reality: both Exa keys returned 403 for a while (revoked or bad);
 the agent produced 0 articles and the merger ran without Exa. Should add
 rotation tracking — see "Where tracking is missing" below.
-
-### DeepL (Hebrew for Reddit + X posts)
-
-Used only by `publish_data.py` to translate Reddit titles + body snippets and
-short X-post descriptions to Hebrew. **Not** used by the per-agent translators
-— those use Anthropic.
-
-If `DEEPL_API_KEY` is missing or exhausted, the Hebrew fields stay empty and
-the UI falls back to showing the **English** source text to Hebrew readers on
-`/community/` (Reddit titles, X-post bodies). Pipeline continues. Free tier
-is 500,000 chars/month; current usage ~16k/day ≈ 480k/month — comfortably
-under.
-
-**Guardrails (added 2026-05-05 after a silent miss shipped English Reddit/X
-titles to HE readers twice in one day):**
-- `local-cycle.sh` exits 1 at startup when `DEEPL_API_KEY` is unset.
-- `publish_data.py` prints `WARNING: DEEPL_API_KEY not set — Reddit/X
-  Hebrew translations will be SKIPPED` so any future miss is visible in run
-  logs, not just at browse time.
 
 ## Where tracking is missing
 
 These rotations work but don't emit tracker events (yet):
 
 1. **Exa key rotation** — `agents/inactive/exa-news-agent/.../pipeline.py`
-2. **NewsAPI key rotation** — `agents/inactive/newsapi-agent/.../pipeline.py`
 3. **YouTube → Google key fallback** — `agents/active/youtube-news-agent/.../pipeline.py`
 4. **Firecrawl success / failure** (silent right now)
 5. **Article cache hit** — not a "failure" per se, but knowing cache-hit rate

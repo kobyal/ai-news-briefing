@@ -3,7 +3,6 @@ import glob
 import json
 import os
 import re
-import smtplib
 import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -205,6 +204,7 @@ def _check_apis() -> list[dict]:
     # Our own per-call usage files are authoritative for what WE spent.
     ctx["today_spend"] = _cost_by_provider_since(today)
     ctx["week_spend"] = _cost_by_provider_since(week_ago)
+    ctx["spend_since"] = _cost_by_provider_since  # balance estimates (Perplexity/Gemini anchors)
     return sources.check_all(ctx)
 
 
@@ -974,7 +974,6 @@ def _collect_freshness() -> list[dict]:
         ("agents/active/adk-news-agent",        "briefing_*.json",    "ADK",        2, 3),
         ("agents/active/github-trending-agent", "github_*.json",      "GitHub",     3, 5),
         ("agents/inactive/exa-news-agent",     "exa_*.json",     "Exa",        2, 3),
-        ("agents/inactive/newsapi-agent",      "newsapi_*.json", "NewsAPI",    2, 3),
     ]
     for agent_dir, pat, label, warn_days, err_days in _news_agents:
         files = sorted(glob.glob(f"{agent_dir}/output/{today_str}/{pat}"))
@@ -1413,26 +1412,8 @@ Sources: {_sources_label} · merged by {_merger_label} · sent from <b>{RUNNER}<
 msg.attach(MIMEText(body_plain, "plain"))
 msg.attach(MIMEText(body_html,  "html"))
 
-try:
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(SENDER, APP_PASSWORD)
-        server.sendmail(SENDER, RECIPIENT, msg.as_string())
-except (smtplib.SMTPException, OSError) as e:
-    # From 2026-10-09 Gmail drops every SMTP AUTH from this machine (even a
-    # wrong password gets "Connection unexpectedly closed", not 535), so the
-    # daily email silently stopped. Same MIME message via the Gmail API (gws,
-    # OAuth). gws lives under nvm, which launchd's shell may not have on PATH.
-    import base64, shutil, subprocess
-    print(f"  ⚠ SMTP send failed ({e!r}) — retrying via the Gmail API (gws)")
-    gws = shutil.which("gws") or next(iter(sorted(glob.glob(os.path.expanduser("~/.nvm/versions/node/*/bin/gws")))), None)
-    if not gws:
-        raise
-    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-    res = subprocess.run([gws, "gmail", "users", "messages", "send", "--params", '{"userId": "me"}',
-                          "--json", json.dumps({"raw": raw})], capture_output=True, text=True, timeout=120,
-                         env={**os.environ, "PATH": f"{os.path.dirname(gws)}:{os.environ.get('PATH', '')}"})
-    if res.returncode != 0 or '"id"' not in res.stdout:
-        raise RuntimeError(f"Gmail API fallback failed: {(res.stderr or res.stdout)[-300:]}") from e
+from shared.gmail_send import send_mime
+send_mime(msg, SENDER, APP_PASSWORD, RECIPIENT)
 
 print(f"Email sent → {RECIPIENT}")
 

@@ -740,7 +740,8 @@ def _regen_tldr_over_union(_merger: dict) -> bool:
     print(f"  Regenerating TLDR over unioned {len(_items)} stories via claude -p...")
     try:
         _res = _subp.run(
-            ["claude", "-p", "--model", os.environ.get("MERGER_CC_MODEL", OPUS), _prompt],
+            ["claude", "-p", "--strict-mcp-config",
+             "--model", os.environ.get("MERGER_CC_MODEL", OPUS), _prompt],
             capture_output=True, text=True, check=False, timeout=180,
         )
         if _res.returncode != 0:
@@ -1745,7 +1746,7 @@ except Exception as _e:
 # story null, the source URLs were bad for og:image (YouTube videos, Hacker
 # News threads, content-farm aggregators). Search the web for the headline,
 # fetch top news article results, extract og:image, vision-validate. Mirrors
-# what scripts/fix_today_images.py does, but built into the cycle.
+# the old one-off fix_today_images.py did (deleted 2026-11-06), built into the cycle.
 # Skip .avif candidates — lambda's CDN ingest doesn't transcode them and
 # they show as broken on live (2026-05-07 thenextweb.com Anthropic.avif case).
 def _tavily_og_for_story(item: dict, api_key: str) -> str | None:

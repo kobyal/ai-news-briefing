@@ -16,7 +16,7 @@ from pathlib import Path
 
 import anthropic
 
-from .feeds import fetch_all, fetch_subreddit_icon
+from .feeds import fetch_all, fetch_subreddit_icon, LAST_FEED_HEALTH
 from .tools import _parse
 
 # Shared subscription path — shells to `claude -p` when MERGER_VIA_CLAUDE_CODE=1
@@ -301,6 +301,7 @@ def _step4_publish(briefing_json: str, hebrew_json: str, community_articles: lis
             "briefing": data,
             "briefing_he": he,
             "reddit_posts": reddit_posts,
+            "feed_health": dict(LAST_FEED_HEALTH),
         }, f, ensure_ascii=False)
     print(f"  Saved → {json_path}")
     return {"saved_to": json_path, "json_saved_to": json_path, "success": True}

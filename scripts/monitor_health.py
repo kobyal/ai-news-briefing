@@ -15,8 +15,6 @@ Checks:
   3. homepage returns 200.
 """
 import json
-import smtplib
-import ssl
 import sys
 import urllib.request
 from datetime import datetime, timezone, timedelta
@@ -27,6 +25,7 @@ RECIPIENT = SENDER = "kobyal@gmail.com"
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))  # for shared/
 from shared.aws_config import PUBLIC_BASE as BASE  # noqa: E402
+from shared.gmail_send import send_mime  # noqa: E402
 LOG = _ROOT / "logs" / "health-check.log"
 
 
@@ -69,9 +68,7 @@ def _email(subject: str, body: str):
     msg["Subject"] = subject
     msg["From"] = SENDER
     msg["To"] = RECIPIENT
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=ssl.create_default_context()) as s:
-        s.login(SENDER, pw)
-        s.sendmail(SENDER, [RECIPIENT], msg.as_string())
+    send_mime(msg, SENDER, pw, [RECIPIENT])
     _log(f"ALERT EMAIL SENT: {subject}")
 
 

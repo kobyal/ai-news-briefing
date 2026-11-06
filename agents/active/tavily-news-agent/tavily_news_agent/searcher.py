@@ -85,7 +85,48 @@ class TavilySearcher:
     def search(self, query: str, days: int = 3, max_results: int = 5) -> List[dict]:
         if self._client:
             return self._tavily_search(query, days, max_results)
+        return self._fallback_search(query, max_results, "no tavily client")
+
+    def _fallback_search(self, query: str, max_results: int, reason: str) -> List[dict]:
+        """Chain after every Tavily key is exhausted: Serper (Google News, if
+        SERPER_API_KEY is set) → DuckDuckGo. Each hop is tracked."""
+        res = self._serper_search(query, max_results)
+        if res is not None:
+            try:
+                from shared.fallback_tracker import track
+                track("tavily", "tavily", "serper", reason[:80])
+            except Exception:
+                pass
+            return res
+        try:
+            from shared.fallback_tracker import track
+            track("tavily", "tavily", "duckduckgo", reason[:80])
+        except Exception:
+            pass
         return self._ddg_search(query, max_results)
+
+    def _serper_search(self, query: str, max_results: int):
+        """Google News via serper.dev. Returns None when no key / on error so the
+        caller can continue to DuckDuckGo; [] is a real empty result."""
+        key = os.environ.get("SERPER_API_KEY", "")
+        if not key:
+            return None
+        import json as _json
+        import urllib.request
+        try:
+            req = urllib.request.Request(
+                "https://google.serper.dev/news",
+                data=_json.dumps({"q": query, "num": max_results, "tbs": "qdr:w"}).encode(),
+                headers={"X-API-KEY": key, "Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                news = _json.loads(r.read()).get("news", [])
+            return [{"title": n.get("title", ""), "url": n.get("link", ""),
+                     "content": (n.get("snippet", "") or "")[:300],
+                     "published_date": n.get("date", ""), "score": 0.6}
+                    for n in news if n.get("link")]
+        except Exception as e:
+            print(f"  [Serper] Error: {e} — falling back to DuckDuckGo")
+            return None
 
     def _tavily_search(self, query: str, days: int, max_results: int) -> List[dict]:
         _RETRY_DELAYS = [3, 8]
@@ -114,13 +155,8 @@ class TavilySearcher:
                     import time
                     time.sleep(delay)
                     continue
-                print(f"  [Tavily] Error after retries: {e} — falling back to DuckDuckGo")
-                try:
-                    from shared.fallback_tracker import track
-                    track("tavily", "tavily", "duckduckgo", str(e)[:80])
-                except Exception:
-                    pass
-                return self._ddg_search(query, max_results)
+                print(f"  [Tavily] Error after retries: {e} — falling back to Serper/DuckDuckGo")
+                return self._fallback_search(query, max_results, str(e))
 
     def _ddg_search(self, query: str, max_results: int) -> List[dict]:
         try:

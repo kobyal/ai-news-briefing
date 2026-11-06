@@ -6,7 +6,7 @@ Output: docs/data/hot_tools.json — frontend reads on /github/ mount.
 
 Phase 1 (2026-05-11): HF models + Spaces.
 Phase 1.1 (2026-05-11 PM): real owner avatars + README-derived descriptions
-+ DeepL Hebrew translations per item (was just emoji + bare tag).
++ Hebrew translations per item (Claude Haiku; was DeepL) (was just emoji + bare tag).
 """
 import json
 import os
@@ -224,7 +224,8 @@ def _translate_via_cli(text: str) -> str:
             if k in _keep or not k.startswith("CLAUDE_CODE_")
         }
         prompt = f"Translate to Hebrew. Return ONLY the translation, no explanations:\n\n{text[:500]}"
-        r = subprocess.run(["claude", "-p", prompt], capture_output=True, text=True,
+        r = subprocess.run(["claude", "-p", "--strict-mcp-config", prompt],
+                           capture_output=True, text=True,
                            env=clean_env, timeout=60)
         return r.stdout.strip() if r.returncode == 0 else ""
     except Exception:
@@ -244,7 +245,7 @@ def _translate_via_cli(text: str) -> str:
 _TRANSLATE_DEADLINE = time.time() + 240
 
 
-def deepl_translate(text: str, target: str = "HE") -> str:
+def translate_he(text: str, target: str = "HE") -> str:
     """Translate a single text to Hebrew via Claude Haiku API, with CLI fallback."""
     if not text:
         return ""
@@ -353,7 +354,7 @@ def _vendor_for(owner: str) -> str:
 
 def fetch_hf_models(limit: int = 12) -> list[dict]:
     """HF trending models. Enriched per item with: real owner avatar URL,
-    README-derived description (cleaned), DeepL Hebrew translation."""
+    README-derived description (cleaned), Hebrew translation via Claude Haiku."""
     out: list[dict] = []
     url = f"https://huggingface.co/api/models?sort=trendingScore&direction=-1&limit={limit * 2}"
     data = _http_json(url)
@@ -373,7 +374,7 @@ def fetch_hf_models(limit: int = 12) -> list[dict]:
         owner_fullname = fullname or _vendor_for(owner) or owner
         description = fetch_readme_intro(mid, kind="models")
         if description:
-            description_he = deepl_translate(description)
+            description_he = translate_he(description)
         else:
             # Synthesize a 1-liner when README has nothing usable. Better
             # than an empty card; keeps the visual rhythm consistent.
@@ -429,7 +430,7 @@ def fetch_hf_spaces(limit: int = 10) -> list[dict]:
         owner_fullname = fullname or _vendor_for(owner) or owner
         description = fetch_readme_intro(sid, kind="spaces")
         if description:
-            description_he = deepl_translate(description)
+            description_he = translate_he(description)
         else:
             description, description_he = _synthesize_description(
                 kind="spaces", owner_fullname=owner_fullname, sdk=sdk,
@@ -538,9 +539,9 @@ def fetch_docker_hub(limit: int = 10) -> list[dict]:
             "is_official":   bool(d.get("user") == "library" or d.get("is_official")),
         })
     items.sort(key=lambda i: i.get("pull_count", 0), reverse=True)
-    # Translate top-N descriptions to Hebrew (cap to limit to save DeepL quota)
+    # Translate top-N descriptions to Hebrew (cap to limit the translate budget)
     for it in items[:limit]:
-        it["description_he"] = deepl_translate(it["description"]) or ""
+        it["description_he"] = translate_he(it["description"]) or ""
     return items[:limit]
 
 
@@ -618,7 +619,7 @@ def fetch_pypi(limit: int = 10) -> list[dict]:
         })
     items.sort(key=lambda i: i.get("downloads_month", 0), reverse=True)
     for it in items[:limit]:
-        it["description_he"] = deepl_translate(it["description"]) or ""
+        it["description_he"] = translate_he(it["description"]) or ""
     return items[:limit]
 
 
@@ -702,7 +703,7 @@ def fetch_npm(limit: int = 10) -> list[dict]:
         })
     items.sort(key=lambda i: i.get("downloads_week", 0), reverse=True)
     for it in items[:limit]:
-        it["description_he"] = deepl_translate(it["description"]) or ""
+        it["description_he"] = translate_he(it["description"]) or ""
     return items[:limit]
 
 

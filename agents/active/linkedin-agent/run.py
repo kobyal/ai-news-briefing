@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(next((_p for _p in Path(__file__).resolve().parents if (_p / "shared" / "__init__.py").exists()), Path(__file__).resolve().parents[1])))
 from shared.repo_root import repo_root  # noqa: E402
 
-# Load private/.env so KOBYTEST_LI_AT etc. are available when running directly
+# Load private/.env so APIFY_API_TOKEN etc. are available when running directly
 _env_path = repo_root() / "private" / ".env"
 if _env_path.exists():
     for _line in _env_path.read_text().splitlines():

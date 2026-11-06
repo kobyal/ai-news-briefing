@@ -21,7 +21,7 @@ VENDOR_NAMES = [
 # Pipe-separated string for LLM prompts (e.g. merger, briefing writers)
 VENDOR_ENUM = " | ".join(f'"{v}"' for v in VENDOR_NAMES) + ' | "Other"'
 
-# Search queries per vendor — used by Tavily, ADK, Perplexity, NewsAPI, Article Reader
+# Search queries per vendor — used by Tavily, ADK, Perplexity, Article Reader
 VENDOR_QUERIES = [
     ("Anthropic",    ["Anthropic Claude AI news latest release",        "Claude API update announcement"]),
     ("OpenAI",       ["OpenAI ChatGPT GPT news latest",                 "OpenAI model release announcement"]),
@@ -39,7 +39,7 @@ VENDOR_QUERIES = [
     ("Samsung",      ["Samsung AI Gauss news latest",                   "Samsung on-device AI announcement"]),
 ]
 
-# Keyword → vendor mapping for classification (used by Exa, NewsAPI, RSS, YouTube)
+# Keyword → vendor mapping for classification (used by Exa, RSS, YouTube)
 VENDOR_KEYWORDS = {
     "Anthropic":    ["anthropic", "claude", "claude-3", "claude-4", "opus", "sonnet", "haiku"],
     "OpenAI":       ["openai", "chatgpt", "gpt-4", "gpt-5", "o1", "o3", "sora", "dall-e", "codex"],

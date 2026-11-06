@@ -38,9 +38,8 @@ agents/
                            youtube · github · twitter · linkedin
                  merger  → merges + dedups all sources into one briefing (+ Hebrew)
                  editorial → front-page lenses / picks / featured
-  inactive/    parked: exa, newsapi (dead — present, not wired), xai-twitter (disabled)
+  inactive/    parked: exa (not wired — candidate extra source), xai-twitter (disabled)
 concepts/      product ideas, not pipeline code (client-content-agent)
-archive/       retired experiments (shadow_eval)
 shared/        cross-agent helpers — the anti-copy-paste layer
                  anthropic_cc (the one claude -p wrapper), vendors, story_id,
                  image_fallback, json_repair, pricing, repo_root, …
@@ -71,7 +70,7 @@ for req in agents/active/adk-news-agent agents/active/perplexity-news-agent agen
            agents/active/rss-news-agent agents/active/merger-agent agents/active/twitter-agent; do
   pip install -r "${req}/requirements.txt"
 done
-pip install firecrawl-py exa-py newsapi-python duckduckgo-search
+pip install firecrawl-py exa-py duckduckgo-search
 
 # 3. Provide API keys (.env at repo root, or export in shell)
 cp .env.example .env  # fill in the keys you have; missing keys make agents no-op cleanly
@@ -104,10 +103,9 @@ flowchart TD
         TAV["Tavily<br/>Vendor search + Claude write"]
     end
 
-    subgraph supp["Supplemental collectors (5)"]
+    subgraph supp["Supplemental collectors (4)"]
         AR["Article Reader<br/>Jina + Firecrawl"]
         EXA["Exa<br/>Semantic search"]
-        NEWS["NewsAPI<br/>Wire-service news"]
         YT["YouTube<br/>Channel + search"]
         GH["GitHub Trending<br/>Repos + releases"]
     end
@@ -125,7 +123,6 @@ flowchart TD
     TAV --> M
     AR --> M
     EXA --> M
-    NEWS --> M
     YT --> M
     GH --> M
     TW --> M
@@ -140,7 +137,7 @@ flowchart TD
 | Layer | Why it exists |
 |-------|---------------|
 | Core LLM pipelines | Each retrieves news from a *different* surface (live web search, vendor blog feeds, semantic search). Running them in parallel means no single provider outage breaks the briefing. |
-| Supplemental collectors | Widen recall (Exa for niche AI research; NewsAPI for mainstream coverage), enrich content (Article Reader pulls full body text into merger context), or feed dedicated UI sections (YouTube videos, GitHub repos). |
+| Supplemental collectors | Widen recall (Exa for niche AI research — parked), enrich content (Article Reader pulls full body text into merger context), or feed dedicated UI sections (YouTube videos, GitHub repos). |
 | Social channels | People-quote and trending-post sections. Twitter scraper covers this for free; xAI Grok is wired in but disabled (cost ≈ $0.35/run, no quality lift over the scraper). |
 
 ---
@@ -156,7 +153,6 @@ flowchart LR
         C4["Tavily"]
         C5["Article Reader<br/>(Jina + Firecrawl)"]
         C6["Exa"]
-        C7["NewsAPI"]
         C8["YouTube"]
         C9["GitHub"]
         C10["Twitter scrape"]
@@ -165,7 +161,7 @@ flowchart LR
     subgraph save["Per-agent JSON outputs"]
         S1["briefing_*.json<br/>(core 4)"]
         S2["articles_*.json"]
-        S3["exa_*.json / newsapi_*.json"]
+        S3["exa_*.json"]
         S4["youtube_*.json / github_*.json"]
         S5["twitter_*.json"]
     end
@@ -178,7 +174,7 @@ flowchart LR
 
     subgraph publish["Publishing"]
         P1["docs/index.html<br/>+ docs/report/&lt;date&gt;.html"]
-        P2["publish_data.py<br/>(combine + DeepL Reddit/X)"]
+        P2["publish_data.py<br/>(combine + audio + OG mirror)"]
         P3["docs/data/&lt;date&gt;.json"]
         P4["send_email.py<br/>(status panel + cost)"]
     end
@@ -189,7 +185,6 @@ flowchart LR
     C4 --> S1
     C5 --> S2
     C6 --> S3
-    C7 --> S3
     C8 --> S4
     C9 --> S4
     C10 --> S5
@@ -219,7 +214,6 @@ flowchart LR
 | Tavily | ✓ | — | via merged briefing |
 | Article Reader | ✓ (full-text context) | — | — |
 | Exa | ✓ | — | via merged briefing |
-| NewsAPI | ✓ | — | via merged briefing |
 | YouTube | — | ✓ (video grid) | ✓ |
 | GitHub Trending | — | ✓ (repo cards) | ✓ |
 | Twitter scrape | — | ✓ (people + trending) | ✓ |
@@ -311,7 +305,7 @@ flowchart LR
 
 **Run:** `cd rss-news-agent && python3 run.py`
 **Env:** `ANTHROPIC_API_KEY`, `RSS_WRITER_MODEL`, `RSS_TRANSLATOR_MODEL`, `LOOKBACK_DAYS`
-**Note:** Reddit posts (filtered to score ≥ 20) are also surfaced separately on the live site via `publish_data.py` + DeepL translation.
+**Note:** Reddit posts (filtered to score ≥ 20) are also surfaced separately on the live site via `publish_data.py` (Hebrew via Claude Haiku).
 
 ### 4. Tavily News Agent — `agents/active/tavily-news-agent/`
 
@@ -355,21 +349,6 @@ flowchart LR
 
 **Run:** `cd exa-news-agent && python3 run.py`
 **Env:** `EXA_API_KEY` (+ `EXA_API_KEY2`), `LOOKBACK_DAYS`
-
-### 7. NewsAPI Agent — `agents/inactive/newsapi-agent/`
-
-Structured wire-service feed for mainstream coverage. 8 queries, vendor classification, dedup.
-
-```mermaid
-flowchart LR
-    A[8 NewsAPI queries] --> B[Collect]
-    B --> C[Deduplicate]
-    C --> D[Classify by vendor]
-    D --> E[newsapi_*.json]
-```
-
-**Run:** `cd newsapi-agent && python3 run.py`
-**Env:** `NEWSAPI_KEY` (+ `NEWSAPI_KEY2`), `LOOKBACK_DAYS`
 
 ### 8. YouTube News Agent — `agents/active/youtube-news-agent/`
 
@@ -425,7 +404,7 @@ Final synthesis. Loads the latest of every per-agent JSON output, runs them thro
 flowchart LR
     A[Load core 4 briefings] --> M[Merge call<br/>(Claude Sonnet 5<br/>or Opus 5.5 sub)]
     B[Load Article Reader<br/>full text] --> M
-    C[Load Exa + NewsAPI] --> M
+    C[Load Exa<br/>(if present)] --> M
     M --> T[3× parallel<br/>Hebrew translation]
 
     T --> H[HTML builder]
@@ -559,7 +538,6 @@ Output: `private/qa-evaluator-agent/output/<DATE>/report.md` + `report.json`. Se
 | Tavily | writer + translator: `claude-haiku-4-5` | → Opus 5.5 via `claude -p` | Tavily + Anthropic |
 | Article Reader | (no LLM) | (n/a) | Jina + Firecrawl |
 | Exa | (no LLM) | (n/a) | Exa |
-| NewsAPI | (no LLM) | (n/a) | NewsAPI |
 | YouTube | (no LLM) | (n/a) | YouTube Data API v3 |
 | GitHub Trending | (no LLM) | (n/a) | GitHub REST |
 | Twitter | (no LLM) | (n/a) | X GraphQL (scrape) |
@@ -578,7 +556,6 @@ Output: `private/qa-evaluator-agent/output/<DATE>/report.md` + `report.json`. Se
 | `<agent>/output/<YYYY-MM-DD>/usage_<HHMMSS>.json` | Per-call token + cost log (LLM agents only) |
 | `agents/active/article-reader-agent/output/.../articles_*.json` | Full article body text for merger context |
 | `agents/inactive/exa-news-agent/output/.../exa_*.json` | Supplemental sources |
-| `agents/inactive/newsapi-agent/output/.../newsapi_*.json` | Supplemental sources |
 | `agents/active/youtube-news-agent/output/.../youtube_*.json` | Direct-render video items |
 | `agents/active/github-trending-agent/output/.../github_*.json` | Direct-render repo items |
 | `agents/active/twitter-agent/output/.../briefing_*.json` | People highlights + trending posts |
@@ -776,20 +753,17 @@ Stories not matching a specific vendor are classified as `Other`.
 | `TAVILY_API_KEY` (+ `TAVILY_API_KEY2`, `TAVILY_API_KEY3`) | Tavily, Article Reader search |
 | `TAVILY_WRITER_MODEL` / `TAVILY_TRANSLATOR_MODEL` | Tavily |
 | `EXA_API_KEY` (+ `EXA_API_KEY2`) | Exa |
-| `NEWSAPI_KEY` (+ `NEWSAPI_KEY2`) | NewsAPI |
 | `YOUTUBE_API_KEY` (+ `YOUTUBE_API_KEY2`) | YouTube. Multi-key rotation on HTTP 403/429 (`agents/active/youtube-news-agent/.../pipeline.py::_yt_get`, `publish_data.py::_yt_search`). |
 | `GITHUB_TOKEN` | GitHub Trending (optional) |
 | `XAI_API_KEY` | xAI Grok agent |
 | `JINA_API_KEY` (+ `JINA_API_KEY2`) | Article Reader |
 | `FIRECRAWL_API_KEY` | Article Reader fallback |
 | `TWITTER_AUTH_TOKEN` / `TWITTER_CT0` | Twitter scrape (cookies from logged-in x.com) |
-| `DEEPL_API_KEY` | `publish_data.py` (Hebrew for Reddit + X posts) |
 | `LOOKBACK_DAYS` | Most agents (default 3) |
 | `AGENT_TIMEOUT` | `run_all.py` (default 1200 s per process — must be ≥ `ADK_TIMEOUT`) |
 | `ADK_TIMEOUT` | ADK pipeline internal cap (default 900 s; raises if Publisher didn't write today's JSON) |
 | `SKIP_ARTICLE_READING` | Article Reader |
 | `GMAIL_APP_PASSWORD` | `send_email.py` |
-| `DASHBOARD_MTD_JSON` | `send_email.py` (CI only — mirrors `private/dashboard_mtd.json`) |
 
 ---
 
@@ -811,7 +785,6 @@ Cookies expire when X invalidates the session (re-login, password change, suspic
 - **Three-layer URL defense** — (a) merger system prompt forbids inventing URLs, (b) `agents/active/merger-agent/pipeline.py` drops any URL not present in source briefings, (c) `publish_data.py` drops URLs whose page title shares zero keywords with the story headline. Prevents cross-story URL mis-assignment.
 - **Data-quality audit** — `publish_data.py::_audit_data_quality()` flags EN/HE-translation mismatches, zero-URL stories, and orphan items; the email's `PROBLEMS` banner surfaces them daily so silent regressions can't hide.
 - **Image fallback** — `shared/image_fallback.py` covers vendor-logo / OG-image / GitHub-org-logo paths with a denylist for generic-looking org pages (universities, big-firm GH orgs).
-- **Dashboard MTD** — `private/dashboard_mtd.json` (gitignored, mirrored to GH secret `DASHBOARD_MTD_JSON`) carries the month-to-date numbers from each provider dashboard. Email displays alongside live today/7-day totals computed from the per-agent usage logs.
 
 ---
 

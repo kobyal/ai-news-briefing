@@ -26,7 +26,7 @@ Measured **2026-04-24** with `python3 run_all.py --skip xai`.
 | adk-news-agent | Google Gemini 2.5 Flash | 158,289 | 30,669 | $0.0420 |
 | **TOTAL** | | | | **$1.0109** |
 
-Free-tier / no-LLM agents (twitter scrape, RSS feeds, Reddit Arctic Shift, GitHub Trending, NewsAPI, Exa, YouTube, Jina, Firecrawl): **$0** marginal cost.
+Free-tier / no-LLM agents (twitter scrape, RSS feeds, Reddit Arctic Shift, GitHub Trending, YouTube, Jina, Firecrawl, Apify): **$0** marginal cost.
 
 ## Current per-run cost — Claude Max subscription path
 
@@ -53,21 +53,23 @@ Jina), a tiny real call where there's no balance API (Anthropic API key, Gemini)
 (`today $X · 7d $Y`) come from our own `usage_*.json` files. The old hand-edited
 `private/dashboard_mtd.json` is no longer read (it showed an April snapshot as current).
 
-Snapshot **2026-09-29** (dashboards + live checks):
+Snapshot **2026-11-06** (full audit — see `docs/PROVIDERS.md` for contribution + decisions):
 
 | Provider | Balance / usage | Notes |
 |----------|-----------------|-------|
-| Anthropic API | $0.00 | Unused in practice — all calls go through the Claude Max subscription |
-| Google Gemini | ₪20.67 / ₪100 monthly cap | Tier 1 |
-| Perplexity | $9.77 left, ~$5.20 / 30 days | |
-| Apify | $0.49 / $5 this month | LinkedIn |
-| Tavily | key #1 1,000/1,000 · #2 8/1,000 · #3 353/1,000 | free Researcher plan per key, monthly |
-| Jina | both keys out of balance (402) | articles still read via no-key mode |
-| Firecrawl | token invalid | backup article reader is down |
-| xAI | $2.22 | parked (X backup) |
+| Anthropic API | $0.00 | By decision: subscription only, no API fallback |
+| Google Gemini | ₪60 prepay added 2026-11-06; ~₪0.7/day | Tier 1; backup key = kobytest free tier |
+| Perplexity | $21.96 after a $20 top-up, ~$5.6 / 30 days | #1 story source (27% sole-source) |
+| Apify | $0.85 / $5 this month | LinkedIn, one account |
+| Tavily | key #1 268/1,000 · #2 0/1,000 · #3 7/1,000 | free Researcher plan per key, monthly |
+| Jina | both keys 402 — no-key mode on purpose | Firecrawl covers the misses |
+| Firecrawl | 1,000 credits/month, key fixed 2026-11-06 | backup article reader is back |
+| AWS S3 | Oct $14.29 → expected ~$2–3 after `--size-only` | 2.4M PUTs/month was the whole bill |
+| xAI | ~$2.22 | parked (X backup) |
 
 ## What changed recently
 
+- **2026-11-06** Provider audit (`docs/PROVIDERS.md`): Firecrawl key fixed, DeepL + NewsAPI deleted, Serper wired as Tavily fallback, Perplexity/Gemini low-balance alerts via `*_BALANCE_ANCHOR`, S3 sync `--size-only` (Oct's $11.92 of PUT requests → ~$1).
 - **2026-09-29** Provider balances checked live by `shared/sources.py` (email no longer reads `dashboard_mtd.json`). Ingest Lambda retired. Models: Opus 5.5 (subscription), Gemini 3.8 Flash.
 - **2026-04-27** Per-requirement pip install (CI + `local-cycle.sh`). The old single batched `pip install -r a -r b -r c` was atomic — if one git+https URL transiently 404'd, the whole batch rolled back, silently skipping `google-adk` / `firecrawl-py` / etc. ADK silently produced 0 items for ≥1 day before the cause was found. Splitting per-file fixes the root cause; per-cost impact zero, but per-run cost reliability went up.
 - **2026-04-26** Lambda CDK redeploy passes `secondary_vendor` through; the old `local-cycle.sh` step that re-uploaded `docs/data/<date>.json` to S3 (and broke the website's `{date, stories}` shape) is now removed.
@@ -112,11 +114,11 @@ In order of size:
 These are cheap but worth tracking:
 
 - **Per-story audio** — 4 MP3s/story × ~22 stories = 88 MP3s/day via `edge-tts` (Microsoft Edge TTS, free; no API key). Adds ~2-3 min to publish_data wall-clock, $0 cost.
-- **Hot Tools fetcher (`scripts/fetch_hot_tools.py`)** — 50+ HF API hits (free, no auth) + 14 Docker Hub hits (free) + 24 PyPI hits + pypistats hits (rate-limited, ~70% fill rate) + 16 npm registry hits. **DeepL Hebrew translations** for descriptions: ~50 strings × ~200 chars = ~10K chars/day → free tier covers (500K chars/month). Runs ~5-7 min wall-clock daily.
+- **Hot Tools fetcher (`scripts/fetch_hot_tools.py`)** — 50+ HF API hits (free, no auth) + 14 Docker Hub hits (free) + 24 PyPI hits + pypistats hits (rate-limited, ~70% fill rate) + 16 npm registry hits. Hebrew descriptions via Claude Haiku (API key if present, else `claude -p`). Runs ~5-7 min wall-clock daily.
 - **Podcasts fetcher (`scripts/fetch_podcasts.py`)** — 13 iTunes Search hits + 13 RSS parses. Free. ~30 sec wall-clock.
 - **Search index builder (`scripts/build_search_index.py`)** — local file scan + S3 upload + CloudFront invalidation. Free for CF invalidations under 1000/month (we do 2-3/day = ~90/month).
 - **QA functional probes** — Playwright launches one headless Chromium, runs 7 interaction tests, ~30-45 sec wall-clock. Free.
 
-Total daily cost addition: **$0 (subscription path) or marginal DeepL overage if it tips past 500K chars** (currently nowhere close).
+Total daily cost addition: **$0 on the subscription path**.
 
 None of these are decided beyond the subscription path. See README → "Two ways to run the merger" for the active options.

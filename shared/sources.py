@@ -72,6 +72,27 @@ def _spend(ctx: dict, api: str) -> str:
     return f"today {_money(t)} · 7d {_money(w)}"
 
 
+def _balance_estimate(ctx: dict, api: str, anchor_env: str, low_usd: float = 5.0):
+    """Estimated prepaid balance for consoles with no balance API (Perplexity,
+    Gemini). `<ANCHOR_ENV>=YYYY-MM-DD:USD` in private/.env is the console
+    balance on that date (refresh after every top-up); we subtract our own
+    usage logs since then. Returns (status, detail) — "warn" under `low_usd`."""
+    raw = os.environ.get(anchor_env, "").strip()
+    if not raw or ":" not in raw:
+        return "ok", f"balance: console only (set {anchor_env}=DATE:USD for alerts)"
+    day, usd = raw.split(":", 1)
+    spend_since = ctx.get("spend_since")
+    try:
+        spent = float((spend_since(day) if callable(spend_since) else {}).get(api, 0.0))
+        est = float(usd) - spent
+    except Exception:
+        return "ok", f"balance: anchor {raw} unreadable"
+    detail = f"≈{_money(est)} left (anchor {day} {_money(float(usd))} − {_money(spent)} since)"
+    if est < low_usd:
+        return "warn", f"⚠ LOW BALANCE {detail} — top up and refresh {anchor_env}"
+    return "ok", detail
+
+
 def _worst(statuses: list[str]) -> str:
     order = ["error", "exhausted", "warn", "ok", "off"]
     return min(statuses, key=order.index) if statuses else "off"
@@ -119,7 +140,10 @@ def _check_gemini(src: Source, ctx: dict):
     if not res:
         return "error", "no key set"
     st = "ok" if any(s == "ok" for s, _ in res) else _worst([s for s, _ in res])
-    detail = " · ".join(d for _, d in res) + f" · {_spend(ctx, 'Google Gemini')} · balance: console only"
+    bst, bdetail = _balance_estimate(ctx, "Google Gemini", "GEMINI_BALANCE_ANCHOR")
+    if bst == "warn" and st == "ok":
+        st = "warn"
+    detail = " · ".join(d for _, d in res) + f" · {_spend(ctx, 'Google Gemini')} · {bdetail}"
     notice = src.extra.get("notice")
     if notice and datetime.now().strftime("%Y-%m-%d") <= src.extra.get("notice_until", ""):
         st = "warn" if st == "ok" else st
@@ -134,7 +158,8 @@ def _check_perplexity(src: Source, ctx: dict):
     code, txt = _http("https://api.perplexity.ai/v1/models", {"Authorization": f"Bearer {pairs[0][1]}"})
     if code != 200:
         return "error", f"auth HTTP {code}: {txt[:50]}"
-    return "ok", f"auth ok · {_spend(ctx, 'Perplexity')} · balance: console only (no API)"
+    bst, bdetail = _balance_estimate(ctx, "Perplexity", "PERPLEXITY_BALANCE_ANCHOR")
+    return bst, f"auth ok · {_spend(ctx, 'Perplexity')} · {bdetail}"
 
 
 def _check_tavily(src: Source, ctx: dict):
@@ -217,6 +242,26 @@ def _check_x_scrape(src: Source, ctx: dict):
     return "ok", f"{n_people} people · {n_trend} trending · auth ok"
 
 
+def _check_rss_feeds(src: Source, ctx: dict):
+    fh = ctx.get("feed_health")
+    if not fh:
+        return "off", "no rss output today"
+    total, errors, empty = fh.get("total", 0), fh.get("errors", []), fh.get("empty", [])
+    va = fh.get("vendor_articles", 0)
+    detail = f"{total - len(errors) - len(empty)}/{total} feeds returned items · {len(errors)} errors · {len(empty)} empty · {va} vendor articles"
+    if va < 5 or (total and len(errors) > 0.25 * total):
+        return "warn", "⚠ " + detail + (f" · errors: {', '.join(errors[:4])}" if errors else "")
+    return "ok", detail
+
+
+def _check_serper(src: Source, ctx: dict):
+    pairs = src.present_keys()
+    if not pairs:
+        return "off", "no SERPER_API_KEY — Tavily falls straight to DuckDuckGo (sign up at serper.dev, 2,500 free queries)"
+    code, txt = _http("https://google.serper.dev/news", {"X-API-KEY": pairs[0][1]}, body={"q": "AI", "num": 1})
+    return ("ok", "auth ok (Tavily fallback)") if code == 200 else ("error", f"HTTP {code}: {txt[:40]}")
+
+
 def _check_reddit(src: Source, ctx: dict):
     n = ctx.get("reddit_posts")
     if n is None:
@@ -267,6 +312,13 @@ SOURCES: dict[str, Source] = {s.name: s for s in [
     Source("X scrape", "free", ["TWITTER_AUTH_TOKEN"],
            "twitter-agent (cookie auth)", "section empty (xAI Grok agent is the parked backup)",
            "https://x.com/", _check_x_scrape),
+    # parked=True only so a missing key renders as ⚪ "not set up" instead of ❌.
+    Source("Serper (Tavily fallback)", "free", ["SERPER_API_KEY"],
+           "tavily-news-agent fallback between the 3 Tavily keys and DuckDuckGo", "DuckDuckGo",
+           "https://serper.dev/dashboard", _check_serper, parked=True),
+    Source("RSS feeds", "free", [],
+           "rss-news-agent: ~110 vendor/community feeds (no auth)", "thin briefing (merger relies on other agents)",
+           "—", _check_rss_feeds),
     Source("Reddit (ArcticShift)", "free", [],
            "rss-news-agent Reddit (no auth)", "Reddit section empty",
            "https://arctic-shift.photon-reddit.com/", _check_reddit),
@@ -274,8 +326,6 @@ SOURCES: dict[str, Source] = {s.name: s for s in [
            "—", "https://console.x.ai/", _check_parked, parked=True),
     Source("Exa", "free", ["EXA_API_KEY", "EXA_API_KEY2"], "possible extra news source (agent in agents/inactive)",
            "—", "https://dashboard.exa.ai/", _check_parked, parked=True),
-    Source("NewsAPI", "free", ["NEWSAPI_KEY", "NEWSAPI_KEY2"], "unlikely — free plan delays news 24h",
-           "—", "https://newsapi.org/account", _check_parked, parked=True),
 ]}
 
 
@@ -313,6 +363,8 @@ def run_context(date: str, root: str = ".") -> dict:
         try:
             d = json.load(open(rs[-1]))
             ctx["reddit_posts"] = len(d.get("reddit_posts") or (d.get("briefing") or {}).get("reddit_posts") or [])
+            if isinstance(d.get("feed_health"), dict):
+                ctx["feed_health"] = d["feed_health"]
         except Exception:
             pass
     return ctx

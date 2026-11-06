@@ -62,7 +62,7 @@ NOTE: social_briefing["linkedin_posts"] contains real posts from AI leaders (Dar
 - Community pulse: a LinkedIn post with high engagement (likes+comments) signals industry reaction
 - Source URLs: always include the post URL when citing a LinkedIn item
 
-ADDITIONAL SOURCES (Exa semantic search, NewsAPI, YouTube AI channels, GitHub trending repos):
+ADDITIONAL SOURCES (Exa semantic search, YouTube AI channels, GitHub trending repos):
 {extra_sources}
 
 FULL ARTICLE CONTENT (use these to write richer, more detailed summaries with specific facts, numbers, and quotes):

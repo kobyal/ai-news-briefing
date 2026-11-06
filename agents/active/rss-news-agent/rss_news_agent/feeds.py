@@ -254,6 +254,7 @@ def _fetch_rss(url: str, vendor_tag: str, since: datetime) -> List[dict]:
         return articles
     except Exception as e:
         print(f"  [RSS] Error fetching {url}: {e}")
+        LAST_FEED_HEALTH.setdefault("errors", []).append(url)
         return []
 
 
@@ -539,6 +540,12 @@ def _fetch_reddit_hot(url: str, since: datetime, max_items: int = 15) -> List[di
 # Main fetch entry point
 # ---------------------------------------------------------------------------
 
+# Per-run feed health, written into the agent's output JSON so the daily email
+# (shared/sources.py::_check_rss_feeds) can flag dead/empty feeds — not just
+# "RSS ran". {total, errors:[url], empty:[url], vendor_articles}.
+LAST_FEED_HEALTH: dict = {}
+
+
 def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
     """Fetch all feeds concurrently.
 
@@ -557,24 +564,30 @@ def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
     for url, vendor_tag, feed_type in FEEDS:
         tasks.append((url, vendor_tag, feed_type))
 
+    LAST_FEED_HEALTH.clear()
+    LAST_FEED_HEALTH.update({"total": len(tasks), "errors": [], "empty": []})
     all_articles = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        futures = []
+        futures = {}
         for url, vendor_tag, feed_type in tasks:
             if feed_type == "rss":
-                futures.append(pool.submit(_fetch_rss, url, vendor_tag, vendor_since))
+                futures[pool.submit(_fetch_rss, url, vendor_tag, vendor_since)] = url
             elif feed_type == "hn":
-                futures.append(pool.submit(_fetch_hn, url, since))
+                futures[pool.submit(_fetch_hn, url, since)] = url
             elif feed_type == "hf_papers":
-                futures.append(pool.submit(_fetch_hf_papers, url, since))
+                futures[pool.submit(_fetch_hf_papers, url, since)] = url
             elif feed_type == "reddit_arctic":
-                futures.append(pool.submit(_fetch_reddit_hot, url, since))
+                futures[pool.submit(_fetch_reddit_hot, url, since)] = url
 
         for f in concurrent.futures.as_completed(futures):
             try:
-                all_articles.extend(f.result())
+                items = f.result()
+                all_articles.extend(items)
+                if not items and futures[f] not in LAST_FEED_HEALTH["errors"]:
+                    LAST_FEED_HEALTH["empty"].append(futures[f])
             except Exception as e:
                 print(f"  Feed future error: {e}")
+                LAST_FEED_HEALTH["errors"].append(futures[f])
 
     # Deduplicate by URL
     seen_urls: set = set()
@@ -600,6 +613,8 @@ def fetch_all(lookback_days: int = 3) -> tuple[List[dict], List[dict]]:
     community_articles.sort(key=_reddit_rank, reverse=True)
 
     print(f"  → {len(vendor_articles)} vendor articles, {len(community_articles)} community posts")
+    LAST_FEED_HEALTH["vendor_articles"] = len(vendor_articles)
+    print(f"  Feed health: {len(LAST_FEED_HEALTH['errors'])} errors, {len(LAST_FEED_HEALTH['empty'])} empty of {LAST_FEED_HEALTH['total']}")
     # Loud sanity check: 70+ vendor RSS feeds running over a 7-day window
     # should yield 30+ articles on a normal week. Anything below 5 means
     # something silently broke (feedparser gone, network error, mass-403, etc.).

@@ -6,7 +6,6 @@ Agents that exist in the tree but do **not** run in the daily pipeline. Kept
 | Agent | Why parked |
 |-------|-----------|
 | `exa-news-agent` | **Dead.** Exa search source. Key present, but never added to the `run_all.py` registry. |
-| `newsapi-agent` | **Dead.** NewsAPI source. Same — present, not wired into `run_all`. |
 | `xai-twitter-agent` | **Disabled.** Grok-4 X pass. Still in the `run_all` registry but skipped by default (`run_all.py --skip xai`); `twitter-agent` is the free replacement. ~$0.35/run. |
 
 To revive one: add/enable it in `run_all.py`'s `AGENTS` registry and confirm its

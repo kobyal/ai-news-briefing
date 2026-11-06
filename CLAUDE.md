@@ -1,6 +1,7 @@
 # ai-news-briefing — project instructions
 
-Docs first: `README.md`, `docs/COSTS.md`, `docs/FALLBACKS.md`, `docs/ROADMAP.md`.
+Docs first: `README.md`, `docs/REPO_MAP.md` (what runs / what's dead), `docs/PROVIDERS.md`
+(every external provider: contribution, balances, decisions), `docs/COSTS.md`, `docs/FALLBACKS.md`, `docs/ROADMAP.md`.
 Frontend has its own `web/CLAUDE.md` (→ `web/AGENTS.md`) — heed it when editing `web/`.
 
 ## Don't duplicate — centralize shared logic

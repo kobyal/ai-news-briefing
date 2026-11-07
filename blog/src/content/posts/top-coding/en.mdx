@@ -1,0 +1,114 @@
+---
+title: "Top coding: the list that went stale in 106 days"
+description: "On June 8 Opus 4.8 scored 88.6%. By September 22 Claude Code ran a different model. What happened to coding agent rankings, and what to pin this week."
+lang: en
+key: top-coding
+term: "top coding"
+kind: warstory
+pubDate: 2026-11-07
+tags: ["coding-agents", "benchmarks", "claude-code", "evals", "model-pinning"]
+hook: "number"
+cover: illus
+tldr: ["Pin the model in .claude/settings.json, so a model upgrade goes through a PR.", "Build an eval from 20 closed issues in your own repo, with tests.", "Re-run the eval every time a vendor changes its default model."]
+hero: /posts/top-coding/hero-en.jpg
+diagram: /posts/top-coding/diagram.svg
+sources:
+  - { title: "From Copilot to agents: The history of AI coding", url: "https://www.coderabbit.ai/blog/a-very-brief-history-of-ai-coding-from-copilot-to-next-gen-agents", date: "" }
+  - { title: "Medium", url: "https://medium.com/@mehulgupta_7991/ranking-ai-coding-agents-from-cursor-to-claude-code-dda0984b737f", date: "" }
+  - { title: "12 AI Coding Agents Compared in 2026: Claude Code vs Antigravity vs Codex vs Cursor vs OpenCode vs Hermes", url: "https://ssojet.com/blog/ai-coding-agents-compared", date: "" }
+  - { title: "Best AI coding agents for developers in 2026 (real-world reviews)", url: "https://www.faros.ai/blog/best-ai-coding-agents-2026", date: "" }
+  - { title: "Best AI Coding Agents in 2026, Ranked | MightyBot", url: "https://mightybot.ai/blog/coding-ai-agents-for-accelerating-engineering-workflows", date: "" }
+opinion: "We don't pick a coding agent from a list, and we don't think anyone should. Top coding lists are a good starting point for the question of what to try, and a bad answer to the question of what to run. Testing beats generating: 20 tasks from your own repo, with tests, are worth more than any score someone else measured on someone else's code. And determinism wherever possible: a model pinned in config, and upgrades that go through like any other change, in a PR with numbers. The agent at the top of the table today may really be the best one for you. Just prove it on your code."
+madeWith: { model: "claude-opus-5-5", sourceCount: 5, reviewedBy: "Koby Almog" }
+---
+
+88.6%. That was Opus 4.8's score on SWE-bench Verified, as listed on June 8, 2026 in SSOJet's comparison of 12 coding agents. Next to it: 74.6% on Terminal-Bench 2.1, and $20 a month as the entry price for Claude Code, Codex, Cursor and Windsurf. The post promised you could pick an agent "in an afternoon".
+
+106 days later, Claude Code was running a different model, and one of the four $20 products no longer went by that name. This post is about top coding lists, the rankings of the leading coding agents, and what happens to a team that picks from one and never revisits the decision.
+
+## June 8: a list you pick from in an afternoon
+
+SSOJet compared 12 tools, from Claude Code and Codex to Antigravity, OpenCode and Hermes. Last fact check: June 7. To their credit, they say their hands-on experience is "partial": smoke tests on a small Node.js repo, no multi-week deployment of any tool. Their framework has four levers: the model, the price under heavy use, parallel sub-agents, and benchmark score.
+
+> That single pair of numbers explains why benchmark scores, not marketing, now drive agent selection.
+>
+> — SSOJet, "12 AI Coding Agents Compared in 2026", June 2026
+
+Now look at the takeaways in the same post. Opus 4.8 leads SWE-bench Verified at 88.6%, and GPT-5.5 "leads" Terminal-Bench 2.0 at 82.7%. But the Opus score they cite is from Terminal-Bench 2.1. Two versions of the same benchmark in one row, as if they were the same ruler. And that's before anything broke.
+
+## September 22: the agent changed without a deploy
+
+Anthropic released Opus 5.5 on September 22. According to MightyBot, it became Claude Code's default Opus model that same day. Yes, the same day.
+
+Now picture a team that chose Claude Code in June because of the 88.6%. The code didn't change, CLAUDE.md didn't change, CI didn't change. But the model deciding which file to edit and which test to skip is a different model. On the same day, OpenAI shipped GPT-6 Sol and GPT-6 Luna, and Codex with Sol scored 57 on Artificial Analysis's Coding Agent Index, at $2.99 per task.
+
+Most of the time this is an upgrade. But an upgrade you didn't ask for and didn't measure is a production change with zero lines in your changelog.
+
+<figure><img src="/posts/top-coding/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/top-coding/src6.jpg" alt="MightyBot refreshed their ranking two days after the number one spot changed models. A list like this is a date, not a recommendation (credit: MightyBot)" loading="lazy" /><figcaption>MightyBot refreshed their ranking two days after the number one spot changed models. A list like this is a date, not a recommendation (credit: MightyBot)</figcaption></figure>
+
+## From the outside: two lists, a month apart, and a product that no longer exists
+
+On September 24, MightyBot refreshed their ranking. Claude Code with Opus 5.5 first, 66 to Codex with GPT-6 Astra's 62. Cursor rose to third after SpaceX closed its acquisition. Devin rose to fourth, on Cognition's SWE-2 model, and absorbed Windsurf, which is now called Devin Desktop.
+
+On October 22, Faros updated their list. Windsurf is still there, in the Runner Ups row, next to Aider and Gemini CLI.
+
+Go back further. On January 9, Mehul Gupta put Cursor first and Claude Code third, because it "doesn't integrate as smoothly with IDEs". Nine months later Claude Code is first at MightyBot, and Faros still calls Cursor "the default AI IDE".
+
+In short: from the outside it looks like a market that changes its mind every month. In practice it's a handful of lists measuring different things, on different dates, on someone else's code.
+
+<figure><img src="/posts/top-coding/v2-svg-en.jpg" alt="Between June 8 and September 22 the ranking stood still and the model moved. Anyone who chose in June was running a different agent in September (SSOJet, MightyBot, Faros)" loading="lazy" /><figcaption>Between June 8 and September 22 the ranking stood still and the model moved. Anyone who chose in June was running a different agent in September (SSOJet, MightyBot, Faros)</figcaption></figure>
+
+## The first fix: chasing the new number one
+
+The reflex is to open the updated list and switch tools. MightyBot themselves work this way: a refresh in July, a refresh in September, a different number one each time. That swaps one snapshot for another. In two months a new model ships, the default moves again, and you're back where you started, with one more migration behind you.
+
+And look at the gaps. 66 vs 62 is 4 points, on someone else's index, on someone else's tasks. Even at MightyBot, Grok Build climbed to fifth despite a weak Terminal-Bench 4.0 score, because in their use it "does much more per dollar". So even the people publishing the ranking don't trust the benchmark alone.
+
+<figure><img src="/posts/top-coding/v3-chart-en.jpg" alt="4 points between first and second, on someone else's tasks. Sol's $2.99 per task is the number worth measuring on your own code (MightyBot / Artificial Analysis)" loading="lazy" /><figcaption>4 points between first and second, on someone else's tasks. Sol's $2.99 per task is the number worth measuring on your own code (MightyBot / Artificial Analysis)</figcaption></figure>
+
+## The real cause: ranking a pair that moves
+
+Faros put it best: "Agent = Model + Harness". The model brings the intelligence, and the harness, meaning the tools, permissions, context and test loop, turns it into an agent. Every ranking photographs that pair on one date. And both halves move without asking you: the model gets swapped as the default, the harness gains parallel sub-agents, and the product itself gets acquired or merged.
+
+This isn't new. CodeRabbit points out that GitHub launched Copilot on June 29, 2021, and the Codex paper published on July 7 says explicitly that what powers Copilot is a separate production version of Codex. The model that got the score and the model that wrote your code were two different things from day one.
+
+> **My take:** I don't make tooling decisions off a table. A benchmark answers a different question: how a specific pair, on a specific date, solves issues in open source projects. Your question is what happens in your repo this week, and there's no table for that.
+
+## What to pin this week
+
+First, pin the model. In Claude Code that's `"model"` in the repo's `.claude/settings.json` (or the `--model` flag, or `ANTHROPIC_MODEL`). In Codex it's `model` in `~/.codex/config.toml`. From then on, a model upgrade is a PR, not a Tuesday surprise.
+
+```json title=".claude/settings.json"
+{
+  "model": "claude-opus-5-5"
+}
+```
+
+Next, build a small eval of your own. 15 to 20 closed issues from the repo, each with a merged PR and tests. One file per task: the first line is the commit before the fix, the rest is the prompt. Run each model in its own worktree, with no production credentials in the env, and record pass/fail and cost.
+
+```bash title="agent-eval.sh"
+#!/usr/bin/env bash
+# ./agent-eval.sh claude-opus-5-5
+set -uo pipefail
+MODEL="$1"
+OUT="$PWD/eval/results.csv"
+for task in eval/tasks/*.md; do
+  name=$(basename "$task" .md)
+  base=$(head -n 1 "$task")
+  wt="/tmp/eval-$name"
+  git worktree add -q --detach "$wt" "$base"
+  tail -n +2 "$task" | (cd "$wt" && claude -p --model "$MODEL" --permission-mode acceptEdits --output-format json) > "/tmp/eval-$name.json"
+  if (cd "$wt" && npm test --silent >/dev/null 2>&1); then r=pass; else r=fail; fi
+  cost=$(jq -r '.total_cost_usd' "/tmp/eval-$name.json")
+  echo "$name,$MODEL,$r,$cost" >> "$OUT"
+  git worktree remove --force "$wt"
+done
+```
+
+What to measure: the share of tasks that pass tests, $ per task, and which files the diff touched. For comparison: $2.99 per task for Codex with Sol at MightyBot. If yours comes out 3x that, better to find out before the invoice.
+
+Then the assert that actually matters: re-run the script every time a vendor announces a new default, and once a month regardless. MightyBot wrote that the best teams already split models by task, an expensive model for planning and cheaper ones for parallel execution. Without numbers from your own repo, you have nothing to base that split on.
+
+June's 88.6% didn't lie. It just measured an agent you're no longer running.

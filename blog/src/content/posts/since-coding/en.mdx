@@ -1,0 +1,145 @@
+---
+title: "Since coding: five years after Copilot, and what to change on your team on Monday"
+description: "The model is the least important call when working with coding agents. Six steps: permissions, a devbox per task, AGENTS.md, proof in the PR, measurement."
+lang: en
+key: since-coding
+term: "since coding"
+kind: fieldnotes
+pubDate: 2026-11-08
+tags: ["coding-agents", "claude-code", "sandbox", "code-review", "devbox"]
+hook: "claim"
+cover: photo
+tldr: ["Restrict the agent with --allowedTools before you compare models.", "Run every task in its own git worktree or devbox, never in the main repo.", "Require test output and a handoff in every agent PR, not just a diff."]
+hero: /posts/since-coding/hero-en.jpg
+diagram: /posts/since-coding/diagram.svg
+sources:
+  - { title: "Show HN: Aether – Run Claude Code, Codex, or OpenCode in devboxes you can watch", url: "https://www.runaether.dev", date: "2026-07-11" }
+  - { title: "From Copilot to agents: The history of AI coding", url: "https://www.coderabbit.ai/blog/a-very-brief-history-of-ai-coding-from-copilot-to-next-gen-agents", date: "" }
+  - { title: "Coding agents explained: how AI agents boost development", url: "https://hackernoon.com/coding-agents-explained-how-ai-agents-boost-development", date: "" }
+  - { title: "Agentic AI, explained", url: "https://mitsloan.mit.edu/ideas-made-to-matter/agentic-ai-explained", date: "" }
+opinion: "We don't see since coding as a method. It's just the point where the question moved from 'which model' to 'what system do we build around the model'. The 2026 skill isn't writing a better prompt. It's deciding what the agent sees, what it touches, how it gets checked and when it gets reset. We prefer determinism wherever we can get it: an allowed-tools list, tests, a schema, and model judgment only where there's no other option. A loop that checks itself is worth more than a brilliant first draft, so we'll always take a mediocre agent with tests over a smart one without. And when 'agent orchestrator' job listings show up before anyone has published how to measure the work, we get suspicious."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+My claim: which agent you run, Claude Code, Codex or OpenCode, is the least important decision you'll make this year about coding with AI. They all read a repo, edit a few files and run tests. Whether it holds up on your team depends on everything around it: where it runs, what it's allowed to touch, and how it proves it worked.
+
+Since coding is my name for this timeline. Nobody else coined it. It starts on June 29, 2021, the day GitHub announced Copilot. Eight days later, on July 7, OpenAI published the Codex paper with HumanEval, and it says outright that a distinct version of Codex powers Copilot. Copilot completed a line or a function inside the file, and that was it. Five years later, in Aether's Show HN from July 11, 2026, every task gets its own Firecracker microVM, a warm devbox boots in about 5 seconds, and the agent records video of a real browser clicking through its change.
+
+Same underlying models, a completely different product. HackerNoon put it best:
+
+> The distinction that matters is scope of action, not model quality. An assistant suggests. An agent acts, then reports what it did.
+> — Coding agents explained, HackerNoon, October 2026
+
+That's the whole story. A bad autocomplete suggestion costs you a few lines, and you see it right away. A bad agent costs you a whole PR, after twenty shell commands you never saw. So here's how I'd approach it this week, in order.
+
+## 01 · Decide how far it reaches, then pick a model
+
+Write one line per access level, and decide where you start:
+
+- **Suggests.** What Copilot did in 2021. You accept or reject, and your hands stay on the keyboard.
+- **Edits and runs tests.** The agent touches a few files and runs `npm test`, but doesn't push and doesn't touch CI.
+- **Opens a PR.** Works on its own branch and hands back a PR for review.
+
+I start teams at level two. In practice that's one flag. In Claude: `--allowedTools "Read,Edit,Glob,Grep,Bash(npm test:*)"`, and any other shell command is blocked or asks for approval. In Codex it's `--sandbox workspace-write`, which limits writes to the working directory.
+
+What you have at the end of this step: a short list of allowed commands. Anything not on the list is your decision, not the model's. The difference between a completion and an agent sits exactly in that line.
+
+<figure><img src="/posts/since-coding/src2.jpg" alt="In 2021 Copilot put the model inside the editor. Today the question isn't where it suggests, it's what it's allowed to do (credit: CodeRabbit)" loading="lazy" /><figcaption>In 2021 Copilot put the model inside the editor. Today the question isn't where it suggests, it's what it's allowed to do (credit: CodeRabbit)</figcaption></figure>
+
+## 02 · Every task gets its own machine
+
+An agent running on your laptop sees your .env, your ~/.aws and everything else. Aether solve this with a fresh microVM per task: every command is logged, you can SSH into the devbox mid-run, and they only charge for the machine. The agent itself runs on the subscription you already have.
+
+Don't want another vendor? You can get most of the way locally with a git worktree and a container:
+
+```bash title="run-agent.sh"
+#!/usr/bin/env bash
+# ./run-agent.sh fix-checkout "Fix the order summary on mobile checkout"
+set -euo pipefail
+NAME="$1"; TASK="$2"
+WT="$(pwd)/../wt-$NAME"
+
+git worktree add "$WT" -b "agent/$NAME"
+
+docker run --rm \
+  -e ANTHROPIC_API_KEY -e TASK="$TASK" \
+  -v "$WT":/work -w /work \
+  node:22 bash -lc '
+    npm ci &&
+    npx -y @anthropic-ai/claude-code -p "$TASK" \
+      --allowedTools "Read,Edit,Glob,Grep,Bash(npm test:*)" \
+      > .agent-log.txt
+  '
+
+cd "$WT" && git status --short && git diff --stat
+```
+
+What you have at the end: `git diff --stat` on a separate branch, and a log of what the agent did. The main repo is untouched. Want to throw it away? `git worktree remove ../wt-fix-checkout` and you're done.
+
+One more thing: the network. This container can still reach the internet, because the agent needs to talk to the API. If that bothers you, Anthropic publish a reference devcontainer for Claude Code with a firewall that only allows outbound traffic to allowlisted domains. Worth copying as is.
+
+<figure><img src="/posts/since-coding/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/since-coding/v2-screenshot-en.jpg" alt="A microVM per task and every command logged: the isolation is the product, the model stays yours (Aether)" loading="lazy" /><figcaption>A microVM per task and every command logged: the isolation is the product, the model stays yours (Aether)</figcaption></figure>
+
+## 03 · House rules go in the repo, not the prompt
+
+Every time you tell the agent in chat not to touch migrations, it's gone by the next session. Write it to a file. Aether put it in one line: Commit a SKILL.md and every agent that touches the repo follows it.
+
+Claude reads CLAUDE.md, and Codex and OpenCode read AGENTS.md. So, one file and a symlink:
+
+```markdown title="AGENTS.md"
+## Before you finish
+- Run `npm test` and paste the last 20 lines of output in your summary.
+- Never edit files under `migrations/` or `.github/workflows/`.
+- One concern per branch. Found a second bug? Write it down, don't fix it.
+
+## Handoff (always, at the end)
+- What changed: files, one line each
+- What you assumed
+- What is still open
+```
+
+Then `ln -s AGENTS.md CLAUDE.md`, and both tools read the same thing.
+
+The important part here is the handoff. It's lifted almost word for word from HackerNoon: what changed, what was assumed, what's still open. Without it you get a 400-line diff and 'Done!', and burn half an hour trying to work out what it was thinking.
+
+## 04 · A PR without proof goes back
+
+This is where most teams fall down. The agent says the tests passed, and you believe it. Don't. Ask for the output.
+
+Aether's review is built on this idea: findings come from the running app, not just the diff, there are screenshots of the base branch next to the commit, and you can turn on video of a real browser clicking through the change. Their reviewer also re-checks every push until it approves.
+
+Even without Aether, here's a checklist you can put in your PR template tomorrow morning:
+
+- Test output attached, not just 'passed'
+- For UI changes: a before and after screenshot
+- The list of assumptions from the handoff
+- One branch, one concern
+
+> **My take:** A video of an agent clicking a button looks great in a demo. But a test that fails before the change and passes after it is worth more than any video, because it stays in the repo and runs again tomorrow. If you have to pick, require the test.
+
+## 05 · Two or three in parallel, not ten
+
+That's the next trap. Once it works, you want to open ten. Aether sell campaigns: a lead agent splits a big task into sub-agents, each in its own devbox and branch, and it all comes back as one PR. Nice. But HackerNoon put their finger on the problem: the agents can work in parallel, your attention can't.
+
+Run `git worktree list`. One line per agent, with the branch it's on. If there are more lines than you can explain from memory, what each one is waiting on from you, you have too many. A rule of thumb that works for me: three. Past that I start forgetting which decision is still open and which handoff nobody picked up.
+
+<figure><img src="/posts/since-coding/v3-svg-en.jpg" alt="Three parallel agents produce one queue: the bottleneck moves from writing to review, which is why three is the ceiling (HackerNoon, 2026)" loading="lazy" /><figcaption>Three parallel agents produce one queue: the bottleneck moves from writing to review, which is why three is the ceiling (HackerNoon, 2026)</figcaption></figure>
+
+## 06 · One week, three numbers
+
+The MIT Sloan and BCG survey from spring 2025 says 35% had already adopted agents by 2023, and another 44% plan to. Nice, but it tells you nothing about your team. Measure one week:
+
+1. **Time from task to merge**, against the same kind of task without an agent.
+2. **How many PRs merged with no human commit.** If that's close to zero, the agent writes drafts, not code.
+3. **Review rounds per PR.** If that number goes up, your handoff is weak. Go back to step 03.
+
+There's no good public benchmark for this. The only baseline that matters is yours, from the week before.
+
+## Takeaways
+
+- Permissions before model. `--allowedTools` first, model comparisons later.
+- One task = one worktree or devbox. Never the main repo.
+- Instructions go in AGENTS.md, not in chat. The handoff is part of the definition of Done.
+- An agent isn't done when it says it's done. It's done when there's test output in the PR.

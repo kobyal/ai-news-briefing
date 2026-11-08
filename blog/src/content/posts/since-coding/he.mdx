@@ -1,0 +1,145 @@
+---
+title: "Since coding: חמש שנים מ-Copilot, ומה לשנות בצוות כבר ביום ראשון"
+description: "המודל הוא ההחלטה הכי פחות חשובה בעבודה עם coding agents. שישה צעדים: הרשאות, devbox לכל משימה, AGENTS.md, הוכחה ב-PR ומדידה."
+lang: he
+key: since-coding
+term: "since coding"
+kind: fieldnotes
+pubDate: 2026-11-08
+tags: ["coding-agents", "claude-code", "sandbox", "code-review", "devbox"]
+hook: "claim"
+cover: photo
+tldr: ["הגבילו את ה-agent עם --allowedTools לפני שאתם משווים מודלים.", "כל משימה ב-git worktree או devbox נפרד, אף פעם לא בריפו הראשי.", "דרשו פלט טסטים ו-handoff בכל PR של agent, לא רק diff."]
+hero: /posts/since-coding/hero.jpg
+diagram: /posts/since-coding/diagram.svg
+sources:
+  - { title: "Show HN: Aether – Run Claude Code, Codex, or OpenCode in devboxes you can watch", url: "https://www.runaether.dev", date: "2026-07-11" }
+  - { title: "From Copilot to agents: The history of AI coding", url: "https://www.coderabbit.ai/blog/a-very-brief-history-of-ai-coding-from-copilot-to-next-gen-agents", date: "" }
+  - { title: "Coding agents explained: how AI agents boost development", url: "https://hackernoon.com/coding-agents-explained-how-ai-agents-boost-development", date: "" }
+  - { title: "Agentic AI, explained", url: "https://mitsloan.mit.edu/ideas-made-to-matter/agentic-ai-explained", date: "" }
+opinion: "אנחנו לא רואים ב-since coding שיטה. זה פשוט הרגע שבו השאלה זזה מ'איזה מודל' ל'איזו מערכת בונים סביב המודל'. המיומנות של 2026 היא לא לכתוב פרומפט טוב יותר, אלא להחליט מה ה-agent רואה, במה הוא נוגע, איך בודקים אותו ומתי מאפסים אותו. אנחנו מעדיפים דטרמיניזם איפה שאפשר: רשימת כלים מותרים, טסטים, schema, ושיקול דעת של מודל רק איפה שאין ברירה. לופ שבודק את עצמו שווה יותר מטיוטה ראשונה מבריקה, אז תמיד נעדיף agent בינוני עם טסטים על פני agent חכם בלי. וכשמשרות 'agent orchestrator' מופיעות לפני שמישהו פרסם איך מודדים את זה, אנחנו מתחילים לחשוד."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+הטענה שלי: איזה agent אתם מריצים, Claude Code, Codex או OpenCode, זו ההחלטה הכי פחות חשובה שתקבלו השנה לגבי קוד עם AI. כולם יודעים לקרוא ריפו, לערוך כמה קבצים ולהריץ טסטים. מה שקובע אם זה יחזיק אצלכם זה מה שמסביב: איפה הוא רץ, במה מותר לו לגעת, ואיך הוא מוכיח שזה עבד.
+
+since coding זה השם שאני נותן לציר הזה. אף אחד לא טבע אותו. הציר מתחיל ב-29 ביוני 2021, היום ש-GitHub הכריזה על Copilot. שמונה ימים אחר כך, ב-7 ביולי, OpenAI פרסמו את מאמר Codex עם HumanEval, וכתבו שם במפורש שגרסה נפרדת של Codex מריצה את Copilot. Copilot השלים שורה או פונקציה בתוך הקובץ, וזהו. חמש שנים אחרי, ב-Show HN של Aether מ-11 ביולי 2026, כל משימה מקבלת microVM של Firecracker משלה, devbox חם עולה תוך כ-5 שניות, וה-agent מקליט וידאו של דפדפן אמיתי שמקליק על השינוי שלו.
+
+אותם מודלים בבסיס, מוצר אחר לגמרי. HackerNoon ניסחו את זה הכי טוב:
+
+> The distinction that matters is scope of action, not model quality. An assistant suggests. An agent acts, then reports what it did.
+> — Coding agents explained, HackerNoon, אוקטובר 2026
+
+בגדול, זה כל הסיפור. הצעה גרועה של autocomplete עולה לכם כמה שורות, ואתם רואים אותה מיד. agent גרוע עולה לכם PR שלם, אחרי עשרים פקודות shell שלא ראיתם. אז ככה הייתי ניגש לזה השבוע, לפי הסדר.
+
+## 01 · קודם מחליטים כמה רחוק הוא מגיע, אחר כך בוחרים מודל
+
+תכתבו שורה אחת לכל רמת גישה, ותחליטו מאיפה אתם מתחילים:
+
+- **מציע.** מה ש-Copilot עשה ב-2021. אתם מקבלים או דוחים, המקלדת אצלכם.
+- **עורך ומריץ טסטים.** ה-agent נוגע בכמה קבצים ומריץ `npm test`, אבל לא עושה push ולא נוגע ב-CI.
+- **פותח PR.** עובד על branch משלו ומחזיר PR לבדיקה.
+
+אני מתחיל צוותים ברמה השנייה. בפועל זה דגל אחד. בקלוד: `--allowedTools "Read,Edit,Glob,Grep,Bash(npm test:*)"`, וכל פקודת shell אחרת נחסמת או מבקשת אישור. ב-Codex זה `--sandbox workspace-write`, שמגביל כתיבה לתיקיית העבודה.
+
+מה שאתם רואים בסוף הצעד הזה: רשימה קצרה של פקודות מותרות. כל מה שלא ברשימה זו החלטה שלכם, לא של המודל. ההבדל בין completion ל-agent יושב בדיוק בשורה הזאת.
+
+<figure><img src="/posts/since-coding/src2.jpg" alt="ב-2021 Copilot שם את המודל בתוך העורך. היום השאלה כבר לא איפה הוא מציע, אלא מה מותר לו לעשות (credit: CodeRabbit)" loading="lazy" /><figcaption>ב-2021 Copilot שם את המודל בתוך העורך. היום השאלה כבר לא איפה הוא מציע, אלא מה מותר לו לעשות (credit: CodeRabbit)</figcaption></figure>
+
+## 02 · כל משימה מקבלת מכונה משלה
+
+agent שרץ על הלפטופ שלכם רואה את ה-.env, את ה-~/.aws ואת כל השאר. Aether פותרים את זה עם microVM חדש לכל משימה: כל פקודה נרשמת, אפשר לעשות SSH לתוך ה-devbox באמצע הריצה, והם מחייבים רק על המכונה. ה-agent עצמו רץ על המנוי שכבר יש לכם.
+
+לא רוצים עוד ספק? את רוב הדרך אפשר לעשות מקומית עם git worktree וקונטיינר:
+
+```bash title="run-agent.sh"
+#!/usr/bin/env bash
+# ./run-agent.sh fix-checkout "Fix the order summary on mobile checkout"
+set -euo pipefail
+NAME="$1"; TASK="$2"
+WT="$(pwd)/../wt-$NAME"
+
+git worktree add "$WT" -b "agent/$NAME"
+
+docker run --rm \
+  -e ANTHROPIC_API_KEY -e TASK="$TASK" \
+  -v "$WT":/work -w /work \
+  node:22 bash -lc '
+    npm ci &&
+    npx -y @anthropic-ai/claude-code -p "$TASK" \
+      --allowedTools "Read,Edit,Glob,Grep,Bash(npm test:*)" \
+      > .agent-log.txt
+  '
+
+cd "$WT" && git status --short && git diff --stat
+```
+
+מה שאתם רואים בסוף: `git diff --stat` על branch נפרד, ולוג של מה שה-agent עשה. הריפו הראשי לא נגע. רוצים לזרוק? `git worktree remove ../wt-fix-checkout` וזהו.
+
+רגע, הרשת. הקונטיינר הזה עדיין יוצא לאינטרנט, כי ה-agent צריך לדבר עם ה-API. אם זה מפריע לכם, אנטרופיק מפרסמים devcontainer לדוגמה ל-Claude Code עם firewall שמאפשר יציאה רק לדומיינים שברשימה. שווה להעתיק אותו כמו שהוא.
+
+<figure><img src="/posts/since-coding/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/since-coding/v2-screenshot-he.jpg" alt="microVM לכל משימה וכל פקודה בלוג: הבידוד הוא המוצר, המודל נשאר שלכם (Aether)" loading="lazy" /><figcaption>microVM לכל משימה וכל פקודה בלוג: הבידוד הוא המוצר, המודל נשאר שלכם (Aether)</figcaption></figure>
+
+## 03 · כללי הבית נכנסים לריפו, לא לפרומפט
+
+כל פעם שאתם מסבירים ל-agent בצ'אט שאסור לגעת ב-migrations, זה נעלם בשיחה הבאה. תכתבו את זה לקובץ. Aether מנסחים את זה בשורה אחת: Commit a SKILL.md and every agent that touches the repo follows it.
+
+קלוד קורא CLAUDE.md, ו-Codex ו-OpenCode קוראים AGENTS.md. אז קובץ אחד ו-symlink:
+
+```markdown title="AGENTS.md"
+## Before you finish
+- Run `npm test` and paste the last 20 lines of output in your summary.
+- Never edit files under `migrations/` or `.github/workflows/`.
+- One concern per branch. Found a second bug? Write it down, don't fix it.
+
+## Handoff (always, at the end)
+- What changed: files, one line each
+- What you assumed
+- What is still open
+```
+
+ואז `ln -s AGENTS.md CLAUDE.md`, ושני הכלים קוראים את אותו דבר.
+
+החלק החשוב פה הוא ה-handoff. הוא לקוח כמעט מילה במילה מ-HackerNoon: מה השתנה, מה הניחו, מה נשאר פתוח. בלי זה אתם מקבלים diff של 400 שורות ו-'Done!', ושורפים חצי שעה על לנסות להבין מה עבר לו בראש.
+
+## 04 · PR בלי הוכחה חוזר אחורה
+
+פה רוב הצוותים נופלים. ה-agent אומר שהטסטים עברו, ואתם מאמינים. אל תאמינו. תבקשו את הפלט.
+
+ה-review של Aether בנוי על הרעיון הזה: הממצאים מגיעים מהאפליקציה שרצה ולא רק מה-diff, יש צילומי מסך של ה-base branch מול ה-commit, ואפשר להדליק וידאו של דפדפן אמיתי שמקליק על השינוי. ה-reviewer שלהם גם בודק מחדש כל push עד שהוא מאשר.
+
+גם בלי Aether, זה צ'קליסט שאפשר להכניס ל-PR template מחר בבוקר:
+
+- פלט הטסטים מצורף, לא רק 'passed'
+- בשינוי UI: צילום לפני ואחרי
+- רשימת ההנחות מה-handoff
+- branch אחד, נושא אחד
+
+> **הדעה שלי:** וידאו של agent מקליק על כפתור נראה מעולה בדמו. אבל טסט שנכשל לפני השינוי ועובר אחריו שווה יותר מכל וידאו, כי הוא נשאר בריפו ורץ גם מחר. אם צריך לבחור, תדרשו את הטסט.
+
+## 05 · שניים-שלושה במקביל, לא עשרה
+
+זו המלכודת הבאה. ברגע שזה עובד, בא לכם לפתוח עשרה. Aether מוכרים campaigns: agent מוביל שמפצל משימה גדולה ל-sub-agents, כל אחד ב-devbox וב-branch משלו, והכל חוזר כ-PR אחד. יפה. אבל HackerNoon שמו את האצבע על הבעיה: ה-agents יכולים לעבוד במקביל, הקשב שלכם לא.
+
+תריצו `git worktree list`. שורה לכל agent, ועל איזה branch הוא יושב. אם יש יותר שורות ממה שאתם יכולים להגיד בעל פה מה כל אחת מחכה מכם, יש לכם יותר מדי. כלל אצבע שעובד לי: שלוש. מעבר לזה אני מתחיל לשכוח איזו החלטה נשארה פתוחה ואיזה handoff אף אחד לא הרים.
+
+<figure><img src="/posts/since-coding/v3-svg-he.jpg" alt="שלושה agents מקבילים מייצרים תור אחד: צוואר הבקבוק זז מכתיבה ל-review, ולכן שלושה זה התקרה (HackerNoon, 2026)" loading="lazy" /><figcaption>שלושה agents מקבילים מייצרים תור אחד: צוואר הבקבוק זז מכתיבה ל-review, ולכן שלושה זה התקרה (HackerNoon, 2026)</figcaption></figure>
+
+## 06 · שבוע אחד, שלושה מספרים
+
+הסקר של MIT Sloan ו-BCG מאביב 2025 אומר ש-35% כבר אימצו agents ב-2023, ועוד 44% מתכננים. נחמד, אבל זה לא אומר כלום על הצוות שלכם. תמדדו שבוע אחד:
+
+1. **זמן ממשימה ל-merge**, מול אותו סוג משימה בלי agent.
+2. **כמה PRs נכנסו בלי commit אנושי.** אם זה קרוב לאפס, ה-agent כותב טיוטות, לא קוד.
+3. **כמה סבבי review לכל PR.** אם המספר עולה, ה-handoff שלכם חלש. חזרו לצעד 03.
+
+אין benchmark ציבורי טוב לזה. ה-baseline היחיד שרלוונטי הוא שלכם, מהשבוע שלפני.
+
+## מה לקחת
+
+- הרשאות לפני מודל. `--allowedTools` קודם, השוואת מודלים אחר כך.
+- משימה אחת = worktree או devbox אחד. אף פעם לא הריפו הראשי.
+- הוראות הולכות ל-AGENTS.md, לא לצ'אט. ה-handoff הוא חלק מההגדרה של Done.
+- agent לא סיים כשהוא אומר שסיים. הוא סיים כשיש פלט טסטים ב-PR.

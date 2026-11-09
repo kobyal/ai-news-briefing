@@ -1,0 +1,128 @@
+---
+title: "AI-native engineering: writing code isn't the bottleneck anymore, verifying it is"
+description: "What AI-native engineering is, what Meta and Anthropic actually did, and why the work moved from writing code to verifying it. With an AGENTS.md to copy."
+lang: en
+key: ai-native-engineering
+term: "ai-native engineering"
+kind: explainer
+pubDate: 2026-11-09
+tags: ["ai-native", "agents", "software-engineering", "verification", "spec-driven-development"]
+hook: "scene"
+cover: type
+tldr: ["Measure how many of the agent's PRs merged without a manual rewrite", "Write a spec with acceptance criteria before you open an agent", "Give the agent one verification command, make check, in AGENTS.md"]
+hero: /posts/ai-native-engineering/hero-en.jpg
+diagram: /posts/ai-native-engineering/diagram.svg
+sources:
+  - { title: "What We Learned Hiring 33 Engineers in Two Weeks", url: "https://www.digitalocean.com/blog/ai-native-engineering-interview", date: "2026-06-10" }
+  - { title: "Is AI-native Engineering DevOps 2.0 (or even Agile 3.0)?", url: "https://www.wwt.com/blog/is-ai-native-engineering-really-devops-20-or-even-agile-30", date: "2026-09-01" }
+  - { title: "Meta Built a New App with AI-Native Engineering", url: "https://engineering.fb.com/2026/10/15/ml-applications/how-meta-built-forum-ai-native-engineering", date: "2026-10-18" }
+  - { title: "Running an AI-native engineering org", url: "https://claude.com/blog/running-an-ai-native-engineering-org", date: "2026-06-13" }
+  - { title: "Spec-Driven Development: A Spec-First Approach to AI-Native Engineering", url: "https://developer.microsoft.com/blog/spec-driven-development-ai-native-engineering", date: "2026-06-12" }
+  - { title: "Building an AI-Native Engineering Team", url: "https://developers.openai.com/codex/guides/build-ai-native-engineering-team", date: "2026-06-09" }
+  - { title: "'How ASML is applying AI-native engineering for the next technology era'", url: "https://www.asml.com/en/news/stories/2026/machines-behind-machines", date: "2026-06-12" }
+  - { title: "What is AI-Native Engineering? | Alfonso Graziano", url: "https://alfonsograziano.it/blog/what-is-ai-native-engineering", date: "" }
+  - { title: "What is AI-Native Development? | AI-Native Software Development | Bitloops Resources", url: "https://bitloops.com/resources/ai-native-development/what-is-ai-native-development", date: "" }
+  - { title: "Building an AI-native engineering team", url: "https://cdn.openai.com/business-guides-and-resources/building-an-ai-native-engineering-team.pdf", date: "" }
+  - { title: "A Practical Guide to Becoming an AI-Native Engineer", url: "https://blog.bytebytego.com/p/a-practical-guide-to-becoming-an", date: "" }
+  - { title: "AI-Native Engineering: 5 Blueprints for Production AI Agents", url: "https://www.harbingergroup.com/blogs/ai-native-engineering-why-the-right-blueprints-matter-more-than-the-right-model", date: "" }
+opinion: "We're not excited about the name. AI-native engineering is mostly regular engineering with an agent inside the loop, and a new name doesn't change what you do on Monday. What does change is that the work moved from writing to verification, and Meta and Anthropic each say so independently, without coordinating. We judge a team by how much of the agent's code merges without a rewrite, not by how much code it produced. And watch who's selling the term: when it shows up on a consulting slide and in a job description before it shows up in an engineering write-up, be suspicious. What convinces us is Meta measuring verified outcomes and openly admitting it doesn't work in every stage yet."
+madeWith: { model: "claude-opus-5-5", sourceCount: 12, reviewedBy: "Koby Almog" }
+---
+
+Anthropic published a post on June 3, 2026 about how the Claude Code team works, and one scene in it will be familiar to any tech lead. The team wrote a six-month roadmap. The post calls it "pretty good." By month three it no longer applied. Claude Code itself made it obsolete: the tool changed the pace of the people building it.
+
+Four months later, on October 15, Meta described how a small team built Forum from scratch. Forum is a standalone app for Facebook Groups, and the team had an agent inside the whole development cycle. Their metric wasn't how much code got written. They counted changes that pass the build, pass the tests and survive review.
+
+The name for this is AI-native engineering. It sounds like a consulting slide, and sometimes it is one. Underneath the name, though, something real changed: where the bottleneck sits on an engineering team.
+
+## Nobody invented it; the term just stuck in 2026
+
+There's no inventor. There's one document everyone cites: OpenAI's guide, Building an AI-native engineering team, released as a PDF on November 20, 2025. It leans on a single METR number. In August 2025, frontier models could finish tasks that take 2 hours and 17 minutes, with roughly a 50% chance of getting them right. That length doubles about every seven months. A few years ago it was 30 seconds, enough to complete a line.
+
+Then came June 2026, and within ten days everyone was using the term. Anthropic on June 3. OpenAI put the guide up as a web page on June 9, and the same day DigitalOcean explained how it hired 33 engineers in two weeks, using an interview where the candidate works with AI. Microsoft posted about Spec-Driven Development on June 10, and ASML talked about it at the AI Now Summit in Paris on June 12.
+
+Alfonso Graziano wrote the sharpest definition back in April: AI-native is the opposite of the vibe coding Karpathy described in early 2025. Same tools, opposite habits. A spec before the prompt, an AGENTS.md file that teaches the agent the repo, and a feedback loop that catches mistakes before a human sees them.
+
+In August, WWT asked the right question: is this DevOps 2.0? DevOps also started with one talk, Flickr's 2009 talk on 10+ deploys a day, and seventeen years later there are still silos. Tools alone didn't change culture then, and we don't think they will now.
+
+<figure><img src="/posts/ai-native-engineering/v1-strip-en.jpg" alt="Every 2026 number measures writing. None of them measures how much of it survived review (DigitalOcean, ByteByteGo, METR)" loading="lazy" /><figcaption>Every 2026 number measures writing. None of them measures how much of it survived review (DigitalOcean, ByteByteGo, METR)</figcaption></figure>
+
+## What it is, and what it isn't
+
+The short version: an agent is in every stage of development, not just writing. Planning, implementation, tests, review, deploy. The human owns what gets built, the boundaries, and the call on whether the result is good.
+
+What it isn't:
+
+- **Copilot bolted onto your existing process.** Bitloops put it well: you can add Copilot to waterfall and still be doing waterfall.
+- **Vibe coding.** Great for a throwaway prototype. In production it's code that looks fine, passes the tests, and breaks on an edge case nobody thought about.
+- **Prompt engineering with a new name.** The prompt is the least interesting part here.
+
+Why the urgency? Meta's Shah Rahman gives the numbers on ByteByteGo: at Google, AI writes more than 75% of new code, and Amazon moved 30,000 apps from Java 8 to Java 17 in a few months, a project estimated at 4,500 developer-years. In the same breath he asks why most teams ship more bugs today than two years ago. The New York Times called it code overload in April.
+
+<figure><img src="/posts/ai-native-engineering/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+## What Meta actually did: human-on-the-loop
+
+The most useful distinction in this whole wave comes from Meta. With human-in-the-loop, the engineer drives every step and AI helps inside it: completes a function, suggests a fix. The pace is the human's pace.
+
+With human-on-the-loop, the agent runs the iteration itself: plans, writes, builds, runs tests, fixes, repeats. The engineer sets the goal, watches the run, steps in when it goes sideways, and approves. Meta says plainly that this is a target, not a finished state. Some stages run on their own, and some still have an engineer in every round.
+
+And the line worth pinning next to your CI:
+
+> Weak signals don't remove the constraint; they move it from writing code to reviewing code that looks finished and isn't.
+>
+> — Forum team, Meta Engineering, October 15, 2026
+
+In other words: without a reliable signal, the agent didn't save you time. It just moved the work from the keyboard to review.
+
+<figure><img src="/posts/ai-native-engineering/src3.jpg" alt="On Forum, Meta didn't count lines of code. They counted changes that survived build, tests and review (credit: Meta Engineering)" loading="lazy" /><figcaption>On Forum, Meta didn't count lines of code. They counted changes that survived build, tests and review (credit: Meta Engineering)</figcaption></figure>
+
+## The bottleneck moved to verification, so invest there
+
+Anthropic says the same thing from the other side. On the Claude Code team, writing code, tests and refactoring barely hold anything up. What holds things up is verification, code review and security. And the question they get most from engineering managers: how do humans keep up with review?
+
+Bitloops claims that before, 60–70% of time went to writing, and after, 50–70% goes to review. Those are vendor numbers with no methodology. Take the direction, not the percentages.
+
+What you can take: every check the agent runs on its own saves you review. Tests, type check, lint, schema validation, build. If you don't have one command that says pass or fail, the agent doesn't know when it's done, and you'll read every diff by eye.
+
+To decide where a human stays, Harbinger suggests three questions: how reversible is the decision, how much does it hurt if it's wrong, and how ambiguous is the problem. If any one is high, a human decides. A migration on the customers table? Human. A button on a settings page? Agent.
+
+> **My take:** every place I replaced a model's judgment with a deterministic check came out cheaper and more reliable. An agent that runs its own tests is worth more than a smarter model without tests. A loop that checks itself beats a better first draft, almost every time.
+
+<figure><img src="/posts/ai-native-engineering/v3-svg-en.jpg" alt="Agents produce at machine speed while verification still runs at human speed, so every automated check is worth more than a smarter model (Anthropic, Meta)" loading="lazy" /><figcaption>Agents produce at machine speed while verification still runs at human speed, so every automated check is worth more than a smarter model (Anthropic, Meta)</figcaption></figure>
+
+## How to start in your repo
+
+First, an instructions file for the agent. Codex, Cursor and others read AGENTS.md, and Claude Code reads CLAUDE.md. Length doesn't matter. What matters is one verification command and clear boundaries:
+
+```markdown title="AGENTS.md"
+# AGENTS.md
+
+## Done means verified
+- Run `make check` (lint + typecheck + unit tests). A task is done only when it passes.
+- Never edit or delete tests to make them pass. If a test looks wrong, say so and stop.
+
+## Spec
+- Work from `specs/<ticket>.md`. If acceptance criteria are missing or ambiguous, ask before coding.
+
+## Scope
+- Touch only the files the task needs. No drive-by refactors.
+- New dependency? Stop and ask.
+
+## Hands off (human only)
+- DB migrations, infra changes, secrets, auth logic.
+```
+
+Next, a spec before the prompt. Microsoft's SDD defines what you write up front: guardrails, requirements, constraints, acceptance criteria and edge cases. You don't need a framework for that. One markdown file per ticket in a specs/ folder is enough to start.
+
+One more small change from Anthropic: when you need context, ask Claude instead of whoever wrote the code. That saves someone else an interrupt. It only works if decisions are written down somewhere in the repo, so it also forces you to write them down.
+
+## What to try this week
+
+1. **Measure Meta's metric.** Of the PRs the agent opened in the last two weeks: how many passed CI on the first try, and how many merged without a manual rewrite. That's your baseline.
+2. **One spec.** Take a medium-sized ticket, write acceptance criteria before you open an agent, and count fix-up rounds against a similar ticket without a spec.
+3. **A verification command.** `make check` or `npm run check` that runs lint, types and tests, plus a line in AGENTS.md saying a task is done only when it passes.
+4. **Kill one ritual.** A ten-page design doc for a two-day feature? Anthropic moved to JIT planning: prototype, internal users, feedback.
+5. **If you're hiring:** DigitalOcean turned the work itself into the interview. Give the candidate an agent and a real task, and watch how they check what comes out.
+
+If you can't say how much of the agent's code merged without a rewrite, you're not AI-native yet. You're just typing faster.

@@ -1,0 +1,128 @@
+---
+title: "AI-native engineering: הקוד כבר לא הבעיה, הבדיקה כן"
+description: "מה זה AI-native engineering, מה מטא ואנטרופיק עשו בפועל, ולמה העבודה עברה מכתיבת קוד לבדיקה. עם AGENTS.md להעתקה וצ'קליסט לשבוע."
+lang: he
+key: ai-native-engineering
+term: "ai-native engineering"
+kind: explainer
+pubDate: 2026-11-09
+tags: ["ai-native", "agents", "software-engineering", "verification", "spec-driven-development"]
+hook: "scene"
+cover: type
+tldr: ["תמדדו כמה PRs של ה-agent נכנסו בלי שכתוב ידני", "תכתבו spec עם acceptance criteria לפני שאתם פותחים agent", "תנו ל-agent פקודת אימות אחת, make check, ב-AGENTS.md"]
+hero: /posts/ai-native-engineering/hero.jpg
+diagram: /posts/ai-native-engineering/diagram.svg
+sources:
+  - { title: "What We Learned Hiring 33 Engineers in Two Weeks", url: "https://www.digitalocean.com/blog/ai-native-engineering-interview", date: "2026-06-10" }
+  - { title: "Is AI-native Engineering DevOps 2.0 (or even Agile 3.0)?", url: "https://www.wwt.com/blog/is-ai-native-engineering-really-devops-20-or-even-agile-30", date: "2026-09-01" }
+  - { title: "Meta Built a New App with AI-Native Engineering", url: "https://engineering.fb.com/2026/10/15/ml-applications/how-meta-built-forum-ai-native-engineering", date: "2026-10-18" }
+  - { title: "Running an AI-native engineering org", url: "https://claude.com/blog/running-an-ai-native-engineering-org", date: "2026-06-13" }
+  - { title: "Spec-Driven Development: A Spec-First Approach to AI-Native Engineering", url: "https://developer.microsoft.com/blog/spec-driven-development-ai-native-engineering", date: "2026-06-12" }
+  - { title: "Building an AI-Native Engineering Team", url: "https://developers.openai.com/codex/guides/build-ai-native-engineering-team", date: "2026-06-09" }
+  - { title: "'How ASML is applying AI-native engineering for the next technology era'", url: "https://www.asml.com/en/news/stories/2026/machines-behind-machines", date: "2026-06-12" }
+  - { title: "What is AI-Native Engineering? | Alfonso Graziano", url: "https://alfonsograziano.it/blog/what-is-ai-native-engineering", date: "" }
+  - { title: "What is AI-Native Development? | AI-Native Software Development | Bitloops Resources", url: "https://bitloops.com/resources/ai-native-development/what-is-ai-native-development", date: "" }
+  - { title: "Building an AI-native engineering team", url: "https://cdn.openai.com/business-guides-and-resources/building-an-ai-native-engineering-team.pdf", date: "" }
+  - { title: "A Practical Guide to Becoming an AI-Native Engineer", url: "https://blog.bytebytego.com/p/a-practical-guide-to-becoming-an", date: "" }
+  - { title: "AI-Native Engineering: 5 Blueprints for Production AI Agents", url: "https://www.harbingergroup.com/blogs/ai-native-engineering-why-the-right-blueprints-matter-more-than-the-right-model", date: "" }
+opinion: "אנחנו לא מתלהבים מהשם. AI-native engineering הוא בעיקר הנדסה רגילה עם agent בתוך הלולאה, ושם חדש לא משנה מה עושים ביום שני. מה שכן משנה זה שהעבודה עברה מכתיבה לאימות, ומטא ואנטרופיק אומרים את זה כל אחד בנפרד, בלי לתאם. אנחנו שופטים צוות לפי כמה מהקוד של ה-agent נכנס בלי שכתוב, לא לפי כמה קוד הוא ייצר. ותשימו לב מי מוכר את המונח: כשהוא מופיע בשקף של חברת ייעוץ ובתיאור משרה לפני שהוא מופיע במאמר, כדאי לחשוד. מה שמשכנע אותנו זה מטא שמודדת verified outcomes ומודה בגלוי שזה עוד לא עובד בכל השלבים."
+madeWith: { model: "claude-opus-5-5", sourceCount: 12, reviewedBy: "Koby Almog" }
+---
+
+בפוסט של אנטרופיק מ-3 ביוני 2026, על איך עובד צוות Claude Code, יש סצנה שכל tech lead יזהה. הצוות כתב roadmap לשישה חודשים, 'די טוב' בלשון הפוסט. בחודש השלישי הוא כבר לא היה רלוונטי. ומה שהרג אותו זה Claude Code עצמו: הכלי שינה את הקצב של מי שבונה אותו.
+
+ארבעה חודשים אחר כך, ב-15 באוקטובר, מטא פרסמה איך צוות קטן בנה מאפס את Forum, אפליקציה נפרדת לקבוצות של פייסבוק, עם agent בתוך כל מחזור הפיתוח. המדד שלהם לא היה כמה קוד נכתב. הם ספרו שינויים שעוברים build, עוברים tests ושורדים review.
+
+לזה קוראים היום AI-native engineering. השם נשמע כמו שקף של חברת ייעוץ, ולפעמים הוא באמת שקף של חברת ייעוץ. אבל מתחת לשם יש שינוי אמיתי: איפה נמצא צוואר הבקבוק בצוות פיתוח.
+
+## אף אחד לא המציא את זה, זה פשוט נדבק ב-2026
+
+אין ממציא. יש מסמך שכולם מצטטים: המדריך של OpenAI, Building an AI-native engineering team, שיצא כ-PDF ב-20 בנובמבר 2025. הוא נשען על מספר אחד של METR: באוגוסט 2025 המודלים המובילים סיימו משימות של 2 שעות ו-17 דקות, עם סיכוי של בערך 50% לתשובה נכונה. והאורך הזה מכפיל את עצמו בערך כל שבעה חודשים. לפני כמה שנים זה היה 30 שניות, מספיק להשלים שורה.
+
+ואז הגיע יוני 2026, ותוך עשרה ימים כולם השתמשו במונח. אנטרופיק ב-3 ביוני. OpenAI העלתה את המדריך כגרסת web ב-9 ביוני, ובאותו יום DigitalOcean סיפרה איך גייסה 33 מהנדסים בשבועיים, עם ראיון שבו המועמד עובד עם AI. מיקרוסופט פרסמה ב-10 ביוני על Spec-Driven Development, ו-ASML דיברה על זה ב-AI Now Summit בפריז ב-12 ביוני.
+
+את ההגדרה הכי חדה כתב אלפונסו גרציאנו באפריל: AI-native זה ההפך מה-vibe coding של קרפתי מתחילת 2025. אותם כלים, הרגלים הפוכים. spec לפני prompt, קובץ AGENTS.md שמלמד את ה-agent את ה-repo, ולולאת feedback שתופסת טעויות לפני שבן אדם רואה אותן.
+
+ו-WWT שאלו באוגוסט את השאלה הנכונה: זה DevOps 2.0? גם DevOps התחיל מהרצאה אחת של Flickr ב-2009 על 10+ deploys ביום, ושבע-עשרה שנה אחרי עדיין יש silos. כלים לבד לא שינו תרבות אז, ולא נראה לי שישנו עכשיו.
+
+<figure><img src="/posts/ai-native-engineering/v1-strip-he.jpg" alt="כל המספרים של 2026 מודדים כתיבה. אף אחד מהם לא מודד כמה מזה שרד review (DigitalOcean, ByteByteGo, METR)" loading="lazy" /><figcaption>כל המספרים של 2026 מודדים כתיבה. אף אחד מהם לא מודד כמה מזה שרד review (DigitalOcean, ByteByteGo, METR)</figcaption></figure>
+
+## מה זה, ומה זה לא
+
+בגדול: agent נמצא בכל שלב של הפיתוח, לא רק בכתיבה. תכנון, מימוש, tests, review, deploy. הבן אדם מחזיק את מה שבונים, את הגבולות, ואת ההחלטה אם התוצאה טובה.
+
+מה זה לא:
+
+- **Copilot שהוספתם לתהליך הקיים.** Bitloops ניסחו את זה טוב: אפשר להוסיף Copilot ל-waterfall ועדיין לעשות waterfall.
+- **vibe coding.** מצוין לפרוטוטייפ שזורקים. ב-production זה קוד שנראה בסדר, עובר tests, ונופל על edge case שאף אחד לא חשב עליו.
+- **prompt engineering בשם חדש.** ה-prompt הוא החלק הכי פחות מעניין פה.
+
+למה זה דחוף? שאה רחמן ממטא מביא ב-ByteByteGo את המספרים: בגוגל AI כותב יותר מ-75% מהקוד החדש, ואמזון העבירה 30,000 אפליקציות מ-Java 8 ל-Java 17 בכמה חודשים, פרויקט שהעריכו ב-4,500 שנות מפתח. ובאותה נשימה הוא שואל למה רוב הצוותים שולחים היום יותר באגים מלפני שנתיים. בניו יורק טיימס קראו לזה באפריל code overload.
+
+<figure><img src="/posts/ai-native-engineering/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+## מה מטא עשו בפועל: human-on-the-loop
+
+ההבחנה הכי שימושית בכל הגל הזה היא של מטא. ב-human-in-the-loop המהנדס מנהל כל צעד וה-AI עוזר בתוכו: משלים פונקציה, מציע תיקון. הקצב הוא הקצב של הבן אדם.
+
+ב-human-on-the-loop ה-agent מריץ את האיטרציה בעצמו: מתכנן, כותב, בונה, מריץ tests, מתקן, ושוב. המהנדס קובע מטרה, מסתכל על הריצה, נכנס כשזה מתברבר, ומאשר. הם עצמם כותבים שזה יעד ולא מצב גמור. חלק מהשלבים רצים לבד, ובחלק עדיין יש מהנדס בכל סיבוב.
+
+והמשפט שכדאי לתלות ליד ה-CI:
+
+> Weak signals don't remove the constraint; they move it from writing code to reviewing code that looks finished and isn't.
+>
+> — צוות Forum, Meta Engineering, 15 באוקטובר 2026
+
+בקיצור: בלי סיגנל אמין, ה-agent לא חסך לכם זמן. הוא רק העביר את העבודה מהמקלדת ל-review.
+
+<figure><img src="/posts/ai-native-engineering/src3.jpg" alt="ב-Forum מטא לא ספרו שורות קוד. הם ספרו שינויים ששרדו build, tests ו-review (credit: Meta Engineering)" loading="lazy" /><figcaption>ב-Forum מטא לא ספרו שורות קוד. הם ספרו שינויים ששרדו build, tests ו-review (credit: Meta Engineering)</figcaption></figure>
+
+## הצוואר זז לבדיקה, אז שם משקיעים
+
+אנטרופיק אומרים אותו דבר מהכיוון השני. בצוות Claude Code כתיבת קוד, tests ו-refactoring כמעט לא מעכבים. מה שמעכב זה verification, code review ואבטחה. והשאלה שהם מקבלים הכי הרבה ממנהלי הנדסה: איך בני אדם עומדים בקצב של ה-review?
+
+Bitloops טוענים שלפני זה 60–70% מהזמן הלכו על כתיבה, ואחרי 50–70% הולכים על review. אלה מספרים של ספק בלי מתודולוגיה. קחו את הכיוון, לא את האחוזים.
+
+מה שכן אפשר לקחת: כל בדיקה שה-agent מריץ לבד חוסכת לכם review. tests, type check, lint, schema validation, build. אם אין לכם פקודה אחת שאומרת 'עבר' או 'לא עבר', ה-agent לא יודע מתי הוא סיים, ואתם תקראו כל diff בעיניים.
+
+ובשביל להחליט איפה בן אדם נשאר, Harbinger מציעים שלוש שאלות: כמה ההחלטה הפיכה, כמה זה כואב אם היא שגויה, וכמה הבעיה עמומה. אם אחת מהן גבוהה, בן אדם מחליט. migration על טבלת לקוחות? בן אדם. כפתור בדף הגדרות? ה-agent.
+
+> **הדעה שלי:** כל מקום שבו החלפתי שיקול דעת של מודל בבדיקה דטרמיניסטית יצא זול ואמין יותר. agent שמריץ את ה-tests של עצמו שווה יותר ממודל חכם יותר בלי tests. לולאה שבודקת את עצמה מנצחת draft ראשון טוב יותר, כמעט תמיד.
+
+<figure><img src="/posts/ai-native-engineering/v3-svg-he.jpg" alt="agents מייצרים בקצב של מכונה, הבדיקה עדיין בקצב של בן אדם, ולכן כל בדיקה אוטומטית שווה יותר ממודל חכם יותר (Anthropic, Meta)" loading="lazy" /><figcaption>agents מייצרים בקצב של מכונה, הבדיקה עדיין בקצב של בן אדם, ולכן כל בדיקה אוטומטית שווה יותר ממודל חכם יותר (Anthropic, Meta)</figcaption></figure>
+
+## איך מתחילים ב-repo שלכם
+
+קודם כל, קובץ הוראות ל-agent. Codex, Cursor ואחרים קוראים AGENTS.md, ו-Claude Code קורא CLAUDE.md. האורך לא משנה. מה שמשנה זה פקודת אימות אחת וגבולות ברורים:
+
+```markdown title="AGENTS.md"
+# AGENTS.md
+
+## Done means verified
+- Run `make check` (lint + typecheck + unit tests). A task is done only when it passes.
+- Never edit or delete tests to make them pass. If a test looks wrong, say so and stop.
+
+## Spec
+- Work from `specs/<ticket>.md`. If acceptance criteria are missing or ambiguous, ask before coding.
+
+## Scope
+- Touch only the files the task needs. No drive-by refactors.
+- New dependency? Stop and ask.
+
+## Hands off (human only)
+- DB migrations, infra changes, secrets, auth logic.
+```
+
+חוץ מזה, spec לפני prompt. מיקרוסופט מגדירים ב-SDD מה כותבים מראש: guardrails, דרישות, אילוצים, acceptance criteria ו-edge cases. לא צריך framework בשביל זה. קובץ markdown לכל טיקט בתיקיית specs/ מספיק כדי להתחיל.
+
+ועוד שינוי קטן מאנטרופיק: כשצריך context, שואלים את קלוד ולא את מי שכתב את הקוד. זה חוסך interrupt למישהו אחר. וזה עובד רק אם ההחלטות כתובות איפשהו ב-repo, אז זה גם מכריח אתכם לכתוב אותן.
+
+## מה לנסות השבוע
+
+1. **תמדדו את המדד של מטא.** מתוך ה-PRs שה-agent פתח בשבועיים האחרונים: כמה עברו CI בניסיון הראשון, וכמה נכנסו בלי שכתוב ידני. זה ה-baseline שלכם.
+2. **spec אחד.** קחו טיקט בינוני, תכתבו לו acceptance criteria לפני שאתם פותחים agent, ותספרו סבבי תיקון מול טיקט דומה בלי spec.
+3. **פקודת אימות.** `make check` או `npm run check` שמריץ lint, types ו-tests, ושורה ב-AGENTS.md שאומרת שמשימה גמורה רק כשהיא עוברת.
+4. **תהרגו טקס אחד.** design doc של עשרה עמודים לפיצ'ר של יומיים? אנטרופיק עברו ל-JIT planning: prototype, משתמשים פנימיים, feedback.
+5. **אם אתם מגייסים:** DigitalOcean הפכו את העבודה עצמה לראיון. תנו למועמד agent ומשימה אמיתית, ותסתכלו איך הוא בודק את מה שיצא.
+
+אם אתם לא יודעים להגיד כמה מהקוד של ה-agent נכנס בלי שכתוב, אתם עוד לא AI-native. אתם פשוט מקלידים מהר יותר.

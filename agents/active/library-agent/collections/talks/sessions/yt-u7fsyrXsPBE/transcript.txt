@@ -1,0 +1,275 @@
+[0:00] Kevin Madura
+[0:00] Hey everybody, nice to see you here. My name is Kevin Madura. My colleague Natalia and I are from Alex Partners, which is a global management consulting firm. We focus primarily on bankruptcy and restructuring, business and technology advisory, and risk and compliance.
+[0:29] and I'm part of the AI engineering team there.
+[0:31] NADJA KONOLI- Awesome.
+[0:32] Thanks, Gavin.
+[0:33] Natalia Connelly, part of the AI and Data team at Alex Partners.
+[0:37] And today, we'd like to share our experience
+[0:39] with putting cloud code on a real procurement analysis
+[0:42] with you.
+[0:43] Our talk will have three parts.
+[0:45] So we'll talk about the business context, and then
+[0:47] our approach, and then some lessons learned.
+[0:50] All right, let's get to it.
+[0:52] OK, so some business context first.
+[0:55] Let's consider a very large health care company.
+[0:58] And it just acquired a smaller sort of niche player that's extremely good in one particular area.
+[1:05] And the parent company has some experience in that area, but just not that much.
+[1:10] So with that deal handed, the procurement team is hundreds of vendors across the two companies,
+[1:16] over 40,000 distinct contract documents, and multiple databases that really were not linked to one another.
+[1:23] So there was no holistic view, really, of each vendor and each contract relationship.
+[1:28] From here on out, let's deal with a synthetic replica of the situation.
+[1:34] So here it is, right?
+[1:35] So Harbor Health is our big parent company, and it acquired Summit Health Plan.
+[1:39] That's the small regional player that's extremely good in this one area.
+[1:43] And both of them have a relationship with a particular vendor.
+[1:46] Let's call it Acme Health Services.
+[1:48] Okay?
+[1:49] So after the merger, what the procurement team at Harbor Health really wants is answers,
+[1:54] such as, well, can we maybe get better terms from ACME now that we've merged?
+[1:59] And if so, can you maybe size up the savings?
+[2:02] And how quickly do I have to act in order to realize those savings?
+[2:06] So that's sort of the bottom line.
+[2:08] And our job is to make sure that that procurement lead from Harbor Health,
+[2:12] who will be sitting across from ACME during negotiations,
+[2:15] is well-equipped to answer any questions that they might raise,
+[2:18] any objections, anything, right, with a specific citation,
+[2:22] with a specific contract page or a specific invoice line.
+[2:27] So everything needs to be traced back to the source.
+[2:30] Okay, so originally when we put cloud code to it, this is what it gave us, right?
+[2:35] It came back with these answers.
+[2:37] They look complete.
+[2:39] They're certainly well formatted.
+[2:40] They look plausible enough.
+[2:42] And so then we went back to the warehouse and we checked every single answer.
+[2:47] Here's what we found out.
+[2:48] The total annual spend, the split between the two companies and the contract counts were all correct, so that was fine.
+[2:54] However, the total contract value was wrong by approximately $800,000.
+[3:02] So that's one.
+[3:03] The second one was the date by which we had to act in order to prevent the soonest expiring contract from auto-renewing was also wrong.
+[3:12] The agent said December 1st.
+[3:14] The actual date was November 1st, right?
+[3:17] And so if we just kind of believed the agent and waited until December 1st, the contract
+[3:21] would have auto-renewed, and, you know, whether we wanted it or not, right?
+[3:26] And so that's a problem.
+[3:28] So what happened?
+[3:29] How come Cloud Code did those things and got two answers wrong?
+[3:33] Well, the first thing to check, of course, would be the data.
+[3:36] So let's talk about the data just for a second.
+[3:39] And when you think about it, it just seems so straightforward to extract data from contracts,
+[3:43] right?
+[3:43] In reality though, contract data are a lot messier
+[3:46] than they appear.
+[3:48] So just some things that can potentially go wrong
+[3:52] with contract data.
+[3:53] For instance, you can have very long contracts
+[3:56] and they just get kind of stuck in pre-processing,
+[3:59] they just hang there.
+[4:00] And maybe you catch the exception with the timeout
+[4:03] and you kind of go on in your merry way,
+[4:05] you never even know that the contract never made it
+[4:07] into the database, that's one.
+[4:10] Another one is orphan amendments.
+[4:12] So for instance, there's an amendment to a parent contract,
+[4:15] but for whatever reason,
+[4:16] it's just not linked properly to its parent,
+[4:18] so it's just kind of floating out there as an orphan.
+[4:20] And this is actually exactly what happened in our example,
+[4:23] where Cloud Code missed the $800,000.
+[4:26] That's because it couldn't find that orphan amendment.
+[4:29] So that's another potential issue.
+[4:32] Another one, and this is pretty common,
+[4:34] is where you have multiple amendments
+[4:36] restating the original contract's terms.
+[4:38] So here you have one MSA, Master Service Agreement,
+[4:41] and two amendments that restated the total contract value.
+[4:44] And if you just extract the structured outputs,
+[4:47] the dollar amounts, right,
+[4:48] then your cloud code will very happily go
+[4:50] and just sum up those dollar amounts and go,
+[4:52] oh, the total contract value is about $17 million.
+[4:56] But if you read the actual text,
+[4:58] not just look at the numbers, the dollar numbers, right,
+[5:00] the text says that every amendment restates
+[5:03] the total contract value, so the correct answer is seven,
+[5:05] which is the most recent amendment's value.
+[5:08] That's another sort of gotcha to watch out for.
+[5:11] Finally, you can have situations like that
+[5:13] where you have very long tables.
+[5:15] Let's say these are the tables of RAIDs
+[5:17] for various services, right?
+[5:19] And they go across multiple pages.
+[5:21] And so if you look at page two,
+[5:23] it just starts out with some numbers and there's no header.
+[5:27] And Cloud Code might not necessarily know the context.
+[5:30] I mean, it will just do its best to kind of guess,
+[5:32] but it might not know what each value really means.
+[5:35] These are just some examples.
+[5:36] And none of this is exotic,
+[5:37] But it just shows that real contract portfolios are full of issues that may or may not be
+[5:42] apparent when you first started out on this journey.
+[5:46] And that's why Kevin and I spent quite some time really building a super robust data processing
+[5:52] pipeline in the beginning.
+[5:54] We spent about two weeks on it, just making sure that every single little thing like that
+[5:58] that you just saw and more, all of that stuff was accounted for.
+[6:02] And so it was really great.
+[6:04] So we spent those two weeks just building that robust pipeline, and then 40,000 plus
+[6:08] contracts were processed overnight once it was done.
+[6:11] I imagine if we did it by hand, it would have required probably a much larger team than
+[6:15] just us two, and probably a little bit more time than that.
+[6:19] But just a summary of the pipeline.
+[6:21] It was a five-stage pipeline.
+[6:22] The first one was mostly pre-processing, so document intelligence, OCR, that kind of stuff.
+[6:27] The second step was classification.
+[6:29] So what is each contract?
+[6:31] Is it the master service agreement?
+[6:32] Is it an amendment?
+[6:33] Is it an NDA, something like that?
+[6:36] Then there was the terms, rates, and spend extraction.
+[6:39] That's the next step.
+[6:40] And this is where we would account for things
+[6:41] like very long tables that could break across page boundaries.
+[6:45] And then we would map all the services to spend categories.
+[6:48] Only then would cloud code go over the extracted data
+[6:52] and sort of do its thing.
+[6:54] It was very important to have those structured tables,
+[6:56] not only because it helped out cloud code,
+[6:59] but also because it made it that much easier for us later on
+[7:03] to go and check every answer programmatically in code.
+[7:06] All right, so Kevin.
+[7:08] Sure, thanks, Natalia.
+[7:10] And so obviously contract data is very text heavy,
+[7:13] but not always.
+[7:15] And so there's sometimes there's multimodal elements,
+[7:17] there might be charts or graphs or other things
+[7:19] that if you just run it through a naive OCR process,
+[7:23] you might get what you see on the right
+[7:24] in terms of the axes,
+[7:26] but you actually lose the information
+[7:28] that's contained within the chart.
+[7:29] And so a lot of what we're talking about now,
+[7:32] your bitter lesson pill, this will likely not be relevant maybe like six to 12 months, we'll see.
+[7:37] But what we did here to solve this specific problem was take the contract pages as images
+[7:42] and feed them through using DSPy to arrive at a highly structured output, which is what you see
+[7:49] on the bottom right there. And so you go from this large unstructured data set to basically a
+[7:55] database of elements that you know are going to be relevant for the balance of your work. And so
+[8:01] it's very tempting to just let Claude rip on the unstructured data and kind of have it figure it
+[8:08] out, which is a valid approach. But there are certain engagements like this one where we know
+[8:15] upfront we want rate tiers. We know we want rebates. We know we want certain data elements.
+[8:20] So you structure some of that upfront and then let Claude fill in that framework behind it.
+[8:25] And so once you have everything in this highly structured format, you can then use Cloud Code to dynamically build tools for itself.
+[8:34] And so you have common ones, of course, like execute SQL or list tables or things like that.
+[8:39] But we found that it was really helpful for later implementations or later agents when they're coming in fresh to the data to have some of these tools available to them.
+[8:50] So invest a lot of time upfront to structure the data, as I mentioned previously, where you essentially create these derivative databases off of contract data or other spend data or invoices.
+[9:03] You normalize all that together.
+[9:05] And then you have Claude build these custom tools so that it has kind of a shortcut, if you will, to get certain information that are specific, in this case, to this deal.
+[9:15] And so you have things like get rate card page or get specific vendor spend.
+[9:19] And that's where you can embed some of the business logic, where you might know of some gotchas or some context that isn't immediately apparent or obvious in the contract data.
+[9:29] You can start to embed some of that in the tool calls themselves.
+[9:32] The way that it queries data or pulls things back is very helpful to enforce some of those more custom pieces of logic.
+[9:41] And Cloud Code is perfect for something like this, because it's used to navigating autonomously around kind of messy code bases.
+[9:49] This is a similar concept.
+[9:51] It's just contract data and spend data.
+[9:53] So it's all largely in tabular format,
+[9:56] but it can dynamically explore and pull in the different elements
+[9:59] that I mentioned previously.
+[10:01] And then once we found something that was useful that would work,
+[10:04] we would package that up either into something specific in the prompt,
+[10:08] but I think we lean more on these custom tools
+[10:12] and custom views within the database
+[10:13] to enforce some of that business logic in code
+[10:17] versus just relying on on a prompt and once you have all that packaged together you can start to
+[10:22] develop custom mcp servers and and configurations that live on and it's it's a it's a bunch of
+[10:29] different elements uh that really get at how do you perpetuate and accrue knowledge across the
+[10:35] the life cycle in this case for particular engagement but if you're working on something
+[10:40] internally right you want to accrue the the knowledge and accrue certain business rules
+[10:45] that you want to enforce later down the line.
+[10:48] So that is a nice way to do it.
+[10:51] And then, of course, you have the ability
+[10:52] to better govern access to the underlying data.
+[10:56] So you can block certain calls.
+[10:57] There was a great talk right before this
+[10:59] regarding security of how agents interact
+[11:03] with the rest of the environment.
+[11:04] It's actually pretty simple, I think, at the end of the day.
+[11:07] You just have a defined set of operations
+[11:09] that you're comfortable with, and you block everything else.
+[11:12] And you can enforce that up front.
+[11:13] So we'll walk through just a couple of lessons here very quickly.
+[11:18] Natalia mentioned previously about the agent using the wrong date.
+[11:22] And so it's a good example of, again, some external business context that is helpful and useful to embed into the agent up front.
+[11:31] Because in this case, yes, it pulled out the date from the termination clause.
+[11:36] But actually, the question we were asking was supposed to use the date from calculated from the renewal clause.
+[11:42] And so it seems like a minor thing, but it's a lot of these nuanced issues which compound your error rates.
+[11:51] And so the more you can build these sorts of rules in up front, the better the result ultimately, of course, will be.
+[11:59] Natalia mentioned also the kind of the dangling references for different amendments.
+[12:04] And so this is something that we run across a lot.
+[12:07] So many organizations have a contract lifecycle management system, a CLM.
+[12:13] It's intended to be a highly structured database of your contract data,
+[12:18] like the vendor name and extraction of termination dates and whatnot.
+[12:22] They're almost never maintained properly or well.
+[12:26] And so we often find we have to, of course, use the data that's available to us,
+[12:30] but take somewhat of a bottoms-up approach to actually have Claude read through
+[12:34] the contents of the contracts to find instances of where it might not be properly captured in the
+[12:41] CLM. And so you have to go through and have Claude kind of build out this hierarchy of
+[12:45] relationships. So you have an MSA that is tied to SOWs, and then there are multiple amendments
+[12:52] to those SOWs. And sometimes they're just not organized properly. And so again, structuring
+[12:59] everything up front makes it really easy to tack on these kind of loose documents later on which
+[13:05] has a meaningful impact if you're looking for savings opportunities in this case it was a an
+[13:10] m a you know consolidation so you don't want to double count something but you also want to capture
+[13:15] the latest kind of state of the relationship with the vendor which this kind of process allows you
+[13:21] to do so claude was very good at doing that i made a point before about governed access to the data
+[13:29] this can come back to bite you as well.
+[13:31] Because there were two separate entities
+[13:33] that were being put together here,
+[13:35] the way that we accessed data
+[13:37] from entity A versus entity B was different.
+[13:41] And so we ran into a few instances
+[13:43] where the return value would have been
+[13:46] something that was malformed or zero,
+[13:48] or there was some type of access permission.
+[13:50] And Claude, when making the tool call,
+[13:52] didn't really get the right type of feedback.
+[13:55] And so it kind of just went forward
+[13:57] thinking that maybe an invoice was zero or basically an incorrect value.
+[14:03] And so a lesson learned there for us was anytime there's some sort of governance failure or access denied error or something like that,
+[14:11] giving Claude more feedback about what went wrong allows it to fail gracefully or otherwise recover,
+[14:17] maybe flag something to a human or say, OK, I know this information is actually in this other authoritative database I can go to instead.
+[14:25] because when you're relying on it for some sort of savings analysis or something similar
+[14:30] you want Claude to have as much of that context of course as possible another thing we did was
+[14:39] the dispatch agents for different savings levers so our colleagues who have been doing this for
+[14:45] 20 years or whatever it is they have a whole library of ways to identify savings some are
+[14:51] obvious than others but okay you're putting two companies together maybe they share vendors maybe
+[14:57] different vendors but same services so you have a whole library of different activities and
+[15:02] analyses that you could do so we dispatched agents to do each of those in parallel and they came back
+[15:10] with actually pretty good results but there's of course this step afterwards where you need to
+[15:15] deduplicate the findings that come back so you can't ultimately double count in this case a
+[15:21] potential savings if um you know if it's coming from the same source or the same vendor as an
+[15:27] example um and so the way that we did this was um essentially build out an additional process and a
+[15:35] very specific and precise uh set of workflows where you would kind of let claude do its thing
+[15:42] do its analysis but then the reconciliation step is very uh it's built around kind of dspi ultimately
+[15:49] where you're very prescriptive about which data points you're evaluating how you do the
+[15:53] reconciliation and what's an acceptable next step in the process there was another pretty good talk
+[15:59] this morning about using DAGs for for policy execution it's the same idea you have a highly
+[16:05] structured workflow for how you do this this sort of work and then the most common one in retrospect
+[16:12] and the most obvious, I suppose, is just making sure that the agent has general context about what you're trying to achieve.
+[16:19] But more importantly, like what's actually going on in the business at the time.
+[16:23] So in this case, it's an active M&A deal.
+[16:26] There were things that management had already started actioning.
+[16:29] And so in our pursuit of potential savings opportunities, it will come up with these great recommendations,
+[16:35] but it would be shot down immediately because, hey, we already started that three months ago.
+[16:40] So it seems obvious on its face, but it's actually a pretty tricky problem to try and get the right context and the right elements into Claude at the right point in the process, such that you don't hamstring the analysis up front, but you don't come out with recommendations that are irrelevant or invalid at the end of the day.
+[16:59] and so it goes back to the point about knowledge accrual of just starting with an analysis
+[17:08] accruing things that you've kind of tagged along the way as hey this is a project that's
+[17:14] in motion or something something else that's relevant to the ultimate objective of what
+[17:20] you're trying to do and having Claude have some sort of whether it's a memory system or you embed
+[17:26] in your tools or something similar where you don't have Claude kind of spending tokens to rediscover
+[17:31] the same problems you've already you've already flagged it's already just embedded in the way that
+[17:36] it does its work so i'll leave you or we will leave you with two main takeaways the first is
+[17:42] it's worthwhile to invest some tokens and effort and money up front to structure your data first
+[17:48] precisely so that Claude doesn't have to spin its wheels and spend additional tokens rediscovering
+[17:54] the environment so highly structured data is very helpful and then ultimately of course context is
+[18:00] still king we don't have 100 million token context windows yes we have rlms i know uh raymond in the
+[18:08] back is a big fan of those um but that doesn't help you with the business context so putting in
+[18:14] the right business context is incredibly important um and that's uh that's what we found doing this
+[18:21] engagement so happy to take any questions afterwards but thanks so much for your time

@@ -1,0 +1,328 @@
+[0:00] So my name is Ryan Carson. I'm the founder and CEO of Untangle. So we're building an AI
+[0:18] paralegal specifically for family law, focusing on divorce in particular. So quick audience poll,
+[0:25] who has been divorced? Raise your hand. Don't be shy. Raise your hand. Who's been divorced?
+[0:30] Okay. Keep your hands up. Who knows somebody that's been divorced? Raise your hand. Everybody.
+[0:35] Yeah. So for you watching the video, everyone raised their hand by the end. Divorce touches
+[0:38] a lot of people. Two of my sisters got divorced. My parents got divorced. And it's one of the most
+[0:45] painful things in your whole life. And I wanted to work on that problem and just make it a little
+[0:49] less painful. Started off as a consumer app, quickly pivoted to B2B and we sell to family
+[0:55] law firms now and thankfully product market fit is there and we're growing really fast. So that's
+[1:00] really fun. So I've built and sold four companies. My last startup, we scaled to about 110 people
+[1:08] and I learned a lot about managing people. And it turns out managing people is like managing agents.
+[1:14] And so I'm going to share with you how we manage agents at Untangle and how everything I've learned
+[1:19] managing people kind of fits there. So I'm hoping to teach you some of those things.
+[1:23] I'm also going to show you how we hire.
+[1:27] I think hiring is very different in the age of agents.
+[1:30] I've hired a lot of people over my career.
+[1:32] I've made a lot of mistakes.
+[1:33] And I'm going to share how we're hiring now at Untangle
+[1:36] and I think how it's really working.
+[1:37] And then I'm going to show you a live demo.
+[1:41] So let's get started.
+[1:44] This is me on X and this is Untangle
+[1:45] if you want to know more about us.
+[1:49] If my little clicker works, you can do it.
+[1:53] Okay.
+[1:56] So what does the org chart look like now in the age of agents?
+[2:00] How do you run your agents?
+[2:02] So the way we do it is pretty straightforward.
+[2:05] So we have humans at the top, and obviously we set priorities.
+[2:08] We talk to our customers.
+[2:09] We're doing all the human stuff.
+[2:11] But what we use are manager agents, and these are literally just sessions.
+[2:15] So we use Devon.
+[2:16] Love Devon.
+[2:17] We do all our engine in the cloud.
+[2:18] I've done everything from coding by hand to using cursor to here and we're in Devon.
+[2:26] But we have a manager session.
+[2:27] I'm going to show you this.
+[2:28] It's literally just a session.
+[2:29] I call it engineer manager and it never writes code.
+[2:34] And I mostly talk to this agent and it manages a bunch of children.
+[2:38] So I'll talk to you about how we do that.
+[2:40] We also, I mostly use audio to manage this agent.
+[2:44] I don't know about you, but I'm not a fast reader.
+[2:47] I'm definitely not an agent and I prefer audio.
+[2:50] I can ingest audio a lot better for some reason than reading.
+[2:54] So I talk mostly to my manager agent over audio.
+[2:58] I'll show you that.
+[2:59] I just find it.
+[3:01] I can absorb it.
+[3:02] I can understand it.
+[3:03] I can see what's happening.
+[3:04] It's much more natural.
+[3:05] So I'm going to show you that as well.
+[3:07] Now the manager agent primarily works from a ticket board.
+[3:10] We use linear.
+[3:11] It doesn't really matter what you use, but this is kind of the source of truth about
+[3:15] what needs to be built.
+[3:17] Every ticket should be one PR, which is how we work, in that the manager agent knows which
+[3:23] tickets to pull based off dependencies.
+[3:25] It's like pretty basic engineering manager stuff here.
+[3:28] But this is where it gets interesting.
+[3:29] So each manager agent concurrently manages up to about 20 builder agents.
+[3:37] This number varies.
+[3:38] Like, it can go anywhere from five to probably 25.
+[3:42] This is somewhat bottlenecked by your ability to talk to the manager agent and understand
+[3:47] what's happening.
+[3:49] I think if you push too hard on this, you quickly spin out of control.
+[3:54] I find we can concurrently manage about 25 builders.
+[3:59] Now the key here is that the manager is talking to these builders.
+[4:02] You never go into these sessions.
+[4:04] You never talk to them.
+[4:05] You never manage them.
+[4:06] You never do anything.
+[4:07] It's all done through the manager agent.
+[4:09] And usually what it's doing is answering technical questions that I don't need to answer or unblocking
+[4:17] small things.
+[4:18] I also have an automation that forces the manager agent to read all the children's sessions
+[4:24] every...
+[4:25] It's like every 15 minutes, it says 10, but I've decided 15 is about the right call.
+[4:29] You have to build an automation.
+[4:31] You can't trust your manager agent to do this, right?
+[4:38] It's not deterministic.
+[4:39] So this is basically a script.
+[4:40] Again, in Devon, it has automations.
+[4:43] You just tell it, hey, every 15 minutes,
+[4:45] go read every single child.
+[4:47] Push things along.
+[4:48] Keep things moving.
+[4:51] And then any questions, go back to the manager agent.
+[4:53] So who is tracking so far?
+[4:55] You understand what I'm saying?
+[4:57] OK, good.
+[4:57] And probably a lot of you are doing this.
+[4:59] I'm not claiming this is rocket science,
+[5:00] but this is what we're doing right now in prod,
+[5:03] and it's working.
+[5:05] Each of these builder agents has a review agent
+[5:09] that it calls upon.
+[5:10] Devon has built-in reviews.
+[5:12] Probably every code harness you have has built-in reviewers.
+[5:16] We typically stick to a three review max,
+[5:20] where we allow the builders to loop about three times
+[5:24] with reviews.
+[5:25] If they still have any important bugs that have been fixed
+[5:28] after three, then they bubble that back up to the manager
+[5:30] agent.
+[5:31] And if the manager agent needs to,
+[5:32] it bubbles it back up to me.
+[5:35] That seems to work pretty well.
+[5:38] OK, so what's happening under the code, under the hood here?
+[5:41] Like all the normal stuff, right?
+[5:42] You've got code plus tests.
+[5:43] You've got a QA agent.
+[5:45] This is actually an additional process that we run.
+[5:49] It actually spins up a child of the builder to run QA.
+[5:54] Y'all, this is cheap.
+[5:56] You should be spinning up as many agents as you can,
+[5:59] as long as you're not holding up your merge queue, right?
+[6:02] So this works well for us now.
+[6:05] A wonderful engineer named Dale recently joined.
+[6:08] He helped install this QA process.
+[6:10] I think it's working pretty well so far.
+[6:12] The thing that you're all going to encounter
+[6:13] is just merge queue slowdown.
+[6:15] There's this fine balance of just pecking your PRs to death
+[6:21] versus just getting them merged.
+[6:24] The other thing I love, love, love, love is videos.
+[6:28] So Devon has this built in.
+[6:30] If not, you should build this.
+[6:32] It's hard.
+[6:34] Every builder records a video of the feature being used
+[6:38] and passing tests.
+[6:39] So if it's a UI-facing feature, you've
+[6:42] got to look at it.
+[6:45] This is how we know that what we built looks good, how it works.
+[6:48] So in Devon, it's a built-in feature.
+[6:51] It's called Test.
+[6:51] And basically, it builds test cases.
+[6:53] And then it records a video.
+[6:55] And it gives you green or red on those tests.
+[6:58] And if you get a video that's all green,
+[7:00] you can watch it and know what we think is happening
+[7:02] is happening, and visually it looks good.
+[7:05] So this is the human in the loop
+[7:07] where a human has to say ship it.
+[7:09] So the manager session will let me know
+[7:13] there's a video ready for you, watch it.
+[7:16] So I watched the video.
+[7:17] And this is the hard part.
+[7:18] You've got to zoom in and understand,
+[7:20] what is this PR doing?
+[7:22] What am I watching?
+[7:24] So I usually read a summary of what is this thing?
+[7:26] What is it supposed to do?
+[7:28] I watch it and I engage.
+[7:29] And I would encourage you, this is the part
+[7:31] where you want to cut corners.
+[7:33] You got to watch the video.
+[7:34] Like there is no, this is the part of the bottleneck
+[7:37] you have to engage in as a product owner.
+[7:40] Got to watch the video, got to pay attention.
+[7:42] Usually it has to be on your laptop.
+[7:46] This literally, before this talk, I was on my phone,
+[7:48] you know, talking to my manager agent and it said,
+[7:51] there's a video for you.
+[7:52] I watch it and I just couldn't see it well enough.
+[7:55] And I was so tempted to be like, it's okay, ship it.
+[7:58] Like, no, get back to my machine, watch the video.
+[8:03] This is working.
+[8:05] Like, you know, we ship a lot of PRs at high quality this way.
+[8:09] We've iterated, you know, hundreds of times on this process,
+[8:12] and I feel pretty good about this.
+[8:14] Now, this will change tomorrow
+[8:15] and probably will be useless a week from now,
+[8:19] but it works well today.
+[8:21] The thing I will say is, like, if you're coding locally, stop.
+[8:24] Like, you really need to be coding with a cloud agent.
+[8:28] I don't care if it's Devon or whatever it is,
+[8:30] but if you're running local dev, you are screwing up.
+[8:33] You're holding yourself back.
+[8:35] You're holding your team back.
+[8:36] You're holding everything back, because you can't do this.
+[8:39] So that's where we're going, and I feel strongly about that.
+[8:43] So how does this work at scale?
+[8:45] Well, say you have 10 folks who are working on things.
+[8:51] Typically, they'll have an engineering manager session each.
+[8:55] Sometimes they'll have two.
+[8:56] Right now, I have two running.
+[8:59] And what's beautiful is that these things talk to each other.
+[9:02] And so, again, in Devon, this is built in.
+[9:06] It's probably built into whatever harness you use.
+[9:08] The sessions all need to be able to talk to each other,
+[9:10] and they all need to know who each other is.
+[9:14] And they're really good at this.
+[9:16] This is such a delight.
+[9:18] So what you'll see if you zoom into any sessions,
+[9:21] they're messaging each other.
+[9:23] It's clear, it's straightforward, it's fast, it's good.
+[9:27] Like, you should be allowing your sessions
+[9:29] to talk to each other.
+[9:31] And again, if you're not, you are holding yourself back
+[9:34] and you're probably shipping worse software.
+[9:36] So they all talk a lot.
+[9:38] And it's not chit chat or stupid stuff.
+[9:40] Like, this is important stuff that they
+[9:42] need to know to unblock each other, which is very useful.
+[9:46] However, you still need what we call a merge queue manager.
+[9:51] So this is how we coordinate this just wave of PRs that come in.
+[9:58] You know, you have things like database migration numbers.
+[10:01] These need to be coordinated.
+[10:03] Like, if all the agents are trying to grab these things,
+[10:05] you constantly collide, right?
+[10:07] So the merge manager just helps all that go away.
+[10:11] It also is a little more intelligent about how
+[10:12] the merge queue is happening.
+[10:14] So this is really nice.
+[10:17] It's working well for us.
+[10:18] And again, these are just sessions.
+[10:19] This is not like something special.
+[10:22] These are just sessions in Devon.
+[10:23] And I name them so I understand what's happening.
+[10:27] And it's pretty straightforward.
+[10:29] You know, the talk from the gentleman from OpenAI
+[10:32] said basically you've got to un-hobble, just un-hobble the thing.
+[10:36] So set up the roles and then un-hobble the model.
+[10:41] And I think just having a merge manager say, hey,
+[10:44] make all this better really works well.
+[10:46] All right, who's tracking so far?
+[10:49] Good.
+[10:50] Who thinks this is bullshit?
+[10:52] Raise your hand.
+[10:53] Oh, one guy.
+[10:54] Two.
+[10:54] One.
+[10:55] Come on.
+[10:56] Be more brave.
+[10:57] I don't think we'll have to talk afterwards.
+[10:59] Where are you?
+[11:01] OK, and then we use GitHub merge queues.
+[11:03] That's fine.
+[11:04] It's not rocket science.
+[11:05] It works pretty well.
+[11:06] So all right, next up, how we hire.
+[11:10] So who's hiring engineers or employees right now?
+[11:13] Raise your hand.
+[11:14] Yeah, decent number of you. I think everything has changed. Everything you used to do about hiring employees is over. None of it makes sense. It's all outdated, and I would encourage you to do something like this.
+[11:26] So we don't do, number one, any sort of pre-screens. We don't do any video chats.
+[11:33] We don't do anything with people for most of this process because it will bias you.
+[11:39] You'll like their hobbies. You'll like the way they talk to you. You'll think they're interesting.
+[11:44] And it's all noise. None of it is signal. Right? All that matters is can they operate an agent? Right?
+[11:51] Right?
+[11:52] Can they do that?
+[11:53] So the way we do that is we ask candidates
+[11:56] to submit a 45-ish minute video, whole screen recording.
+[12:02] And we ask them to ship a feature, PR typically,
+[12:05] on a app that they already maintain.
+[12:08] And we just ask them to record that.
+[12:11] No instruction, no guidance, no nothing.
+[12:14] And we just want to see, like, how good of an agent operator
+[12:16] is this person?
+[12:17] Right?
+[12:18] So that is free.
+[12:21] we don't pay for that. That's basically how you get in the door. And what we then do is we feed
+[12:26] these videos into our ranking agent and basically say, watch the video, watch the transcript,
+[12:30] stack rank these people. Now, what's interesting is I did this and I didn't trust it the first time.
+[12:38] I didn't like what it said. And what's ironic is it actually was correct. Like the person that was
+[12:45] Number one, I should have hired them.
+[12:48] But I didn't trust it because I was biased.
+[12:51] So you stack rank them.
+[12:52] Now, this is just a lot of video to watch.
+[12:54] You could watch all these videos if you want.
+[12:56] If you have time, do it.
+[12:57] But I think you'll find, actually, a very intelligent model
+[13:00] is pretty good at understanding how good is this person.
+[13:04] What's interesting, though, is candidates will mumble sometimes,
+[13:10] or they won't think out loud, which is kind of fascinating.
+[13:12] you can't really tell what they're thinking or doing,
+[13:15] which is interesting, so that's something to sort of note.
+[13:20] And some talk a lot.
+[13:21] So you never know.
+[13:24] Then we basically pick the top five,
+[13:26] and we invite them to a paid project.
+[13:27] So we pay them a fixed fee for 16 hours of their time.
+[13:31] We actually give them a seat on Devon,
+[13:33] and we ask them to get a real PR ready for merge.
+[13:39] We have them sign an NDA.
+[13:41] and we record all the video.
+[13:43] This is 16 hours of video.
+[13:46] We basically use Loom, and then we feed all the videos
+[13:49] into our agent, basically Devin,
+[13:52] and we say, hey, which one should we pick?
+[13:55] I actually watched all 16 hours of these videos
+[13:58] for the last round.
+[13:59] It was brutal, but it did give me a good read on the people.
+[14:03] And then you basically pick one.
+[14:05] You pick your finalists, and then what's important
+[14:09] is that you don't do calls before this.
+[14:13] You will get biased, you'll get confused,
+[14:15] you'll try to pick somebody you shouldn't,
+[14:17] and I would just call the finalists and say,
+[14:20] hey, we think we'd like to hire you,
+[14:23] let's talk a little bit.
+[14:25] And that gives you the final sort of human read,
+[14:27] but you're gonna watch videos of these people for hours,
+[14:29] like you're not really gonna need that call,
+[14:31] but I think there's a little bit of human connection there
+[14:34] that's important.
+[14:36] I think this is how everyone's gonna hire.
+[14:38] Like, this works.
+[14:40] I've hired hundreds and hundreds and hundreds of people
+[14:42] in my career.
+[14:44] This is just way easier and way better.
+[14:47] And I think it's where we're all moving to.
+[14:50] So I'm actually going to finish three minutes early.
+[14:55] If you want to know more about Untangle,
+[14:56] just go to untangle.us.
+[14:58] I'm on X, like, just all the time.
+[15:00] I've literally been on X for 20 years.
+[15:03] And so that's where I live and breathe.
+[15:05] So if you want to know more about leading companies,
+[15:09] managing agents, that's where I am.
+[15:11] If you're interested in family law
+[15:14] and you're passionate about making divorce less painful,
+[15:17] get in touch.
+[15:19] And that is all I have to say.
+[15:20] Thanks, everybody.
+[15:21] Appreciate it.

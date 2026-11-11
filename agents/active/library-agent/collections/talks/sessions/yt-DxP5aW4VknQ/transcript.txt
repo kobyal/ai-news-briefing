@@ -1,0 +1,235 @@
+[0:00] Hey folks, this is Grish, a principal software engineer at Microsoft. Outside my job, I build open source tools for AI agents. One of them is MCP Pacemaker, a supervised bridge that keeps MCP servers running.
+[0:16] Before we start, a small disclosure. The views in this talk are my own and doesn't represent my employer.
+[0:22] So sub-agents are a distributed system.
+[0:26] Over the past year, I have been using agents and sub-agents on real engineering work.
+[0:31] Devositions, code reviews, instant tracing, whatnot.
+[0:37] This talk is about what happens when one agent hands work to another.
+[0:43] So here's an architecture.
+[0:46] The orchestrator splits the task and hands the pieces to three different sub-agents.
+[0:52] They all run at the same time. They all read from the same shared state.
+[0:59] Colonization, memory files, repo, working trees, issues, vector stores. And they don't
+[1:09] just think. They make tool calls to real systems which touch databases, APIs, CI tools, deployment
+[1:18] pipelines. And the results come back and orchestrator merges them into a single answer.
+[1:27] An orchestrator works shared mutable state and results merge from concurrent executions.
+[1:34] This represents a classic distribute system. I have known how to reason with distribute systems
+[1:39] for decades, but none of this setup came with it. What you get is a function that takes a string
+[1:48] and returns a string. Failures we hit are not new, are not specific to AI agents.
+[1:55] They are classic distribute system failures.
+[1:57] Partial failure. A normal call that fails halfway through and returns an exception error code.
+[2:06] In a sub-agent case, it returns a text that looks like a success.
+[2:11] Dirty reads. Normally, we have isolations, versions. Here, every worker reads one shade
+[2:20] context, including things another worker only guessed. Unbounded fan out. A busy service
+[2:29] pushes back with the queues, 429s, 503s. In agents, orchestrator does not see any of this.
+[2:38] It just starts in the worker. Retrace. In normal distributed systems,
+[2:44] we build a impotency to make read-tries reliable. In agents, a read-write sub-agent runs the whole
+[2:51] task again with side effects included. For each of these cases, I'll name the concept it already is,
+[3:01] then I'll put them together as a consistency model I'm proposing and walk through why each part is
+[3:06] there. Start with the failure model because everything else depends on it. A friendly case
+[3:13] is a crash stop. The process that was running correctly stops and stays stopped. The subagent
+[3:20] that throws an error in this box is easy to handle. Next, no reply. The call is lost,
+[3:27] but it's very late. We'll come back to this one. The hot case is the one from Byzantine General
+[3:35] Cyber, a component that gives conflicting information. The process answers and the answer
+[3:41] is wrong. A half-finished subagent sits closest to the box. It is not malicious, but from the
+[3:48] outside it looks the same. It does not crash. It answers fluently. Let's jump into this.
+[3:55] A subagent that half-finished does not raise. It returns normal looking text with the same type
+[4:02] signature as sexes. I talked about one version of this in one of my talks. We pointed an agent
+[4:09] at an alert queue. Here's an illustration I used there with three different paths which
+[4:16] gave the same answer. The first one it pulled the telemetry and compared with a non-benign set.
+[4:24] It actually did the work. The second one it matched against the title it has seen before
+[4:30] and give the response. The third alert, it didn't do anything. It just
+[4:38] resonated. All three are categorized as benign with the same level of confidence.
+[4:45] And nothing downstream can tell this apart. The orchestrator can read the conclusion.
+[4:50] It cannot read how much work was behind it. Now, the call gets no reply. The orchestrator
+[4:59] send work and the timeout fired. From here, 3 volts look the same. The subagent is still working.
+[5:07] It crashed and the reply was lost. It's a hard limit, not a Turing gap. The FLP paper from 1985
+[5:15] showed that in an asynchronous system with even one faulty process, agreement can fail to finish.
+[5:22] Chandra and 2X answer in 1996 was failure detectors that can make mistakes. They suspect
+[5:28] did not know. I hit both directions in my own open source project, MCP pacemaker supervised bridge.
+[5:39] A server whose first run downloads itself hit the 30 second call timeout and look broken.
+[5:46] It was slow, not dead. We fixed it by giving initialize its own timeout. Now the other way.
+[5:53] The server crashed during a call. The call then timed out and the timeout overwrote the exit code
+[6:00] that explained the crash. We fixed it by recording the timeout only when it was alive. So timeout is
+[6:10] a suspicion. Record it as unknown and keep the real cause. And now make failure a value. Let's
+[6:21] take this illustration. A sub-agent returns the status, what it did, what it did not do,
+[6:29] the evidence, and any side effects. Partial is a norm answer here.
+[6:35] The protocols already have a slot for this. In A2A, a task can end as completed, failed,
+[6:43] cancelled or rejected or stop and ask for input. In MCP, a tool result can say is error true.
+[6:52] But a sub-agent can still say completed while its text says something else.
+[6:58] And a loop that only reads the text never sees the difference.
+[7:03] Another split. Checking a condition and getting no is a different fact from not being able to
+[7:10] check it all. My own individual internet draft on evaluation states talks about this. Collapse the
+[7:20] two and you change what gets retried and who gets paged and what target says later. Next, dirty reads.
+[7:31] Let's take this made up example from one of my talks. A sub-agent does triage. It writes into
+[7:38] a shade context saying that error rate fell by 80%. It did not measure that. It inferred it.
+[7:47] Now, two other sub-agents read from the same shade context.
+[7:54] The second sub-agent writes a review note and picks the same sentence up. The third agent
+[8:01] writes a run book and uses it as a reason to proceed. The orchestrator
+[8:06] merges all these three. Three artifacts agree. It is once an unsupported sentence read three
+[8:14] different times. The 1995 critique of SQL isolation levels define a dirty read as,
+[8:20] you read a value before the writer commits or rolls back. In a shared context, a guess is readable
+[8:27] the moment it is written, and nothing marks it as unchecked. A regular fix is to ask three subagents,
+[8:36] and get a quorum. Quorums do work for a specific reason. In weighted voting from 1979, the
+[8:45] read quorum plus write quorum is greater than total. So every read overlaps the latest write.
+[8:53] The overlap is the guarantee. In sub-agent's case, the three sub-agents that read the same
+[8:59] shared context does not give you that. They are not independent copies. They read the
+[9:04] same guess. Their agreement is one source counted three different times. Let's pick a consistency
+[9:10] model. In databases, we have a cavalry for this. Linearizable. Every operation appears to happen
+[9:19] at one point in real-time order. Sequential. One total order that respects each process
+[9:26] one order. Causal. Operations that are causally related appear in the same order everywhere.
+[9:33] Session guarantees. There are promises to one client like read your writes and monotonic reads.
+[9:41] Eventually. If no new updates are made, reads eventually return the last value.
+[9:47] A shared context gives you none of these. There is no stated guarantee at all.
+[9:53] And you don't need the top consistency models. The strongest models cannot stay available when
+[10:02] the network splits. Causal end session guarantees can, as long as each client sticks to one place.
+[10:09] For sub-agents, that place is the orchestrator. So here's a consistency model I use for sub-agents.
+[10:17] I call it SAVE HANDOFFS.
+[10:21] S stands for SOURCE FEEDS.
+[10:25] Every fact a worker hands on carries its source version as of time and revision, and decisions read only fresh source facts.
+[10:36] A. At most one's effects.
+[10:40] Every write has an identity and a single use approval for that exact action.
+[10:45] an outcome is read back, never replayed.
+[10:50] If fan-out budgets, each downstream gets a gate and a bounded weight, and refusal counts
+[10:58] as a failure.
+[11:01] E stands for explicit outcomes.
+[11:04] Every handoff ends in a named state, and a timeout is unknown, with its cost kept.
+[11:11] This consistency model is the one I use for my own sub-agents.
+[11:15] It's not a universal model. It's based off my own public work. Some of it is in my
+[11:21] FCP pacemaker bridge and some are based on my other talks and my own internet draft.
+[11:30] Now let's see what's behind each letter. Yes, source reads. It's the answer to 30 reads,
+[11:40] where one worker's guess becomes another worker's fact. What helps is to treat every fact as a
+[11:47] record, not a sentence. Lampard's 1978 paper defined when one event happened before another.
+[11:54] The fact's provenance is that record, what it was read from and when. Let's take this
+[12:00] This is made up example.
+[12:04] The record names, the claim and its revision, the source and its version, the scope and
+[12:12] three different times.
+[12:14] When the data was current, when we read it and when we used it.
+[12:20] Freshness is checked when the fact is used.
+[12:24] In this illustration, the data ends at 905.
+[12:30] We read it at 906 and we decided at 907.
+[12:35] In this case, we picked a 5-minute limit.
+[12:39] So the data decision at 907 is fine.
+[12:44] Now at 915, the second decision came in.
+[12:49] Because our freshness limit is 5, this is still recorded.
+[12:53] reject it. And we say that the next decision needs another read. This is how you separate
+[13:01] an observation from an inference. An observation has a source and a read time. An inference has none.
+[13:09] Yay, at most of it is about retries. This is an illustration from my article about
+[13:18] MCP pacemaker bridge. The orchestrator delegates a task. The subagent calls a tool which does a
+[13:27] real write, like creating a PR. The reply is lost. The orchestrator knows one thing, the outcome is unknown.
+[13:38] So, it retries the whole task.
+[13:42] The write happens again.
+[13:44] This is a classic problem.
+[13:47] In 1984, RPC paper, it says that if the call returns, the procedure ran precisely once.
+[13:56] If you get an exception, it ran once or not at all.
+[14:00] And you are not told which.
+[14:03] So you pick a delivery semantic at most once, don't retry and accept the fact that you may
+[14:12] be lost. At least once, retry and accept the duplicates are possible. Exactly once,
+[14:22] it happened at least once and this is the way we can deduplicate, maybe by using an idopetency key.
+[14:29] In MCP, item potent hint is only a hint and DTE false or false.
+[14:35] If you need it, you build it.
+[14:37] Here's the small design from my bridge on how I handle it.
+[14:43] When a client comes back after restart, the bridge replaces the client's recorded initialize
+[14:48] against a fresh server.
+[14:49] That's safe.
+[14:50] It's just a handshake.
+[14:52] And it does not restore tool state.
+[14:56] What it never replaces is an uncertain tool call.
+[14:58] When a shared server is recycled, the bridge drains it, and calls still unanswered at the deadline fail as potentially excluded.
+[15:08] That status is honest.
+[15:10] It tells the caller to go and check.
+[15:14] What helped is giving every side effect an identity.
+[15:19] Approval binds that exact action.
+[15:22] It's only used once.
+[15:24] After the call, read back by that identity.
+[15:28] Submitted is not confirmed. Confirm means you observe their effect.
+[15:33] The last part of A. It shows up when work passes and resumes. A lease is a lock with a timeout.
+[15:41] Martin Kleppman's post about distributed locking shows this problem. A client passes while holding
+[15:48] it. The lease expects. Someone else takes over and the first client wakes up and writes anyway.
+[15:55] The fix he proposed is a fencing token, a number that goes up every time the lock is
+[16:03] granted.
+[16:04] The storage remembers the highest token it has seen and rejects any right with a older
+[16:12] one.
+[16:13] Sub-agents pause and resume all the time.
+[16:16] In my other talk, as I put it, restore context, not side effects.
+[16:23] So treat an approval like a fencing token.
+[16:25] One action, one use.
+[16:27] Checked at the gate.
+[16:29] Not remembered in the prompt or conversation.
+[16:33] My bridge fixed the same class of bug.
+[16:36] A stale exit or a deleted resume can no longer remove or bring back a replacement session.
+[16:43] If fanout budgets is about unbounded fanout.
+[16:47] This is flow control or the lack of it.
+[16:51] I hid this issue in my own MCP bridge before it had a limit on cold starts.
+[16:57] Many sessions start their service at the same time through NPX.
+[17:03] They share one package cache.
+[17:05] Every one of them failed with NPM's lock compromise error.
+[17:10] Nothing in any single request was wrong.
+[17:12] The failures was the concurrency itself.
+[17:15] And when a downstream does push back, it can arrive as a plain text.
+[17:20] This is MCP specs one example of a tool execution error.
+[17:24] A rate limit has one sentence.
+[17:27] The model reads the sentence.
+[17:29] The orchestrator code may never look.
+[17:31] The next worker starts anyway.
+[17:34] So I introduce a quota budget in my bridge.
+[17:39] Cold starts that use a package manager go through a gate.
+[17:43] Two at a time by default.
+[17:45] Everyone else waits.
+[17:47] And the wait is 15 seconds.
+[17:50] Past that, the start goes ahead without a gate.
+[17:54] And I documented why.
+[17:57] A corrupted cache is a risk, while a hunk client request is certainty.
+[18:01] That is a choice for availability, made on purpose and written down.
+[18:07] And I also built a cap on sessions.
+[18:11] At the cap, a new session waits up to 10 seconds.
+[18:15] And then it's refused.
+[18:17] But refusal now counts as a failure in health.
+[18:20] Another book, capacity has to be reserved before the synchronous start, not after.
+[18:26] Otherwise, queued starts overbook the cab.
+[18:30] That is a check then act race.
+[18:32] For sub-agents, give the orchestrator a number per downstream, a bounded weight and a refusal
+[18:38] it can see.
+[18:40] Now, E, the explicit outcomes.
+[18:45] Every hand of ends in a named state, like stale or unknown, not just text.
+[18:51] The last piece is who decided that state.
+[18:54] Treats of the agent output as untrusted input, the same way you treat a request body from
+[18:59] the internet.
+[19:00] The orchestrator owns the checks, in code.
+[19:05] Does the result match the schema?
+[19:06] Is the evidence there?
+[19:08] Is it fresh enough?
+[19:09] Do the numbers hold when you recompute them?
+[19:13] If a check fails, the step returns a refusal with a reason.
+[19:17] It does not pass the text along with a warning paragraph underneath.
+[19:21] If the same model can skip a check and declare it passed, you have a request, not a boundary.
+[19:27] Here is a made-up example from another talk.
+[19:31] A sub-agent says the error rate fell.
+[19:34] Before it was 10 errors in 1000 requests.
+[19:38] After it was 6 errors in 600 requests.
+[19:42] run from 10 to 6 and it claimed that the rate fell. But when we computed the rate, it's
+[19:47] both 1%. We re-computed it and then the claim is refused. A supported answer is fine. A
+[19:56] deliberate handoff to a person is fine. A confident guess, it's not. So limitations,
+[20:03] because the consistency model is only useful when you know where we should start. So here's
+[20:09] what SAFE model does not do. It does not make facts true. A source fact is checkable, not correct.
+[20:19] It does not give you exactly one's delivery. A lost reply stays unknown until you read it back.
+[20:27] It does not roll anything back. Undoing a partial task is a compensation step you design,
+[20:33] like the Saga's paper from 1987. And finally, there is no global order across workers. Only
+[20:41] causal order per fact. And it has a price. CAP theorem says that when the network splits,
+[20:51] you trade off availability against consistency. My bridge shows availability for cold starts
+[20:58] on purpose. For rights, safe picks consistency over availability. It refuses rather than
+[21:07] guesses. Backlack adds that even without failures, you trade latency for consistency. Every freshness
+[21:16] check is another read and every refusal needs an owner. So, where it does not fit? If a
+[21:26] sub-agent only drafts text that a person reads before anything happens. Most of this is a
+[21:33] overhead. It also assumes that there is one single orchestrator. If you have more, this does not fit.
+[21:42] Peer agents with no single place to stick to need something else. This is the consistency model I
+[21:49] use for my own agents that touch actual real production systems. It's not universal. So,
+[21:55] Wrapping up, here's three key takeaways.
+[22:00] Treat every handoff to a subagent as a network call.
+[22:03] It can fail halfway, it can be slow, and it can come back twice.
+[22:08] Return status, not just text.
+[22:11] If the result cannot say partial, stale, or unknown, the orchestrator will read it as done.
+[22:17] And start with our safe consistency model and enforce it in code.
+[22:23] keep what fits and change what does not. We already know how to build distribute systems.
+[22:29] We just have to notice that we are building one. So these are some of the sources behind this talk.
+[22:38] On the left side, it's my own work, my open source projects, my articles,
+[22:43] and drafts and my talks on right side specs and standards and bunch of papers
+[22:53] behind each concept. Thank you.

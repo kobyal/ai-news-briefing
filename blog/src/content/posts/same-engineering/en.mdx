@@ -1,0 +1,102 @@
+---
+title: "Same engineering: same tasks, a different score, and no model changed"
+description: "DeepSWE v1.1 changed only execution and grading, and tasks moved 36 points. How to measure this yourself without mistaking noise for progress."
+lang: en
+key: same-engineering
+term: "same engineering"
+kind: explainer
+pubDate: 2026-11-12
+tags: ["benchmarks", "evals", "agents", "harness", "reproducibility"]
+hook: "scene"
+cover: type
+tldr: ["Run the same config twice. The delta between the two runs is your noise floor", "Store HARNESS_VERSION and GRADER_VERSION with every result, and change only one at a time", "A delta without a run count isn't a number. Check for z≥2 before you announce anything"]
+hero: /posts/same-engineering/hero-en.jpg
+diagram: /posts/same-engineering/diagram.svg
+sources:
+  - { title: "DeepSWE v1.1 – Updated execution and grading for the same engineering tasks", url: "https://deepswe.datacurve.ai/blog/deepswe-v1-1", date: "2026-06-24" }
+  - { title: "Agentic AI Engineer Explained | Career Guide & Key Skills", url: "https://www.udacity.com/topic/what-is-an-agentic-ai-engineer", date: "" }
+  - { title: "AI Agents for Engineering Design: 5 Types & How to Evaluate", url: "https://www.colabsoftware.com/post/ai-agents-for-engineering-design-real-examples-capabilities-and-how-to-evaluate-them", date: "" }
+  - { title: "What are AI Agents?- Agents in Artificial Intelligence Explained - AWS", url: "https://aws.amazon.com/what-is/ai-agents", date: "" }
+opinion: "We don't think same engineering is a term, and that's fine. It's an experiment, and it changes what you actually do. To us, the real skill in 2026 isn't picking a model. It's designing the system around it, and DeepSWE showed that system alone can move a task by 36 points. That's why we use a deterministic grader wherever we can and leave model judgment only where there's no alternative. A loop that checks itself, with a known noise floor, is worth more than any model comparison table."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+One row in the DeepSWE v1.1 table is worth reading twice. The task is `claude-code-by-agents-recursive-delegation`. In the previous version of the benchmark it was solved in 11% of runs. In the new version, 47%. That's a jump of 36.1 points.
+
+No model changed to get there. Datacurve, who maintain DeepSWE, said so in the headline: "Updated execution and grading for the same engineering tasks". Same tasks. What changed is how they run and how they're checked.
+
+The same update moved other rows too. `eicrud-keyset-pagination-cursor` dropped from 42% to 22%, and `go-git-worktree-merge-conflicts` dropped from 67% to 50%. `koota-entity-snapshot-rollback` stayed exactly at 97%.
+
+## Same engineering isn't a term. It's an experiment
+
+Nobody coined "same engineering". It's half a sentence from a blog headline. It stuck because it describes something that has no good name. The experiment behind it is one of the most useful tools you have if you run agents. Hold the work fixed, change only the system around the model, and measure how far the score moves.
+
+The experiment keeps the same task set, the same ground truth and the same models. Only two things change:
+
+- **The harness**: how the agent gets the task, which tools it has, which sandbox it runs in, and how many steps and how much time it gets.
+- **The grader**: what counts as "solved". This covers which tests run, the timeout, and what happens with a flaky test.
+
+It isn't a new benchmark or a new model. It's also not another "engineering" discipline waiting for a job title. In practice it's an A/B test on the infrastructure, not on the model. The DeepSWE result says the infrastructure alone moves tasks by tens of points.
+
+<figure><img src="/posts/same-engineering/src1.jpg" alt="The tasks are named after real repos like httpx, helm and fastapi, so the movement is on real work, not toy exercises (credit: Datacurve DeepSWE)" loading="lazy" /><figcaption>The tasks are named after real repos like httpx, helm and fastapi, so the movement is on real work, not toy exercises (credit: Datacurve DeepSWE)</figcaption></figure>
+
+## 36 points without touching the model
+
+Each task in the table has two percentages and a delta. Look at the size of the deltas: +2.8%, -5.6%, +8.3%, -11.1%, +36.1%. Nearly all of them are multiples of 2.78, which is 1 in 36. It looks like most tasks ran 36 times per version. `dynamodb-toolbox-lazy-recursive-schemas` went from 60% to 89%, which fits 45 runs.
+
+Now the math nobody does in their head. With 36 runs and a solve rate around 50%, the standard deviation of the result is about 8.3 points. The standard deviation of the difference between two such runs is 11.8. So the 8.3% drop on `kysely-window-grouping-helpers` and `abs-stepped-slices` is smaller than one standard deviation. It's noise.
+
+The 36.1 on `claude-code-by-agents` is a different story. Its z is about 3.4, so it isn't luck. Something in execution or grading really changed for that task. Some tasks didn't move under either harness: `bandit-structured-nosec-directives` went from 3% to 0%, and `gql-incremental-graphql-delivery` went from 6% to 3%.
+
+> **Caveat:** I'm reading the two columns in the table as the previous version vs v1.1. I'm inferring the run count from the step size, not from the docs. If Datacurve used a different n, the z-scores will shift. The principle won't: a delta without n isn't a number.
+
+<figure><img src="/posts/same-engineering/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/same-engineering/v2-svg-en.jpg" alt="The five tasks that moved most went in both directions, and no model changed. Only execution and grading did (DeepSWE v1.1)" loading="lazy" /><figcaption>The five tasks that moved most went in both directions, and no model changed. Only execution and grading did (DeepSWE v1.1)</figcaption></figure>
+
+## Running same engineering on your own evals
+
+First, pin the task set in code. Keep a hash per task in the repo, not "last week's list". Second, version the harness and the grader separately. DeepSWE v1.1 updated both execution and grading, so the table alone can't tell you which of the two moved each row. In your own setup, change one at a time.
+
+Then do N runs per task. A single run is a coin flip. Datacurve ran 36, and I'd treat 10 as the minimum worth taking seriously. Before anyone posts "we improved 15%" in Slack, check the delta against the noise:
+
+```python title="compare_runs.py"
+import csv, math, sys
+
+def load(path):
+    with open(path) as f:
+        return {r['task']: (int(r['passes']), int(r['runs'])) for r in csv.DictReader(f)}
+
+old, new = load(sys.argv[1]), load(sys.argv[2])
+for task in sorted(old.keys() & new.keys()):
+    (a, n1), (b, n2) = old[task], new[task]
+    p1, p2 = a / n1, b / n2
+    p = (a + b) / (n1 + n2)
+    se = math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2)) or 1e-9
+    z = (p2 - p1) / se
+    verdict = 'REAL' if abs(z) >= 2 else 'noise'
+    print(f'{task:45} {p1:4.0%} -> {p2:4.0%}  {p2 - p1:+6.1%}  z={z:+.1f}  {verdict}')
+```
+
+Save a CSV with the columns `task,passes,runs` for each version, then run `python3 compare_runs.py v1_0.csv v1_1.csv`. On the DeepSWE numbers, assuming 36 and 45 runs, only two of the five big moves clear z≥2. The +19.4 on `dateutil-rfc5545-timezone-interop` and the -19.4 on `eicrud` look dramatic in the table. Statistically, either one could still be luck.
+
+<figure><img src="/posts/same-engineering/v3-chart-en.jpg" alt="The +19.4 and -19.4 look dramatic, but both sit below the z=2 threshold. Only two of the five clear it (DeepSWE v1.1, our calculation)" loading="lazy" /><figcaption>The +19.4 and -19.4 look dramatic, but both sit below the z=2 threshold. Only two of the five clear it (DeepSWE v1.1, our calculation)</figcaption></figure>
+
+## When not to bother
+
+A deterministic grader removes much of this movement, because there's nothing to interpret. Think of a schema that either passes or fails, or a real unit test. CoLab makes exactly this split in AutoReview. AI reviews 2D drawings, and deterministic geometry checks find DFM issues in 3D. Where they can write a rule, they write a rule. Here's how they frame the goal:
+
+> no engineering leader is trying to deploy agents for their own sake. What they want is engineering work that comes out more consistent and easier to review
+>
+> — CoLab Software, on agents for engineering design
+
+"More consistent" is exactly what same engineering measures. Still, sometimes it's a waste of time. With 5 tasks and one run each, you won't see anything. If you're choosing between two vendors with a 30-point gap on 50 tasks, you don't need a z-test to decide.
+
+## What to try this week
+
+- **A/A before A/B.** Run the same config twice without changing a line. The delta between the two runs is your noise floor. Any improvement below it doesn't exist.
+- **Two version numbers on every result.** Put `HARNESS_VERSION` and `GRADER_VERSION` on every result row, next to the model name. Without them you can't compare anything to the past.
+- **20 tasks, 10 runs.** That's 200 runs, which is enough for a serious discussion and still doesn't need a cluster.
+- **For any task that moved more than 15 points, read transcripts.** Ignore the score. Put ten transcripts from each version side by side.
+
+If a second run of the same config moves 10 points for you, every 8-point "improvement" you reported last quarter was just noise.

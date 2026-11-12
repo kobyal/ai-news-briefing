@@ -1,0 +1,278 @@
+[0:00] I had some technical difficulties during my talk this morning, so I ran back home and I'm just going
+[0:06] to record it from my computer instead. So hi everyone, I'm Lydia. I work on the ClockCode team
+[0:11] at Anthropic. And the models have gotten really good lately. So we have Opus 5.5, which is my
+[0:17] favorite daily driver. And earlier this week, we also launched Fable 5.2. And these models are
+[0:22] extremely good at long running tasks and understanding your code base. And especially
+[0:27] Fable is also really good at verifying its own output. But as these models get better,
+[0:32] the way that we work with them in Cloud Code also changes. So earlier this year, I don't know if you
+[0:38] remember, but sessions kind of used to look like this. So we'd use a model like Opus 4-5, which
+[0:43] honestly for its time was really good. I really enjoyed working with Opus 4-5. But compared to
+[0:47] today, it would just stop a lot earlier. So it would just run for shorter amounts of time.
+[0:53] and we'd also keep correcting it we'd keep reminding it to do things add things like
+[0:57] importance exclamation mark all these things to our cloud md file and also features like auto
+[1:02] mode didn't exist yet so we were either approving everything manually or taking the riskier approach
+[1:09] with dangerously skip remission so we were still very much in the loop as humans but as these
+[1:15] models got better at taking on bigger tasks our sessions also changed so nowadays at least
+[1:21] At Anthropic our sessions look more like this.
+[1:23] So we're running dozens of sessions at the same time,
+[1:26] running for hours, verifying their own results along the way.
+[1:29] And we even have sessions orchestrate other sessions.
+[1:33] So whereas we used to be in the loop for almost every step
+[1:36] and running one or just a couple sessions at a time,
+[1:39] we've now essentially become managers for dozens of sessions.
+[1:43] We also get a lot more done though.
+[1:45] Now you may have seen our blog post in October
+[1:47] about how Anthropic went from about 2,500 changes a day in May to more than 30,000 a
+[1:53] day in September.
+[1:54] But this also means that we as developers just have to rethink on what we're focused
+[1:59] on instead.
+[2:00] So if you think about our best practices from earlier this year, it was mainly about steering
+[2:04] sessions, approving commands, saying no to certain things or restricting what Cloud could
+[2:09] do, checking the output and also starting the sessions.
+[2:14] So everywhere that we now step out of that loop, something else has to take over.
+[2:18] And this is either the model, the harness, or the environment that it's running in.
+[2:23] So if we are not in a loop to approve every command and we're running so many sessions
+[2:27] at the same time, how can we make sure that the code it's writing is still high quality?
+[2:33] And most importantly, if these sessions are running for hours without our supervision,
+[2:37] how can we make sure that they're running safely?
+[2:39] So let's go through that by taking this old session and seeing what we have to change
+[2:43] to get to that end result that I showed earlier.
+[2:46] Well, first of all, let's use the actual defaults
+[2:48] we start sessions in nowadays.
+[2:49] So that's not really something you should think about.
+[2:52] So let's update the model here from Opus 4.5 to Opus 5.5
+[2:55] and change the manual permission to auto mode.
+[2:58] And Opus 5.5 is a lot better at understanding your intent
+[3:01] and understanding your code base.
+[3:02] So we really don't have to steer it as much anymore mid-session.
+[3:05] And you also no longer have to approve every command
+[3:08] because we started making auto mode
+[3:10] the default permission mode back in August.
+[3:11] Now, being better at understanding your intent and your code base also means that we have to rethink the instructions we have in our code base.
+[3:18] So if you followed our best practices from earlier this year, you may still have things like important or never do this exclamation mark, all these things in your Cloud MD file.
+[3:27] But with today's models, you really don't need that. And it can actually make the model go off track.
+[3:32] So you end up with more tool calls and overall a worse results.
+[3:36] So nowadays, your CloudMD file should only include the things that Cloud cannot see from your code.
+[3:42] So for example, maybe you have a service that's still using some legacy source somewhere, but it's not directly referenced in the code.
+[3:48] That's still good to keep in there.
+[3:50] But everything else, like what stack you're on or where to look, you really don't need that anymore.
+[3:55] And we actually have a command for this called dr.promptaudit, which makes it really easy to optimize your environment for a specific model.
+[4:02] So if you're on Opus 5.5 here and you run this command, it will automatically check your CloudMD and your skills to see what the new model no longer needs.
+[4:11] Now, auto mode is a permission mode that runs a separate classifier on pretty much everything that isn't just reading or editing files in your project.
+[4:19] So it automatically allows commands that it knows are safe, like running tests or installing dependencies, but it still blocks commands where it's unsure whether they're safe.
+[4:29] And normally that's pretty good.
+[4:31] Normally that's kind of, you know, what we want.
+[4:33] But for example here, if we ask it to ship something to staging,
+[4:37] we would have just, you know, approved the push to our deploy repo.
+[4:40] But by default, auto mode only trust this folder and this repo.
+[4:45] So it would block that command.
+[4:46] So we're back in the loop.
+[4:48] Now the defaults should be good in most cases,
+[4:50] but if you still notice that you have to approve a lot of commands,
+[4:53] even in auto mode, the first thing to look at is settings here,
+[4:57] here because you can configure auto mode in your own settings just in plain English and this is
+[5:01] what gets sent to the classifier which then decides whether to reject or allow certain
+[5:06] commands so here we can just write which repos buckets domains we trust and what it should
+[5:11] always allow or never do okay so honestly this was pretty easy by just using today's defaults
+[5:16] we've already gotten rid of most of our in the loop stuff because the model took over the steering
+[5:22] and auto mode took over all the approving.
+[5:24] So getting out of the loop is easy.
+[5:26] But the harder question now is how do we make sure
+[5:28] it's okay that we're not there anymore?
+[5:30] So first is keeping it safe and then also verification.
+[5:34] So let's start with keeping it safe
+[5:35] because everything so far,
+[5:37] so upgrading the model and using auto mode,
+[5:39] it's just working with a model.
+[5:42] And in most cases it does what you tell it to do,
+[5:44] but that's not a guarantee.
+[5:46] So in a study we published back in August,
+[5:49] we tested auto mode versus real people in the loop
+[5:51] and only about 14% of people caught a clearly dangerous command.
+[5:56] Auto mode blocked 89% of them, so it is a lot better at it than we were.
+[6:01] But about 1 in 10 of those commands still went through.
+[6:04] So if you do want the guarantee, you can only enforce that in the harness.
+[6:09] And this is where some of our older best practices still matters, and that's permission.
+[6:12] So for example, if you have a deny rule for a specific tool call in your project,
+[6:17] clot code looks at this rule before the automo classifier even looks at it in fact if a tool
+[6:22] call matches a deny rule the classifier never even sees it so having deny rules is still the
+[6:28] best way to make sure clot actually never does something but then how do you know what needs to
+[6:33] be a rule in your project versus what the model can just know because they've gotten so good at it
+[6:38] um i think it kind of just comes down to if clot gets this wrong once can i take it back so if it
+[6:44] writes the wrong code, you can still revert that.
+[6:47] So you can still leave that to the model.
+[6:49] But if it throws away our uncommitted changes
+[6:51] or it reads a key that's now in your transcript
+[6:53] and you don't want that, that should still be a rule.
+[6:57] So for example, let's say that we just never
+[6:59] want Claude reading our .end file.
+[7:01] Now by default, Automode is fine with this.
+[7:03] So it would have just approved it.
+[7:05] So if you want to make sure that Claude can never
+[7:08] read this file, you should just add a deny rule.
+[7:10] And then commands like cat cannot open this file either.
+[7:13] But it's not always that straightforward because sometimes certain
+[7:16] commands can have side effects.
+[7:18] So for example, let's say that npm test here, a very normal command.
+[7:22] It's just a test.
+[7:23] So automote runs it.
+[7:24] That's fine.
+[7:25] But when the script is running, it runs code that you didn't write,
+[7:28] like your dependencies, or maybe Claude runs a script real quick that it wrote
+[7:32] just to quickly check something.
+[7:34] So if one of those scripts is compromised, it could just open that same end
+[7:39] file or your SSH keys and send those to a server you've never heard of.
+[7:43] right and even if we were still there as humans approving everything honestly we would have just
+[7:48] clicked allow because there's nothing to say no to it's just part of the script that in this example
+[7:54] case npm test runs and permissions only decide if a tool call runs but they cannot limit what it can
+[8:01] reach once it's running so we want to make sure that these kinds of scripts can still run because
+[8:06] this is just part of you know how cloud can check its own work running tests so we cannot just block
+[8:11] npm test but we want to limit its side effects so really we just want to limit the environment that
+[8:16] it's running in so if you're running it locally or on your own machine you can run commands like
+[8:22] that in a sandbox so then you have control over which files in a command it can read which folders
+[8:27] it can write to which hosts it can reach and the operating system enforces that also this also
+[8:34] applies to everything that command then starts so any child processes so on its own that deny rule
+[8:41] get checked by Claude before the command runs but all it sees there is npm test so it doesn't see
+[8:46] which files that script ends up opening but with the sandbox on that same rule gets passed on to
+[8:51] the operating system so now when that dependency tries to open our end file the operating system
+[8:57] just doesn't let it and by default it can still read most of your machine so you'd want to add
+[9:02] another rule for your ssh keys if you care about that and it also cannot reach a host that wasn't
+[9:09] approved but the sandbox only covers the shell commands that cloud runs and whatever those start
+[9:14] but claude's own files your mcp servers and all of your hooks still run outside of it so the rest
+[9:20] of your session still runs on your own machine and everything that's on there so ideally you want
+[9:25] this whole thing to run somewhere where none of that is even there in the first place and that is
+[9:30] a cloud session because there it gets its own machine with a fresh copy of a repo and this
+[9:36] runs even when we close our laptop which is definitely something you want for these longer
+[9:40] running sessions that run for hours so in this case this automatically gets rid of the end file
+[9:46] issue because it's not in git and neither are my ssh keys or our github token and if it still needs
+[9:52] an api key uh you can add that as a network secret or it will tell you like hey i'm missing an api
+[9:57] key mid-session um so it can use it without actually ever sending it to the model and by
+[10:03] By default, also in a cloud session, network access is limited to things like package registries and GitHub.
+[10:09] So you have to explicitly add those domains to your environment for cloud to, to reach other hosts.
+[10:16] Okay.
+[10:16] So with a cloud session, we can run these long running sessions, even with our laptop closed.
+[10:21] And it keeps us safe because it runs in its own environment.
+[10:26] Now it's still good to remember that this machine is disposable, but the things that leave it aren't.
+[10:31] So a commit pushed or a message it sent through a connector.
+[10:35] So we still run it in auto mode with our deny rules,
+[10:38] just commit it into the repo so they come along.
+[10:40] So it could still catch things like a force push
+[10:43] or a secret and a commit, all that kind of stuff.
+[10:47] And beyond just safety,
+[10:49] we also need to make sure that Claude
+[10:51] is actually working on the right thing.
+[10:53] So next is verification.
+[10:55] And the nice thing about being in a loop,
+[10:57] like we kind of knew the work was good
+[10:59] because we'd already kind of seen every change,
+[11:01] we'd proved everything,
+[11:03] but now if Cloud works for hours in the background,
+[11:06] we don't have that anymore.
+[11:07] And we're not really gonna read every file
+[11:10] at the end either.
+[11:12] So, you know, say that we ask you to move our auth
+[11:15] to a new API.
+[11:16] Well, Cloud is very good at understanding what we want,
+[11:19] but there are still a lot of small decisions
+[11:21] that it has to make along the way.
+[11:23] So with the exact same prompt, you know,
+[11:25] one run might move it over, but leave the old API in there,
+[11:28] or one might move it, but only for new logins,
+[11:31] and another one might move it, but log everyone out.
+[11:34] And these all look pretty reasonable,
+[11:36] but it really helps to set up
+[11:38] these verification points along the way.
+[11:40] So Claude keeps verifying its own results.
+[11:43] And those can be anything that comes back as a pass or fail.
+[11:46] So tests, a build, a screenshot, whatever you have.
+[11:49] So now we just wanna make sure
+[11:51] that we review these verification points.
+[11:54] They're a lot shorter to review
+[11:55] than if we just had to review the whole change at the end.
+[11:58] So that's pretty reasonable.
+[12:00] So if one of these runs would still log everyone out,
+[12:02] it doesn't get past that first check,
+[12:04] and then it just has to find another way.
+[12:06] And there's a couple ways to set this up.
+[12:08] The easiest one is of course, just in your prompt.
+[12:10] So you say what done looks like
+[12:12] and ask it to split that into tasks
+[12:14] so they have their own tests.
+[12:16] And I also like to ask it to show the actual output
+[12:18] because you weren't there to see it.
+[12:21] But again, prompting is not a guarantee
+[12:23] that a model will do it.
+[12:24] So for the ones that have to run, guaranteed run,
+[12:28] I would use hooks, which are just, you know,
+[12:30] scripts that cloud code runs at a specific point.
+[12:33] And those give you a lot of control
+[12:35] because you decide when they run
+[12:37] and what they run and what they check.
+[12:39] So for example, every time it edits a file,
+[12:42] we can run our linter.
+[12:43] Every time it wants to mark a task as complete,
+[12:45] we can run the tests for what it changed.
+[12:48] So, you know, if it touched our auth code or something,
+[12:50] it has to pass the auth tests.
+[12:53] And when it wants to finish the whole session,
+[12:54] we can just run the entire test suite.
+[12:56] And if one of those fails, it goes,
+[12:58] oh, that's still broken.
+[13:00] It goes back until it passes.
+[13:02] So it fixes it.
+[13:03] Now, just one thing, when a test fails,
+[13:06] by default, most tools that exit with a one exit code,
+[13:11] but with a one, that task by Cloud Code
+[13:13] just gets marked as completed anyway.
+[13:15] So make sure that your scripts exit with a two exit code
+[13:19] because that's what actually sends Cloud back to fix it.
+[13:22] So, okay, now we have one session that I'm pretty comfortable with leaving alone.
+[13:28] So now we can start with a few more of those because they've all got their own machine.
+[13:32] So they're, you know, not all working in the same folder.
+[13:34] And we don't really have to think about work trees too much ourselves anymore.
+[13:39] But then we still start every session ourselves and we review every one of them.
+[13:44] And honestly, this is already a pretty good place to be.
+[13:46] We are still fully in control over what gets started and when we call a task done.
+[13:52] But even there, you know, we're still the ones kicking off every session and we're still in the loop for all of them.
+[13:59] So I think the most important thing to have in place here now is your CI because all of these sessions eventually open a PR and your CI runs the same checks on every one of them, no matter how that session was set up or, you know, what Claude decided to do along the way.
+[14:13] And if you turn on autofix, we have like CI autofix, Claude can also see when one of those checks fails and then go back to fix it.
+[14:20] So you're not the one spending your review on things that, you know, a check could have already caught.
+[14:26] And for some of them, you can even turn on merge when ready.
+[14:29] So then GitHub merges the PR once all of the checks have passed.
+[14:33] So you're not in the loop to review.
+[14:35] But again, that's not the default.
+[14:37] And that really depends on how risky the change is.
+[14:40] So for example, on our team, every PR gets reviewed by Cloud first.
+[14:44] So not by the session that wrote it.
+[14:46] So it comes with a fresh context and also a separate group of agents to just double check every bug it finds.
+[14:53] And then how much we review ourselves just depends on the risk.
+[14:57] So smaller changes like docs or copy, they don't need a person.
+[15:00] So once the automated checks are green, we're pretty good to go.
+[15:03] Maybe ordinary product changes just need one reviewer and then risky changes might need two.
+[15:09] now ultimately kind of where we see things going um and we're already kind of doing more of that
+[15:15] at an anthropic is that you're not really starting all of those sessions yourself either because if
+[15:19] you're anything like me i'm terrible at context switching so having to manage so many sessions at
+[15:24] the at the same time doesn't always go well so instead you just have one main session that's
+[15:30] your orchestrator and you can already see this in things like cloud code projects which is still in
+[15:35] beta but you just tell it what it needs to be done and the orchestrator splits that up and then starts
+[15:42] other sessions for each task and it keeps track of what comes back so it automatically starts and
+[15:47] verifies these threads which are just new sessions so instead of talking to eight sessions you're
+[15:52] just talking to one and the main session doesn't write the code itself so there you want a model
+[15:58] that's really good at deciding what to do and judging what comes back a model like fable and
+[16:03] if something comes back that isn't actually done it just you know sends it back so until it's
+[16:08] actually done and passes everything and the threads need a model that's good at actually
+[16:12] doing the work like opus 5 5 and you can set those separately so you know one model for the main
+[16:18] session and then another one for the threads and another benefit is that with this setup with
+[16:23] cloak code projects specifically we don't manage context anymore that's all done automatically for
+[16:28] us so we no longer have to think about you know when to compact or clear all of that stuff okay
+[16:34] so if you look back at those old best practices they're all still there but they've just moved
+[16:40] so the model sears it now auto mode approves your deny rules and the environment restrict what's
+[16:45] possible your test your hooks and your ci check set and then ultimately claude can just start them
+[16:51] as well so almost everything we used to do ourselves is now either the model the harness
+[16:56] or the environment. And we're really just here to start that first one and to just review what comes
+[17:01] out. So if you want to try this in your own setup, I would say just take one thing that's way bigger
+[17:07] than you normally give Claude. Make sure your CI actually catches the things you care about,
+[17:11] and then spend a bit of time just configuring your environment, like its network access,
+[17:15] its secret, and its setup script. And then start in the cloud and see where your sessions get stuck
+[17:21] and where you're still in the loop, because that's the next thing to hand over to Claude.
+[17:25] I also highly recommend checking out our best practices in the docs as well. Thank you so much.

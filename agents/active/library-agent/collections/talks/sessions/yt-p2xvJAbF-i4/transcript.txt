@@ -1,0 +1,401 @@
+[0:00] A lot of roads lead to prompt caching, not all, but for any customer that we talk to,
+[0:03] that caching is the first recommendation we get.
+[0:15] So we're going to be talking about the Messages API today and just Cloud Platform more generally.
+[0:20] For folks who have not built on top of Cloud Platform before, what is the Messages API?
+[0:24] The easiest way to see it is the cornerstone of our API.
+[0:27] So it allows you to customize it and build almost whatever you can imagine with it.
+[0:31] So we have this very normal structure that anyone who has been building the industry
+[0:35] is used to by now, in which you have a system turns and user turns and tool calls in the
+[0:38] middle.
+[0:39] On a bare bones perspective, you can take it from there and build whatever you want.
+[0:41] But into the API itself, we have built a lot of tools to allow you to further customize
+[0:46] and have knobs into clause behavior.
+[0:48] One of those can change clause behavior pretty dramatically, like the effort.
+[0:51] You take the same model on high effort and low effort.
+[0:53] Feels like choose captured models.
+[0:54] You can, from first principles, build anything you want,
+[0:57] but with all the tools we have put into the Cloud API,
+[1:00] we're giving you a lot of an easier path
+[1:02] to get into the ultimate app you want to build.
+[1:04] Some of it comes from us having a very opinion-native take.
+[1:07] So we're very close. We're in the same room of research.
+[1:09] We share building, we share a lot of Slack conversations,
+[1:11] a lot of meetings.
+[1:12] And with it, we have a lot of good take
+[1:15] on what actually makes Cloud shine.
+[1:17] We put those as the default in the API.
+[1:20] So if you just copy-paste from our documentation,
+[1:22] the most basic request,
+[1:23] And it's going to carry what we think is the best out-of-the-box experience.
+[1:27] But with it, there's also all those knobs, such as effort,
+[1:30] that you can try to prompt Cloud into having a certain type of behavior or not.
+[1:34] But with those knobs, you can do more than any prompting outside could ever do.
+[1:37] So it actually unlocks a level of customization that's just not available otherwise.
+[1:41] Talk to me about how we decide what to ship.
+[1:44] What knobs and dials do we allow to actually unlock the best Cloud intelligence?
+[1:49] It's a very two-way conversation with the researchers at this company.
+[1:52] So one way comes from them to us, in which they are experimenting and building it.
+[1:57] They start finding out things that cloud is good at.
+[1:59] And that comes as a very raw thought.
+[2:00] Like, oh, you know, once upon a time, a long time ago,
+[2:02] they started noticing that cloud was getting better at using computers.
+[2:05] Yeah, I remember that day.
+[2:06] And then ultimately, that became the computer use tools we have in the API.
+[2:09] But sometimes it goes the other way, in which we are talking to our customers,
+[2:12] and we're understanding what our customers want and ask us more for.
+[2:15] And we convert those into actually asks for research to train into,
+[2:19] obviously not the past clouds, but the new clouds.
+[2:21] Because there's always a pipeline.
+[2:22] So any user ask or user need we have, we can eventually put it in an API.
+[2:26] And that true conversation keeps going.
+[2:28] It's a good chunk of my job.
+[2:30] And that's how we actually try to get that best cloud out each time.
+[2:33] Yeah, and what have we done to make a choice that we felt like really empowers developers to bring the best of cloud to their users as well?
+[2:41] It's funny because these two feel so small, but they are very big in practice.
+[2:45] So being able to change effort in system prompts mid-conversation
+[2:49] are two things for me that really show the power of being able to have a knob later on.
+[2:54] And you could always change a system prompt.
+[2:56] You could always change effort, but then you break prompt caching.
+[2:58] And that to the user is like a deal breaker.
+[3:00] Yeah, that's the unique thing that we can provide there,
+[3:02] which is, okay, how do you make these changes?
+[3:04] How do you empower the experience you want to
+[3:07] while keeping costs low or otherwise unlocking the best intelligence?
+[3:11] Exactly.
+[3:11] And sometimes a user has an agentic flow that has been operating under high effort,
+[3:17] and they know that the next request is actually easier.
+[3:19] But if they change the effort to low, the cache is broken,
+[3:22] and that defeats the whole purpose of their saving cost.
+[3:24] But being able to change effort mid-conversation really gives you that power.
+[3:26] So we're making these changes.
+[3:28] We have this tight loop with research, with inference,
+[3:31] with a bunch of other team safeguards included.
+[3:33] What does it take to get from idea to launch in the API
+[3:37] and empowering our users to leverage Claude?
+[3:40] After the idea, the first thing you need is some sense of how well cloud works.
+[3:45] And that usually goes around evals in each step of the process.
+[3:48] This is what I was hoping to get into.
+[3:50] We have all these changes coming through.
+[3:52] What do we need to do to ensure that one workflows aren't breaking,
+[3:56] or otherwise you're getting the best from any of these knobs and dials we're bringing?
+[4:00] Yeah, and we run a lot of evals.
+[4:03] And we recommend each customer who is adopting each of these knobs run their own evals
+[4:06] because ultimately we are an API, we're very generic, we're trying to serve everyone.
+[4:10] And for a customer building on top, they have their own use case.
+[4:13] They have their own personalization that applies to them and only them in the world.
+[4:16] So we talk a lot about changing things in the API as a result of unlocking intelligence,
+[4:21] sort of staying at the frontier with Cloud.
+[4:22] But traditionally APIs have been versioned, there are breaking changes,
+[4:27] and we think about these things in a way of migrations.
+[4:30] It's like, okay, user X needs to make a change in API Y and so on,
+[4:34] and roll that out to other users and take some time.
+[4:36] With models, it's actually been quite different.
+[4:37] So describe, in your mind, as you're thinking about new changes in the API,
+[4:42] how do you actually ensure that migrations are relatively slow,
+[4:46] that rollouts are relatively fast, and otherwise users can ingest the changes well?
+[4:52] Yeah, I'm very curious about your thoughts on this as well, actually.
+[4:54] Want to track that? Okay.
+[4:56] Yeah, I think one thing that's been very interesting is,
+[5:01] I come from other worlds and other roles
+[5:04] roles where API versioning has been relatively important, but also relatively painful.
+[5:11] Models provide such an interesting version mechanism for us, right?
+[5:14] I mean, you have this model string, you have an API version, you have an intertwining of
+[5:18] these two things, you have prompt stability, you have buckets of changes, or switches rather,
+[5:23] that allow you to bring new changes to your end users.
+[5:26] And it's actually been very fortunate that models have been able to be really on this
+[5:29] frontier of intelligence.
+[5:30] And because of that, users are more willing to make adjustments
+[5:34] because the value is so high for making those adjustments.
+[5:37] And I think that is such a powerful mechanism both for our users,
+[5:41] but also for us to ensure that we're bringing the best intelligence forward.
+[5:44] And so we think a lot about how to make sure our API versioning strategy
+[5:49] keeps up with model intelligence, but also how model strings effectively as a version
+[5:54] mean that we're bringing the best intelligence very, very quickly to users.
+[5:57] But again, it comes back to what you just described,
+[5:59] which is your harness still needs to be evaled,
+[6:01] it needs to be tested, it needs to be validated
+[6:03] that these changes are working well.
+[6:06] And anything from the number of tokens used
+[6:09] to intelligence to outcome from the task
+[6:11] are all measured and I think are very, very important
+[6:14] for any end user to really think about.
+[6:16] Yeah, to elaborate on something you said there,
+[6:18] sometimes we need to do some implicit versioning
+[6:21] when you go from one model to the other.
+[6:22] And the easy part of implicit versioning
+[6:24] is when you're adding your capabilities, no one complains.
+[6:27] It's difficult sometimes when you need to deprecate one capability.
+[6:29] Someone relies a lot on that.
+[6:30] Yeah, I didn't go into deprecation, I did additive, right?
+[6:32] Yeah.
+[6:33] One that comes to mind is when we changed the thinking
+[6:35] from regular extended thinking that everyone is used to
+[6:38] to adaptive thinking.
+[6:39] We knew by then that adaptive thinking
+[6:41] was already performing better in evals,
+[6:43] and we wanted to roll it out,
+[6:44] and we wanted it to be the way to do thinking for the future.
+[6:46] So we did roll it out.
+[6:48] But for a while, we kept it as this other type of thinking
+[6:51] that you can still switch back as a developer,
+[6:54] toggle back to the old thinking.
+[6:55] And I didn't even touch on these.
+[6:56] we have beta headers and other mechanisms for you to roll back to previous changes
+[7:01] if you need time to update your harness.
+[7:02] Exactly.
+[7:03] And we try to buy that time.
+[7:06] Some of it at some point we need to do a harder application
+[7:08] because at some point models stop being trained for this old way.
+[7:11] And then for us to put a knob on the API that doesn't do anything
+[7:14] or doesn't do what it's supposed to would be even more harmful to the developer.
+[7:17] So that's the end date of the migration essentially,
+[7:19] but we do try to move it out as much as we possibly can.
+[7:22] You always have a model to slowly migrate
+[7:25] and we change what is recommended, but you can still go, you know, stay it your old way.
+[7:28] Yeah.
+[7:29] So maybe stated plainly, you know, how do you think about the sort of loop of capability comes out?
+[7:34] Like, what should a developer think about as they're upgrading to these new versions?
+[7:37] Like, what does that sort of loop with their evals look like?
+[7:39] Yeah, I think in general you should, like, apply this thinking for every single part of a workflow.
+[7:43] Even as you're using an app, if you're using cloud code,
+[7:46] it's always good to periodically reevaluate all the loop and setup you have around your own product
+[7:51] when this model changes.
+[7:52] because models can be really good at one thing
+[7:54] that makes one part of your harness different.
+[7:58] And this actually goes into a whole conversation
+[8:00] about building harnesses in general,
+[8:02] which they're very good at leveraging this capability from the model.
+[8:04] But at some point, if a model is 10 times smarter
+[8:06] than the previous model was,
+[8:07] then the harness can start to be a limitation.
+[8:09] So I think even these forced applications at times
+[8:12] are a good forcing function to reevaluate parts of the harness
+[8:15] that maybe don't need to be there anymore,
+[8:16] whether this new feature can help you get better prompt caching.
+[8:19] And if you get better prompt caching,
+[8:20] you get better cost savings.
+[8:22] So, you know, we do a lot of things on our end, make a lot of changes, make a lot of updates for intelligence.
+[8:28] We also make a lot of them for cost as well.
+[8:31] And, you know, prompt caching is one of the largest levers that we have in order to control for cost.
+[8:35] What are some other ways that you think about cost controls in the API and otherwise prompt caching is one of our unique value propositions that we can control and help our users with?
+[8:45] I think a lot of roads lead to prompt caching, not all, but to take a second to talk about prompt caching itself.
+[8:50] For any customer that we talk to that still hasn't optimized their prompt caching, it's
+[8:54] the first recommendation we get, because it's the one that can bring your costs down meaningfully.
+[8:58] What is prompt caching?
+[8:59] How does that work?
+[9:00] Prompt caching is a good way to see if you're in the middle of an energetic turn in which
+[9:04] your second request is very similar to your first request, where it's more like an append.
+[9:08] You're just adding new things each time.
+[9:10] We cache those blocks that are already run once.
+[9:13] Whenever our sales teams are talking to customers, the first thing comes up, like, how much have
+[9:16] you worked on your prompt caching rates?
+[9:18] and you get it to up to 90% from caching,
+[9:20] because those are the dream numbers to achieve,
+[9:22] and it really translates to cost,
+[9:24] and it's a win-win all around.
+[9:25] The other ones are, and you can tell me
+[9:27] what you think about this in general,
+[9:28] how do you approach cost per task versus cost per token?
+[9:31] Because some of those features we have,
+[9:32] they don't change the cost per token of the model,
+[9:33] but they change the number of tokens ultimately used.
+[9:36] It's a tough one, because I think tokens
+[9:39] and cost per token is just the unit of measurement
+[9:41] that a lot of people look at.
+[9:43] But a lot of times, we've found in many evals,
+[9:46] and so our own users have found through many evals
+[9:49] that the cost per token also needs the dimension
+[9:52] of intelligence per token.
+[9:54] And intelligence per token is how quickly can the outcome
+[9:59] be achieved as a result of the model that you've chosen.
+[10:02] So one of our higher intelligence models,
+[10:05] maybe a Fable version versus a Haiku version,
+[10:08] is going to be wildly different in terms of the number
+[10:10] of tokens used to achieve that same outcome.
+[10:12] And so I think we're almost back to this evals point of,
+[10:14] OK, great, how do you make sure that your harness,
+[10:17] the model that you've chosen, the knobs and dials
+[10:19] that you've pushed on, pulled on, however you want to frame it,
+[10:22] are tuned and tweaked well enough where you have confidence
+[10:25] in your eval story that, oh, actually, if I upgrade
+[10:28] to this new model or change this dial, I'm thinking,
+[10:31] or otherwise, that you're still achieving the same outcome,
+[10:34] but potentially on a different cost curve,
+[10:36] one that's favorable to you.
+[10:38] We see that a lot with users using Haiku or Sonnet,
+[10:43] in some cases, which is great.
+[10:44] but then not realizing, oh, actually,
+[10:45] if I were to just use one of these higher intelligent models,
+[10:48] that would be in a much better place.
+[10:50] That's something that I'd love to see more of
+[10:52] and even have us build product around
+[10:54] and help our end users do that even easier than they can today.
+[10:58] The biggest thought is when the stronger model is more expensive,
+[11:01] but then it solves a task that you couldn't solve before.
+[11:03] Maybe the inverse is true too, right?
+[11:05] Where as the models on all classes get more and more intelligent,
+[11:08] there are times where you might use a model
+[11:10] with slightly less intelligence that is not capable
+[11:12] of handling that same workflow.
+[11:15] Yeah, exactly.
+[11:15] So maybe you're using Fable 5 for something
+[11:17] because it's the only model that could solve this.
+[11:19] But now Opus 5 can solve it for you.
+[11:21] Yeah, exactly.
+[11:22] Well, let's maybe shift gears slightly.
+[11:24] I would love to talk about the API.
+[11:27] We talk about leveraging for intelligence.
+[11:29] We talk about eval flows.
+[11:30] What we haven't really talked about is
+[11:32] how to think about good actors versus bad actors, potentially,
+[11:36] and misuse of the API.
+[11:37] Because I know a very top of mind topic for most folks
+[11:42] that are using these APIs in safety.
+[11:45] It's our number one mission as Anthropic.
+[11:47] So how do you think about the difference
+[11:50] between good acting and bad acting in the models,
+[11:53] and maybe some of the changes we've been making recently?
+[11:55] What are those intended to protect,
+[11:57] and why is that so important?
+[11:58] Whenever we get a new model, we start seeing how smart it is.
+[12:01] We get the first feeling of this excitement,
+[12:03] like, wow, this model can do things that it couldn't do before.
+[12:05] And the thing that I always tell myself,
+[12:07] and everyone in this company tells themselves,
+[12:08] is we have a lot of ideas,
+[12:10] but we have such a large pool of customers
+[12:12] that they're going to have more ideas than we do.
+[12:13] So we take this model, and it is our number one mission
+[12:16] to also get it in front of users so they can build
+[12:18] all these amazing products.
+[12:19] We have users who are doing science research with the model,
+[12:21] so they need to get their access to this.
+[12:23] And the second instinct is the other side of that,
+[12:25] in which you worry about, what will a bad actor do
+[12:27] with this model?
+[12:28] And navigating that balance is the focus of a lot of people.
+[12:32] It's one of my focuses.
+[12:33] And you see it in the very clear split of the Mythos
+[12:36] and Fable models.
+[12:37] Yeah, let's talk about that.
+[12:39] Every model in the API runs with a lot of classifiers,
+[12:42] and a lot of these classifiers is trying to prevent bad usage of it.
+[12:46] It was born on the fact that there's a lot of cyber good to be done.
+[12:49] Which we believe. Our mission is safety to bring best intelligence,
+[12:54] best outcomes to society based on bad intelligence.
+[12:57] How to cure the next disease,
+[12:58] how to ensure that we're having better blockage on cybersecurity issues.
+[13:03] There's a bunch of good to come from it.
+[13:05] Yeah, exactly. It is very important for our mission
+[13:08] to actually get the right people with access to mythos.
+[13:10] And then Fable is the other side of this coin
+[13:13] for anyone who doesn't go through this entire KYC process
+[13:17] can actually get and use Fable.
+[13:18] And it's the same intelligence,
+[13:19] the same model weights at the end of the day.
+[13:21] And it's just about how much you can do
+[13:22] with this model based on classifiers.
+[13:24] The other part of the safety coin
+[13:26] is there's a lot of distillation that happens.
+[13:28] If we put a model out there that gets distilled
+[13:30] and created into another model that sure will be weaker,
+[13:33] but it'll still be a strong model.
+[13:35] That model being unsafeguarded in the wild is an incredibly dangerous position for the world.
+[13:40] And it is something that we work a lot on to try to stop.
+[13:43] And we're very forthcoming and honest users about this.
+[13:46] So we just rolled out a batch of changes on thinking protections.
+[13:49] And we document that as measures we need to do to prevent desolation.
+[13:53] Yeah, how do you make sure we are balancing the developer experience with some of these safeguards?
+[13:59] What are some mechanisms that we use to make sure that that happens?
+[14:03] So we run an absurd amount of evals.
+[14:06] Everything that eventually makes it public,
+[14:08] there were 10 other variations that we experimented internally
+[14:10] that we're just trying to see what is the actual best one.
+[14:13] And it is a difficult problem, but an extremely data-driven solution.
+[14:17] And it takes a lot of people looking at a lot of numbers
+[14:19] over a long period of time to eventually make one decision,
+[14:22] and that's one feature that makes it up.
+[14:23] It's actually quite fun to look at all these numbers as well.
+[14:26] And even getting to the point where the model is maybe
+[14:29] so good at one of these evals,
+[14:31] even in the face of some of these changes that we're making,
+[14:33] that we actually have to make the evals harder
+[14:35] in order for the model to continue to hill climb or otherwise improve.
+[14:40] Yeah, eval saturation is a very funny good problem to have
+[14:43] that we keep running into.
+[14:45] We had an eval that at some point it stops being meaningful
+[14:47] because every model can solve it.
+[14:49] Yeah, maybe what's one thing that you're excited about for the future
+[14:52] when it comes to model launches generally that you can share, of course?
+[14:56] Things that maybe more broadly you'd love to see and continue to push on?
+[15:00] The most exciting one is always new capabilities.
+[15:02] So there's always this drive internally whenever a new model is fresh out of the oven.
+[15:06] It's like, what can you do?
+[15:08] Can you test all the prototypes that you built before that were failing?
+[15:12] And I think ultimately it's all about model intelligence.
+[15:15] Everything else next to that matters, but nothing matters as much as model intelligence.
+[15:20] So what we do a lot, we reevaluate all of our features.
+[15:23] We reevaluate many features that we didn't launch before because they weren't good enough.
+[15:27] We always have a few features in our set of options that we haven't launched yet because it's just not at the performance level we want to put out for users.
+[15:34] Every time we put something in API, it has a stamp of quality.
+[15:37] We really care about it.
+[15:39] And the thing that excites me the most when we have a new model coming up is rerunning evals on all of those.
+[15:43] Do any of those clear the bar now?
+[15:45] And when it does, we actually put it out there.
+[15:47] And it's something that we also try to pass that same insight to our users.
+[15:50] All of those things that were very close but not there before, or they're there now.
+[15:54] How are you thinking a lot about long-running and evolving the API to power these autonomous flows as we see AI running into all these workflows?
+[16:06] A lot of our API is designed, at the end of the day, about for agents.
+[16:10] So if you open our docs, you very quickly see about our cloud-managed agents offering.
+[16:14] And there's a lot that can be said about that.
+[16:16] But it gives a really easy way to just pin up and have very, very powerful agents.
+[16:19] But then the other side being, as we talked a lot about, the cornerstone, the Messages API itself.
+[16:24] We have a lot of features there, but most of them, they are, at the end of the day, about agenting flows.
+[16:30] This comes from us talking a lot to customers who build agents.
+[16:33] The other tools we have are a lot of, in our client-side tools, and they are things that we know work well.
+[16:38] And this comes from our huge battery of evals.
+[16:41] And you can always use your own bash tool or text editor tool, but you can also use ours.
+[16:45] And the others being all those toggles to control cloud intelligence.
+[16:49] Obviously, you can control thinking, you can also control effort.
+[16:51] and those matter because they really change your agent
+[16:54] from being able to do something or not.
+[16:56] Yeah, and I think a good iteration of this too
+[16:58] or a good showing of what the Messages API can do
+[17:01] is through all of our first-party apps,
+[17:03] you know, all Cloud Code, Cloud AI,
+[17:05] but also we have Cloud Managed Agents as well.
+[17:07] You know, it's been very great to see a lot of this,
+[17:10] you know, happening where we can take off a lot of this
+[17:12] from your plate as an end developer using the Cloud platform,
+[17:16] making that easier and easier for you
+[17:17] as you go into these higher-order agent abstractions,
+[17:20] which is really cool.
+[17:21] And so, yeah, prompt caching, there's thinking tuning,
+[17:24] there's consistently looking at changes we're making
+[17:29] to improve efficiency in the API
+[17:31] and otherwise making things faster.
+[17:33] So once a lot of those things land in our launch,
+[17:37] I think we're going to continue to see this evolution
+[17:39] more towards agents and leveraging the Messages API
+[17:41] to make that happen.
+[17:43] Yeah, and actually Cloud Management Agents
+[17:44] is built on top of the Messages API.
+[17:46] So it's also another case of us just being
+[17:48] very tightly integrated in-house.
+[17:51] Because we are building this Agents API,
+[17:52] we, at the messages level, understand a lot of what they need.
+[17:55] And when we understand what they need,
+[17:56] we put it in the API available,
+[17:58] and everyone being the Agents,
+[17:59] whether through the Cloud Manager Agents API
+[18:01] or just straight from Messages API,
+[18:03] gets all the same lessons to them as well.
+[18:05] Yeah, makes sense.
+[18:06] Well, it's been awesome talking with you about messages,
+[18:10] about the API, and about just Cloud Platform generally.
+[18:13] We have a lot of work ahead of us,
+[18:15] but it was very exciting to hear about the ways
+[18:17] that you think about model launches and evailing
+[18:20] and just making sure that everyone can get the best intelligence from Claude.
+[18:23] So thanks.
+[18:23] Yeah, great chatting.

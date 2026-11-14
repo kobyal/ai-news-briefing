@@ -1,0 +1,195 @@
+[0:00] Hi, I'm Dmitry. In this session, I will show how I work on maintaining large AI coding projects.
+[0:08] Coding agents made code cheap. They made entropy even cheaper. In the Marvel movie,
+[0:15] Thanos watched his home planet Titan collapse under its own growth. So when the universe got
+[0:21] crowded, he raised half of everything. This talk is about the one time I did the same in one project.
+[0:29] Our code was growing the way Titan did.
+[0:32] When I found what my agents had done, I deleted tests and boilerplate code nobody used.
+[0:41] I had to rewrite the whole project and I lost some useful pieces.
+[0:46] And that's the dilemma. Drown in chaos or break what people use?
+[0:51] And here we'll build the third option.
+[0:55] For that project, the rewrite didn't hold.
+[0:58] The agents kept writing and the mess grew back.
+[1:02] So I drew a line.
+[1:04] Above it, there is more change than anyone can check.
+[1:09] The third option is to stay under it with small sweeps every week and feedback loops
+[1:15] built into the system.
+[1:16] Each chapter of this talk is one thing I had to learn to get there.
+[1:21] Tunnels needed six stones for one snap.
+[1:24] Hours are six questions and they light up in the corner as we go.
+[1:29] The first one is time.
+[1:31] How do we stay under the line?
+[1:34] Chapter 1.
+[1:35] To stay under the line, I first had to know what right means here.
+[1:40] I used to think the tests decide that.
+[1:43] So what does right actually depend on?
+[1:47] Let's keep one task in mind.
+[1:50] wants to change the amount on an order we already approved. Two kinds of agents meet here. One wrote
+[1:58] the instructions and the other follows them in production. We run this in 110 countries with
+[2:06] about 10 000 scenarios of prose instructions. Every task lands in a slice, one process in one country.
+[2:16] that's the second stone space it asks where a change is allowed to go by default it stays inside
+[2:24] its slice most of this system is pros about three quarters by my estimate so pros needs engineering
+[2:32] too at start we borrowed mutation testing you break one sentence on purpose and you watch
+[2:39] for red test. Here, almost none turned red. And if your wrapper is all code, your agent instructions
+[2:47] and your tests are your pros. With agents, a rewrite is easy. The hard part is knowing what
+[2:55] has to survive it. For code, tests can tell you. For pros, only people can. Agents can't build a
+[3:03] complex system on their own. They fix what is easy to see and break consistency on the way.
+[3:10] And people also get tired, so we spend their judgment only where it's needed.
+[3:17] When business asks check with the team, it hides a real question. Is this a human step or can we
+[3:24] automate it? Experts can't answer that. They don't see how the systems connect inside. So developers
+[3:31] dig through the traces and logs with their coding agents and they decide which it is.
+[3:37] In our task, the team leads decisions human. The limit was data we could connect.
+[3:44] Business experts see the rules. Developers see what's under the water. And that's where most
+[3:51] bugs live. They have their coding agents write those links down so the runtime can check them.
+[3:58] Our guide for experts says it simply. Business tells us what, we work out how.
+[4:06] One document to readers. Agents read the blocks, so the blocks have to be exact.
+[4:13] Experts read the text around them and they sign it. We keep one copy. The second one we drift.
+[4:19] And it works both ways. Our code needs a plain description for experts too. Experts can only fix
+[4:26] what they can see each of them reviews a task exactly the way the agent saw it the node becomes
+[4:34] the next change made by a coding agent and tested on the same task so right depends on people
+[4:42] no single person knows it a group of experts decides and that's why we bring them in from the
+[4:49] start. You'll see the soul stone here a lot. We take it in chapter 4.
+[4:56] Chapter 2. Experts correct one task at a time, while agents run the same prose all day. We track
+[5:04] every outcome, accepted or rejected. The accuracy shows us where people still need to look. I used
+[5:12] to think the goal was to move everything into code so where do we still need judgment here is our task
+[5:20] again the pro says the limit is 1500 the code says a thousand the same order is fine in one place
+[5:29] and too high in the other and nothing throws an error even a line like do not call x teaches the
+[5:37] model that X exists. That's the third stone, reality. Is it true or does it only look true
+[5:45] for the model? Prose has no compiler, so we built one. Then the author lends every changed file
+[5:53] into ledger, just like code. Lend can't stop copies drifting apart, so we watched the walks.
+[6:03] A walk is the path one agent takes through the pros.
+[6:07] When agents keep walking the same path, we turn it into one workflow tool and we delete the pros that walked it.
+[6:16] Our first workflow tools made things worse. The pros still named the steps inside them, so agents run those steps again.
+[6:25] It worked once the pros kept only the decisions.
+[6:29] Now a walk becomes code only when it repeats and agrees across countries.
+[6:35] Otherwise, it stays prose.
+[6:38] What still varies stays in prose inside the frame.
+[6:43] Code prepares the facts and carries out the decision.
+[6:47] Experts own the decision table and the model only picks a row.
+[6:52] If no row fits, a person takes over.
+[6:55] We haven't built the next step yet.
+[6:57] the model will take the small decisions and workflows will connect them.
+[7:03] This boundary moves both ways. We moved hundreds of lines of expressions out of code and into prose
+[7:11] because experts couldn't read them. A regex is still fine for spotting a critical signal.
+[7:17] When there are many, they move into config. Judgment stays wherever the answer varies,
+[7:23] in a place an expert can read. Chapter 3. Now the model decides and its decision becomes an action.
+[7:32] I used to think control meant permissions on the agent. So what does it mean to stay in control?
+[7:41] Control starts with what the model sees. That's what the fourth stone mined. What does the model
+[7:48] know. When we let it choose what to load, it loaded everything. Then it invented a pricing check just
+[7:55] because prices were visible. Whatever sits in its context becomes a reason to act. The runtime decides
+[8:04] what the model sees. For our task, that's three facts from the order. The full record stays with
+[8:11] the runtime and the model makes fewer wrong moves.
+[8:18] Here are how we minimize context bloat.
+[8:20] For a big set, the model passes a handle, a short name for date that the runtime already
+[8:24] holds.
+[8:26] The runtime checks it before any write.
+[8:28] It keeps the context small and still enough for the decision.
+[8:32] At the same time, it validates context for consistency.
+[8:38] A model with the right facts can still do damage.
+[8:41] That's the fifth stone – power.
+[8:44] What may change?
+[8:46] We control a change twice – during development and again at the right at runtime.
+[8:52] Only code opens the right path, so we can't change pros many times a day.
+[8:57] The open rings are the parts that still depend on people.
+[9:02] Let's zoom in and run right.
+[9:04] Five walls stand in front of it, and the sixth checks that it landed.
+[9:09] If a write looks like it failed, an agent retries, and the journal makes sure it runs only once.
+[9:17] Control means much more than permissions on the agent.
+[9:23] Chapter 4. Most days I glide over the system.
+[9:27] From up here, everything looks fine, so I don't go down into every change my agents made.
+[9:35] Then the surface gets rough. How do we know we're losing control?
+[9:40] All those controls protect the system. Nothing protected my attention.
+[9:45] At the start, I read every change, and that's how the system picked up my habits.
+[9:51] Then the volume grew past what one person can read.
+[9:55] I was burning out and I stopped reading every change.
+[9:59] That was the price of the last stone.
+[10:02] So, who judges and what does it cost?
+[10:05] With it, the gauntlet is complete.
+[10:08] Every tech lead I know has been here.
+[10:11] The one person every change waits on.
+[10:14] Agents just get you there in weeks instead of years.
+[10:18] I needed a way of working that doesn't run through one head.
+[10:23] And the first gauge was me.
+[10:25] When I'm tired and I can't explain what changed, that's the signal.
+[10:30] The dashboard can be green while that gauge is firing, so I stop and fix the process first.
+[10:37] I don't wait for a number.
+[10:39] I couldn't read every div anymore, so I built instruments that watch how things change and their derivatives.
+[10:47] One of them is blast radius.
+[10:50] Before we built one new check, we replayed its rule over several thousand past sessions.
+[10:56] It would have fired on less than 1%.
+[10:59] Where the numbers jump, I go down and read.
+[11:03] When something looks wrong, we wait.
+[11:05] One signal waits until it comes back, even when it comes from an expert.
+[11:10] A cluster across slices is different.
+[11:13] Then we fix the concept behind it once.
+[11:16] once. Left alone, an agent keeps adding additions until today's tasks pass. The
+[11:22] eval score drops when you take them out and you get an honest list of gaps.
+[11:30] One red slice is rarely alone. The experts note becomes an eval and an agent
+[11:37] searches the siblings for the same failure. Siblings differ on purpose by
+[11:42] market and by local law. So we sweep them and the fix goes only where the failure is confirmed.
+[11:53] At any time 10 to 20 of these loops are open. At one point I had become the message
+[12:00] bus between users and my agents. At this scale every user has to be an evaluator,
+[12:06] with a screen to give feedback without me. My job as the architect is to build those loops
+[12:13] into the system. Each loop writes to a ledger, so nothing waits on my memory and nothing waits on me.
+[12:24] Agents forget everything when a session ends, so the memory has to live in files.
+[12:29] We keep two kinds – what happened and what is true now.
+[12:34] The next session starts from what is true now.
+[12:41] Every issue has to connect to its root cause.
+[12:44] Without that the agent decides on wrong facts and the check has nothing to count.
+[12:50] So we don't act without evidence.
+[12:54] Reality comes back.
+[12:57] In chapter 2 it asked if the pros is true.
+[13:00] Now it asks if the change is.
+[13:03] I used to trust Green.
+[13:05] So what would make us change our mind?
+[13:09] Green was tempting because checking is where the times goes.
+[13:12] My agent spent almost 9 tenths of that time on a change just checking it.
+[13:18] And checking took a bigger share of my own week too.
+[13:22] Verification speed is the limit.
+[13:27] We rank evidence by what it proves. A replay on real tasks sits at the top. Before the data arrives, we write down what would prove us wrong, and every new check has to fail once on purpose before we trust it.
+[13:43] AI refactors fail quietly. Every condition and every decision table role is a branch,
+[13:54] and after a refactor each one has to land exactly once. Here the branch for amounts
+[14:00] over the limit got lost. Our order would have gone through without the team lead. Real tasks
+[14:08] decide what we test.
+[14:10] We freeze them as a set and replay the old version
+[14:14] against the new one.
+[14:16] If no real task takes a branch, we call that no evidence.
+[14:21] You can't trust one agent to judge its own work.
+[14:25] A second agent checks it with a checklist
+[14:29] and without the author's reasoning.
+[14:31] It can't be talked into agreeing.
+[14:33] Over six months, it grew to most of my checking.
+[14:38] Coding agents finish most of a batch and quietly skip the rest, especially when their context is full.
+[14:46] The ledger shows what was skipped.
+[14:49] In one backclock most items look covered, but only about a quarter could really be closed.
+[14:56] So now evidence we can count is what changes our mind.
+[15:02] This is the third option from the start of the talk.
+[15:07] I used to think there were two choices, keep everything or snap.
+[15:13] So what is worth carrying forward?
+[15:16] This one process over a year.
+[15:19] Some branches merged back, some still drift, and some are dead but still look alive.
+[15:25] Which ones deserve to survive?
+[15:30] A fix is only a moment.
+[15:33] These forces keep pushing right after it.
+[15:36] You've met most of them already.
+[15:38] This chapter deals with regrowth and branching.
+[15:44] The first gauge was me back in Chapter 4.
+[15:47] These are the gauges for the code.
+[15:50] Time gets its answers here.
+[15:52] The bridge line comes back as a number.
+[15:55] A ratchet means the count can only go down.
+[15:58] Two gauges run today and six more are next.
+[16:04] Every week real use decides what stays. Anything no real task reaches gets a name and its evidence
+[16:12] before it goes. That's the evidence I didn't have when I snapped. Tests kept dead variants
+[16:19] alive. Agents kept every option at tests still mentioned. Now a retired variant takes its
+[16:27] test with it. Here's the whole method as one week. This is the third option as a process.
+[16:39] Together, there's the full gauntlet. Thanos used his for one snap. We use ours every week
+[16:46] in small doses with evidence. I haven't had to snap again.
+[16:51] Sol had a second prize and I only saw it later. After we delivered it to production,
+[17:01] I found my own engineering principles built into the system's design.
+[17:07] Its skills and its memory carry my habits and my biases. Conway said the system copies the org chart.
+[17:14] ours copies whoever corrects it. Here are 18 questions, three for each stone.
+[17:21] I'm using them when working on my projects. Pause here and pick one your own repository
+[17:29] can't answer yet. That's where to start. I learned to use this process when I was
+[17:40] already burning out. If you're the one your team's changes wait on today, this
+[17:46] is for you. Use your stones while you can still read every change. In the end,
+[17:52] Thanos retires to a garden. Maybe he should start using them daily. Thank you.

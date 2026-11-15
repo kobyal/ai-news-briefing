@@ -493,9 +493,21 @@ if [ "$DO_PUSH" -eq 1 ]; then
     # daily — 2.4M Tier-1 requests = $11.92 of October's $14.29 S3 bill. Hashed
     # _next/ chunks get new names when they change; HTML that changes content
     # almost always changes size. Today's new story pages are new keys anyway.
+    # EXCEPT when a chunk is renamed: the HTML/RSC that references it keeps the
+    # same byte length (same-length hash), so --size-only skipped it while
+    # --delete removed the old chunk → /community, /media, /tools, /search served
+    # unstyled from 2026-11-08 to 11-15. So: if any local chunk is missing on S3
+    # (= the build changed), this run does a full content sync.
+    _SIZE_ONLY="--size-only"
+    _S3_NEXT=$(aws s3 ls "s3://${S3_BUCKET}/_next/static/" --recursive \
+      --profile "$S3_PROFILE" --region us-east-1 2>/dev/null | awk '{print $4}')
+    if [ -n "$_S3_NEXT" ] && (cd web/out && find _next/static -type f) | grep -vxF -f <(echo "$_S3_NEXT") -q; then
+      _SIZE_ONLY=""
+      echo "  ↻ _next chunks changed — full sync this run (no --size-only)"
+    fi
     aws s3 sync web/out/_next "s3://${S3_BUCKET}/_next" --size-only \
       --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1 || true
-    if aws s3 sync web/out "s3://${S3_BUCKET}" --delete --size-only \
+    if aws s3 sync web/out "s3://${S3_BUCKET}" --delete $_SIZE_ONLY \
          --exclude "data/*" --exclude "audio/*" --exclude "img/*" --exclude "library-assets/*" \
          --profile "$S3_PROFILE" --region us-east-1 >/dev/null 2>&1; then
       # ── ATOMIC DATA PUBLISH ────────────────────────────────────────────────

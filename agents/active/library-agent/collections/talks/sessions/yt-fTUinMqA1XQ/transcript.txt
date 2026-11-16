@@ -1,0 +1,230 @@
+[0:00] Welcome to our session on multiplayer software factories, where I'll walk you through what the
+[0:05] tensions are, what the solutions are, when multiple people and multiple agents are working on the same
+[0:11] software delivery pipeline. Software delivery pipelines are of course not new and existed before
+[0:17] AI. And you know, we have the typical build, test, and then kind of wait for the release
+[0:25] and the merge to go out into main. This is pretty much a serial flow and it has
+[0:31] helped us automate and be more robust in the delivery. At the same time people are
+[0:37] building factories and I call them solo factories on their laptops on their
+[0:41] kind of systems within their coding agents and increasingly they're using
+[0:46] multiple agents and doing kind of delivery with agents. Now they often have
+[0:52] still make the decisions and they also have to do the merges and they kind of
+[0:57] are a little bit of this central piece or almost like they have to keep the
+[1:01] memory what they're doing and so on. I'm talking not single player of not solo
+[1:07] player but multiplayer and there's probably a gradation in between.
+[1:11] Currently people doing it on our laptops then people sharing their setups like
+[1:16] their context, their skills, their loops within their factories. Pretty much the
+[1:20] state of many factories out there and then the multiplayer factories of
+[1:25] people collaborating at the same time in the same kind of ticket board on
+[1:32] their same code base. And that's what I'll work you through today. Now on the
+[1:37] left the tension is everybody wants to merge into main. On the right there's
+[1:43] multiple people on the board and they have to collaborate and work together.
+[1:46] So that's kind of the two parts of this talk. Let's start with the first part, the
+[1:52] code, and how to make that like a central piece of agents being able to work
+[1:56] together. You know one of the first things when you turn on a factory or a
+[2:01] multiplayer factory you'll see that there's definitely an increase in pull
+[2:05] requests. You know it's almost like a factor 10 of more and more pull request
+[2:12] landing. That's good because we're being more productive, we get more changes
+[2:16] done and but that also builds up some of the tension. For example we have a lot
+[2:24] more merges and they have to make sure that they're not conflicting and if
+[2:28] we're unlucky the agents also spend time of going rounds around us. You know one
+[2:34] agent changing something then the other agent changing it back. These conflicts
+[2:39] are real when you turn on a multiplayer factory. And one of the most noticed of
+[2:44] things is we start to wait more for releases because when we merge to change all the other
+[2:51] PRs need to rebase and they typically rerun their tests and you will have to wait and at the same
+[2:57] time that means actually your CI CD system is becoming a lot lot slower because of that multi
+[3:05] thing and also more costly but that's a side effect now the PR queue is kind of building up
+[3:12] not just with features, there's also the agent incidents that we have to solve as I mentioned,
+[3:18] and then there's factory maintenance on their own, like the improvement of the skills, the
+[3:22] improvement of the loops that we've been using, all more and more work that needs to get approved by us.
+[3:30] So why can't we flip this from being this concurrency and it being an exception to
+[3:36] becoming the routine. And this is what I call concurrent delivery and going from continuous
+[3:42] delivery to concurrent delivery and design for people to work and agents to work together on
+[3:47] the same code base. Now one of the simple things that we can do is instead of just running and
+[3:55] running agents just in parallel, we can get smarter about this. Almost like splitting up the work like
+[4:02] we would do with humans. Like you get to do this task, you get to do that task. And there's different
+[4:08] ways of splitting this in a way that we can say well you work on authentication, I work on payment,
+[4:13] I work on other parts, and we can use even the ASD graph to determine which pieces are like able to
+[4:20] split quite well. And then we can go have the agents go on more granular level and they would do like
+[4:26] hey this file, this function, and even they would go on certain keystrokes like in certain files
+[4:31] doing together. So this is a way of kind of dealing with kind of more splitting
+[4:37] of the work before you actually do the actual coding. This is a better way of
+[4:42] planning the changes. And then once you start planning and you will start
+[4:48] actually executing the plan, much like you would do on your scrum board, you
+[4:54] would say I'm gonna take care of this. And the agent writes and says it claims
+[4:58] the ticket. It says I want to do that ticket so no other agent can actually step in at the same time
+[5:04] and it also announces which files and which changes it's going to make. So this is something
+[5:09] that is helpful for other agents to see that they're not starting to overlap during the planning
+[5:15] and the execution. Now to make sure that they can keep executing a lot of people use work trees to
+[5:23] kind of separate them. When you kind of think about this broader, there is a lot more splitting that
+[5:28] you could do. You basically are freezing the world of an agent. You give them their own kind of
+[5:33] machine, you give their their own freeze of the context, you give them their own version of the
+[5:38] API that's being locked, and even the database gets their snapshot, their test data, and even
+[5:44] outside world like digital twins and kind of making sure that everything's mocked and that they can
+[5:50] do these things without having to deal with any impact of the outside world.
+[5:56] Now when two agents do collide during the work there's a couple of strategies.
+[6:01] They can either start waiting for each other one after the other, they can
+[6:06] retry after the wait, they can say like okay I'm gonna wait but I'll requeue
+[6:10] and I'll wait until it's done, or they can start changing and optimizing the plan.
+[6:15] Like you do this, I do that, and that's renegotiation in the end. So they're
+[6:20] changing the planning while they're doing the execution to make sure that they don't interfere with each other.
+[6:27] Now on a conflict you could rerun it and within your merging today you say okay there's a conflict what do I do?
+[6:38] You rerun and see if it merges on the rerun which was typically our PR change or you could just kind of make sure that the agents do that for you instead.
+[6:49] So they can see whether they can merge instead of just by code lines, they can merge by function and it becomes smarter.
+[6:57] And then the agent maybe can fix the merge so you don't have to do that again.
+[7:01] And ultimately it can even start seeing changes coming.
+[7:05] So hey, this agent is probably going to change this. I'm going to see this coming and I'm already kind of adapting my code at the same time.
+[7:14] So this is thinking in concurrency instead of being kind of serial in the changes.
+[7:21] Now one of the things you can see is that you know agents have been optimized to merge stuff
+[7:26] right like with the merging of code this is clear but what if two changes land at the same time?
+[7:33] In this case you're calculating and changing the function of calculating the total for an invoice
+[7:40] and say it's not just in dollars but in dollar cents. Now at the same time there is another PR
+[7:46] that changes the fact of reporting out. Now two mergers that consistently could merge
+[7:53] with the test succeeding but at the same time it was a different intent. The report don't want to
+[8:00] have it in euro cents or in dollar cents right. So they're not conflicting in code but they're
+[8:06] conflicting on intent. So we could have agents actually look at the intent,
+[8:11] whether they're still consistent across the multiple merges, and warn us or
+[8:15] change the PR accordingly. Now if you want to start merging, the PRs are
+[8:24] able to merge, they're good to merge, but what if one of those merges
+[8:31] doesn't merge well? Then you'll typically rebase all the others,
+[8:36] they'll have to do rework and so on. Now there's a better way of dealing with
+[8:40] these merge strains is by looking in a concept called speculative merge
+[8:45] strains. It looks at all the PRs coming in and it sees which ones are
+[8:51] compatible with each other and it kind of already checks them in pairs. And then
+[8:55] it says like one that is landing and this one isn't landing but you could
+[8:59] still do the others. It goes faster because all the others that can go
+[9:02] through already go through in the merge queue. These are just some examples of
+[9:09] kind of new strategies of dealing with merges and conflicts and reviews and
+[9:13] better planning. I think in general there's a new kind of infralayer coming
+[9:17] and you see that almost from the vendors. You know it's a new developer
+[9:21] infrastructure, mergers are gonna have you handle differently, there's now an
+[9:25] analytics, there's now a better planning, there's no a better tool for anything.
+[9:29] And that's kind of what we're building up.
+[9:31] Right now, a lot of the factories are just glorified loops, as we would do with the CireCD,
+[9:37] but the concurrency will only increase.
+[9:40] Now, I told you there was a flip side to this.
+[9:42] There's also the humans working together, not just the agents.
+[9:46] And typically the change is that you're working together in one kind of task board.
+[9:51] Right.
+[9:52] And all the humans are being able to see what changes are coming, what tasks are being done.
+[9:58] and this creates the visibility where in your solo factory you would have that doing that all alone
+[10:03] but it wouldn't be a central kind of board that you're working on.
+[10:07] Now they all need your attention and that's probably the easy part, right?
+[10:12] So we want to reduce also that attention from the agents having to call you all the time.
+[10:17] So this is a side effect of having multiple agents working at the same time.
+[10:21] Now, one of the nice features is, and it's been kind of interesting to see, that agents can join your chat.
+[10:29] And this is a different way of coding. It is not you prompting, but it's you kind of pulling an agent into a conversation.
+[10:37] And that's really powerful because the agent is picking up clues, not just from you, from your team members at the same time.
+[10:44] same time. And what it's actually doing, it is refining the ticket from all the
+[10:49] input. And that is really powerful because you actually not only had like
+[10:53] adversarial review by agents, but you also get multiple input by humans on the
+[10:59] same ticket while during the conversation. And what it's really good at
+[11:05] is prompting you with questions instead of having to ask everything over and
+[11:10] over again. So one thing that's helpful is that it clarifies what is the test,
+[11:16] what should it do, what are the requirements that it needs to do, and
+[11:22] the ticket actually becomes almost like a plan, the plan mode in your coding
+[11:27] agent, but now as a shared feature within your board of looking at all the
+[11:33] requirements. Now what's even more powerful is that it doesn't only have to
+[11:39] be engineers. Think of this as in the past sales marketing support they were
+[11:45] kind of filing tickets to the engineering that would get somewhere on
+[11:49] a board and they'll have to wait until an engineer comes. That could have taken
+[11:53] weeks. Right now what we see in our factory at TESOL is that people are just
+[11:58] sharing and doing a chat within kind of the organization and the agent is there.
+[12:04] Now they don't need to build the code all the time and before they were maybe
+[12:14] doing vibe coding but one of the problems with the vibe coding is it
+[12:18] didn't fit according to engineering practices. Now with a multiplayer
+[12:23] factory people are using the same pipeline, the same knowledge, the same
+[12:27] skills, the same loops to actually already fit into that flow of engineering
+[12:32] itself. So they can experiment, they can refine the feature, and they can also even build a feature
+[12:39] where before we would wait they can just kick start it and engineer and refuse that. That's a
+[12:44] very powerful flow of giving everybody on board and being in the flow of that one multiplayer factory.
+[12:53] Now sometimes the agent while executing is unsure and you might have the same feeling that sometimes
+[13:01] the ticket mode within a factory is slow and you want to do fast iteration. Now there's a way to
+[13:08] do this hybridly when for example your agent is stuck. There was a very interesting idea from
+[13:14] HelixML where when your agent is stuck it actually starts a new kind of coding IDE
+[13:21] with the exact context that the agent was working on. You as a human almost jump in to help the agent
+[13:29] figure out like with all the context available with all kind of the files available and then when
+[13:34] you made the right choices when you did the right experiments you hand it actually back to the agent
+[13:39] and the factory to continue so this is a nice way of finding the middle ground between a personal
+[13:45] coding agent fast iterations and still doing the factory and the agent can use it as well to kind
+[13:51] of clarify and help and ask for help. Now what we really want to do is reduce
+[13:58] kind of the choices that it has to make and what is really powerful is that it
+[14:04] represents actually questions to us for decisions not just what should I do and
+[14:12] open questions. You know you see that in coding ages as well it gives you a couple
+[14:16] of options that you can choose for and then it goes off. This is really powerful and it is less
+[14:23] trained on having to tell the agent all the time what to do by presenting options there as well.
+[14:31] Of course you can override but this is really a powerful multiplayer thing.
+[14:37] Now every decision that people make actually goes onto a ledger. This is like your context locally
+[14:43] maybe that you have in your coding agent, but if you are in a multiplayer factory, this is shared
+[14:49] somewhere on the decision log. And that can be used either by agents, it could be used by humans to
+[14:55] find, and you can trace things back like who made what decision, and when that context is being used
+[15:01] in the next session, you can also query that as well. Now we want that to be small because big
+[15:08] changes they are not very readable so while I said in the beginning you could
+[15:13] automize for agents not being conflicting there is also another kind of thing you
+[15:18] have to think about which is the human review how much change can a human
+[15:23] review but you can build like separate PRs in multiple main merge
+[15:28] trains for people to do fast reviewing of those things now a lot of people are
+[15:34] focused on when the PR and we want to reduce the number of PR reviews is that there is some kind
+[15:42] of automated review. Now the first part is typically to reduce the failures which is great.
+[15:50] We want to provide better context, better tools, we have adversarial agents looking at the code
+[15:56] before it comes to us. That is a good way of reducing the risk by it being better quality.
+[16:04] Now at the same time we're optimizing that we can actually see what it did.
+[16:09] We're asking for screen shots, for videos, for proof, for testing,
+[16:15] all the things that could help a reviewer. And then ultimately how far do you go?
+[16:21] Several people tell me like hey I'm not looking at the code anymore
+[16:25] and I ask them okay you know but what is the impact
+[16:29] of this going to production. Some is documentation that is limited impact maybe, you know some don't
+[16:38] have real customers which is also great right like the impact is not a lot, but if you really start
+[16:44] thinking about what you're doing is you're selecting by what risk you can take. So some of the tests
+[16:51] will kind of say well if it's maybe in the documentation part you can go ahead. If it's like
+[16:57] a more impactful change like within authentication you kind of do more kind of review by a human and
+[17:05] sometimes there's a middle ground hey this feature can just roll out we'll check what the output is
+[17:11] whether there's any errors like gradual releases so instead of only optimizing for quality and
+[17:17] reducing of the likelihood you're also kind of have a way of looking at it from a risk perspective
+[17:25] And when it moves out of production, you can also see how you can mitigate the risk.
+[17:31] Because if the impact is that you lose data, do you have a fast restore strategy?
+[17:38] Or you can think about this like what if one node fails or can I fast roll back?
+[17:44] Those are architectural decisions as well. So what you want to do is when things go wrong,
+[17:49] you want to have it being cheap to restore or to fix. And that is important
+[17:55] in not only optimizing but there is multiple ways of kind of dealing with
+[17:59] the risk on the PR review. Now one of the funny things when you work in a
+[18:05] multiplayer factory is that you know before people were chatting and I
+[18:11] personally for example work remote where most of the team is in a central place
+[18:16] in London. Now they get together, they do a lot of chats and so on, and me sometimes
+[18:21] from remote I had a hard time catching up what has changed. Now when you turn on
+[18:26] the multiplayer factory everybody needs to keep up. There's so much code
+[18:30] being produced that maybe marketing, support and other places can't keep up.
+[18:36] They need to have a translation in their changes that have happened in their
+[18:42] language. So communication and radiating change is actually a very important
+[18:47] feature in a multiplayer factory. How do you keep up within your domain, within
+[18:52] your understanding, for your part of the job? Now in a nutshell you can do a lot
+[18:59] of automation and you will use a lot of skills and that like context and better
+[19:04] improvement on those pieces and you kind of reserve the people for the
+[19:10] exceptions. And that's the way that I want you to think about is automate what you can,
+[19:15] but make sure you are able to route to a human to make the right decision.
+[19:21] With all that infrastructure, with all those kind of ways of working together,
+[19:26] there is kind of a new team that is forming, which is almost like the factory team, similar to a
+[19:33] platform team that was dealing with a Kubernetes or with a cluster or with the cloud. But right now,
+[19:39] this is they are dealing with the coding agents and the coding fabric of working all together.
+[19:46] They make sure that who owns the skills, the context is up to date, they make sure that things
+[19:51] are connected to the right pieces and that the whole factory also itself is being maintained
+[19:58] and being monitored as well. So this is a nutshell, there's a lot more to it, but this was in a
+[20:05] a nutshell two things like the pressure is building up on agents working more
+[20:09] together in the code base and then the humans also kind of working with the
+[20:15] agents more and more together in a concurrent way and delivering more
+[20:19] output at the same time and for that there needs to be a lot of change now
+[20:25] one of the things that we're playing now with is they're not just the coding
+[20:29] agents they're not just the people that do things in the board now they're being
+[20:35] those personal agents and they will work in the board. They will make decisions for you. They will
+[20:41] provide answers to other agents as well. This is a new way of building. This is a new way of kind of
+[20:48] delegating some of the tasks that you are doing in the factory. So my advice is brace yourself.
+[20:56] We're not there yet. Like the coding agents were a good step on your solo factories. Multiplayer
+[21:02] factories will bring new dynamics both to the agents coding and both to the organizational
+[21:07] working together. And that's it. And thank you very much for listening. You can kind of find the
+[21:14] slides by asking to me in DM on LinkedIn. I happily send you in exchange for some feedback.
+[21:21] And you know you can have source try the Tesla factory where we implement and are working on
+[21:28] kind of loops factories and skills for you being in a multiplayer mode and I'd also share the
+[21:36] research at a site on concurrent.cd where I find like people and tools and techniques that people
+[21:43] are solving this concurrency all together thank you very much for listening and I hope you learned
+[21:50] some of the new things today and feel free to leave some comments and I'll happily have a look
+[21:56] and respond to that. Thank you very much.
+[22:26] Thank you.

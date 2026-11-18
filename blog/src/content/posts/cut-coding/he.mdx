@@ -1,0 +1,162 @@
+---
+title: "Cut coding: לחתוך את המודל מכל צעד שכבר התגבש"
+description: "איך לוקחים workflow של agent שרץ כל יום, מוצאים את הצעדים שלא צריכים מודל ומעבירים אותם לקוד. שישה צעדים, עם trace, harness ומדידה."
+lang: he
+key: cut-coding
+term: "cut coding"
+kind: fieldnotes
+pubDate: 2026-11-18
+tags: ["agents", "harness-engineering", "skills", "cost", "determinism"]
+hook: "claim"
+cover: photo
+tldr: ["תריצו workflow חוזר 5–10 פעמים עם trace, וספרו קריאות כלים זהות", "צעד עם אותו קלט ואותו פלט עובר ל-Python, לא למודל", "המודל מחזיר מספר או enum, והקוד בודק אותו לפני שממשיכים"]
+hero: /posts/cut-coding/hero.jpg
+diagram: /posts/cut-coding/diagram.svg
+sources:
+  - { title: "From Copilot to agents: The history of AI coding", url: "https://www.coderabbit.ai/blog/a-very-brief-history-of-ai-coding-from-copilot-to-next-gen-agents", date: "" }
+  - { title: "What Is an AI Coding Agent? How They Work and When to Use Them | MindStudio", url: "https://www.mindstudio.ai/blog/what-are-ai-coding-agents", date: "" }
+  - { title: "How I Cut an AI Agent's Token Use by 94%", url: "https://vivekhaldar.com/articles/compiling-an-ai-agent-skill", date: "" }
+  - { title: "AI Coding Agents, Deconstructed - by Alejandro Piad Morffis", url: "https://blog.apiad.net/p/the-anatomy-of-ai-coding-agents", date: "" }
+opinion: "השם cut coding לא מלהיב אותנו, אבל השיטה היא בדיוק מה שצריך לעשות ביום שני. דטרמיניזם איפה שאפשר, שיפוט של מודל רק איפה שחייבים. בכל מקום שהחלפנו קריאת LLM בכלל פשוט ב-pipeline שלנו, זה יצא זול ואמין יותר. ומה שהכי חשוב לנו בדוגמה של Haldar הוא לא ה-94%, אלא שהקוד בודק את מה שהמודל החזיר לפני שממשיכים: verification מנצח generation. מי שעדיין מריץ workflow קבוע דרך פרומפט ארוך משלם כל בוקר על תכנון של משהו שכבר מתוכנן."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+ה-agent הכי טוב שלכם הוא זה שכמעט לא קורא למודל.
+
+כן, זה הפוך ממה שכולם מוכרים. ב-29 ביוני 2021 גיטהאב הכריזה על Copilot והמודל נכנס לעורך. חמש שנים אחרי הוא כבר לא רק משלים שורות. הוא מתכנן, מריץ פקודות, קורא קבצים ומחליט מה הלאה. ובדרך התרגלנו לתת לו להריץ גם צעדים שלא צריכים מודל בכלל.
+
+הדוגמה הכי נקייה לזה היא של Vivek Haldar. יש לו skill שעובר על ארכיון הפוסטים בבלוג שלו, בוחר פוסט ישן שכדאי להעלות מחדש, בודק שלא הזכיר אותו לאחרונה ומנסח טיוטה ללינקדאין. הגרסה הראשונה הייתה כולה הוראות בשפה טבעית, ו-Codex פירש אותן מחדש בכל ריצה. אחרי שהוא העביר את רוב העבודה ל-Python והשאיר למודל שני צעדים בלבד, צריכת ה-tokens ירדה ב-94%.
+
+בגדול, זה cut coding: חותכים את המודל מכל צעד שכבר התגבש, ומשאירים אותו רק איפה שצריך שיפוט. אף אחד לא טבע את השם ב-paper, ו-Haldar עצמו קורא לזה compiling של skill. זה פחות משנה. את השיטה אפשר להריץ כבר השבוע, והנה הצעדים בסדר שאני עושה אותם.
+
+## 01 · מריצים את ה-workflow עם trace מלא
+
+קודם כל צריך לראות מה ה-agent עושה בפועל, לא מה כתוב ב-skill. תבחרו workflow אחד שרץ אצלכם כל יום או כל שבוע: triage של issues, סיכום PRs, דוח בוקר. תריצו אותו חמש פעמים עם לוג מלא.
+
+עם קלוד קוד זה נראה ככה:
+
+```bash title="trace.sh"
+PROMPT="Run the weekly issue triage skill"   # your recurring workflow
+for i in $(seq 1 5); do
+  claude -p "$PROMPT" --output-format stream-json --verbose > "run-$i.jsonl"
+done
+# which tools ran, and how often, across all runs
+jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | .name' run-*.jsonl \
+  | sort | uniq -c | sort -rn
+```
+
+אם ה-workflow צריך הרשאות, תוסיפו `--allowedTools` עם אותה רשימה שאתם מאשרים ידנית. ב-Codex הרעיון זהה עם `codex exec --json`.
+
+מה תראו: אותן קריאות כלים, באותו סדר, כמעט עם אותם ארגומנטים. `git log`, `gh issue list`, קריאה של אותו קובץ config. אם המספרים ב-`uniq -c` כמעט מתחלקים בחמש, יש לכם מועמד.
+
+## 02 · מסמנים כל צעד: קוד או שיפוט
+
+ב-MindStudio מגדירים agent כלולאה: plan, execute, observe, iterate. הלולאה הזאת שווה זהב כשהמשימה חדשה. כשהיא חוזרת על עצמה כל בוקר, אתם משלמים על תכנון של משהו שכבר מתוכנן.
+
+אז עוברים על ה-trace ושואלים על כל צעד שאלה אחת: אם אני נותן לו את אותו קלט, אני מצפה לאותו פלט? אם כן, זה קוד. אם התשובה היא "תלוי מה המודל יחשוב", זה שיפוט.
+
+אצל Haldar החלוקה יצאה חדה:
+
+> There are really only two steps where LLMs are needed: 1. Choosing a good candidate from the filtered inventory. 2. Writing the LinkedIn draft. Everything else can be ordinary deterministic code.
+>
+> — Vivek Haldar, How I Cut an AI Agent's Token Use by 94%
+
+שליפת המקורות, בניית ה-inventory, הבדיקה מול פוסטים אחרונים, הסינון, שמירת ה-state. כל אלה רצו דרך המודל כל בוקר, ואף אחד מהם לא דרש מחשבה. אצלכם זה כנראה ייראה דומה: רוב הצעדים הם plumbing.
+
+<figure><img src="/posts/cut-coding/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/cut-coding/v1-svg-he.jpg" alt="מתוך שבעה צעדים רק שניים צריכים שיפוט, והחיתוך הזה לבד הוריד 94% מה-tokens (Vivek Haldar)" loading="lazy" /><figcaption>מתוך שבעה צעדים רק שניים צריכים שיפוט, והחיתוך הזה לבד הוריד 94% מה-tokens (Vivek Haldar)</figcaption></figure>
+
+## 03 · כותבים harness: קוד מסביב, מודל באמצע
+
+עכשיו כותבים קוד. המבנה פשוט: Python שעושה את כל ה-plumbing, ושתי קריאות מודל ממוקדות באמצע. הנה שלד שמבוסס על הדוגמה של Haldar. תחליפו את ה-feed ואת הפרומפטים:
+
+```python title="resurface.py"
+import json, os, sys, pathlib
+import feedparser, anthropic
+
+FEED = "https://example.com/feed.xml"        # your archive
+STATE = pathlib.Path("state/recent.json")
+MODEL = os.environ.get("MODEL", "claude-sonnet-4-5")
+client = anthropic.Anthropic()
+
+def ask(prompt, max_tokens=400):
+    r = client.messages.create(model=MODEL, max_tokens=max_tokens,
+                               messages=[{"role": "user", "content": prompt}])
+    print(f"tokens in={r.usage.input_tokens} out={r.usage.output_tokens}", file=sys.stderr)
+    return r.content[0].text.strip()
+
+# deterministic: inventory + filter
+recent = set(json.loads(STATE.read_text())) if STATE.exists() else set()
+items = [{"url": e.link, "title": e.title} for e in feedparser.parse(FEED).entries]
+candidates = [i for i in items if i["url"] not in recent][:30]
+if not candidates:
+    sys.exit("nothing to resurface")
+
+# model: selection only, answer is a number
+menu = "\n".join(f"{n}. {c['title']}" for n, c in enumerate(candidates))
+pick = ask("Pick the one post most worth resurfacing today. "
+           f"Reply with its number only.\n{menu}", max_tokens=10)
+
+# deterministic: check the model's answer before using it
+if not pick.isdigit() or int(pick) >= len(candidates):
+    sys.exit(f"bad pick: {pick!r}")
+chosen = candidates[int(pick)]
+
+# model: the draft
+print(ask(f"Draft a short LinkedIn post linking to: {chosen['title']} {chosen['url']}"))
+
+STATE.parent.mkdir(exist_ok=True)
+STATE.write_text(json.dumps(sorted(recent | {chosen["url"]})))
+```
+
+שני דברים לשים לב אליהם. קודם כל, המודל מחזיר מספר ולא JSON חופשי, וה-Python בודק שהמספר תקין לפני שממשיכים. זה ה-verification, והוא עולה שלוש שורות. חוץ מזה, הקוד מחזיק את ה-state. המודל לא צריך לזכור כלום בין ריצות, ולא צריך לקרוא את ההיסטוריה של עצמו כדי להבין איפה הוא עומד.
+
+## 04 · ה-skill נשאר, אבל רק כ-bootloader
+
+לא זורקים את ה-skill. Haldar כתב שהגרסה החדשה היא barely a skill at all, כלומר bootloader דק שמפעיל תוכנית Python. ככה ה-agent עדיין יודע מתי להפעיל את ה-workflow, רק שהוא לא מריץ אותו בעצמו צעד אחרי צעד.
+
+```markdown title="SKILL.md"
+---
+name: resurface-post
+description: Pick an old blog post worth resurfacing and draft a LinkedIn post. Use when asked for a repost idea.
+---
+Run `python resurface.py` from this skill's directory.
+Show the draft to the user as-is. Do not post it.
+If the script exits with an error, report the error and stop.
+```
+
+מה תראו בלוג: קריאת Bash אחת במקום שרשרת של קריאות כלים. ה-context של השיחה כמעט לא גדל, וזה שווה הרבה גם מעבר לכסף.
+
+<figure><img src="/posts/cut-coding/src5.jpg" alt="כל סיבוב בלולאה מנפח את ה-context, ו-bootloader שמריץ סקריפט אחד חוסך את כל הסיבובים האלה (credit: Alejandro Piad Morffis)" loading="lazy" /><figcaption>כל סיבוב בלולאה מנפח את ה-context, ו-bootloader שמריץ סקריפט אחד חוסך את כל הסיבובים האלה (credit: Alejandro Piad Morffis)</figcaption></figure>
+
+## 05 · מודדים לפני ואחרי
+
+בלי מספרים זו רק תחושה. תריצו את הגרסה החדשה אותן חמש פעמים ותשוו שלושה מדדים: tokens לריצה, זמן מקצה לקצה, וכמה ריצות נכשלו או החזירו משהו בפורמט לא נכון.
+
+בגרסה הישנה העלות יושבת בהודעת ה-result האחרונה ב-stream-json:
+
+```bash title="cost.sh"
+jq -c 'select(.type=="result") | {cost: .total_cost_usd, ms: .duration_ms, usage: .usage}' run-*.jsonl
+```
+
+בגרסה החדשה הסקריפט מדפיס tokens ל-stderr בכל קריאה. היעד שלכם הוא ה-94% של Haldar. אם ירדתם רק ב-30%, כנראה נשאר צעד שיפוטי שהוא בעצם plumbing, או שהפרומפט של הבחירה מקבל יותר context ממה שהוא צריך. חוזרים ל-02.
+
+> **הדעה שלי:** הירידה ב-tokens היא הבונוס. מה שאני באמת רוצה זה שהריצה ה-50 תתנהג בדיוק כמו הראשונה, ושעדכון מודל לא ישנה לי את סדר הצעדים. קוד נותן את זה, פרומפט באורך שלושה מסכים לא.
+
+## 06 · איפה לא חותכים
+
+רגע, לא כל workflow מוכן לזה. Haldar עצמו אומר שהגרסה הראשונה בשפה טבעית הייתה הדרך הנכונה להתחיל: קל לנסח, קל לשנות. אם ה-workflow עוד זז כל שבוע, קוד רק יאט אתכם.
+
+הכלל שלי: עשר ריצות שבהן ה-trace נראה זהה, ושבועיים בלי שינוי ב-skill. אז חותכים. לפני זה, לא.
+
+ומה שכן, החיתוך עוזר גם לצעדים שנשארו אצל המודל. Alejandro Piad Morffis כותב שכל סיבוב של ReAct מנפח את ה-context, ושבין מעט מדי context להרבה מדי יש פער צר. צעד בחירה שמקבל 30 כותרות נקיות עובד יותר טוב מצעד שמקבל אותן אחרי עשרים קריאות כלים.
+
+וכן, עכשיו יש לכם קוד לתחזק. זה המחיר, ודי משתלם.
+
+## מה לקחת
+
+- trace לפני חיתוך. חמש ריצות עם `--output-format stream-json`, ורק אז מחליטים מה עובר לקוד.
+- שאלה אחת לכל צעד: אותו קלט, אותו פלט? אז זה Python.
+- המודל מחזיר משהו קטן שקל לבדוק, מספר או enum, והקוד בודק אותו לפני הצעד הבא.
+- כל צעד שעבר מהמודל לקוד הוא צעד שעדכון מודל כבר לא ישבור לכם.

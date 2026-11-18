@@ -1,0 +1,162 @@
+---
+title: "Cut coding: take the model out of every step that has settled"
+description: "Take an agent workflow that runs daily, find the steps that don't need a model, and move them to code. Six steps: trace, harness, measurement."
+lang: en
+key: cut-coding
+term: "cut coding"
+kind: fieldnotes
+pubDate: 2026-11-18
+tags: ["agents", "harness-engineering", "skills", "cost", "determinism"]
+hook: "claim"
+cover: photo
+tldr: ["Run a recurring workflow 5–10 times with a trace, and count identical tool calls", "A step with the same input and the same output goes to Python, not to the model", "The model returns a number or an enum, and the code checks it before moving on"]
+hero: /posts/cut-coding/hero-en.jpg
+diagram: /posts/cut-coding/diagram.svg
+sources:
+  - { title: "From Copilot to agents: The history of AI coding", url: "https://www.coderabbit.ai/blog/a-very-brief-history-of-ai-coding-from-copilot-to-next-gen-agents", date: "" }
+  - { title: "What Is an AI Coding Agent? How They Work and When to Use Them | MindStudio", url: "https://www.mindstudio.ai/blog/what-are-ai-coding-agents", date: "" }
+  - { title: "How I Cut an AI Agent's Token Use by 94%", url: "https://vivekhaldar.com/articles/compiling-an-ai-agent-skill", date: "" }
+  - { title: "AI Coding Agents, Deconstructed - by Alejandro Piad Morffis", url: "https://blog.apiad.net/p/the-anatomy-of-ai-coding-agents", date: "" }
+opinion: "We're not excited by the name cut coding, but the method is exactly what to do on Monday. Determinism where possible, model judgment only where required. Everywhere we replaced an LLM call with a simple rule in our pipeline, it came out cheaper and more reliable. And what matters most to us in Haldar's example isn't the 94%. It's that the code checks what the model returned before moving on: verification beats generation. Anyone still running a fixed workflow through a long prompt is paying every morning to plan something that's already planned."
+madeWith: { model: "claude-opus-5-5", sourceCount: 4, reviewedBy: "Koby Almog" }
+---
+
+Your best agent is the one that barely calls the model.
+
+Yes, that's the opposite of what everyone is selling. On June 29, 2021, GitHub announced Copilot and the model moved into the editor. Five years later it does a lot more than complete lines. It plans, runs commands, reads files and decides what comes next. Along the way we got used to letting it run steps that don't need a model at all.
+
+The cleanest example comes from Vivek Haldar. He has a skill that goes through his blog archive, picks an old post worth resurfacing, checks he hasn't mentioned it recently, and drafts a LinkedIn post. The first version was all natural-language instructions, and Codex reinterpreted them on every run. After he moved most of the work to Python and left the model only two steps, token use dropped by 94%.
+
+That's cut coding: you cut the model out of every step that has settled, and keep it only where judgment is needed. Nobody coined the term in a paper, and Haldar himself calls it compiling a skill. The name matters less than the method, which you can run this week. Here are the steps in the order I do them.
+
+## 01 · Run the workflow with a full trace
+
+First you need to see what the agent actually does, not what the skill says. Pick one workflow that runs every day or every week: issue triage, PR summaries, a morning report. Run it five times with full logging.
+
+With Claude Code it looks like this:
+
+```bash title="trace.sh"
+PROMPT="Run the weekly issue triage skill"   # your recurring workflow
+for i in $(seq 1 5); do
+  claude -p "$PROMPT" --output-format stream-json --verbose > "run-$i.jsonl"
+done
+# which tools ran, and how often, across all runs
+jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | .name' run-*.jsonl \
+  | sort | uniq -c | sort -rn
+```
+
+If the workflow needs permissions, add `--allowedTools` with the same list you approve by hand. In Codex the idea is the same with `codex exec --json`.
+
+What you'll see: the same tool calls, in the same order, with nearly the same arguments. `git log`, `gh issue list`, a read of the same config file. If the counts from `uniq -c` divide almost evenly by five, you have a candidate.
+
+## 02 · Mark each step: code or judgment
+
+MindStudio defines an agent as a loop: plan, execute, observe, iterate. That loop is worth a lot when the task is new. When the task repeats every morning, you're paying to plan something that's already planned.
+
+So go through the trace and ask one question about each step: if I give it the same input, do I expect the same output? If yes, it's code. If the answer is "depends on what the model thinks", it's judgment.
+
+For Haldar the split came out sharp:
+
+> There are really only two steps where LLMs are needed: 1. Choosing a good candidate from the filtered inventory. 2. Writing the LinkedIn draft. Everything else can be ordinary deterministic code.
+>
+> — Vivek Haldar, How I Cut an AI Agent's Token Use by 94%
+
+Fetching sources, building the inventory, checking against recent posts, filtering, saving state. All of these ran through the model every morning, and none of them needed thought. Yours will probably look similar: most steps are plumbing.
+
+<figure><img src="/posts/cut-coding/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/cut-coding/v1-svg-en.jpg" alt="Of seven steps, only two need judgment, and that cut alone removed 94% of the tokens (Vivek Haldar)" loading="lazy" /><figcaption>Of seven steps, only two need judgment, and that cut alone removed 94% of the tokens (Vivek Haldar)</figcaption></figure>
+
+## 03 · Write a harness: code around, model in the middle
+
+Now write code. The structure is simple: Python that does all the plumbing, with two focused model calls in the middle. Here's a skeleton based on Haldar's example. Swap in your feed and prompts:
+
+```python title="resurface.py"
+import json, os, sys, pathlib
+import feedparser, anthropic
+
+FEED = "https://example.com/feed.xml"        # your archive
+STATE = pathlib.Path("state/recent.json")
+MODEL = os.environ.get("MODEL", "claude-sonnet-4-5")
+client = anthropic.Anthropic()
+
+def ask(prompt, max_tokens=400):
+    r = client.messages.create(model=MODEL, max_tokens=max_tokens,
+                               messages=[{"role": "user", "content": prompt}])
+    print(f"tokens in={r.usage.input_tokens} out={r.usage.output_tokens}", file=sys.stderr)
+    return r.content[0].text.strip()
+
+# deterministic: inventory + filter
+recent = set(json.loads(STATE.read_text())) if STATE.exists() else set()
+items = [{"url": e.link, "title": e.title} for e in feedparser.parse(FEED).entries]
+candidates = [i for i in items if i["url"] not in recent][:30]
+if not candidates:
+    sys.exit("nothing to resurface")
+
+# model: selection only, answer is a number
+menu = "\n".join(f"{n}. {c['title']}" for n, c in enumerate(candidates))
+pick = ask("Pick the one post most worth resurfacing today. "
+           f"Reply with its number only.\n{menu}", max_tokens=10)
+
+# deterministic: check the model's answer before using it
+if not pick.isdigit() or int(pick) >= len(candidates):
+    sys.exit(f"bad pick: {pick!r}")
+chosen = candidates[int(pick)]
+
+# model: the draft
+print(ask(f"Draft a short LinkedIn post linking to: {chosen['title']} {chosen['url']}"))
+
+STATE.parent.mkdir(exist_ok=True)
+STATE.write_text(json.dumps(sorted(recent | {chosen["url"]})))
+```
+
+Two things to notice. First, the model returns a number, not free-form JSON, and Python checks the number is valid before going on. That's the verification, and it costs three lines. Second, the code holds the state. The model doesn't need to remember anything between runs, and it doesn't need to read its own history to figure out where it is.
+
+## 04 · Keep the skill, as a bootloader only
+
+Don't throw the skill away. Haldar wrote that the new version is barely a skill at all: a thin bootloader that launches a Python program. The agent still knows when to trigger the workflow. It just doesn't run it step by step itself.
+
+```markdown title="SKILL.md"
+---
+name: resurface-post
+description: Pick an old blog post worth resurfacing and draft a LinkedIn post. Use when asked for a repost idea.
+---
+Run `python resurface.py` from this skill's directory.
+Show the draft to the user as-is. Do not post it.
+If the script exits with an error, report the error and stop.
+```
+
+What you'll see in the log: one Bash call instead of a chain of tool calls. The conversation context barely grows, and that's worth a lot beyond the money.
+
+<figure><img src="/posts/cut-coding/src5.jpg" alt="Every loop round inflates the context, and a bootloader that runs one script skips all those rounds (credit: Alejandro Piad Morffis)" loading="lazy" /><figcaption>Every loop round inflates the context, and a bootloader that runs one script skips all those rounds (credit: Alejandro Piad Morffis)</figcaption></figure>
+
+## 05 · Measure before and after
+
+Without numbers it's just a feeling. Run the new version the same five times and compare three metrics: tokens per run, end-to-end time, and how many runs failed or returned something in the wrong format.
+
+In the old version, the cost sits in the final result message of the stream-json:
+
+```bash title="cost.sh"
+jq -c 'select(.type=="result") | {cost: .total_cost_usd, ms: .duration_ms, usage: .usage}' run-*.jsonl
+```
+
+In the new version, the script prints tokens to stderr on every call. Your target is Haldar's 94%. If you only got 30%, there's probably a "judgment" step left that is really plumbing, or the selection prompt gets more context than it needs. Back to 02.
+
+> **My take:** The token drop is the bonus. What I actually want is for run 50 to behave exactly like run 1, and for a model update not to reorder my steps. Code gives you that. A three-screen prompt doesn't.
+
+## 06 · Where not to cut
+
+Not every workflow is ready for this. Haldar himself says the first natural-language version was the right way to start: easy to write, easy to change. If the workflow still shifts every week, code will only slow you down.
+
+My rule: ten runs where the trace looks identical, and two weeks without a change to the skill. Then you cut. Not before.
+
+That said, cutting also helps the steps that stay with the model. Alejandro Piad Morffis writes that every ReAct round inflates the context, and that the gap between too little context and too much is narrow. A selection step that gets 30 clean titles works better than one that gets them after twenty tool calls.
+
+And yes, now you have code to maintain. That's the price, and it's a good deal.
+
+## Takeaways
+
+- Trace before you cut. Five runs with `--output-format stream-json`, and only then decide what moves to code.
+- One question per step: same input, same output? Then it's Python.
+- The model returns something small that's easy to check, a number or an enum, and the code checks it before the next step.
+- Every step that moves from the model to code is a step a model update can no longer break.

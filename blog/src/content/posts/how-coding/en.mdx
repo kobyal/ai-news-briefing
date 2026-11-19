@@ -1,0 +1,102 @@
+---
+title: "How a coding agent actually works: a loop, ripgrep, and function names"
+description: "Under Claude Code and Codex sits a simple loop and rg. How it works step by step, and what to change in your code so the agent finds it faster."
+lang: en
+key: how-coding
+term: "how coding"
+kind: explainer
+pubDate: 2026-11-19
+tags: ["coding-agents", "agent-loop", "ripgrep", "harness", "developer-tools"]
+hook: "scene"
+cover: type
+tldr: ["Run an rg script that finds names defined more than once, and rename them.", "Count how many turns pass before the first edit. That's your metric.", "Add an AGENTS.md with the test command and a map of the directories."]
+hero: /posts/how-coding/hero-en.jpg
+diagram: /posts/how-coding/diagram.svg
+sources:
+  - { title: "how coding harnesses are used, an introspection", url: "https://research.tamarillo.ai/coding-harness-inspection", date: "2026-05-19" }
+  - { title: "Tau – Learn how coding agents are built", url: "https://twotimespi.dev", date: "2026-06-30" }
+  - { title: "How coding agents read your code (and how to write for them)", url: "https://modem.dev/blog/how-coding-agents-read-your-code", date: "2026-07-20" }
+  - { title: "Show HN: 80s Choplifter game ported to Vision Pro as an agent eval (WIP)", url: "https://www.bounds.dev/posts/rescue82-making-a-choplifter-style-game-for-apple-vision-pro", date: "2026-10-03" }
+  - { title: "From Copilot to agents: The history of AI coding", url: "https://www.coderabbit.ai/blog/a-very-brief-history-of-ai-coding-from-copilot-to-next-gen-agents", date: "" }
+opinion: "The term coding agent doesn't excite us. In practice it's a loop, a few tools and grep. That's old engineering with a model inside, and that's fine. What matters day to day is the system around the model: what it sees, what it can touch, and how you check what it did. The best agent we've seen is the one whose loop ends on a green test, not on a confident answer. A good function name is cheap determinism. No model has to guess what format does if it's called formatDurationForSlack."
+madeWith: { model: "claude-opus-5-5", sourceCount: 5, reviewedBy: "Koby Almog" }
+---
+
+July 20, 2026. The Modem team publishes a post with a real session from their repo: Claude Code needs to find where `formatDuration` is used. The repo is 360K lines of TypeScript plus 320K lines of tests, and an LLM wrote 99.9% of it. What does the agent run? Not a semantic index. Not embeddings. It runs `rg -l 'formatDuration' --type ts`. That's ripgrep, the same tool you have in your terminal.
+
+That's basically the whole secret. The agent that wrote almost 700K lines of code searches content the way a developer does with grep. Once you see that, it's also clear what to change in your code.
+
+## From autocomplete to a loop
+
+Copilot was announced on June 29, 2021. A week later, on July 7, OpenAI published the paper on Codex, the model behind it. It was smart autocomplete. It suggested a line, sometimes a whole function. You still found the right file yourself, ran the tests yourself, and decided what to do when something broke.
+
+A coding agent is the next step. Nobody coined the term; it just stuck. The cleanest definition I found comes from a small project, Tau, a Python agent written so people would read its code:
+
+> A coding agent is a language model run in a loop, where each reply may ask for a tool — read a file, edit it, run a command — and each tool result is fed back as the next input. The loop stops when the model answers without asking for anything.
+>
+> — Tau, twotimespi.dev
+
+That's it. Sessions, skills and the terminal UI are all built around the loop, not inside it. It's also worth saying what it isn't: a smarter model. It's the same model with hands. Everything around the model is now called the harness. In May 2026, Tamarillo scanned about 400K public GitHub repos that contain harness config files. Five tools out of about 20 (Claude Code, Codex, Copilot, Cursor and Hermes) show up in about 80% of them.
+
+## One turn, step by step
+
+First, you write a task. The harness sends it to the model along with a system prompt and a list of tools. Each tool is half schema, half function. It has a name, a description, JSON parameters the model reads, and a plain async function that actually runs. In Tau you can see all of this in 20 lines.
+
+Then the model doesn't answer. It asks for a tool: `rg -l 'formatDuration' --type ts`. The harness runs the command and returns the output as the next message. At Modem, four or more paths came back: the definition in `packages/common`, its test, a file in the dashboard and a file in slack.
+
+After that the model opens files, edits them and runs tests. If a test fails, the stack trace goes back in as input. The loop stops only when the model answers without asking for any tool.
+
+Why does this matter? Every result stays in the context, and every turn resends everything from the turns before it. A search that returns 40 files instead of 4 costs more than extra lines. It adds turns.
+
+<figure><img src="/posts/how-coding/diagram.svg" alt="How the mechanism works" loading="lazy" /><figcaption>How the mechanism works</figcaption></figure>
+
+<figure><img src="/posts/how-coding/v1-svg-en.jpg" alt="Every turn resends everything that came before, so a vague name costs you turns, not just lines (loop per Tau, search per Modem)" loading="lazy" /><figcaption>Every turn resends everything that came before, so a vague name costs you turns, not just lines (loop per Tau, search per Modem)</figcaption></figure>
+
+## Example: one name, four files
+
+Modem show something else: agents also search by file name. Ask "how does the session broker work" and the agent will look for files with names like session broker. If the logic lives in `utils/helpers2.ts`, it won't find it on the first try.
+
+Now picture a function called `format` or `handle`. rg returns hundreds of hits. The agent has to open each file to tell a definition from a call from a copy someone pasted. Their post says that when they tested their code with these rules, they saw fewer tokens and fewer turns spent on code search. They also caught more bugs and got fewer wrong answers stated with full confidence. Those are their numbers on their repo, but the direction is pretty clear.
+
+<figure><img src="/posts/how-coding/src3.jpg" alt="A 680K-line repo, and an agent that navigates it with text search. Names are the only index it has (credit: Modem)" loading="lazy" /><figcaption>A 680K-line repo, and an agent that navigates it with text search. Names are the only index it has (credit: Modem)</figcaption></figure>
+
+## Writing code the agent can find
+
+Use unique, searchable names. Call it `formatDurationForSlack`, not `format`. A unique name takes one search instead of five.
+
+Name files after what's in them. Use `session-broker.ts`, not `manager.ts`, because the agent also searches by file name.
+
+Write explicit types. A good signature means the agent doesn't have to chase the implementation to learn what the function returns.
+
+Put the explanation next to the code, not in the wiki. The agent can't see your Confluence. It sees what rg returns.
+
+To get started, here's a script that finds names defined in more than one place. Those are the names that send the agent on a tour of the whole repo:
+
+```bash title="name-collisions.sh"
+#!/usr/bin/env bash
+# exported names defined in more than one place
+rg -o --no-filename -t ts \
+  'export\s+(?:async\s+)?(?:function|const|class)\s+(\w+)' -r '$1' \
+  | sort | uniq -c | sort -rn | awk '$1 > 1' | head -20
+```
+
+You get back a list of names, each with its number of definitions. Any name with 3 or more is a candidate for renaming this week.
+
+> **My take:** I don't buy the "the model will figure it out" argument. The model only understands what the harness gave it, and the harness gives it whatever grep found. Good names are the cheapest and most deterministic thing you can add to the loop.
+
+## Two agents, or one
+
+On September 28, 2026, Bounds published Rescue '82, a Choplifter-inspired game for Vision Pro built with two agents. Astra in Codex handled planning, system boundaries and tough review. Opus 5.5 in Claude Code handled the implementation and the fixes to the 3D model. The author says the cross-checking improved the visual quality.
+
+It has a cost, though. You get more context, more review, and sometimes two agents working from conflicting assumptions. To save tokens, he hands Opus a structured brief, only the relevant spec files, and the findings from the planning session. He also says himself that he has no controlled token comparison. Good on him for saying so.
+
+In short, one agent is enough for a small task in one file. Two agents pay off when there's a real planning phase and review is what's blocking you.
+
+## What to try this week
+
+- Run `name-collisions.sh` and rename the top five names on the list.
+- Open a session on a real bug and watch the tool calls. Count the turns before the first edit. That's the number you want to bring down.
+- Add an `AGENTS.md` or `CLAUDE.md` at the repo root with the exact command for running tests and a map of the main directories.
+- If you want to see the loop for yourself, read Tau. Its authors say you can read the whole agent in an afternoon.
+
+The agent doesn't read your code. It searches it. Write accordingly.

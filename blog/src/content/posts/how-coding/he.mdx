@@ -1,0 +1,102 @@
+---
+title: "איך coding agent באמת עובד: לולאה, ripgrep ושמות של פונקציות"
+description: "מתחת ל-Claude Code ו-Codex יש לולאה פשוטה ו-rg. ככה זה עובד צעד אחרי צעד, ומה לשנות בקוד שלכם כדי שה-agent ימצא אותו מהר יותר."
+lang: he
+key: how-coding
+term: "how coding"
+kind: explainer
+pubDate: 2026-11-19
+tags: ["coding-agents", "agent-loop", "ripgrep", "harness", "developer-tools"]
+hook: "scene"
+cover: type
+tldr: ["תריצו סקריפט rg שמוצא שמות שמוגדרים יותר מפעם אחת, ותשנו אותם.", "תספרו כמה turns עוברים עד העריכה הראשונה. זה המדד שלכם.", "תוסיפו AGENTS.md עם פקודת הטסטים ומפה של התיקיות."]
+hero: /posts/how-coding/hero.jpg
+diagram: /posts/how-coding/diagram.svg
+sources:
+  - { title: "how coding harnesses are used, an introspection", url: "https://research.tamarillo.ai/coding-harness-inspection", date: "2026-05-19" }
+  - { title: "Tau – Learn how coding agents are built", url: "https://twotimespi.dev", date: "2026-06-30" }
+  - { title: "How coding agents read your code (and how to write for them)", url: "https://modem.dev/blog/how-coding-agents-read-your-code", date: "2026-07-20" }
+  - { title: "Show HN: 80s Choplifter game ported to Vision Pro as an agent eval (WIP)", url: "https://www.bounds.dev/posts/rescue82-making-a-choplifter-style-game-for-apple-vision-pro", date: "2026-10-03" }
+  - { title: "From Copilot to agents: The history of AI coding", url: "https://www.coderabbit.ai/blog/a-very-brief-history-of-ai-coding-from-copilot-to-next-gen-agents", date: "" }
+opinion: "אנחנו לא מתרגשים מהמונח coding agent. בפועל זו לולאה, כמה כלים ו-grep: הנדסה ישנה עם מודל בפנים, וזה בסדר. מה שמשנה ביומיום זו המערכת סביב המודל: מה הוא רואה, במה הוא יכול לגעת ואיך בודקים את מה שהוא עשה. ה-agent הכי טוב שראינו הוא זה שהלולאה שלו נגמרת בטסט ירוק, ולא בתשובה שבטוחה בעצמה. ושם פונקציה טוב הוא דטרמיניזם זול: אף מודל לא צריך לנחש מה format עושה אם קוראים לו formatDurationForSlack."
+madeWith: { model: "claude-opus-5-5", sourceCount: 5, reviewedBy: "Koby Almog" }
+---
+
+20 ביולי 2026. בצוות של Modem מפרסמים פוסט ומראים session אמיתי מהריפו שלהם: Claude Code צריך למצוא איפה משתמשים ב-`formatDuration`. מדובר על 360 אלף שורות TypeScript ועוד 320 אלף שורות טסטים, ו-99.9% מהן נכתבו על ידי LLM. מה ה-agent מריץ? לא index סמנטי ולא embeddings. הוא מריץ `rg -l 'formatDuration' --type ts`. ripgrep, אותו כלי שיש לכם בטרמינל.
+
+בגדול, זה כל הסוד. ה-agent שכתב כמעט 700 אלף שורות קוד מחפש בתוכן כמו מתכנת עם grep. וכשמבינים את זה, ברור גם מה לשנות בקוד שלכם.
+
+## מ-autocomplete ללולאה
+
+Copilot הוכרז ב-29 ביוני 2021. שבוע אחרי, ב-7 ביולי, OpenAI פרסמו את המאמר על Codex, המודל שעבד מאחוריו. זה היה autocomplete חכם: הוא הציע שורה, לפעמים פונקציה שלמה. את הקובץ הנכון עדיין מצאתם לבד, את הטסטים הרצתם לבד, ואתם החלטתם מה עושים אחרי שמשהו נפל.
+
+coding agent זה הצעד הבא. אף אחד לא המציא את המונח, הוא פשוט תפס. ההגדרה הכי נקייה שמצאתי באה דווקא מפרויקט קטן, Tau, agent בפייתון שנכתב כדי שיקראו את הקוד שלו:
+
+> A coding agent is a language model run in a loop, where each reply may ask for a tool — read a file, edit it, run a command — and each tool result is fed back as the next input. The loop stops when the model answers without asking for anything.
+>
+> — Tau, twotimespi.dev
+
+זהו. sessions, skills, ה-UI בטרמינל, כל אלה בנויים מסביב ללולאה, לא בתוכה. ומה זה לא: זה לא מודל חכם יותר. זה אותו מודל, רק עם ידיים. לכל מה שמסביב למודל קוראים היום harness. Tamarillo סרקו במאי 2026 כ-400 אלף ריפואים ציבוריים ב-GitHub שיש בהם קבצי קונפיגורציה של harness. חמישה כלים מתוך כ-20 (Claude Code, Codex, Copilot, Cursor ו-Hermes) מופיעים בכ-80% מהם.
+
+## מה קורה בסיבוב אחד, צעד אחרי צעד
+
+קודם כל, אתם כותבים משימה. ה-harness שולח אותה למודל, ביחד עם system prompt ורשימת כלים. כל כלי הוא חצי schema וחצי פונקציה: שם, תיאור, פרמטרים ב-JSON שהמודל קורא, ופונקציה async רגילה שרצה בפועל. ב-Tau אפשר לראות את זה ב-20 שורות.
+
+אז המודל לא עונה. הוא מבקש כלי: `rg -l 'formatDuration' --type ts`. ה-harness מריץ את הפקודה ומחזיר את הפלט כהודעה הבאה. אצל Modem חזרו ארבעה נתיבים ויותר: ההגדרה ב-`packages/common`, הטסט שלה, קובץ ב-dashboard וקובץ ב-slack.
+
+אחרי זה המודל פותח קבצים, עורך ומריץ טסטים. אם טסט נופל, ה-stack trace חוזר פנימה כ-input. הלולאה נעצרת רק כשהמודל עונה בלי לבקש שום כלי.
+
+רגע, למה זה חשוב? כי כל תוצאה נשארת ב-context, וכל סיבוב שולח מחדש את כל מה שהיה בסיבובים הקודמים. חיפוש שמחזיר 40 קבצים במקום 4 לא עולה רק שורות. הוא מוסיף סיבובים.
+
+<figure><img src="/posts/how-coding/diagram.svg" alt="איך המנגנון עובד" loading="lazy" /><figcaption>איך המנגנון עובד</figcaption></figure>
+
+<figure><img src="/posts/how-coding/v1-svg-he.jpg" alt="כל סיבוב שולח מחדש את כל מה שהיה קודם, ולכן שם עמום עולה סיבובים ולא רק שורות (הלולאה לפי Tau, החיפוש לפי Modem)" loading="lazy" /><figcaption>כל סיבוב שולח מחדש את כל מה שהיה קודם, ולכן שם עמום עולה סיבובים ולא רק שורות (הלולאה לפי Tau, החיפוש לפי Modem)</figcaption></figure>
+
+## דוגמה: שם אחד, ארבעה קבצים
+
+Modem מראים עוד משהו: agents מחפשים גם לפי שם קובץ. אם תשאלו "how does the session broker work", ה-agent יחפש בריפו קבצים שהשם שלהם דומה ל-session broker. אם הלוגיקה יושבת ב-`utils/helpers2.ts`, הוא פשוט לא ימצא אותה בניסיון הראשון.
+
+עכשיו תחשבו על פונקציה בשם `format` או `handle`. ה-rg מחזיר מאות תוצאות, וה-agent צריך לפתוח כל קובץ כדי להבין מה הגדרה, מה קריאה ומה עותק שמישהו הדביק. לפי הפוסט שלהם, כשהם הריצו בדיקות על הקוד שלהם עם הכללים האלה, יצאו פחות טוקנים ופחות turns על חיפוש קוד, יותר באגים נתפסו, והיו פחות תשובות שגויות שנאמרו בביטחון מלא. אלה המספרים שלהם, על הריפו שלהם, אבל הכיוון די ברור.
+
+<figure><img src="/posts/how-coding/src3.jpg" alt="ריפו של 680 אלף שורות, ו-agent שמנווט בו עם חיפוש טקסט. שמות הם ה-index היחיד שיש לו (credit: Modem)" loading="lazy" /><figcaption>ריפו של 680 אלף שורות, ו-agent שמנווט בו עם חיפוש טקסט. שמות הם ה-index היחיד שיש לו (credit: Modem)</figcaption></figure>
+
+## איך לכתוב קוד שה-agent מוצא
+
+תנו שמות ייחודיים שאפשר לחפש. `formatDurationForSlack` ולא `format`. שם ייחודי זה חיפוש אחד במקום חמישה.
+
+תנו לקבצים שמות שמתארים מה יש בהם. `session-broker.ts` ולא `manager.ts`, כי ה-agent מחפש גם לפי שם הקובץ.
+
+תכתבו טייפים מפורשים. חתימה טובה חוסכת ל-agent לרדוף אחרי ה-implementation כדי להבין מה חוזר מהפונקציה.
+
+ותשימו את ההסבר ליד הקוד, לא בוויקי. ה-agent לא רואה את ה-Confluence שלכם. הוא רואה את מה ש-rg מחזיר.
+
+כדי להתחיל, הנה סקריפט שמוצא שמות שמוגדרים ביותר ממקום אחד, בדיוק אלה ששולחים את ה-agent לסיבוב בכל הריפו:
+
+```bash title="name-collisions.sh"
+#!/usr/bin/env bash
+# exported names defined in more than one place
+rg -o --no-filename -t ts \
+  'export\s+(?:async\s+)?(?:function|const|class)\s+(\w+)' -r '$1' \
+  | sort | uniq -c | sort -rn | awk '$1 > 1' | head -20
+```
+
+מה שחוזר הוא רשימת שמות עם מספר ההגדרות של כל אחד. כל שם עם 3 ומעלה הוא מועמד לשינוי שם השבוע.
+
+> **הדעה שלי:** אני לא קונה את הטענה ש"המודל כבר יבין לבד". המודל מבין מה שה-harness הביא לו, ומה שה-harness הביא תלוי במה ש-grep מצא. שמות טובים הם הדבר הכי דטרמיניסטי וזול שאפשר להוסיף ללולאה.
+
+## שני agents, או אחד
+
+ב-28 בספטמבר 2026 Bounds פרסמו את Rescue '82, גרסה בהשראת Choplifter ל-Vision Pro, שנבנתה עם שני agents. Astra ב-Codex עשה תכנון, גבולות מערכת ו-review קשוח. Opus 5.5 ב-Claude Code עשה את המימוש ואת התיקונים במודל התלת-ממדי. לפי הכותב, הבדיקה ההדדית שיפרה את האיכות הוויזואלית.
+
+מה שכן, יש לזה מחיר: יותר context, יותר review, ולפעמים שני agents עם הנחות סותרות. השיטה שלו לחסוך טוקנים היא להעביר ל-Opus brief מסודר, רק את קבצי ה-spec הרלוונטיים, ואת הממצאים מה-session של התכנון. והוא כותב בעצמו שאין לו השוואת טוקנים מבוקרת. יפה שהוא אומר את זה.
+
+בקיצור: למשימה קטנה בקובץ אחד, agent אחד מספיק. שני agents משתלמים כשיש שלב תכנון אמיתי וה-review הוא מה שתוקע אתכם.
+
+## מה לנסות השבוע
+
+- תריצו את `name-collisions.sh` ותשנו את השמות של חמשת הראשונים ברשימה.
+- תפתחו session על באג אמיתי ותסתכלו על ה-tool calls. תספרו כמה turns עוברים עד העריכה הראשונה. זה המספר שאתם רוצים להוריד.
+- תוסיפו `AGENTS.md` או `CLAUDE.md` בשורש הריפו, עם הפקודה המדויקת להרצת טסטים ומפה של התיקיות הראשיות.
+- אם אתם רוצים לראות את הלולאה בעיניים, תקראו את Tau. לפי הכותבים, זה agent שאפשר לקרוא תוך אחר צהריים אחד.
+
+ה-agent לא קורא את הקוד שלכם. הוא מחפש אותו. תכתבו בהתאם.

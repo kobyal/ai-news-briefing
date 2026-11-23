@@ -1,0 +1,359 @@
+[0:00] .
+[0:07] All right. Hi, everyone. Excited to be here.
+[0:15] Today I'm going to chat about the evolution of software engineering
+[0:21] and how it's becoming factory engineering. So, excited to do this.
+[0:24] First, a little bit about me. I've been an engineer for a long time.
+[0:29] I was a principal engineer at Google.
+[0:31] I used to lead engineering on the Google Docs suite,
+[0:35] helped scale that product to hundreds of millions of users.
+[0:38] I'm currently the founder and CEO of Warp.
+[0:41] Warp builds a platform for companies
+[0:44] to build their own internal software factories.
+[0:47] I'm going to show a little bit of that today.
+[0:50] Warp is also well known for our open source agentic terminal.
+[0:54] It has about 65,000 GitHub stars.
+[0:57] It's used by almost a million developers.
+[1:00] Our mission has always been helping developers
+[1:02] ship better software more quickly,
+[1:04] and it's cool to evolve what we're doing
+[1:06] as the world changes around us.
+[1:09] This is where I think we're still mostly at.
+[1:13] Most developers that I talk to, most platform teams,
+[1:19] they're working with individuals
+[1:21] who are running their own coding agents locally.
+[1:24] Maybe they're running multiple of them at a time.
+[1:28] Could be through their terminal,
+[1:29] it could be through an agentic development environment.
+[1:33] Just show of hands quickly actually.
+[1:34] How many people in here are mostly working
+[1:37] in this fashion, local multi-threading?
+[1:41] Okay, so still most people, but actually not everyone.
+[1:45] I think that this is gonna change
+[1:47] and it's starting to change already.
+[1:50] The reasons are, there's a few of them.
+[1:53] So one is like if you are doing local interactive prompting
+[1:56] as your main way of working with coding agents,
+[2:00] you're kind of limited by human throughput really.
+[2:03] Like you cannot automate if every agent
+[2:07] needs to be interactively prompted.
+[2:09] There's a second reason too that I hear a lot
+[2:11] from platform teams and from engineering leaders.
+[2:16] This mechanism of like everyone choosing
+[2:18] their own local setup, their own models, their own skills,
+[2:22] makes it very hard to actually make sure that you're using these agents efficiently from
+[2:27] like a cost perspective and a productivity perspective.
+[2:31] And then finally, there's like a big security problem and governance problem when everyone
+[2:36] is setting up and running their own local agents.
+[2:38] And so the thing that is coming, I loosely call a software factory, that means different
+[2:45] things to different people.
+[2:47] I would, well, I'm curious for people in this room,
+[2:51] like how many folks are currently trying to build
+[2:54] or building or using their own internal software factories?
+[2:57] Show of hands.
+[2:59] Okay, so I would say that's almost more
+[3:01] than the interactive agents at this point.
+[3:03] That's super cool.
+[3:05] So I'm gonna define what I think of as a software factory,
+[3:09] but I'll start by saying what I think
+[3:11] a software factory is not.
+[3:13] I think it's not just a loose set of automations.
+[3:18] I don't think of a software factory
+[3:20] as a collection of AI teammates.
+[3:23] I don't think it's a shared set of skills and MCPs.
+[3:27] And I also don't think software factories
+[3:28] are personal agent swarms.
+[3:30] I think these are all useful primitives,
+[3:32] but they're not the end state
+[3:35] that we should be shooting for.
+[3:38] And so to me, the way that I define software factory
+[3:41] is very specific, and I'll unpack this.
+[3:45] But I define it as a code-defined closed-loop system
+[3:49] for continuously measuring and improving cloud coding agents.
+[3:53] That's a mouthful, but let me unpack it.
+[3:56] So if you want to build a software factory and really
+[3:59] scale it, I believe the first thing you need to do
+[4:02] is fully encode it in a declarative language.
+[4:06] So you need to say, OK, these are all of the coding agents
+[4:11] that I want to run.
+[4:12] These are how they're triggered.
+[4:14] When work comes into this factory,
+[4:16] this is the workflow from triage to spec.
+[4:19] Whatever your workflow is, you need
+[4:21] to specify what MCPs are available, where your agents
+[4:25] run, really as much as you can in a Terraform style declarative
+[4:32] set of code files that define your factory.
+[4:34] I'll talk about why this matters in a bit.
+[4:37] The second part of it is a continuous closed
+[4:39] loop of improvement.
+[4:41] And that closed loop can look something like this.
+[4:44] This is the typical one.
+[4:45] This is just really the SDLC, where you have ideas that
+[4:49] come in from people.
+[4:52] They could come in from automated signals.
+[4:54] And then your agents do some amount of work
+[4:57] taking that issue through various stages,
+[5:00] from triage to implementation, verification, monitoring,
+[5:03] and so on.
+[5:05] The important piece here is really this closed loop concept,
+[5:08] where the more that your agents run,
+[5:11] the more efficient you can make this loop.
+[5:14] And I'll talk about how you do that in a second.
+[5:17] The third really key aspect, if you're building a software
+[5:20] factory, is that everything needs to be measurable.
+[5:24] If you're just going on vibes in terms of how you deploy coding
+[5:27] agents, you can't be confident that you're actually
+[5:31] getting the best, highest quality outputs at the best cost.
+[5:36] You can't be confident you're maximizing throughput.
+[5:38] So you really need a measurement mindset and measurement capabilities.
+[5:43] And so if there's one thing that I'm hoping people walk away from this talk with,
+[5:48] it's the idea that the way to work with coding agents and
+[5:52] the way to think about them is that there's a really cool fundamental new
+[5:57] engineering problem, which is how do you take this magic new primitive that we all
+[6:03] have, that we've gotten the last year, that you have these intelligent agents,
+[6:07] And how do you engineer a system around them to use them most effectively?
+[6:13] To me, it's not about growing a garden or following a recipe.
+[6:18] We're all engineers.
+[6:20] We've spent our careers learning how to solve problems from an engineering mindset.
+[6:24] And when you think of coding agents as a new engineering primitive, then you'll naturally
+[6:32] start to build a certain way of using them.
+[6:34] That's the mindset.
+[6:35] So yeah, just to unpack that a bit, so there's continual measurement and continual learning,
+[6:43] but there's also a new set of tools.
+[6:46] And so when I was learning how to become a better engineer at Google, I really had to
+[6:52] get good at using things like debuggers and profilers and Chrome DevTools, and basically
+[6:58] there were all of these tools of the trade for building software by hand that maybe are
+[7:02] are not as important now, but they really separated
+[7:07] the best engineers from the okay engineers.
+[7:10] And in the new world of factory engineering,
+[7:13] there's a new set of tools
+[7:15] that everyone should be trying to master.
+[7:17] And so those are things like evals,
+[7:20] can you set up self-improvement loops that work?
+[7:24] Can you write benchmarks?
+[7:26] Can you A, B test your factory?
+[7:29] And that's a really important skillset,
+[7:31] And mastering that skill set is something
+[7:34] that I think of as factory engineering.
+[7:38] Now, that doesn't mean that that's
+[7:40] the only kind of engineering you're going to be doing.
+[7:42] You're still going to be doing product engineering,
+[7:44] meaning you as an engineer should still
+[7:48] feel responsible for does the product you ship actually
+[7:53] solve a real user or customer problem.
+[7:56] But the best engineers, and I would say every engineer really,
+[8:00] is going to need to learn this new tool set of how
+[8:02] do you improve the system, not just build the product.
+[8:07] And so what does that look like?
+[8:09] If you think from first principles
+[8:11] about how do you engineer an agentic system,
+[8:15] I think you come up with something like this.
+[8:16] It doesn't have to be exactly this,
+[8:18] but it's kind of an infrastructure stack
+[8:21] that you're going to want to use to engineer your agents.
+[8:24] And so at the bottom of this is what I call factories is code.
+[8:28] I talked about this earlier.
+[8:29] It's defining all of your coding agent workflows
+[8:33] in a code format.
+[8:34] And the value of that is that you get the ability
+[8:37] to branch off it and test different factory
+[8:39] configurations.
+[8:41] You can roll back.
+[8:43] And then, crucially, it opens up the way for self-improvement,
+[8:47] which is the ability for coding agents themselves
+[8:50] that suggest changes to how your factory works
+[8:54] to get that continual loop going.
+[8:56] Above that is a layer of data and context.
+[8:59] This is also crucial.
+[9:01] So if you are running coding agents
+[9:03] at scale in an organization, you really
+[9:07] must be recording everything that those agents are producing.
+[9:10] So all of their conversations, all their artifacts,
+[9:13] the videos that they make, the screenshots.
+[9:17] And the reason for doing that is that's the raw material
+[9:20] that you will use to improve the way your factory works
+[9:23] over time.
+[9:25] On top of that is a compute layer.
+[9:27] So you need to have sandboxing.
+[9:29] Sandboxing increases security.
+[9:32] It makes your factory more repeatable.
+[9:34] Your sandboxing should be probably multi-platform.
+[9:37] On top of that is the inference layer.
+[9:39] The way that I would think about inference and models
+[9:43] in a factory is they are a degree of freedom to test.
+[9:47] And so your factory, however you build it,
+[9:50] should support multiple models.
+[9:53] It should also support multiple coding agents, because Cloud
+[9:57] Code might be better for some things.
+[9:58] Codex, Pi, Warp, these harnesses all
+[10:02] have different properties.
+[10:03] You might want to write your own coding agent harness
+[10:05] that has some of your organizational context baked in.
+[10:08] So your platform should support that.
+[10:10] On top of that, you need an orchestration layer.
+[10:13] So this is what actually moves work through the factory.
+[10:16] In some ways, the least interesting part, but you need that.
+[10:19] And then finally, your factory should be all API and MCP
+[10:23] first so that it can be used not just by people,
+[10:27] but it can be used by other coding agents.
+[10:30] And it can go to where the work is being done.
+[10:32] So your factory should integrate into things
+[10:35] like Slack, Linear, Jira, GitHub, and so on.
+[10:40] I'm going to give a quick demo of what some of these tools
+[10:43] look like in the context of warp factories.
+[10:45] But this stuff I'm going to show, I think,
+[10:48] applies also if you're building your own.
+[10:53] So let me start here.
+[10:55] So at the foundation I mentioned earlier
+[11:00] is factories in code.
+[11:01] And so I'm going to show some code.
+[11:03] It's not going to be that interesting.
+[11:04] But if you're familiar with something like Terraform,
+[11:07] you will get what's going on here.
+[11:10] You basically want a declarative way of saying,
+[11:13] this is my factory.
+[11:15] My factory has certain policies.
+[11:18] It accesses certain repos.
+[11:20] It has certain triggers.
+[11:22] It has a sort of blueprint that defines the workflow of work
+[11:25] going through it.
+[11:27] And then if you zoom out, all of these other things
+[11:29] that are part of the factory also have code definitions.
+[11:34] The second thing, moving up a layer,
+[11:36] is the idea that everything that you do
+[11:45] in the factory should be tracked across your entire team.
+[11:52] And so think of what I'm showing here.
+[11:55] Is this is a sort of Google Docs style live view
+[11:58] of what every coding agent on Warp's team across all
+[12:02] of our engineers are doing at all times.
+[12:04] And so I could click it, and I could see, OK,
+[12:07] I don't know what Maggie is working on,
+[12:08] but I know I could look at it.
+[12:10] She's implementing Opus 5.5 on the high plan.
+[12:13] She's doing it from Slack.
+[12:14] It has this artifact.
+[12:16] I could look in and see the actual conversation here.
+[12:18] I could see what it's generated.
+[12:21] And so I could see this in real time, which is cool.
+[12:23] But the really important thing is that you
+[12:25] gather all this information so that it can be used
+[12:28] for improving the factory.
+[12:31] And so that brings me to the third thing, moving up
+[12:35] the stack here, is once you have all of this information that's
+[12:38] being stored centrally, you get the ability very easily,
+[12:43] without doing any install stuff on everybody's laptop,
+[12:46] anything like that, to understand how these coding agents are
+[12:51] working.
+[12:52] And you can think of that in terms of traditional output
+[12:54] metrics, like your DORA metrics, like cycle time.
+[12:58] But you can also think of that in terms of how automated am I,
+[13:01] like how many human interactions per PR, what's your throughput.
+[13:07] You should be able to see data very clearly here
+[13:10] on what's your cost.
+[13:12] And again, surfacing this, if you don't have this data,
+[13:16] you're kind of flying blind.
+[13:21] So this is really important.
+[13:23] And then there's this next layer of data, which is also really
+[13:27] important that I mentioned earlier,
+[13:29] which is the ability to set up online evals that
+[13:32] run across all your coding agent sessions.
+[13:34] And so what I mean by this, an eval is just
+[13:37] like as these coding agent sessions are running
+[13:40] and they're recording their output,
+[13:41] you want the ability to go back and have another agent look
+[13:46] at them and score them on some dimension that
+[13:49] might indicate how well they're doing.
+[13:52] And to make that more concrete, so it's
+[13:54] like we have an eval, a score here
+[13:57] that we use that is looking for redundant tests.
+[13:59] This is a good example.
+[14:01] And so one common failure mode of coding agents
+[14:03] is that sometimes they will write tests that are unnecessary.
+[14:07] We want to catch that, and that's what this eval does.
+[14:10] We want the ability then to see, OK, when it's writing too many tests,
+[14:16] why is it doing that?
+[14:17] And is there a mechanism that we could change in the factory
+[14:21] for improving that?
+[14:23] And so again, just to kind of recap here,
+[14:26] you want a way of recording all the runs.
+[14:30] When these runs run, I didn't show this,
+[14:32] But all of the runs are, you know, you
+[14:35] want a way of specifying what is the sort of actual loop
+[14:40] that they're running through.
+[14:42] You want to be able to see where they are in that loop.
+[14:44] As the runs work, you want to be able to gather their data.
+[14:48] Once you gather their data, you want
+[14:50] to be able to set up these online evals.
+[14:53] And then these online evals give you
+[14:54] a sense of, like, OK, where are there opportunities
+[14:56] for improvement?
+[14:57] Once you have that in place, you can do something
+[15:01] that we call self-improvement, which is rather than having
+[15:03] humans look at the outputs of these scorers,
+[15:06] you have agents look at the output.
+[15:08] And so the way to think about self-improvement
+[15:11] is it looks at the score output.
+[15:14] It says, OK, we saw some number of failed runs.
+[15:19] Let's try to look for patterns in those failures
+[15:23] and suggest a possible solution.
+[15:27] And then the form that that solution takes
+[15:30] is as a PR against your factory definition.
+[15:36] And so this is the awesome thing about having your factory
+[15:40] defined as code and being able to use coding agents
+[15:42] is that you can then have the coding agents diagnose
+[15:45] problems with how they're working internally
+[15:48] and suggest fixes to them.
+[15:51] The final tool that I'm going to point out
+[15:53] that I mentioned earlier is the ability
+[15:55] to create and run benchmarks.
+[15:57] This is also essential.
+[15:59] So if you're following this course online,
+[16:02] you'll often see things like, OK, this is the best model.
+[16:04] This is the new best skill.
+[16:06] This is the best harness.
+[16:07] The only way to answer those questions for real
+[16:10] is to test on your own data.
+[16:13] And so you should have in place some mechanism
+[16:15] where you can basically create a benchmark set out
+[16:18] of your real data and then replay those tasks
+[16:25] Oops, I'm on the wrong one here.
+[16:27] And replay those tasks against different configurations
+[16:31] to see how they would have done if you had varied some model
+[16:35] or varied some harness or varied your factory configuration.
+[16:39] So just to make this clear, this is something
+[16:46] that looks like what you might get when a new model drops,
+[16:50] like in Sweebench or Terminal Bench.
+[16:53] It's showing the trade-offs of different models here
+[16:55] in terms of cost and quality.
+[16:57] You want to be in this upper left-hand quadrant.
+[17:00] But it's on your own actual data.
+[17:03] And you can test not just models,
+[17:05] but also you want to be able to test, hey,
+[17:06] if I got rid of these skills, does my factory
+[17:08] perform better or worse?
+[17:10] So these are some of the tools.
+[17:14] And just to return to this big concept,
+[17:16] this has worked well for us.
+[17:18] We have managed to use these tools to drastically
+[17:22] improve our throughput and lower our cost.
+[17:25] We are just constantly doing this because this cost really
+[17:28] matters to us, where we're getting a performance baseline,
+[17:32] we're scoring, we're benchmarking, we're testing,
+[17:35] and we're doing factory engineering.
+[17:37] And so that brings me back to this last point
+[17:40] that I just want to emphasize again.
+[17:42] Engineer your agents.
+[17:44] It's a new engineering primitive.
+[17:45] We're all engineers.
+[17:47] Think about how you can get the most out of them
+[17:49] and build the system for that.
+[17:51] I think this is very exciting.
+[17:53] I know there's a lot of angst around what it means
+[17:57] to be an engineer right now.
+[17:59] I know we're not writing code, but I'm still
+[18:01] using all the engineering skills that I spent my whole career
+[18:04] learning.
+[18:04] And so to me, it's still a really exciting time.
+[18:07] If you're interested in Warp Factories,
+[18:09] you can check it out here.
+[18:11] Thank you all for coming to the talk.
+[18:21] Thank you.
